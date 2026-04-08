@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{nav.materials.profit_calculation} + ' - ' + #{app.title}">Profitberechnung - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style>
+            .filter-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+                align-items: flex-end;
+            }
+            .filter-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                min-width: 250px;
+            }
+            .filter-group label {
+                font-family: var(--font-body);
+                font-size: 0.9rem;
+                color: var(--color-primary);
+                text-transform: none;
+            }
+            .filter-group select, .filter-group input:not([type="checkbox"]) {
+                width: 100%;
+                background-color: var(--color-gray-4);
+                border: 1px solid var(--color-gray-3);
+                color: var(--color-gray-1);
+                padding: 0.25rem 0.5rem;
+                font-family: var(--font-body);
+                outline: none;
+                height: 32px;
+                box-sizing: border-box;
+                font-size: 0.9rem;
+            }
+            .filter-group select:hover, .filter-group input:not([type="checkbox"]):hover {
+                border-color: var(--color-primary);
+            }
+            
+            /* Multi-select styling from materials-overview.html */
+            .multi-select-container {
+                position: relative;
+                width: 100%;
+                font-family: var(--font-body);
+            }
+            .multi-select-header {
+                background-color: var(--color-gray-4);
+                color: var(--color-gray-1);
+                border: 1px solid var(--color-gray-3);
+                padding: 0.25rem 0.5rem;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                user-select: none;
+                transition: border-color 0.2s;
+                height: 32px;
+                box-sizing: border-box;
+                font-size: 0.9rem;
+            }
+            .multi-select-header:hover {
+                border-color: var(--color-primary);
+            }
+            .multi-select-header::after {
+                content: '▼';
+                font-size: 0.7em;
+                margin-left: 0.5rem;
+            }
+            .multi-select-options {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background-color: var(--color-gray-4);
+                border: 1px solid var(--color-primary);
+                border-top: none;
+                max-height: 300px;
+                overflow-y: auto;
+                z-index: 100;
+                display: none;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            }
+            .multi-select-options.open {
+                display: block;
+            }
+            .multi-select-option {
+                padding: 0.5rem 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.5rem;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                color: var(--color-gray-1);
+                margin-bottom: 0;
+                font-family: var(--font-body);
+            }
+            .multi-select-option:hover {
+                background-color: var(--color-gray-3);
+            }
+            .multi-select-option input[type="checkbox"] {
+                margin: 0;
+                flex-shrink: 0;
+            }
+            .selected-text {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Table styling matching materials-overview.html */
+            .table-wrapper {
+                overflow-x: auto;
+                max-height: 70vh;
+                overflow-y: auto;
+                border: 1px solid var(--color-gray-3);
+                margin-top: 1rem;
+            }
+
+            .matrix-table {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                white-space: nowrap;
+                font-family: var(--font-body);
+                margin: 0;
+            }
+
+            .matrix-table th, .matrix-table td {
+                padding: 0.75rem;
+                text-align: left;
+                border-bottom: 1px solid var(--color-gray-3);
+                border-right: 1px solid var(--color-gray-3);
+            }
+
+            .matrix-table th {
+                color: var(--color-primary);
+                font-family: var(--font-body);
+                font-weight: bold;
+                font-size: 0.85rem;
+                position: sticky;
+                top: 0;
+                background-color: var(--color-gray-4);
+                z-index: 20;
+                background-clip: padding-box;
+                text-transform: uppercase;
+            }
+
+            .matrix-table th:first-child, .matrix-table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: var(--color-gray-4);
+                z-index: 11;
+                font-weight: bold;
+                color: var(--color-primary);
+                border-right: 2px solid var(--color-primary);
+                background-clip: padding-box;
+                text-align: left;
+            }
+
+            .matrix-table th:first-child {
+                z-index: 30;
+            }
+
+            .matrix-table td {
+                color: var(--color-gray-1);
+                font-family: monospace;
+                text-align: right;
+                font-size: 0.9rem;
+            }
+
+            .matrix-table tr:hover td {
+                background-color: rgba(231, 126, 35, 0.05);
+            }
+
+            .matrix-table td.numeric {
+                text-align: right;
+            }
+
+            .sortable-header {
+                cursor: pointer;
+                user-select: none;
+                transition: color 0.2s;
+            }
+
+            .sortable-header:hover {
+                color: var(--color-primary);
+            }
+
+            .sort-icon {
+                margin-left: 0.5rem;
+                color: var(--color-gray-2);
+                font-size: 0.8em;
+                display: inline-block;
+                width: 1em;
+                text-align: center;
+            }
+
+            .system-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-top: 0.5rem;
+            }
+            .system-tag {
+                background-color: var(--color-gray-3);
+                color: var(--color-gray-1);
+                padding: 0.2rem 0.5rem;
+                font-size: 0.75rem;
+                border-radius: 2px;
+                display: flex;
+                align-items: center;
+                gap: 0.3rem;
+            }
+            .system-tag .remove {
+                cursor: pointer;
+                color: var(--color-primary);
+                font-weight: bold;
+            }
+            @media (max-width: 768px) {
+                .filter-group {
+                    min-width: 100%;
+                }
+            }
+        </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{nav.materials.profit_calculation}">Profitberechnung</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div class="filter-container">
+            <div class="filter-group">
+                <label for="shipSelect" th:text="#{profit.filter.ship}">Schiff wählen</label>
+                <select id="shipSelect" onchange="updateProfitCalculation()">
+                    <option value="" th:text="#{profit.filter.ship.placeholder}">-- Schiff wählen --</option>
+                    <option th:each="ship : ${shipTypes}" 
+                            th:value="${ship.id}" 
+                            th:selected="${ship.id == defaultShipId}"
+                            th:text="${ship.name} + ' (' + (${ship.scu} ?: '0') + ' SCU)'"></option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label th:text="#{profit.filter.systems}">Systeme einschränken</label>
+                <div class="multi-select-container" id="systemFilterContainer">
+                    <div class="multi-select-header" onclick="toggleMultiSelect('systemOptions')" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
+                        <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
+                    </div>
+                    <div class="multi-select-options" id="systemOptions">
+                        <label class="multi-select-option">
+                            <span th:text="#{filter.all}">Alle</span>
+                            <input type="checkbox" id="sysAll" value="ALL" checked onchange="toggleSelectAll('sysAll', 'sysCheck', 'systemHeader'); updateProfitCalculation();">
+                        </label>
+                        <label class="multi-select-option" th:each="sys : ${starSystems}">
+                            <span th:text="${sys}">System</span>
+                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked onchange="updateSelectState('sysAll', 'sysCheck', 'systemHeader'); updateProfitCalculation();">
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="flex-grow: 1; text-align: right;">
+                <p style="font-size: 0.8rem; color: var(--color-gray-2); margin: 0;">
+                    <span th:text="#{profit.info.autoload}">Berücksichtigt nur Auto-Load Terminals.</span><br>
+                    <span th:text="#{profit.info.hullc}">Hull C Sonderregel (Loading Dock) aktiv.</span>
+                </p>
+            </div>
+        </div>
+
+        <div id="profitResults" class="table-wrapper">
+            <table id="resultsTable" class="matrix-table" data-sort-col="0" data-sort-dir="asc">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" onclick="sortTable(0)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-start;">
+                                <span th:text="#{profit.col.material}">Material</span>
+                                <span class="sort-icon" id="sort-icon-0" style="color: var(--color-primary);">▲</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(1)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.min_buy}">Einkauf (min)</span>
+                                <span class="sort-icon" id="sort-icon-1">↕</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(2)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.max_sell}">Verkauf (max)</span>
+                                <span class="sort-icon" id="sort-icon-2">↕</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(3)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.profit_scu}">Gewinn / SCU</span>
+                                <span class="sort-icon" id="sort-icon-3">↕</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(4)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.margin}">Marge (%)</span>
+                                <span class="sort-icon" id="sort-icon-4">↕</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(5)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.load_cost}">Ladungskosten</span>
+                                <span class="sort-icon" id="sort-icon-5">↕</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" onclick="sortTable(6)" title="Klicken zum Sortieren">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <span th:text="#{profit.col.total_profit}">Max Profit</span>
+                                <span class="sort-icon" id="sort-icon-6">↕</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="profitBody">
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-gray-2); font-family: var(--font-body);" th:text="#{profit.info.select_ship}">Bitte wählen Sie ein Schiff aus, um die Berechnung zu starten.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script>
+    function toggleMultiSelect(id) {
+        var el = document.getElementById(id);
+        var isOpened = el.classList.contains('open');
+        
+        // Close all others
+        document.querySelectorAll('.multi-select-options').forEach(function(opt) {
+            opt.classList.remove('open');
+        });
+
+        if (!isOpened) {
+            el.classList.add('open');
+        }
+    }
+
+    function getTranslations(headerId) {
+        var header = document.getElementById(headerId);
+        return {
+            allText: header.getAttribute('data-all'),
+            selectedTextStr: header.getAttribute('data-selected')
+        };
+    }
+
+    function toggleSelectAll(allId, checkClass, headerId) {
+        var isAllChecked = document.getElementById(allId).checked;
+        var checkboxes = document.getElementsByClassName(checkClass);
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = isAllChecked;
+        }
+        updateSelectedText(checkboxes, headerId);
+    }
+
+    function updateSelectState(allId, checkClass, headerId) {
+        var checkboxes = document.getElementsByClassName(checkClass);
+        var allChecked = true;
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (!checkboxes[i].checked) {
+                allChecked = false;
+                break;
+            }
+        }
+        document.getElementById(allId).checked = allChecked;
+        updateSelectedText(checkboxes, headerId);
+    }
+
+    function updateSelectedText(checkboxes, headerId) {
+        var translations = getTranslations(headerId);
+        var count = 0;
+        var total = checkboxes.length;
+        var firstChecked = null;
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (checkboxes[i].checked) {
+                count++;
+                if (!firstChecked) firstChecked = checkboxes[i].previousElementSibling.innerText;
+            }
+        }
+
+        var textElement = document.getElementById(headerId).querySelector('.selected-text');
+        if (count === total) {
+            textElement.innerText = translations.allText;
+        } else if (count === 1) {
+            textElement.innerText = firstChecked;
+        } else {
+            textElement.innerText = count + " " + translations.selectedTextStr;
+        }
+    }
+
+    function sortTable(n, forcedDir) {
+        var table = document.getElementById("resultsTable");
+        var rows, switching, i, x, y, shouldSwitch, dir;
+        switching = true;
+        
+        if (forcedDir) {
+            dir = forcedDir;
+        } else {
+            dir = table.getAttribute("data-sort-dir") === "asc" ? "desc" : "asc";
+            if (table.getAttribute("data-sort-col") !== n.toString()) {
+                dir = "asc";
+            }
+        }
+        
+        table.setAttribute("data-sort-dir", dir);
+        table.setAttribute("data-sort-col", n);
+        
+        while (switching) {
+            switching = false;
+            rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+            
+            for (i = 0; i < (rows.length - 1); i++) {
+                if (rows[i].cells.length < 2) continue; // Skip loading or no data rows
+
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("td")[n];
+                y = rows[i+1].getElementsByTagName("td")[n];
+                
+                if (!x || !y) continue;
+
+                var valX = x.textContent || x.innerText;
+                var valY = y.textContent || y.innerText;
+                
+                if (n >= 1 && n <= 6) {
+                    // Numerische Sortierung
+                    var numX = parseFloat(valX.replace(/[^-0-9,.]/g, '').replace(/\./g, '').replace(',', '.'));
+                    if (n === 4) { // Marge hat Punkt als Dezimaltrenner durch toFixed(2)
+                         numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
+                    }
+                    var numY = parseFloat(valY.replace(/[^-0-9,.]/g, '').replace(/\./g, '').replace(',', '.'));
+                    if (n === 4) {
+                         numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
+                    }
+
+                    if (isNaN(numX)) numX = -Infinity; 
+                    if (isNaN(numY)) numY = -Infinity;
+                    
+                    if (dir === "asc") {
+                        if (numX > numY) { shouldSwitch = true; break; }
+                    } else {
+                        if (numX < numY) { shouldSwitch = true; break; }
+                    }
+                } else {
+                    // Alphabetische Sortierung
+                    if (dir === "asc") {
+                        if (valX.toLowerCase() > valY.toLowerCase()) { shouldSwitch = true; break; }
+                    } else {
+                        if (valX.toLowerCase() < valY.toLowerCase()) { shouldSwitch = true; break; }
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+            }
+        }
+        updateSortIndicators(n, dir);
+    }
+
+    function updateSortIndicators(columnIndex, direction) {
+        for (var i = 0; i <= 6; i++) {
+            var iconElement = document.getElementById("sort-icon-" + i);
+            if (iconElement) {
+                if (i === columnIndex) {
+                    iconElement.innerHTML = direction === 'asc' ? '▲' : '▼';
+                    iconElement.style.color = 'var(--color-primary)';
+                } else {
+                    iconElement.innerHTML = '↕';
+                    iconElement.style.color = 'var(--color-gray-2)';
+                }
+            }
+        }
+    }
+
+    async function updateProfitCalculation() {
+        const shipId = document.getElementById('shipSelect').value;
+        const body = document.getElementById('profitBody');
+
+        if (!shipId) {
+            body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-gray-2);">[[#{profit.info.select_ship}]]</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-primary);">[[#{profit.info.loading}]]</td></tr>`;
+
+        try {
+            let url = `/api/proxy/materials/profit-calculation?shipId=${shipId}`;
+            
+            const sysCheckboxes = document.getElementsByClassName("sysCheck");
+            const activeSys = [];
+            for (let i = 0; i < sysCheckboxes.length; i++) {
+                if (sysCheckboxes[i].checked) activeSys.push(sysCheckboxes[i].value);
+            }
+
+            activeSys.forEach(s => {
+                url += `&starSystemNames=${encodeURIComponent(s)}`;
+            });
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.length === 0) {
+                body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-gray-2);">[[#{profit.info.no_data}]]</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = '';
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                tr.innerHTML = `
+                    <td style="text-align: left;">
+                        <a href="/materials/${item.materialId}">
+                            <strong>${item.materialName}</strong>
+                        </a>
+                    </td>
+                    <td>-${formatNumber(item.minBuyPrice)}</td>
+                    <td>+${formatNumber(item.maxSellPrice)}</td>
+                    <td>${item.profitPerScu > 0 ? '+' : ''}${formatNumber(item.profitPerScu)}</td>
+                    <td>${item.marginPercent.toFixed(2)}%</td>
+                    <td>${formatNumber(item.fullLoadCost)}</td>
+                    <td>${item.maxProfitFullLoad > 0 ? '+' : ''}${formatNumber(item.maxProfitFullLoad)}</td>
+                `;
+                body.appendChild(tr);
+            });
+
+            // Re-apply sorting if set
+            const sortCol = document.getElementById("resultsTable").getAttribute("data-sort-col");
+            const sortDir = document.getElementById("resultsTable").getAttribute("data-sort-dir");
+            if (sortCol !== null && sortDir !== null) {
+                sortTable(parseInt(sortCol), sortDir);
+            }
+        } catch (error) {
+            console.error('Error fetching profit calculation:', error);
+            body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #e74c3c;">[[#{profit.error.fetch}]]</td></tr>`;
+        }
+    }
+
+    function formatNumber(num) {
+        return new Intl.NumberFormat('de-DE').format(num);
+    }
+
+    // Load initial data if default ship is selected
+    window.addEventListener('DOMContentLoaded', () => {
+        // Handle clicks outside of multi-select to close them
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.multi-select-container')) {
+                document.querySelectorAll('.multi-select-options').forEach(function(opt) {
+                    opt.classList.remove('open');
+                });
+            }
+        });
+
+        const shipId = document.getElementById('shipSelect').value;
+        if (shipId) {
+            updateProfitCalculation();
+        }
+    });
+</script>
+</body>
+</html>

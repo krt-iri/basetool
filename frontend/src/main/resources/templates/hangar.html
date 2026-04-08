@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{hangar.title} + ' - ' + #{app.title}">Hangar - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .data-section {
+            margin-bottom: 3rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+        .form-group input[type="checkbox"] {
+            width: auto;
+        }
+        #ship-modal .btn {
+            font-family: var(--font-body);
+            font-weight: 700;
+        }
+    </style>
+    </th:block>
+</head>
+<body th:data-show-modal="${showShipModal}">
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{hangar.title}">Hangar</h1>
+        <a th:href="@{/hangar/squadron}" class="btn" th:text="#{hangar.squadron.title}">Staffelübersicht</a>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+
+        <div class="data-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
+                <button id="add-ship-btn" class="btn" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
+            </div>
+
+            <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th th:text="#{hangar.ship.manufacturer}">Hersteller</th>
+                        <th th:text="#{hangar.ship.type}">Schiffstyp</th>
+                        <th th:text="#{hangar.ship.insurance}">Versicherung</th>
+                        <th th:text="#{hangar.ship.location}">Ort</th>
+                        <th th:text="#{hangar.ship.fitted}">Fitted</th>
+                        <th th:text="#{hangar.ship.name}">Name</th>
+                        <th th:text="#{hangar.ship.action}">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="ship : ${myShips}">
+                        <td th:text="${ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : ''}">Hersteller</td>
+                        <td th:text="${ship.shipType != null ? ship.shipType.name : ''}">Typ</td>
+                        <td>
+                            <th:block th:with="ins=${ship?.insurance}">
+                                <th:block th:switch="${ins}">
+                                    <span th:case="'0'" th:text="#{hangar.ship.insurance.none}">Keine</span>
+                                    <span th:case="'LTI'" th:text="#{hangar.ship.insurance.lti}">LTI</span>
+                                    <span th:case="'1'" th:text="#{hangar.ship.insurance.month}">1 Monat</span>
+                                    <span th:case="*" th:if="${ins != null}" th:text="#{hangar.ship.insurance.months(${ins})}">X Monate</span>
+                                    <span th:case="*" th:unless="${ins != null}">-</span>
+                                </th:block>
+                            </th:block>
+                        </td>
+                        <td th:text="${ship.location != null ? ship.location.name : ''}">Ort</td>
+                        <td th:text="${ship.fitted ? #messages.msg('hangar.ship.yes') : #messages.msg('hangar.ship.no')}">Nein</td>
+                        <td th:text="${ship.name}">Name</td>
+                        <td style="display:flex; gap:0.5rem;">
+                            <button class="btn edit-ship-btn" 
+                                    th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
+                                    th:data-id="${ship.id}" 
+                                    th:data-name="${ship.name}" 
+                                    th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                    th:data-ins="${ship?.insurance}"
+                                    th:data-loc="${ship.location != null ? ship.location.id : ''}"
+                                    th:data-fitted="${ship.fitted}"
+                                    th:data-version="${ship.version}"
+                                    th:text="#{hangar.ship.edit}">Bearbeiten</button>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(myShips)}">
+                        <td colspan="7" style="text-align: center;" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ship Modal -->
+    <div id="ship-modal" class="modal" style="display: none;" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
+        <div class="modal-content hud-box">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title" th:text="#{hangar.ship.modal_title}">Schiff</h2>
+            <form id="ship-form" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
+                <input type="hidden" id="ship-version" name="version" th:value="*{version}">
+                <div class="form-group">
+                    <label for="ship-manufacturer" th:text="#{hangar.ship.manufacturer}">Hersteller</label>
+                    <select id="ship-manufacturer" name="manufacturerId">
+                        <option value="" th:text="#{hangar.ship.select_manufacturer}">Alle Hersteller</option>
+                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.name}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ship-type" th:text="#{hangar.ship.type}">Schiffstyp</label>
+                    <select id="ship-type" name="shipTypeId" th:field="*{shipTypeId}" required>
+                        <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
+                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" style="color: var(--color-dept-combat);"></div>
+                </div>
+                <div class="form-group">
+                    <label for="ship-name" th:text="#{hangar.ship.name}">Name</label>
+                    <input type="text" id="ship-name" name="name" th:field="*{name}">
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color: var(--color-dept-combat);"></div>
+                </div>
+                <div class="form-group">
+                    <label for="ship-insurance" th:text="#{hangar.ship.insurance}">Versicherung</label>
+                    <select id="ship-insurance" name="insurance" th:field="*{insurance}" required>
+                        <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
+                        <option value="0" th:text="#{hangar.ship.insurance.none}">Keine</option>
+                        <option value="LTI" th:text="#{hangar.ship.insurance.lti}">LTI</option>
+                        <option th:each="i : ${#numbers.sequence(1, 120)}" th:value="${i}" th:text="${i == 1 ? #messages.msg('hangar.ship.insurance.month') : #messages.msg('hangar.ship.insurance.months', i)}"></option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('insurance')}" th:errors="*{insurance}" style="color: var(--color-dept-combat);"></div>
+                </div>
+                <div class="form-group">
+                    <label for="ship-location" th:text="#{hangar.ship.location}">Ort</label>
+                    <select id="ship-location" name="locationId" th:field="*{locationId}">
+                        <option value="" th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
+                        <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" style="color: var(--color-dept-combat);"></div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
+                    <label for="ship-fitted" style="margin-bottom: 0;" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <button type="submit" class="btn" th:text="#{hangar.ship.save}">Speichern</button>
+                    <button type="button" id="modal-delete-btn" class="btn btn-danger" style="display: none;" th:text="#{hangar.ship.delete}">Löschen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
+        <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+            <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
+            <p th:text="#{hangar.ship.delete_confirm}" style="margin-bottom: 2rem;">Schiff wirklich löschen?</p>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <form id="delete-confirm-form" th:action="@{/hangar}" method="post" style="margin:0;">
+                    <button type="submit" class="btn btn-danger" th:text="#{hangar.ship.delete}">Löschen</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const modal = document.getElementById("ship-modal");
+        const closeBtn = document.querySelector(".close-modal");
+        const form = document.getElementById("ship-form");
+        const modalTitle = document.getElementById("modal-title");
+
+        function openModal() {
+            modal.style.display = "flex";
+        }
+
+        function closeModal() {
+            if (typeof window.resetUnsavedChanges === 'function') {
+                window.resetUnsavedChanges();
+            }
+            modal.style.display = "none";
+        }
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        
+        const deleteModal = document.getElementById('delete-confirm-modal');
+        const deleteForm = document.getElementById('delete-confirm-form');
+        const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+            if (deleteModal && e.target === deleteModal) deleteModal.style.display = 'none';
+        });
+
+        // Add
+        const addBtn = document.getElementById("add-ship-btn");
+        const modalDeleteBtn = document.getElementById("modal-delete-btn");
+        
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                modalTitle.textContent = modal.getAttribute("data-title-add");
+                form.action = addBtn.getAttribute("data-action");
+                document.getElementById("ship-name").value = "";
+                document.getElementById("ship-type").value = "";
+                document.getElementById("ship-insurance").value = "";
+                document.getElementById("ship-location").value = "";
+                document.getElementById("ship-fitted").checked = false;
+                document.getElementById("ship-version").value = "";
+                modalDeleteBtn.style.display = "none";
+                openModal();
+            });
+        }
+
+        // Edit
+        document.querySelectorAll(".edit-ship-btn").forEach(btn => {
+            btn.addEventListener('click', () => {
+                modalTitle.textContent = modal.getAttribute("data-title-edit");
+                form.action = btn.getAttribute("data-action");
+                document.getElementById("ship-name").value = btn.getAttribute("data-name");
+                document.getElementById("ship-type").value = btn.getAttribute("data-type");
+                document.getElementById("ship-insurance").value = btn.getAttribute("data-ins");
+                document.getElementById("ship-location").value = btn.getAttribute("data-loc") || "";
+                document.getElementById("ship-fitted").checked = btn.getAttribute("data-fitted") === 'true';
+                document.getElementById("ship-version").value = btn.getAttribute("data-version");
+                
+                // Set up delete button
+                const shipId = btn.getAttribute("data-id");
+                // The URL is implicit in the form.action logic or we can construct it
+                // We need to trigger the delete modal, which needs an action URL.
+                // The edit button has th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
+                // We can construct delete URL: /hangar/{id}/delete
+                // Or just get it from the edit action? 
+                // Wait, the edit button has data-action: /hangar/{id}/update
+                // We can replace "/update" with "/delete"
+                const action = btn.getAttribute("data-action");
+                modalDeleteBtn.setAttribute("data-action", action.replace("/update", "/delete"));
+                modalDeleteBtn.style.display = "block";
+                
+                openModal();
+            });
+        });
+        
+        modalDeleteBtn.addEventListener('click', () => {
+            deleteForm.action = modalDeleteBtn.getAttribute('data-action');
+            deleteModal.style.display = 'flex';
+        });
+        
+        if (deleteModal) {
+            // Remove old listeners from table buttons if they existed (they don't anymore)
+            
+            closeDeleteBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    deleteModal.style.display = 'none';
+                });
+            });
+        }
+
+        // Open modal automatically if there are validation errors
+        const showModal = document.body.getAttribute('data-show-modal') === 'true';
+        if (showModal) {
+            openModal();
+        }
+
+        // Prevent double submit
+        form.addEventListener('submit', function() {
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.disabled = true;
+            }
+        });
+
+        // Filter ship types by manufacturer
+        const manufacturerSelect = document.getElementById("ship-manufacturer");
+        const shipTypeSelect = document.getElementById("ship-type");
+        const shipTypeAllOptions = Array.from(shipTypeSelect.options);
+
+        manufacturerSelect.addEventListener("change", function() {
+            const selectedManufacturer = this.value;
+            
+            // Keep the default option (index 0)
+            const defaultOption = shipTypeAllOptions[0];
+            
+            // Clear all options
+            shipTypeSelect.innerHTML = '';
+            shipTypeSelect.appendChild(defaultOption);
+            
+            // Add matching options
+            shipTypeAllOptions.slice(1).forEach(option => {
+                if (!selectedManufacturer || option.getAttribute("data-manufacturer-id") === selectedManufacturer) {
+                    shipTypeSelect.appendChild(option);
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

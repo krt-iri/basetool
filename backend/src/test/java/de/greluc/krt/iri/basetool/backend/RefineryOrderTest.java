@@ -1,0 +1,422 @@
+package de.greluc.krt.iri.basetool.backend;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.iri.basetool.backend.model.*;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreItemDto;
+import de.greluc.krt.iri.basetool.backend.repository.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class RefineryOrderTest {
+
+    @Autowired
+    private WebApplicationContext context;
+
+    private MockMvc mockMvc;
+
+    @Autowired
+    private RefineryOrderRepository refineryOrderRepository;
+
+    @Autowired
+    private LocationRepository locationRepository;
+
+    @Autowired
+    private StarSystemRepository starSystemRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SpaceStationRepository spaceStationRepository;
+
+    @Autowired
+    private MissionRepository missionRepository;
+
+    @Autowired
+    private RefiningMethodRepository refiningMethodRepository;
+
+    @Autowired
+    private MaterialRepository materialRepository;
+
+    @Autowired
+    private InventoryItemRepository inventoryItemRepository;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    private User user1;
+    private User adminUser;
+    private Location station;
+    private Mission mission;
+    private RefiningMethod dinyx;
+    private RefiningMethod ferron;
+    private Material quantanium;
+    private Material gold;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+
+        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+
+        user1 = new User();
+        user1.setId(UUID.randomUUID());
+        user1.setUsername("refineryUser");
+        userRepository.save(user1);
+
+        adminUser = new User();
+        adminUser.setId(UUID.randomUUID());
+        adminUser.setUsername("refineryAdmin");
+        userRepository.save(adminUser);
+
+        StarSystem system = new StarSystem();
+        system.setName("Stanton");
+        starSystemRepository.save(system);
+
+        SpaceStation spaceStation = new SpaceStation();
+        spaceStation.setName("ARC-L1 Station");
+        spaceStation.setHasRefinery(true);
+        spaceStationRepository.save(spaceStation);
+
+        station = new Location();
+        station.setName("ARC-L1");
+        station.setSpaceStation(spaceStation);
+        locationRepository.save(station);
+
+        mission = new Mission();
+        mission.setName("Mining Op");
+        missionRepository.save(mission);
+
+        dinyx = new RefiningMethod();
+        dinyx.setName("Dinyx Solvation");
+        dinyx = refiningMethodRepository.save(dinyx);
+
+        ferron = new RefiningMethod();
+        ferron.setName("Ferron Exchange");
+        ferron = refiningMethodRepository.save(ferron);
+
+        quantanium = new Material();
+        quantanium.setName("Quantanium");
+        quantanium.setType(MaterialType.RAW);
+        quantanium = materialRepository.save(quantanium);
+
+        gold = new Material();
+        gold.setName("Gold");
+        gold.setType(MaterialType.RAW);
+        gold = materialRepository.save(gold);
+    }
+
+    @Test
+    void testUserCreateAndManageRefineryOrder() throws Exception {
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setStartedAt(Instant.now());
+        order.setDurationMinutes(120L);
+        order.setRefiningMethod(dinyx);
+        order.setExpenses(500.00);
+        order.setMission(mission);
+
+        Set<RefineryGood> goods = new HashSet<>();
+        RefineryGood good1 = new RefineryGood();
+        good1.setInputMaterial(quantanium);
+        good1.setInputQuantity(32);
+        good1.setOutputMaterial(quantanium);
+        good1.setOutputQuantity(32);
+        good1.setQuality(100);
+        goods.add(good1);
+        order.setGoods(goods);
+
+        // Create
+        String response = mockMvc.perform(post("/api/v1/refinery-orders")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
+        UUID savedId = UUID.fromString(jsonResponse.get("id").asText());
+        RefineryOrder saved = refineryOrderRepository.findById(savedId).orElseThrow();
+        assertNotNull(saved.getId());
+        assertEquals(user1.getId(), saved.getOwner().getId());
+        assertEquals("ARC-L1", saved.getLocation().getName());
+        assertEquals(1, saved.getGoods().size());
+        assertEquals("Quantanium", saved.getGoods().iterator().next().getInputMaterial().getName());
+        assertEquals(mission.getId(), saved.getMission().getId());
+
+        // Update
+        saved.setRefiningMethod(ferron);
+        // We need to re-set the goods because we want to modify them.
+        // Similar to previous test: create new set for update.
+        saved.setGoods(new HashSet<>());
+        RefineryGood good2 = new RefineryGood();
+        good2.setInputMaterial(gold);
+        good2.setInputQuantity(100);
+        good2.setOutputMaterial(gold);
+        good2.setOutputQuantity(100);
+        good2.setQuality(100);
+        saved.getGoods().add(good2);
+
+        mockMvc.perform(put("/api/v1/refinery-orders/" + saved.getId())
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(saved)))
+                .andExpect(status().isOk());
+
+        RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();
+        assertEquals("Ferron Exchange", updated.getRefiningMethod().getName());
+        assertEquals(1, updated.getGoods().size());
+        assertEquals("Gold", updated.getGoods().iterator().next().getInputMaterial().getName());
+
+        // Delete
+        mockMvc.perform(delete("/api/v1/refinery-orders/" + saved.getId())
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+        )
+                .andExpect(status().isOk());
+
+        assertEquals(de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.CANCELED, refineryOrderRepository.findById(saved.getId()).get().getStatus());
+    }
+
+    @Test
+    void testAdminManageUserRefineryOrder() throws Exception {
+        // User creates order
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setOwner(user1);
+        order.setRefiningMethod(dinyx); // Set a method
+        RefineryGood good = new RefineryGood();
+        good.setInputMaterial(quantanium);
+        good.setInputQuantity(100);
+        good.setOutputMaterial(quantanium);
+        good.setOutputQuantity(100);
+        good.setQuality(100);
+        good.setRefineryOrder(order);
+        order.setGoods(new HashSet<>(Set.of(good)));
+        order = refineryOrderRepository.save(order);
+
+        // Admin updates it
+        order.setRefiningMethod(ferron);
+        mockMvc.perform(put("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
+                .with(jwt().jwt(builder -> builder.subject(adminUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_MANAGE"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isOk());
+
+        RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();
+        assertEquals("Ferron Exchange", updated.getRefiningMethod().getName());
+
+        // Admin deletes it
+        mockMvc.perform(delete("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
+                .with(jwt().jwt(builder -> builder.subject(adminUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_MANAGE"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"))))
+                .andExpect(status().isOk());
+        
+        assertEquals(de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.CANCELED, refineryOrderRepository.findById(order.getId()).get().getStatus());
+    }
+
+    @Test
+    void testAccessControl() throws Exception {
+        // User1 creates order
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setOwner(user1);
+        RefineryGood good = new RefineryGood();
+        good.setInputMaterial(quantanium);
+        good.setInputQuantity(100);
+        good.setOutputMaterial(quantanium);
+        good.setOutputQuantity(100);
+        good.setQuality(100);
+        good.setRefineryOrder(order);
+        order.setGoods(new HashSet<>(Set.of(good)));
+        order = refineryOrderRepository.save(order);
+
+        User user2 = new User();
+        user2.setId(UUID.randomUUID());
+        user2.setUsername("user2");
+        userRepository.save(user2);
+
+        // User2 tries to update User1's order
+        mockMvc.perform(put("/api/v1/refinery-orders/" + order.getId())
+                .with(jwt().jwt(builder -> builder.subject(user2.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isForbidden()); // AccessDeniedException
+
+        // User2 tries to admin-update User1's order (should be forbidden 403)
+        mockMvc.perform(put("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
+                .with(jwt().jwt(builder -> builder.subject(user2.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE"))) // No ROLE_ADMIN
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testCreateRefineryOrder_WithNonRawMaterial_ShouldFail() throws Exception {
+        Material refinedMaterial = new Material();
+        refinedMaterial.setName("Refined Iron");
+        refinedMaterial.setType(MaterialType.REFINED);
+        refinedMaterial = materialRepository.save(refinedMaterial);
+
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setStartedAt(Instant.now());
+        
+        Set<RefineryGood> goods = new HashSet<>();
+        RefineryGood good = new RefineryGood();
+        good.setInputMaterial(refinedMaterial);
+        good.setInputQuantity(50);
+        good.setOutputMaterial(refinedMaterial);
+        good.setOutputQuantity(50);
+        good.setQuality(100);
+        goods.add(good);
+        order.setGoods(goods);
+
+        mockMvc.perform(post("/api/v1/refinery-orders")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testCreateRefineryOrder_WithNullMission_ShouldSucceed() throws Exception {
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setStartedAt(Instant.now());
+        order.setDurationMinutes(120L);
+        order.setRefiningMethod(dinyx);
+        order.setExpenses(500.00);
+        order.setMission(null); // Explicitly null
+
+        Set<RefineryGood> goods = new HashSet<>();
+        RefineryGood good1 = new RefineryGood();
+        good1.setInputMaterial(quantanium);
+        good1.setInputQuantity(32);
+        good1.setOutputMaterial(quantanium);
+        good1.setOutputQuantity(32);
+        good1.setQuality(100);
+        goods.add(good1);
+        order.setGoods(goods);
+
+        String response = mockMvc.perform(post("/api/v1/refinery-orders")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("HANGAR_READ"), new SimpleGrantedAuthority("HANGAR_WRITE"), new SimpleGrantedAuthority("MISSION_READ"), new SimpleGrantedAuthority("REFINERY_READ"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
+        UUID savedId = UUID.fromString(jsonResponse.get("id").asText());
+        RefineryOrder saved = refineryOrderRepository.findById(savedId).orElseThrow();
+        assertNotNull(saved.getId());
+        assertNull(saved.getMission());
+    }
+    @Test
+    void testCreateRefineryOrder_WithDynamicPayload() throws Exception {
+        java.util.Map<String, Object> orderDto = new java.util.HashMap<>();
+        orderDto.put("startedAt", "2026-03-27T18:35:59.123Z");
+        orderDto.put("durationMinutes", 10);
+        orderDto.put("expenses", 100);
+        orderDto.put("location", java.util.Map.of("id", station.getId().toString()));
+        orderDto.put("refiningMethod", java.util.Map.of("id", dinyx.getId().toString()));
+        
+        java.util.List<java.util.Map<String, Object>> goodsDto = new java.util.ArrayList<>();
+        java.util.Map<String, Object> good = new java.util.HashMap<>();
+        good.put("inputMaterial", java.util.Map.of("id", quantanium.getId().toString()));
+        good.put("inputQuantity", 100);
+        good.put("outputQuantity", 200);
+        good.put("quality", 500);
+        goodsDto.add(good);
+        
+        orderDto.put("goods", goodsDto);
+        
+        String json = objectMapper.writeValueAsString(orderDto);
+        System.out.println("[DEBUG_LOG] Request JSON: " + json);
+        
+        org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/refinery-orders")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString())).authorities(new SimpleGrantedAuthority("ROLE_USER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andReturn();
+                
+        System.out.println("[DEBUG_LOG] Response status: " + result.getResponse().getStatus());
+        System.out.println("[DEBUG_LOG] Response body: " + result.getResponse().getContentAsString());
+        if (result.getResolvedException() != null) {
+            System.out.println("[DEBUG_LOG] Resolved Exception: " + result.getResolvedException().getMessage());
+            result.getResolvedException().printStackTrace();
+        }
+    }
+
+    @Test
+    void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
+        // User creates order
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setOwner(user1);
+        order.setRefiningMethod(dinyx);
+        order = refineryOrderRepository.save(order);
+
+        RefineryOrderStoreItemDto itemDto = new RefineryOrderStoreItemDto(
+                quantanium.getId(),
+                station.getId(),
+                100,
+                32.543, // Decimal amount
+                user1.getId(),
+                null
+        );
+        RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
+
+        mockMvc.perform(post("/api/v1/refinery-orders/" + order.getId() + "/store")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(storeDto)))
+                .andExpect(status().isOk());
+
+        RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.COMPLETED, stored.getStatus());
+
+        java.util.List<InventoryItem> items = inventoryItemRepository.findByUser(user1, org.springframework.data.domain.Pageable.unpaged()).getContent();
+        boolean found = items.stream().anyMatch(i -> i.getAmount().equals(32.543));
+        assertTrue(found, "Decimal amount should be stored correctly in inventory");
+    }
+}

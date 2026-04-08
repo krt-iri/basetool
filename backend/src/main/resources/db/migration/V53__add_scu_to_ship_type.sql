@@ -1,0 +1,1 @@
+ALTER TABLE ship_type ADD COLUMN scu INTEGER;

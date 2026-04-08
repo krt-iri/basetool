@@ -1,0 +1,25 @@
+server:
+  ssl:
+    enabled: false
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: test-client
+            authorization-grant-type: authorization_code
+        provider:
+          keycloak:
+            issuer-uri: http://keycloak.example.com/realms/test
+
+spring.thymeleaf.cache: false
+
+app:
+  backend-url: http://backend:11261
+
+resilience4j:
+  spring:
+    boot:
+      verifier:
+        enabled: false

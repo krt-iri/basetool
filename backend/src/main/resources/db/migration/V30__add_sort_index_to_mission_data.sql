@@ -1,0 +1,2 @@
+ALTER TABLE mission_lead_type ADD COLUMN sort_index INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE frequency_type ADD COLUMN sort_index INTEGER NOT NULL DEFAULT 0;

@@ -1,0 +1,155 @@
+package de.greluc.krt.iri.basetool.frontend.controller;
+
+import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderDto;
+import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.time.OffsetDateTime;
+import java.util.Collections;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class RefineryOrderDurationTest {
+
+    @Autowired
+    private WebApplicationContext context;
+
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private BackendApiClient backendApiClient;
+
+    @MockitoBean
+    private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository;
+
+    @BeforeEach
+    void setup() {
+        mockMvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+    }
+
+    @Test
+    void testCreateOrder_DurationConversion() throws Exception {
+        mockMvc.perform(post("/refinery-orders/create")
+                .param("durationHours", "2")
+                .param("durationMinutes", "15")
+                .param("expenses", "100")
+                .param("ownerId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("refiningMethodId", UUID.randomUUID().toString())
+                .param("startedAt", "2024-04-06T12:00")
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .with(csrf())
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/refinery-orders")))
+                .andExpect(header().string("Location", org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/create"))));
+
+        ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+        verify(backendApiClient).post(eq("/api/v1/refinery-orders"), captor.capture(), eq(RefineryOrderDto.class));
+
+        assertEquals(135, captor.getValue().durationMinutes());
+    }
+
+    @Test
+    void testViewOrder_DurationBackConversion() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        RefineryOrderDto order = new RefineryOrderDto(
+                orderId, null, null, null, OffsetDateTime.now(), 145, 100, null, Collections.emptyList(), null, 1L
+        );
+        when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
+
+        mockMvc.perform(get("/refinery-orders/" + orderId)
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("refineryOrderForm"))
+                .andExpect(model().attribute("refineryOrderForm", 
+                        org.hamcrest.Matchers.hasProperty("durationHours", org.hamcrest.Matchers.is(2))))
+                .andExpect(model().attribute("refineryOrderForm", 
+                        org.hamcrest.Matchers.hasProperty("durationMinutes", org.hamcrest.Matchers.is(25))));
+    }
+
+    @Test
+    void testUpdateOrder_DurationConversion() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        mockMvc.perform(post("/refinery-orders/" + orderId)
+                .param("durationHours", "1")
+                .param("durationMinutes", "5")
+                .param("expenses", "200")
+                .param("version", "1")
+                .param("ownerId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("refiningMethodId", UUID.randomUUID().toString())
+                .param("startedAt", "2024-04-06T12:00")
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .with(csrf())
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().is3xxRedirection());
+
+        ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+        verify(backendApiClient).put(eq("/api/v1/refinery-orders/" + orderId), captor.capture(), eq(RefineryOrderDto.class));
+
+        assertEquals(65, captor.getValue().durationMinutes());
+    }
+
+    @Test
+    void testEndsAtCalculation() {
+        OffsetDateTime startedAt = OffsetDateTime.parse("2024-04-06T12:00:00Z");
+        RefineryOrderDto order = new RefineryOrderDto(
+                UUID.randomUUID(), null, null, null, startedAt, 125, 100, null, Collections.emptyList(), null, 1L
+        );
+        
+        OffsetDateTime expectedEnd = startedAt.plusMinutes(125);
+        assertEquals(expectedEnd, order.getEndsAt());
+        assertNotNull(order.getEndsAt());
+    }
+
+    @Test
+    void testViewOrders_OnlyMineFilter() throws Exception {
+        mockMvc.perform(get("/refinery-orders")
+                .param("onlyMine", "true")
+                .with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("onlyMine", true));
+
+        verify(backendApiClient).get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"), any(org.springframework.core.ParameterizedTypeReference.class));
+    }
+
+    @Test
+    void testViewOrders_AllOrders() throws Exception {
+        mockMvc.perform(get("/refinery-orders")
+                .with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("onlyMine", false));
+
+        verify(backendApiClient).get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"), any(org.springframework.core.ParameterizedTypeReference.class));
+    }
+}

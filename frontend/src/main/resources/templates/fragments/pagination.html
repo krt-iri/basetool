@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="pagination(pageResponse, baseUrl)">
+    <div class="pagination" th:if="${pageResponse != null and pageResponse.totalPages() > 1}" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+        <a th:href="@{${baseUrl}(page=0, size=${pageResponse.pageSize()})}" class="btn btn-sm btn-secondary" th:classappend="${pageResponse.pageNumber() == 0 ? 'disabled' : ''}">&laquo;</a>
+        <a th:href="@{${baseUrl}(page=${pageResponse.pageNumber() - 1}, size=${pageResponse.pageSize()})}" class="btn btn-sm btn-secondary" th:classappend="${pageResponse.pageNumber() == 0 ? 'disabled' : ''}">&lsaquo;</a>
+        
+        <span style="display: flex; align-items: center; padding: 0 0.5rem;">
+            <span th:text="${pageResponse.pageNumber() + 1}">1</span> / <span th:text="${pageResponse.totalPages()}">1</span>
+        </span>
+        
+        <a th:href="@{${baseUrl}(page=${pageResponse.pageNumber() + 1}, size=${pageResponse.pageSize()})}" class="btn btn-sm btn-secondary" th:classappend="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages() ? 'disabled' : ''}">&rsaquo;</a>
+        <a th:href="@{${baseUrl}(page=${pageResponse.totalPages() - 1}, size=${pageResponse.pageSize()})}" class="btn btn-sm btn-secondary" th:classappend="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages() ? 'disabled' : ''}">&raquo;</a>
+    </div>
+</div>
+</body>
+</html>

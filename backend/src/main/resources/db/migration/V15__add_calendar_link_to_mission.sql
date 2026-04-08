@@ -1,0 +1,1 @@
+ALTER TABLE mission ADD COLUMN calendar_link VARCHAR(2048);

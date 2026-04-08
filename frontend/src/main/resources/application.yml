@@ -1,0 +1,126 @@
+server:
+  tomcat:
+    relaxed-query-chars: "{,},[,]"
+    relaxed-path-chars: "{,},[,]"
+  max-http-request-header-size: 65536
+  http2:
+    enabled: true
+  port: 18081
+  forward-headers-strategy: framework
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: basetool
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
+  servlet:
+    session:
+      cookie:
+        secure: true
+        http-only: true
+        same-site: lax
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=600s
+  application:
+    name: frontend
+  messages:
+    encoding: UTF-8
+    fallback-to-system-locale: false
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 365d
+          must-revalidate: true
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: "/**"
+    error:
+      whitelabel:
+        enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: basetool-frontend
+            client-authentication-method: none
+            scope: openid, profile, email, roles
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          keycloak:
+            user-name-attribute: preferred_username
+
+app:
+  http:
+    connect-timeout: 2s
+    response-timeout: 5s
+    read-timeout: 3s
+    write-timeout: 3s
+  ui:
+    notification-duration: 5000
+
+resilience4j:
+  spring:
+    boot:
+      verifier:
+        enabled: false
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+    instances:
+      backend:
+        baseConfig: default
+      backendApi:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
+    instances:
+      backend:
+        baseConfig: default
+      backendApi:
+        baseConfig: default
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+    instances:
+      backend:
+        baseConfig: default
+      backendApi:
+        baseConfig: default
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 20
+        maxWaitDuration: 1s
+    instances:
+      backend:
+        baseConfig: default
+      backendApi:
+        baseConfig: default

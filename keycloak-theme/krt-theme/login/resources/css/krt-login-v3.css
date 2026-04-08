@@ -1,0 +1,809 @@
+/* Fonts */
+@font-face {
+    font-family: 'Ethnocentric';
+    src: url('../fonts/Ethnocentric Rg.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+:root {
+    --color-primary: #E77E23;
+    --color-bg-black: #000000;
+    --color-bg-dark-gray: #141414;
+    
+    --color-accent-light: #EEB64B;
+    --color-accent-dark: #C45C00;
+    
+    --color-gray-1: #D2D2D2;
+    --color-gray-2: #646464;
+    --color-gray-3: #282828;
+    --color-gray-4: #141414;
+    
+    --font-headline: 'Ethnocentric', sans-serif;
+    --font-body: 'Lato', sans-serif;
+}
+
+/* Force override PatternFly variables globally */
+:root, * {
+    --pf-c-form-control--BackgroundColor: var(--color-bg-black) !important;
+    --pf-v5-c-form-control--BackgroundColor: var(--color-bg-black) !important;
+    --pf-v6-c-form-control--BackgroundColor: var(--color-bg-black) !important;
+
+    --pf-c-button--m-primary--BackgroundColor: var(--color-primary) !important;
+    --pf-v5-c-button--m-primary--BackgroundColor: var(--color-primary) !important;
+    --pf-v6-c-button--m-primary--BackgroundColor: var(--color-primary) !important;
+
+    --pf-c-button--m-primary--Color: var(--color-bg-black) !important;
+    --pf-v5-c-button--m-primary--Color: var(--color-bg-black) !important;
+    --pf-v6-c-button--m-primary--Color: var(--color-bg-black) !important;
+
+    --pf-c-check__input--BackgroundColor: var(--color-bg-black) !important;
+    --pf-v5-c-check__input--BackgroundColor: var(--color-bg-black) !important;
+    --pf-v6-c-check__input--BackgroundColor: var(--color-bg-black) !important;
+
+    --pf-c-check__input--checked--BackgroundColor: var(--color-primary) !important;
+    --pf-v5-c-check__input--checked--BackgroundColor: var(--color-primary) !important;
+    --pf-v6-c-check__input--checked--BackgroundColor: var(--color-primary) !important;
+
+    --pf-c-global--primary-color--100: var(--color-primary) !important;
+    --pf-v5-global--primary-color--100: var(--color-primary) !important;
+    --pf-v6-global--primary-color--100: var(--color-primary) !important;
+}
+
+/* Hard reset for all backgrounds to remove the orange grid completely */
+body, html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
+    background-image: none !important;
+    background-color: var(--color-bg-black) !important;
+}
+
+* {
+    --pf-c-background-image--BackgroundImage: none !important;
+    --pf-v5-c-background-image--BackgroundImage: none !important;
+    --pf-v6-c-background-image--BackgroundImage: none !important;
+}
+
+body {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: 300;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.login-container {
+    background-color: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-gray-3);
+    border-top: 3px solid var(--color-primary);
+    padding: 40px;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1);
+    position: relative;
+    /* Basic centering adjustments when inside keycloak layout */
+    margin: auto;
+}
+
+/* Technische HUD-Ecken (Sci-Fi Aesthetic) */
+.login-container::before, .login-container::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border: 2px solid var(--color-primary);
+}
+.login-container::before {
+    top: -2px; left: -2px;
+    border-right: none; border-bottom: none;
+}
+.login-container::after {
+    bottom: -2px; right: -2px;
+    border-left: none; border-top: none;
+}
+
+h1 {
+    font-family: var(--font-headline);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-bottom: 30px;
+    font-weight: normal;
+}
+
+.krt-input,
+.kc-input,
+.kc-input-class,
+.pf-c-form-control,
+.pf-v5-c-form-control,
+.pf-v6-c-form-control,
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input.pf-c-form-control,
+input.pf-v5-c-form-control {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    background-color: var(--color-bg-black) !important;
+    border: 1px solid var(--color-gray-2) !important;
+    border-bottom: 2px solid var(--color-primary) !important;
+    color: var(--color-gray-1) !important;
+    font-family: var(--font-body) !important;
+    outline: none !important;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 0 !important;
+}
+
+/* Hide PatternFly pseudo-element borders/backgrounds */
+.pf-c-form-control::before, .pf-c-form-control::after,
+.pf-v5-c-form-control::before, .pf-v5-c-form-control::after,
+.pf-v6-c-form-control::before, .pf-v6-c-form-control::after,
+.pf-c-button::after, .pf-v5-c-button::after, .pf-v6-c-button::after,
+.pf-c-button::before, .pf-v5-c-button::before, .pf-v6-c-button::before,
+.pf-c-check__input::before, .pf-c-check__input::after,
+.pf-v5-c-check__input::before, .pf-v5-c-check__input::after,
+.pf-v6-c-check__input::before, .pf-v6-c-check__input::after {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* If PatternFly wraps the input in a span, target the inner input specifically */
+span.pf-v5-c-form-control input,
+span.pf-v6-c-form-control input,
+span.pf-c-form-control input {
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--color-gray-1) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.krt-input:focus,
+.kc-input:focus,
+.kc-input-class:focus,
+.pf-c-form-control:focus,
+.pf-v5-c-form-control:focus,
+.pf-v6-c-form-control:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+input.pf-c-form-control:focus,
+input.pf-v5-c-form-control:focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
+}
+
+.krt-button,
+.btn-primary,
+.kc-button,
+.kc-button-primary,
+.kc-button-primary-class,
+.pf-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-primary,
+.pf-v6-c-button.pf-m-primary,
+input[type="submit"],
+input[type="button"],
+button[type="submit"],
+button.pf-c-button.pf-m-primary,
+button.pf-v5-c-button.pf-m-primary {
+    width: 100%;
+    padding: 15px;
+    background-color: var(--color-primary) !important;
+    color: var(--color-bg-black) !important;
+    font-family: var(--font-headline) !important;
+    text-transform: uppercase;
+    border: none !important;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background-color 0.3s, transform 0.1s;
+    font-weight: normal !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 0 !important;
+}
+
+.krt-button:hover,
+.btn-primary:hover,
+.kc-button:hover,
+.kc-button-primary:hover,
+.kc-button-primary-class:hover,
+.pf-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v6-c-button.pf-m-primary:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+button[type="submit"]:hover,
+button.pf-c-button.pf-m-primary:hover,
+button.pf-v5-c-button.pf-m-primary:hover {
+    background-color: var(--color-accent-dark) !important; /* Accent Dark */
+}
+
+.krt-button:active,
+.btn-primary:active,
+.kc-button:active,
+.kc-button-primary:active,
+.kc-button-primary-class:active,
+.pf-c-button.pf-m-primary:active,
+.pf-v5-c-button.pf-m-primary:active,
+.pf-v6-c-button.pf-m-primary:active,
+input[type="submit"]:active,
+input[type="button"]:active,
+button[type="submit"]:active,
+button.pf-c-button.pf-m-primary:active,
+button.pf-v5-c-button.pf-m-primary:active {
+    transform: scale(0.98);
+}
+
+/* Secondary Buttons */
+button.krt-button-secondary[type="submit"],
+button.krt-button-secondary,
+a.krt-button-secondary,
+.krt-button-secondary,
+.btn-default,
+.kc-button-default,
+button.pf-c-button.pf-m-control,
+button.pf-c-button.pf-m-secondary,
+button.pf-v5-c-button.pf-m-control,
+button.pf-v5-c-button.pf-m-secondary,
+button.pf-v6-c-button.pf-m-control,
+button.pf-v6-c-button.pf-m-secondary,
+.pf-c-button.pf-m-link,
+.pf-v5-c-button.pf-m-link,
+.pf-v6-c-button.pf-m-link,
+#kc-cancel,
+button[name="cancel-aia"] {
+    width: 100%;
+    padding: 12px 15px;
+    background-color: var(--color-bg-dark-gray) !important;
+    color: var(--color-primary) !important;
+    font-family: var(--font-headline) !important;
+    text-transform: uppercase;
+    border: 1px solid var(--color-primary) !important;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background-color 0.3s, transform 0.1s;
+    font-weight: normal !important;
+    text-decoration: none !important;
+    text-align: center;
+    display: inline-block;
+    box-sizing: border-box;
+    margin-top: 10px;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    border-radius: 0 !important;
+    background-image: none !important;
+}
+
+button.krt-button-secondary[type="submit"]:hover,
+button.krt-button-secondary:hover,
+a.krt-button-secondary:hover,
+.krt-button-secondary:hover,
+.btn-default:hover,
+.kc-button-default:hover,
+button.pf-c-button.pf-m-control:hover,
+button.pf-c-button.pf-m-secondary:hover,
+button.pf-v5-c-button.pf-m-control:hover,
+button.pf-v5-c-button.pf-m-secondary:hover,
+button.pf-v6-c-button.pf-m-control:hover,
+button.pf-v6-c-button.pf-m-secondary:hover,
+.pf-c-button.pf-m-link:hover,
+.pf-v5-c-button.pf-m-link:hover,
+.pf-v6-c-button.pf-m-link:hover,
+#kc-cancel:hover,
+button[name="cancel-aia"]:hover {
+    background-color: var(--color-primary) !important;
+    color: var(--color-bg-black) !important;
+}
+
+/* Checkboxes */
+input.krt-checkbox[type="checkbox"],
+.krt-checkbox,
+input[type="checkbox"],
+.kc-checkbox,
+.pf-c-check__input,
+.pf-v5-c-check__input,
+.pf-v6-c-check__input,
+#logout-sessions {
+    accent-color: var(--color-primary);
+    background-color: var(--color-bg-black) !important;
+    border: 1px solid var(--color-primary) !important;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: inline-block;
+    vertical-align: middle;
+    position: relative;
+    margin-right: 8px;
+    border-radius: 0 !important;
+    background-image: none !important;
+    outline: none !important;
+}
+
+input.krt-checkbox[type="checkbox"]:checked,
+.krt-checkbox:checked,
+input[type="checkbox"]:checked,
+.kc-checkbox:checked,
+.pf-c-check__input:checked,
+.pf-v5-c-check__input:checked,
+.pf-v6-c-check__input:checked,
+#logout-sessions:checked {
+    background-color: var(--color-primary) !important;
+}
+
+input.krt-checkbox[type="checkbox"]:checked::after,
+.krt-checkbox:checked::after,
+input[type="checkbox"]:checked::after,
+.kc-checkbox:checked::after,
+.pf-c-check__input:checked::after,
+.pf-v5-c-check__input:checked::after,
+.pf-v6-c-check__input:checked::after,
+#logout-sessions:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--color-bg-black);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Keycloak specific overrides */
+#kc-header {
+    display: none; /* We handle the header inside our form */
+}
+#kc-info, #kc-registration {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+#kc-info a, #kc-registration a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+#kc-info a:hover, #kc-registration a:hover {
+    text-decoration: underline;
+}
+.krt-label,
+.pf-c-form__label-text,
+.pf-v5-c-form__label-text,
+.pf-v6-c-form__label-text {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--color-gray-1) !important;
+    text-transform: uppercase;
+    font-size: 0.85em !important;
+    letter-spacing: 1px;
+}
+
+/* Keycloak default page titles and text */
+#kc-page-title {
+    font-family: var(--font-headline);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-bottom: 30px;
+    font-weight: normal;
+    font-size: 1.5em;
+}
+
+.pf-c-login__main-body, .pf-v5-c-login__main-body, .pf-v6-c-login__main-body {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+}
+
+.pf-c-login__main-body p, .pf-v5-c-login__main-body p, .pf-v6-c-login__main-body p,
+.pf-c-form__helper-text, .pf-v5-c-form__helper-text, .pf-v6-c-form__helper-text {
+    color: var(--color-gray-1) !important;
+}
+
+.pf-c-login__main-body a, .pf-v5-c-login__main-body a, .pf-v6-c-login__main-body a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.pf-c-login__main-body a:hover, .pf-v5-c-login__main-body a:hover, .pf-v6-c-login__main-body a:hover {
+    text-decoration: underline;
+}
+
+/* Custom helper classes to replace inline styles */
+.krt-title-lato {
+    font-family: var(--font-body) !important;
+    text-transform: none !important;
+    font-weight: 700 !important;
+}
+
+.krt-checkbox-label {
+    color: var(--color-gray-1) !important;
+    font-size: 0.85em !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    cursor: pointer;
+}
+
+.krt-error-message {
+    color: var(--color-primary) !important;
+    font-size: 0.85em !important;
+    display: block;
+    margin-top: 5px;
+}
+
+.krt-info-text {
+    color: var(--color-gray-1) !important;
+    font-size: 0.9em !important;
+    margin-bottom: 20px !important;
+    line-height: 1.5 !important;
+}
+
+.krt-info-text-center {
+    color: var(--color-gray-1) !important;
+    font-size: 0.9em !important;
+    margin-bottom: 20px !important;
+    text-align: center !important;
+}
+
+.krt-ol {
+    padding-left: 20px !important;
+}
+
+.krt-ul {
+    list-style-type: circle !important;
+    padding-left: 20px !important;
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+}
+
+.krt-qr-wrapper {
+    background: white !important;
+    padding: 10px !important;
+    display: inline-block !important;
+    margin: 10px 0 !important;
+}
+
+.krt-form-footer {
+    margin-top: 15px !important;
+    text-align: center !important;
+}
+
+.krt-form-footer a {
+    color: var(--color-primary) !important;
+    text-decoration: none !important;
+}
+
+.krt-form-footer a:hover {
+    text-decoration: underline !important;
+}
+
+.krt-monospace-text {
+    color: var(--color-primary) !important;
+    font-family: monospace !important;
+    font-size: 1.1em !important;
+}
+
+.krt-link {
+    color: var(--color-primary) !important;
+    text-decoration: underline !important;
+}
+
+/* Remove default Keycloak white background and borders */
+.pf-c-login__main, .pf-v5-c-login__main, .pf-v6-c-login__main,
+.card-pf, .login-pf-page .card-pf,
+.pf-c-login__main-body, .pf-v5-c-login__main-body, .pf-v6-c-login__main-body,
+.pf-c-login__main-header, .pf-v5-c-login__main-header, .pf-v6-c-login__main-header,
+.pf-c-login__main-footer, .pf-v5-c-login__main-footer, .pf-v6-c-login__main-footer {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Add login-container HUD style to standard PatternFly login cards if they don't contain .login-container */
+.pf-v5-c-login__main:not(:has(.login-container)),
+.pf-v6-c-login__main:not(:has(.login-container)),
+.pf-c-login__main:not(:has(.login-container)) {
+    background-color: var(--color-bg-dark-gray) !important;
+    border: 1px solid var(--color-gray-3) !important;
+    border-top: 3px solid var(--color-primary) !important;
+    padding: 40px !important;
+    width: 100% !important;
+    max-width: 450px !important;
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
+    position: relative !important;
+    margin: auto !important;
+    display: block; /* ensure block level for auto margins */
+}
+
+/* HUD Corners for the PatternFly main card */
+.pf-v5-c-login__main:not(:has(.login-container))::before, 
+.pf-v5-c-login__main:not(:has(.login-container))::after,
+.pf-v6-c-login__main:not(:has(.login-container))::before, 
+.pf-v6-c-login__main:not(:has(.login-container))::after,
+.pf-c-login__main:not(:has(.login-container))::before, 
+.pf-c-login__main:not(:has(.login-container))::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border: 2px solid var(--color-primary);
+}
+.pf-v5-c-login__main:not(:has(.login-container))::before,
+.pf-v6-c-login__main:not(:has(.login-container))::before,
+.pf-c-login__main:not(:has(.login-container))::before {
+    top: -2px; left: -2px;
+    border-right: none; border-bottom: none;
+}
+.pf-v5-c-login__main:not(:has(.login-container))::after,
+.pf-v6-c-login__main:not(:has(.login-container))::after,
+.pf-c-login__main:not(:has(.login-container))::after {
+    bottom: -2px; right: -2px;
+    border-left: none; border-top: none;
+}
+
+/* --- Language Selector Dropdown Styling --- */
+/* Positioning and Wrapper */
+.pf-v5-c-login__main-header-utilities,
+.pf-v6-c-login__main-header-utilities,
+.pf-c-login__main-header-utilities,
+#kc-locale {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+}
+
+/* Base button / toggle */
+#kc-locale button,
+#kc-current-locale-link,
+#kc-locale-dropdown .pf-v5-c-dropdown__toggle,
+#kc-locale-dropdown .pf-v6-c-dropdown__toggle,
+#kc-locale-dropdown .pf-c-dropdown__toggle,
+#kc-locale .pf-v5-c-menu-toggle,
+#kc-locale .pf-v6-c-menu-toggle,
+#kc-locale .pf-c-menu-toggle,
+.kc-dropdown > a,
+.pf-v5-c-dropdown__toggle,
+.pf-v6-c-dropdown__toggle,
+.pf-v5-c-menu-toggle,
+.pf-v6-c-menu-toggle {
+    background-color: var(--color-bg-dark-gray) !important;
+    background-image: none !important;
+    color: var(--color-gray-1) !important;
+    border: 1px solid var(--color-gray-3) !important;
+    border-bottom: 2px solid var(--color-primary) !important;
+    padding: 8px 15px !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.9em !important;
+    cursor: pointer;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+/* Override PatternFly internal variables and pseudo-elements that cause bright backgrounds */
+#kc-locale .pf-v5-c-menu-toggle,
+#kc-locale .pf-v6-c-menu-toggle,
+#kc-locale .pf-c-menu-toggle,
+#kc-locale-dropdown .pf-v5-c-dropdown__toggle,
+#kc-locale-dropdown .pf-v6-c-dropdown__toggle,
+#kc-locale-dropdown .pf-c-dropdown__toggle,
+.pf-v5-c-menu-toggle,
+.pf-v6-c-menu-toggle,
+.pf-v5-c-dropdown__toggle,
+.pf-v6-c-dropdown__toggle {
+    --pf-v5-c-menu-toggle--BackgroundColor: transparent !important;
+    --pf-v5-c-menu-toggle--hover--BackgroundColor: transparent !important;
+    --pf-v5-c-menu-toggle--active--BackgroundColor: transparent !important;
+    --pf-v5-c-menu-toggle--focus--BackgroundColor: transparent !important;
+    --pf-v5-c-menu-toggle--expanded--BackgroundColor: transparent !important;
+    --pf-v6-c-menu-toggle--BackgroundColor: transparent !important;
+    --pf-v6-c-menu-toggle--hover--BackgroundColor: transparent !important;
+    --pf-v6-c-menu-toggle--active--BackgroundColor: transparent !important;
+    --pf-v6-c-menu-toggle--focus--BackgroundColor: transparent !important;
+    --pf-v6-c-menu-toggle--expanded--BackgroundColor: transparent !important;
+    --pf-c-dropdown__toggle--BackgroundColor: transparent !important;
+    --pf-v5-c-dropdown__toggle--BackgroundColor: transparent !important;
+    --pf-v6-c-dropdown__toggle--BackgroundColor: transparent !important;
+}
+
+#kc-locale button::before,
+#kc-current-locale-link::before,
+#kc-locale .pf-v5-c-menu-toggle::before,
+#kc-locale .pf-v6-c-menu-toggle::before,
+#kc-locale .pf-c-menu-toggle::before,
+#kc-locale-dropdown .pf-v5-c-dropdown__toggle::before,
+#kc-locale-dropdown .pf-v6-c-dropdown__toggle::before,
+#kc-locale-dropdown .pf-c-dropdown__toggle::before,
+.pf-v5-c-menu-toggle::before,
+.pf-v6-c-menu-toggle::before,
+.pf-v5-c-dropdown__toggle::before,
+.pf-v6-c-dropdown__toggle::before,
+#kc-locale button::after,
+#kc-current-locale-link::after,
+#kc-locale .pf-v5-c-menu-toggle::after,
+#kc-locale .pf-v6-c-menu-toggle::after,
+#kc-locale .pf-c-menu-toggle::after,
+#kc-locale-dropdown .pf-v5-c-dropdown__toggle::after,
+#kc-locale-dropdown .pf-v6-c-dropdown__toggle::after,
+#kc-locale-dropdown .pf-c-dropdown__toggle::after,
+.pf-v5-c-menu-toggle::after,
+.pf-v6-c-menu-toggle::after,
+.pf-v5-c-dropdown__toggle::after,
+.pf-v6-c-dropdown__toggle::after {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#kc-locale button:hover,
+#kc-current-locale-link:hover,
+#kc-locale-dropdown .pf-v5-c-dropdown__toggle:hover,
+#kc-locale-dropdown .pf-v6-c-dropdown__toggle:hover,
+#kc-locale-dropdown .pf-c-dropdown__toggle:hover,
+#kc-locale .pf-v5-c-menu-toggle:hover,
+#kc-locale .pf-v6-c-menu-toggle:hover,
+#kc-locale .pf-c-menu-toggle:hover,
+.kc-dropdown > a:hover,
+.pf-v5-c-dropdown__toggle:hover,
+.pf-v6-c-dropdown__toggle:hover,
+.pf-v5-c-menu-toggle:hover,
+.pf-v6-c-menu-toggle:hover {
+    border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
+}
+
+/* The dropdown menu (hidden by default) */
+#kc-locale-dropdown .pf-v5-c-dropdown__menu,
+#kc-locale-dropdown .pf-v6-c-dropdown__menu,
+#kc-locale-dropdown .pf-c-dropdown__menu,
+#kc-locale .pf-v5-c-menu,
+#kc-locale .pf-v6-c-menu,
+#kc-locale .pf-c-menu,
+#kc-locale-dropdown ul,
+.kc-dropdown ul,
+.pf-v5-c-dropdown__menu,
+.pf-v6-c-dropdown__menu,
+.pf-v5-c-menu,
+.pf-v6-c-menu {
+    display: none !important; /* Hide by default, force hover logic */
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 5px;
+    background-color: var(--color-bg-dark-gray) !important;
+    border: 1px solid var(--color-gray-3) !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5) !important;
+    list-style: none !important;
+    padding: 0 !important;
+    min-width: 120px;
+}
+
+/* Force show on hover of the wrapper */
+#kc-locale-dropdown:hover .pf-v5-c-dropdown__menu,
+#kc-locale-dropdown:hover .pf-v6-c-dropdown__menu,
+#kc-locale-dropdown:hover .pf-c-dropdown__menu,
+#kc-locale:hover .pf-v5-c-menu,
+#kc-locale:hover .pf-v6-c-menu,
+#kc-locale:hover .pf-c-menu,
+#kc-locale-dropdown:hover ul,
+.kc-dropdown:hover ul,
+.pf-v5-c-dropdown:hover .pf-v5-c-dropdown__menu,
+.pf-v6-c-dropdown:hover .pf-v6-c-dropdown__menu {
+    display: block !important;
+}
+
+/* Dropdown items */
+.pf-v5-c-dropdown__menu-item,
+.pf-v6-c-dropdown__menu-item,
+.pf-c-dropdown__menu-item,
+.pf-v5-c-menu__item,
+.pf-v6-c-menu__item,
+.pf-c-menu__item,
+.kc-dropdown-item a,
+.pf-v5-c-dropdown__menu li a,
+.pf-v6-c-dropdown__menu li a,
+.pf-c-dropdown__menu li a,
+.pf-v5-c-menu li a,
+.pf-v6-c-menu li a,
+.pf-c-menu li a {
+    display: block !important;
+    padding: 10px 15px !important;
+    color: var(--color-gray-1) !important;
+    text-decoration: none !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.9em !important;
+    background-color: transparent !important;
+    border: none !important;
+    transition: background-color 0.2s, color 0.2s !important;
+}
+
+.pf-v5-c-dropdown__menu-item:hover,
+.pf-v6-c-dropdown__menu-item:hover,
+.pf-c-dropdown__menu-item:hover,
+.pf-v5-c-menu__item:hover,
+.pf-v6-c-menu__item:hover,
+.pf-c-menu__item:hover,
+.kc-dropdown-item a:hover,
+.pf-v5-c-dropdown__menu li a:hover,
+.pf-v6-c-dropdown__menu li a:hover,
+.pf-c-dropdown__menu li a:hover,
+.pf-v5-c-menu li a:hover,
+.pf-v6-c-menu li a:hover,
+.pf-c-menu li a:hover {
+    background-color: var(--color-primary) !important;
+    color: var(--color-bg-black) !important;
+}
+
+/* Remove default Patternfly styling that might conflict */
+.pf-v5-c-dropdown.pf-m-expanded .pf-v5-c-dropdown__menu,
+.pf-v6-c-dropdown.pf-m-expanded .pf-v6-c-dropdown__menu,
+.pf-c-dropdown.pf-m-expanded .pf-c-dropdown__menu,
+.pf-v5-c-menu-toggle.pf-m-expanded + .pf-v5-c-menu,
+.pf-v6-c-menu-toggle.pf-m-expanded + .pf-v6-c-menu {
+    display: block !important;
+}
+
+/* Hide carets/icons that look bad or just let them color match */
+.pf-v5-c-dropdown__toggle-icon,
+.pf-v6-c-dropdown__toggle-icon,
+.pf-c-dropdown__toggle-icon,
+.pf-v5-c-menu-toggle__icon,
+.pf-v6-c-menu-toggle__icon,
+.pf-c-menu-toggle__icon {
+    color: var(--color-primary) !important;
+}
+
+
+/* Utility classes for layout previously handled by inline styles */
+.krt-mb-20 {
+    margin-bottom: 20px !important;
+}
+
+.krt-mb-10 {
+    margin-bottom: 10px !important;
+}
+
+.krt-qr-code-img {
+    max-width: 100% !important;
+    height: auto !important;
+}

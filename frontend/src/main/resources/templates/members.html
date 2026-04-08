@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{members.title} + ' - ' + #{app.title}">Mitgliederverwaltung - IRIDIUM Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{members.title}">Mitgliederverwaltung</h1>
+        <p th:text="#{members.description}">Verwalte die Mitglieder deiner Squadron.</p>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+
+        <form method="get" th:action="@{/members}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
+            <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
+            <div style="flex:1; min-width: 12rem; position: relative;">
+                <input type="text"
+                       id="member-search"
+                       name="search"
+                       th:value="${search}"
+                       th:placeholder="#{members.search.placeholder}"
+                       autocomplete="off"
+                       style="width: 100%; box-sizing: border-box;">
+            </div>
+            <button type="submit" class="btn" th:text="#{general.search}">Suche</button>
+        </form>
+        <div class="table-responsive">
+        <table th:if="${users}">
+            <thead>
+                <tr>
+                    <th th:text="#{profile.username}">Username</th>
+                    <th th:text="#{profile.firstname}">Vorname</th>
+                    <th th:text="#{profile.lastname}">Nachname</th>
+                    <th th:text="#{profile.rank}">Rang</th>
+                    <th th:text="#{members.is_logistician}">Logistiker</th>
+                    <th th:text="#{members.is_mission_manager}">Missions-Manager</th>
+                    <th th:text="#{members.status}">Status</th>
+                    <th th:text="#{general.action}">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="user : ${users}">
+                    <td th:text="${user.effectiveName}">Username</td>
+                    <td th:text="${user.firstName}">Vorname</td>
+                    <td th:text="${user.lastName}">Nachname</td>
+                    <td th:text="${user.rank}">Rang</td>
+                    <td>
+                        <input type="checkbox" 
+                               th:checked="${user.isLogistician}" 
+                               th:data-user-id="${user.id}"
+                               onchange="updateLogisticianStatus(this.getAttribute('data-user-id'), this.checked)"
+                               th:disabled="${#authentication.principal.subject == user.id.toString()}">
+                    </td>
+                    <td>
+                        <input type="checkbox" 
+                               th:checked="${user.isMissionManager}" 
+                               th:data-user-id="${user.id}"
+                               onchange="updateMissionManagerStatus(this.getAttribute('data-user-id'), this.checked)"
+                               th:disabled="${#authentication.principal.subject == user.id.toString()}">
+                    </td>
+                    <td>
+                        <span th:if="${user.inKeycloak}" style="color: var(--success-color, #2ecc71); font-size: 0.8rem;" th:text="#{members.in_keycloak}">In Keycloak</span>
+                        <span th:if="${!user.inKeycloak}" style="color: var(--danger-color, #e74c3c); font-size: 0.8rem;" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <a th:href="@{/members/{id}/edit(id=${user.id})}" class="btn" th:text="#{members.edit}">Bearbeiten</a>
+                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
+                                    class="btn danger"
+                                    th:data-user-id="${user.id}"
+                                    onclick="deleteUser(this.getAttribute('data-user-id'))"
+                                    th:text="#{members.delete}">Löschen</button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        
+        <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
+        
+        <p th:if="${users == null && error == null}" th:text="#{members.empty}">Keine Mitglieder gefunden.</p>
+    </div>
+
+    <!-- Hidden form for deletion to support redirects with Flash-Messages -->
+    <form id="delete-user-form" method="post" style="display:none;">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}" />
+    </form>
+</main>
+<script th:src="@{/js/autocomplete.js}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('member-search');
+        if (searchInput) {
+            krtAutocomplete(searchInput, async (query) => {
+                if (query.length < 2) return [];
+                try {
+                    const resp = await fetch(`/members/api/search?query=${encodeURIComponent(query)}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!resp.ok) return [];
+                    const data = await resp.json();
+                    return [...new Set((data || []).map(u => u.effectiveName).filter(Boolean))].slice(0, 10);
+                } catch (err) {
+                    return [];
+                }
+            }, {
+                onSelect: function(item) {
+                    searchInput.value = item;
+                    const form = searchInput.closest('form');
+                    if (form) form.submit();
+                }
+            });
+        }
+    });
+
+    async function updateLogisticianStatus(userId, isLogistician) {
+        try {
+            const resp = await fetch(`/members/${userId}/logistician?isLogistician=${isLogistician}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || ''
+                }
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                showFrontendErrorToast(data.message || 'Error updating status');
+                // Rollback UI
+                location.reload();
+            } else {
+                showFrontendSuccessToast('Status updated successfully');
+            }
+        } catch (err) {
+            console.error('Failed to update status', err);
+            showFrontendErrorToast('Failed to update status');
+            location.reload();
+        }
+    }
+
+    async function updateMissionManagerStatus(userId, isMissionManager) {
+        try {
+            const resp = await fetch(`/members/${userId}/mission-manager?isMissionManager=${isMissionManager}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || ''
+                }
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                showFrontendErrorToast(data.message || 'Error updating status');
+                // Rollback UI
+                location.reload();
+            } else {
+                showFrontendSuccessToast('Status updated successfully');
+            }
+        } catch (err) {
+            console.error('Failed to update status', err);
+            showFrontendErrorToast('Failed to update status');
+            location.reload();
+        }
+    }
+
+    function deleteUser(userId) {
+        const confirmMsg = "[[#{members.delete_confirm}]]";
+        if (!confirm(confirmMsg)) return;
+
+        const form = document.getElementById('delete-user-form');
+        form.action = `/members/${userId}/delete`;
+        form.submit();
+    }
+</script>
+</body>
+</html>

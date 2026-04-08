@@ -1,0 +1,1 @@
+ALTER TABLE refinery_yield ADD COLUMN version BIGINT;

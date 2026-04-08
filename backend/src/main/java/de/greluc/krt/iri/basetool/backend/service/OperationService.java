@@ -1,0 +1,154 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.model.Operation;
+import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class OperationService {
+
+    private final OperationRepository operationRepository;
+    private final InventoryItemRepository inventoryItemRepository;
+    private final RefineryOrderRepository refineryOrderRepository;
+    private final MissionFinanceEntryRepository missionFinanceEntryRepository;
+    private final EntityManager entityManager;
+
+    @Transactional(readOnly = true)
+    public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
+        return operationRepository.findAll(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Operation getOperationById(@NotNull UUID id) {
+        return operationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Operation not found"));
+    }
+
+    @Transactional
+    public Operation createOperation(@NotNull Operation operation) {
+        return operationRepository.save(operation);
+    }
+
+    @Transactional
+    public Operation updateOperation(@NotNull UUID id, @NotNull Operation operationDetails) {
+        Operation operation = operationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Operation not found"));
+
+        if (operationDetails.getVersion() != null && !operation.getVersion().equals(operationDetails.getVersion())) {
+            throw new ObjectOptimisticLockingFailureException(Operation.class, id);
+        }
+
+        operation.setName(operationDetails.getName());
+        operation.setDescription(operationDetails.getDescription());
+        operation.setStatus(operationDetails.getStatus());
+
+        return operationRepository.save(operation);
+    }
+
+    @Transactional
+    public void deleteOperation(@NotNull UUID id) {
+        log.info("Deleting operation with ID: {}", id);
+        Operation operation = operationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Operation not found"));
+
+        java.util.List<UUID> missionIds = operation.getMissions().stream()
+                .map(de.greluc.krt.iri.basetool.backend.model.Mission::getId)
+                .toList();
+
+        if (!missionIds.isEmpty()) {
+            inventoryItemRepository.unlinkMissions(missionIds);
+            refineryOrderRepository.unlinkMissions(missionIds);
+            missionFinanceEntryRepository.deleteByMissionIdIn(missionIds);
+            
+            // Flush changes to avoid constraint violations when deleting missions/operation
+            entityManager.flush();
+            entityManager.clear();
+        }
+
+        // We must re-fetch the operation because we cleared the entity manager
+        Operation operationToDelete = operationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Operation not found after cleanup"));
+        operationRepository.delete(operationToDelete);
+        log.info("Successfully deleted operation with ID: {}", id);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
+        Operation operation = operationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Operation not found"));
+
+        java.util.Map<String, String> participantNames = new java.util.HashMap<>();
+        java.util.Map<String, Long> validDurations = new java.util.HashMap<>();
+        java.util.Map<String, de.greluc.krt.iri.basetool.backend.model.PayoutPreference> preferences = new java.util.HashMap<>();
+        long totalOperationValidDuration = 0L;
+
+        for (de.greluc.krt.iri.basetool.backend.model.Mission mission : operation.getMissions()) {
+            java.time.Instant actualStart = mission.getActualStartTime();
+            java.time.Instant actualEnd = mission.getActualEndTime();
+            if (actualStart == null || actualEnd == null || !actualEnd.isAfter(actualStart)) {
+                continue; // Mission didn't start/end properly
+            }
+
+            for (de.greluc.krt.iri.basetool.backend.model.MissionParticipant p : mission.getParticipants()) {
+                String pId = p.getUser() != null ? p.getUser().getId().toString() : (p.getGuestName() != null ? "guest_" + p.getGuestName() : null);
+                if (pId == null) continue;
+
+                String pName = p.getUser() != null ? p.getUser().getEffectiveName() : p.getGuestName();
+                participantNames.putIfAbsent(pId, pName);
+
+                de.greluc.krt.iri.basetool.backend.model.PayoutPreference currentPref = preferences.getOrDefault(pId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.PAYOUT);
+                if (p.getPayoutPreference() == de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE) {
+                    preferences.put(pId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE);
+                } else {
+                    preferences.putIfAbsent(pId, currentPref);
+                }
+
+                java.time.Instant pStart = p.getStartTime();
+                if (pStart == null) continue;
+                
+                java.time.Instant pEnd = p.getEndTime() != null ? p.getEndTime() : java.time.Instant.now();
+
+                java.time.Instant effectiveStart = pStart.isBefore(actualStart) ? actualStart : pStart;
+                java.time.Instant effectiveEnd = pEnd.isAfter(actualEnd) ? actualEnd : pEnd;
+
+                if (effectiveEnd.isAfter(effectiveStart)) {
+                    long duration = java.time.Duration.between(effectiveStart, effectiveEnd).toMillis();
+                    validDurations.put(pId, validDurations.getOrDefault(pId, 0L) + duration);
+                    totalOperationValidDuration += duration;
+                }
+            }
+        }
+
+        java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> result = new java.util.ArrayList<>();
+        for (String pId : participantNames.keySet()) {
+            long duration = validDurations.getOrDefault(pId, 0L);
+            double percentage = totalOperationValidDuration > 0 ? (double) duration / totalOperationValidDuration * 100.0 : 0.0;
+            // Round to 2 decimals
+            percentage = Math.round(percentage * 100.0) / 100.0;
+            result.add(new de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto(
+                    pId,
+                    participantNames.get(pId),
+                    percentage,
+                    preferences.get(pId)
+            ));
+        }
+        
+        result.sort(java.util.Comparator.comparing(de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto::participantName, String.CASE_INSENSITIVE_ORDER));
+        return result;
+    }
+}

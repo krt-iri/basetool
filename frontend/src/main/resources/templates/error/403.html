@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{error.403.title} + ' - ' + #{app.title}">Access Denied - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .error-container {
+            text-align: center;
+            border: 2px solid var(--color-dept-combat);
+            box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
+        }
+        .error-code {
+            font-family: var(--font-headline);
+            font-size: 4rem;
+            color: var(--color-dept-combat);
+            margin-bottom: 0.5rem;
+        }
+        .error-title {
+            font-family: var(--font-headline);
+            font-size: 2rem;
+            color: var(--color-gray-1);
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+        }
+        .error-message {
+            font-size: 1.2rem;
+            color: var(--color-gray-1);
+            margin-bottom: 2rem;
+        }
+        .btn-return {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            background-color: var(--color-dept-combat);
+            color: #FFFFFF;
+            font-family: var(--font-headline);
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .btn-return:hover {
+            background-color: #D41A25;
+            box-shadow: 0 0 10px #D41A25;
+        }
+        /* Make sure main takes full screen if no sidebar */
+        main {
+            margin-left: 0 !important;
+            padding-top: 80px;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand" style="margin-left: 1rem;">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="greeting hud-box error-container">
+        <div class="error-code">403</div>
+        <div class="error-title" th:text="#{error.403.title}">Access Denied</div>
+        <p class="error-message" th:text="#{error.403.message}">Insufficient security clearance. This incident has been logged.</p>
+        <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>
+    </div>
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    });
+</script>
+</body>
+</html>

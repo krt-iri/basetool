@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{missions.title} + ' - ' + #{app.title}">Mission Details - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
+        input[type="text"], input[type="url"], select, textarea, input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
+        .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
+        .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .form-row > .form-group { flex: 1; min-width: 250px; }
+
+        /* Column Layout Styles */
+        :root {
+            --mission-col-min-width: 450px;
+        }
+        html, body {
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .page-wrapper {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            width: 100%;
+        }
+        .main-sticky-wrapper {
+            position: sticky;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+        }
+        .mission-columns-container {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 1rem;
+            margin-top: 2rem;
+            align-items: stretch;
+            min-width: 100%;
+            width: max-content;
+            padding-bottom: 1rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
+            box-sizing: border-box;
+        }
+        .mission-column {
+            display: flex;
+            flex-direction: column;
+            flex: 1 0 var(--mission-col-min-width);
+            min-width: max(var(--mission-col-min-width), max-content);
+            transition: all 0.3s ease;
+            background-color: transparent;
+        }
+        .mission-column.collapsed {
+            flex: 0 0 50px;
+            min-width: 50px;
+            cursor: pointer;
+        }
+        .mission-column .col-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--color-gray-4);
+            padding: 0.8rem;
+            border: 1px solid var(--color-primary);
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+        .mission-column .col-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--color-primary);
+            white-space: nowrap;
+            font-family: var(--font-headline);
+            text-transform: uppercase;
+        }
+        .mission-column .col-header .toggle-icon {
+            font-size: 1.2rem;
+            color: var(--color-primary);
+        }
+        .mission-column .col-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .mission-column .vertical-title {
+            display: none;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            text-orientation: mixed;
+            font-family: var(--font-headline);
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            padding: 1rem 0;
+            margin: 0 auto;
+            white-space: nowrap;
+            border: 1px solid var(--color-primary);
+            background-color: var(--color-gray-4);
+            height: 100%;
+            text-align: center;
+        }
+        .mission-column .vertical-title:hover {
+            background-color: var(--color-gray-3);
+        }
+        .mission-column.collapsed .col-header, .mission-column.collapsed .col-content {
+            display: none;
+        }
+        .mission-column.collapsed .vertical-title {
+            display: block;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<div class="page-wrapper">
+    <div class="main-sticky-wrapper">
+        <main style="padding-bottom: 0;">
+            <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 style="margin: 0;" th:if="${isNew}" th:text="#{mission.create}">New Mission</h1>
+                    <h1 style="margin: 0;" th:unless="${isNew}" th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
+                </div>
+                <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
+            </div>
+        </main>
+    </div>
+
+    <div class="mission-columns-container">
+        
+        <!-- Column 1: Details -->
+        <div class="mission-column" id="col-details">
+            <div class="vertical-title" onclick="toggleColumn('col-details')" th:text="#{mission.details}">Details</div>
+            <div class="col-header" onclick="toggleColumn('col-details')">
+                <h2 th:text="#{mission.details}">Details</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+
+                    <form id="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
+                        <input type="hidden" id="mission-version" name="version" th:field="*{version}">
+
+            <div class="form-group">
+                <label th:text="#{mission.name}">Name</label>
+                <input type="text" name="name" th:value="*{name}" required 
+                       th:disabled="${!isNew and !mission.canEdit}">
+                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            
+            <div class="form-group" sec:authorize="isAuthenticated()">
+                <label th:text="#{mission.description}">Description</label>
+                <textarea name="description" rows="5" th:text="*{description}"
+                          th:disabled="${!isNew and !mission.canEdit}"></textarea>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+
+            <div class="form-group">
+                <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="url" name="calendarLink" th:value="*{calendarLink}" style="flex: 1;"
+                           th:disabled="${!isNew and !mission.canEdit}">
+                    <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}" 
+                       th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer" 
+                       class="btn btn-secondary" style="white-space: nowrap;" th:text="#{mission.calendar_link_open}">Öffnen</a>
+                </div>
+                <div th:if="${#fields.hasErrors('calendarLink')}" th:errors="*{calendarLink}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            
+            <div class="form-row">
+            <div class="form-group">
+                <label th:text="#{mission.status}">Status</label>
+                <select name="status" th:disabled="${!isNew and !mission.canEdit}" required>
+                    <option value="PLANNED" th:selected="*{status == 'PLANNED'}">PLANNED</option>
+                    <option value="ACTIVE" th:selected="*{status == 'ACTIVE'}">ACTIVE</option>
+                    <option value="COMPLETED" th:selected="*{status == 'COMPLETED'}">COMPLETED</option>
+                    <option value="CANCELLED" th:selected="*{status == 'CANCELLED'}">CANCELLED</option>
+                </select>
+                <div th:if="${#fields.hasErrors('status')}" th:errors="*{status}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label th:text="#{nav.operations}">Operation</label>
+                <select name="operationId" th:disabled="${!isNew and !mission.canEdit}">
+                    <option value="" th:text="#{general.none}">-- Keine --</option>
+                    <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>
+                </select>
+                <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            </div>
+
+            <div class="form-row">
+            <div class="form-group">
+                <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
+                <input type="datetime-local" name="meetingTime" th:value="*{meetingTime}"
+                       th:disabled="${!isNew and !mission.canEdit}">
+                <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem; justify-content: flex-start;" th:if="${isNew or mission.canEdit}">
+                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" style="margin: 0; flex: 0 0 auto;" th:disabled="${!isNew and !mission.canEdit}">
+                    <label for="isInternal" th:text="#{mission.is_internal}" style="margin: 0; flex: 0 0 auto; display: inline-block;">Intern</label>
+                </div>
+            </div>
+            
+            <div class="form-row">
+            <div class="form-group">
+                <label th:text="#{mission.planned_start}">Planned Start</label>
+                <input type="datetime-local" name="plannedStartTime" th:value="*{plannedStartTime}"
+                       th:disabled="${!isNew and !mission.canEdit}" required>
+                <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label th:text="#{mission.planned_end}">Planned End</label>
+                <input type="datetime-local" name="plannedEndTime" th:value="*{plannedEndTime}"
+                       th:disabled="${!isNew and !mission.canEdit}">
+                <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            </div>
+            
+            <div class="form-row" th:if="${!isNew}">
+            <div class="form-group">
+                <label th:text="#{mission.actual_start}">Actual Start</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="datetime-local" id="actualStartTime" name="actualStartTime" th:value="*{actualStartTime}"
+                           style="flex-grow: 1;"
+                           th:disabled="${!isNew and !mission.canEdit}">
+                    <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
+                            onclick="setNowToInput('actualStartTime')"
+                            th:if="${!isNew and mission.canEdit}">Jetzt</button>
+                </div>
+                <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+
+            <div class="form-group">
+                <label th:text="#{mission.actual_end}">Actual End</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="datetime-local" id="actualEndTime" name="actualEndTime" th:value="*{actualEndTime}"
+                           style="flex-grow: 1;"
+                           th:disabled="${!isNew and !mission.canEdit}">
+                    <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
+                            onclick="setNowToInput('actualEndTime')"
+                            th:if="${!isNew and mission.canEdit}">Jetzt</button>
+                </div>
+                <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+            </div>
+            </div>
+                    </form>
+                </div>
+                <!-- Buttons Box inside Details Column -->
+                <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
+                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn delete-mission-btn" style="background-color: var(--color-dept-combat); margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
+                    <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn" th:text="#{mission.save}">Save</button>
+                    <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
+                </div>
+                
+                <!-- Mission Managers Section -->
+                <div class="hud-box" th:if="${!isNew and mission.canManageManagers}">
+                    <h3 th:text="#{mission.management_rights}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Verwaltungsrechte</h3>
+                    
+                    <div class="form-group">
+                        <label th:text="#{mission.owner}">Besitzer</label>
+                        <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <div style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.5rem; border: 1px solid var(--color-gray-3);">
+                                <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
+                            </div>
+                            <div th:if="${mission.canEdit}" style="display: flex; gap: 0.5rem;">
+                                <select id="new-owner-id" style="flex: 1;">
+                                    <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer wählen --</option>
+                                    <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}" th:selected="${mission.owner != null and u.id == mission.owner.id}"></option>
+                                </select>
+                                <button type="button" class="btn" onclick="changeMissionOwner()" th:text="#{general.save}">Speichern</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label th:text="#{mission.managers}">Co-Manager</label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                            <div th:each="manager : ${mission.managers}" style="display: flex; align-items: center; background: var(--color-gray-4); border: 1px solid var(--color-primary); padding: 0.2rem 0.5rem;">
+                                <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1); margin-right: 0.5rem;">Manager Name</span>
+                                <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-dept-combat);" 
+                                        th:data-manager-id="${manager.id}"
+                                        onclick="removeMissionManager(this.getAttribute('data-manager-id'))">&times;</button>
+                            </div>
+                            <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" style="color: var(--color-gray-3);">Keine</span>
+                        </div>
+                        
+                        <div th:if="${mission.canEdit}" style="display: flex; gap: 0.5rem;">
+                            <select id="new-manager-id" style="flex: 1;">
+                                <option value="" th:text="#{mission.manager.select}">-- Manager wählen --</option>
+                                <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
+                            </select>
+                            <button type="button" class="btn" onclick="addMissionManager()" th:text="#{general.add}">Hinzufügen</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 1.5: Organisation -->
+        <div class="mission-column" id="col-organisation" th:if="${!isNew}">
+            <div class="vertical-title" onclick="toggleColumn('col-organisation')" th:text="#{mission.organisation}">Organisation</div>
+            <div class="col-header" onclick="toggleColumn('col-organisation')">
+                <h2 th:text="#{mission.organisation}">Organisation</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Führungspositionen</h3>
+                    <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+                        <div th:each="leadType : ${missionLeadTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
+                            <div>
+                                <strong th:text="${leadType.name}" style="color: var(--color-gray-1);">Role</strong>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span th:each="p : ${participantsByLeadType[leadType['id']]}"
+                                th:text="${p['user'] != null ? p['user']['effectiveName'] : p['guestName']}"
+                                      style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Frequenzübersicht</h3>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
+                            <div>
+                                <strong th:text="${freqType.name}" style="color: var(--color-gray-1);">Freq</strong>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;" th:with="f=${frequencyByTypeId[freqType.id]}">
+                                <span th:if="${f != null}"
+                                      th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 2), ',', '.')}"
+                                      style="color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">123.45</span>
+                                
+                                <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-secondary set-freq-btn"
+                                        th:data-action="@{/missions/{id}/frequencies(id=${mission.id})}"
+                                        th:data-type-id="${freqType.id}"
+                                        th:text="#{members.edit}">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 2: Participants -->
+        <div class="mission-column" id="col-participants" th:if="${!isNew}">
+            <div class="vertical-title" onclick="toggleColumn('col-participants')" th:text="#{mission.participants}">Teilnehmer</div>
+            <div class="col-header" onclick="toggleColumn('col-participants')">
+                <h2 th:text="#{mission.participants}">Teilnehmer</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;" th:if="${!isNew and mission.canEdit}">
+                        <button id="add-participant-btn" class="btn" th:text="#{mission.participant.add}">Hinzufügen</button>
+                    </div>
+        <div class="table-responsive">
+        <table th:if="${!isNew and participants != null and !participants.isEmpty()}">
+            <thead>
+                <tr>
+                    <th th:text="#{mission.participant.user}">Benutzer</th>
+                    <th th:text="#{admin.mission_data.squadrons}">Staffel</th>
+                    <th th:text="#{mission.participant.desired_job}">Aufgabenwunsch</th>
+                    <th th:text="#{mission.participant.comment}">Bemerkung</th>
+                    <th th:text="#{mission.participant.planned_job}">Zugewiesener Job</th>
+                    <th th:text="#{mission.participant.assigned_unit}">Zugeordnete Einheit</th>
+                    <th th:text="#{general.action}">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="p : ${participants}">
+                    <td th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Username</td>
+                    <td th:text="${p?.squadron != null ? p.squadron.shorthand : '-'}">Staffel</td>
+                    <td th:text="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.name : '-'}">Job</td>
+                    <td th:text="${p?.comment}">Comment</td>
+                    <td th:text="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.name : '-'}">Geplanter Job</td>
+                    <td th:text="${p?.id != null ? assignedUnitByParticipantId[p.id] : ''}">
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:0.5rem;" th:if="${mission.canEdit or (#authorization.expression('isAuthenticated()') and p?.user != null and p.user.id.toString() == #authentication.name) or (p?.user == null)}">
+                            <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}">
+                                <button type="submit" class="btn" th:text="#{mission.participant.checkin}" th:title="#{mission.participant.checkin.tooltip}">Check-In</button>
+                            </form>
+                            <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}">
+                                <button type="submit" class="btn" th:text="#{mission.participant.checkout}">Check-Out</button>
+                            </form>
+                            <button type="button" class="btn edit-participant-btn"
+                                    th:data-participant-id="${p?.id}"
+                                    th:data-action="@{/missions/{id}/participants/{pId}/update(id=${mission.id}, pId=${p?.id})}"
+                                    th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
+                                    th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
+                                    th:data-squadron="${p?.squadron != null ? p.squadron.id : ''}"
+                                    th:data-payout-preference="${p?.payoutPreference?.name()}"
+                                    th:data-comment="${p?.comment}"
+                                    th:data-version="${p?.version}"
+                                    th:data-start-time="${p?.startTime}"
+                                    th:data-end-time="${p?.endTime}"
+                                    th:data-start-time-formatted="${p?.startTimeFormatted}"
+                                    th:data-end-time-formatted="${p?.endTimeFormatted}"
+                                    th:text="#{members.edit}">Edit</button>
+                            
+                            <button type="button" class="btn btn-secondary delete-participant-btn" 
+                                    th:data-action="@{/missions/{id}/participants/{pId}/delete(id=${mission.id}, pId=${p?.id})}"
+                                    th:text="#{info.delete}">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        <p th:if="${!isNew and (participants == null or participants.isEmpty())}" th:text="#{mission.participants.empty}">Keine Teilnehmer.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 3: Units -->
+        <div class="mission-column" id="col-units" th:if="${!isNew}">
+            <div class="vertical-title" onclick="toggleColumn('col-units')" th:text="#{mission.units}">Einheiten</div>
+            <div class="col-header" onclick="toggleColumn('col-units')">
+                <h2 th:text="#{mission.units}">Einheiten</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;" th:if="${!isNew and mission.canEdit}">
+                        <button id="add-unit-btn" class="btn" th:text="#{mission.unit.add}">Hinzufügen</button>
+                    </div>
+            
+            <div th:if="${!isNew and mission.assignedUnits != null and !mission.assignedUnits.isEmpty()}" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div th:each="unit : ${mission?.assignedUnits}" class="hud-box" style="border-color: var(--color-gray-3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" onclick="toggleUnit(this.getAttribute('data-target'), this)" th:title="#{general.toggle}">
+                            <span class="unit-toggle-icon" style="display:inline-block; width:1em; color:var(--color-primary); font-weight:bold;">-</span>
+                            <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: var(--font-headline);">Unit Name</strong>
+                            <span th:if="${unit.shipType != null}" th:text="' - ' + ${unit.shipType.name}" style="color: var(--color-gray-1); margin-left: 0.25rem;"> - ShipType</span>
+                            <span th:if="${unit.ship != null and unit.ship.owner != null}" th:text="${' (' + unit.ship.owner.effectiveName + ')'}" style="color: var(--color-gray-2); font-size: 0.9rem;">(Owner)</span>
+                            <span th:if="${unit.highValueUnit}" style="color: var(--color-accent-light); margin-left: 0.5rem;">[HVU]</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span th:if="${unit.frequency}" th:text="#{mission.unit.frequency} + ': ' + ${#strings.replace(unit.frequency, ',', '.')}">Freq: 123.45</span>
+                            <button th:if="${mission.canEdit}" class="btn assign-crew-btn"
+                                    th:data-unit-id="${unit.id}" 
+                                    th:data-action="@{/missions/{id}/units/{uId}/crew(id=${mission.id}, uId=${unit.id})}"
+                                    th:text="#{mission.unit.assign_crew}">Crew zuweisen</button>
+                            <button th:if="${mission.canEdit}"
+                                    class="btn edit-unit-btn"
+                                    th:data-action="@{/missions/{id}/units/{uId}/update(id=${mission.id}, uId=${unit.id})}"
+                                    th:data-name="${unit.name}"
+                                    th:data-shiptype="${unit.shipType != null ? unit.shipType.id : ''}"
+                                    th:data-ship="${unit.ship != null ? unit.ship.id : ''}"
+                                    th:data-frequency="${unit.frequency}"
+                                    th:data-hvu="${unit.highValueUnit}"
+                                    th:text="#{members.edit}">Edit</button>
+                            <button th:if="${mission.canEdit}" type="button" class="btn btn-secondary delete-unit-btn"
+                                    th:data-action="@{/missions/{id}/units/{uId}/delete(id=${mission.id}, uId=${unit.id})}"
+                                    th:text="#{info.delete}">Delete</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Collapsed Job Summary -->
+                    <div th:id="'unit-summary-' + ${unit.id}" class="unit-summary" style="display: none; flex-wrap: wrap; gap: 1rem; padding-top: 0.5rem; font-size: 0.9rem; color: var(--color-gray-1);">
+                        <span th:if="${unit.jobSummary == null or unit.jobSummary.isEmpty()}" style="color: var(--color-gray-2); font-style: italic;" th:text="#{mission.unit.no_crew}">No crew assigned.</span>
+                        <div th:each="entry : ${unit.jobSummary}" style="display: flex; align-items: center; gap: 0.3rem;">
+                            <span style="color: var(--color-primary); font-weight: bold;" th:text="${entry.value} + 'x'">1x</span>
+                            <span th:text="${entry.key}">Pilot</span>
+                        </div>
+                    </div>
+
+                    <div th:id="'unit-content-' + ${unit.id}" class="unit-content" style="display: block;">
+                    <!-- Crew List -->
+                    <div th:if="${unit.crew != null and !unit.crew.isEmpty()}">
+                        <div class="table-responsive">
+                        <table style="margin-top: 0;">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{mission.participant.name}">Name</th>
+                                    <th th:text="#{admin.mission_data.job_types}">Aufgaben</th>
+                                    <th th:if="${mission.canEdit}" th:text="#{general.action}">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="c : ${unit.crew}">
+                                    <td th:text="${c.participantName}">Name</td>
+                                    <td>
+                                        <span th:each="job, iterStat : ${c.jobTypes}" th:text="${job.name} + (!${iterStat.last} ? ', ' : '')">Pilot</span>
+                                    </td>
+                                    <td th:if="${mission.canEdit}">
+                                        <div style="display:flex; gap:0.5rem;">
+                                            <button type="button" class="btn edit-crew-btn"
+                                                    th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/update(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:data-jobs="${c.jobTypes != null ? #strings.listJoin(c.jobTypes.![id], ',') : ''}"
+                                                    th:text="#{members.edit}">Edit</button>
+                                            <button type="button" class="btn btn-secondary delete-crew-btn" 
+                                                    th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/delete(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:text="#{info.delete}">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                    <div th:if="${unit.crew == null or unit.crew.isEmpty()}" style="color: var(--color-gray-2); font-style: italic;" th:text="#{mission.unit.no_crew}">
+                        No crew assigned.
+                    </div>
+                    </div>
+                </div>
+            </div>
+            <p th:if="${mission.assignedUnits == null or mission.assignedUnits.isEmpty()}" th:text="#{mission.empty_next}">Keine Einheiten.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column Payout: Auszahlung -->
+        <div class="mission-column" id="col-payout" th:if="${!isNew}">
+            <div class="vertical-title" onclick="toggleColumn('col-payout')" th:text="#{mission.payout}">Auszahlung</div>
+            <div class="col-header" onclick="toggleColumn('col-payout')">
+                <h2 th:text="#{mission.payout}">Auszahlung</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <div class="table-responsive">
+                        <table th:if="${!isNew and participants != null and !participants.isEmpty()}">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{mission.participant.user}">Benutzer</th>
+                                    <th th:text="#{mission.participant.participation_percentage}" sec:authorize="isAuthenticated()">Teilnahme (%)</th>
+                                    <th th:text="#{mission.participant.payout_preference}">Auszahlungsart</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="p : ${participants}">
+                                    <td th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Username</td>
+                                    <td th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 2)} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
+                                    <td>
+                                        <select class="form-control" 
+                                                th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}" 
+                                                th:data-participant-id="${p?.id}"
+                                                th:data-original-value="${p?.payoutPreference?.name()}"
+                                                onchange="updatePayoutPreference(this)"
+                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and p.user.id.toString() != #authentication.name and !mission.canEdit)}">
+                                            <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
+                                            <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p th:if="${!isNew and (participants == null or participants.isEmpty())}" th:text="#{mission.participants.empty}">Keine Teilnehmer.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 6: Finance Entries -->
+        <div class="mission-column" id="col-finance" th:if="${!isNew}" sec:authorize="isAuthenticated()">
+            <div class="vertical-title" onclick="toggleColumn('col-finance')" th:text="#{mission.finances}">Finanzen</div>
+            <div class="col-header" onclick="toggleColumn('col-finance')">
+                <h2 th:text="#{mission.finances}">Finanzen</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <h3 style="color: var(--color-dept-mining); font-family: 'Lato', sans-serif; font-weight: 700;" th:if="${financeSum != null}">
+                        <span th:text="#{mission.finance.total}">Gesamtsumme:</span> 
+                        <span th:text="${#numbers.formatDecimal(financeSum, 1, 'POINT', 2, 'COMMA')}">0,00</span> aUEC
+                    </h3>
+                    <div style="margin-bottom: 1rem;">
+                        <button class="btn btn-small" onclick="document.getElementById('finance-modal').style.display='flex';" th:text="#{mission.finance.add}">Neuer Eintrag</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{mission.finance.user}">Nutzer</th>
+                                    <th th:text="#{mission.finance.type}">Typ</th>
+                                    <th th:text="#{mission.finance.amount}">Betrag</th>
+                                    <th th:text="#{mission.finance.note}">Notiz</th>
+                                    <th th:text="#{general.actions}" sec:authorize="isAuthenticated()">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${financeEntries}">
+                                    <td th:text="${entry.participant != null ? (entry.participant.user != null ? entry.participant.user.effectiveName : entry.participant.guestName) : '-'}">Nutzer</td>
+                                    <td>
+                                        <span th:if="${entry.type == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #4CAF50;">Einnahme</span>
+                                        <span th:if="${entry.type == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
+                                    </td>
+                                    <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
+                                    <td th:text="${entry.note}">Notiz</td>
+                                    <td sec:authorize="isAuthenticated()">
+                                        <div style="display:flex; gap:0.5rem;">
+                                            <!-- Edit button -->
+                                            <button type="button" class="btn edit-finance-btn"
+                                                    th:data-id="${entry.id}"
+                                                    th:data-note="${entry.note}"
+                                                    th:data-type="${entry.type}"
+                                                    th:data-amount="${entry.amount}"
+                                                    th:data-version="${entry.version}"
+                                                    onclick="openEditFinanceModal(this.getAttribute('data-id'), this.getAttribute('data-note'), this.getAttribute('data-type'), this.getAttribute('data-amount'), this.getAttribute('data-version'))"
+                                                    th:text="#{members.edit}">Bearbeiten</button>
+                                            
+                                            <!-- Delete button -->
+                                            <button type="button" class="btn btn-secondary delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" th:text="#{info.delete}">Löschen</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
+                                    <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
+                                    <td>
+                                        <span th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
+                                    </td>
+                                    <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
+                                    <td>
+                                        <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-mining); text-decoration: underline;">Raffinerieauftrag</a>
+                                    </td>
+                                    <td sec:authorize="isAuthenticated()">
+                                        <div style="display:flex; gap:0.5rem;">
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p th:if="${(financeEntries == null or financeEntries.isEmpty()) and (refineryOrders == null or refineryOrders.isEmpty())}" th:text="#{mission.finance.empty}">Keine Finanzdaten vorhanden.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<!-- Column 4: Economy (Refinery & Inventory) -->
+        <div class="mission-column" id="col-economy" th:if="${!isNew and ((mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)) or (mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries)))}" sec:authorize="isAuthenticated()">
+            <div class="vertical-title" onclick="toggleColumn('col-economy')" th:text="#{mission.economy}">Wirtschaft</div>
+            <div class="col-header" onclick="toggleColumn('col-economy')">
+                <h2 th:text="#{mission.economy}">Wirtschaft</h2>
+                <span class="toggle-icon">-</span>
+            </div>
+            <div class="col-content">
+                <div class="hud-box">
+                    <!-- Refinery Orders -->
+                    <details class="hud-details" open th:if="${mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)}">
+                        <summary th:text="#{mission.refinery_orders}">Raffinerieaufträge</summary>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{refinery.user}">Nutzer</th>
+                                        <th th:text="#{refinery.location}">Standort</th>
+                                        <th th:text="#{refinery.ends_at}">Ende</th>
+                                        <th th:text="#{refinery.status}">Status</th>
+                                        <th th:text="#{nav.materials}">Materialien</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="order : ${mission.refineryOrders}">
+                                        <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
+                                        <td th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
+                                        <td th:text="${order.startedAt != null and order.durationMinutes != null ? #temporals.format(order.startedAt.plusSeconds(order.durationMinutes * 60), 'dd.MM.yyyy HH:mm') : '-'}">Ende</td>
+                                        <td th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
+                                        <td style="padding: 0.5rem;">
+                                            <table th:if="${order.goods != null and !#lists.isEmpty(order.goods)}" style="margin: 0; background: transparent;">
+                                                <thead>
+                                                    <tr>
+                                                        <th th:text="#{refinery.material}" style="background: transparent; padding: 0.25rem 0.5rem;">Material</th>
+                                                        <th th:text="#{refinery.amount} + ' (SCU)'" style="background: transparent; padding: 0.25rem 0.5rem;">Menge (SCU)</th>
+                                                        <th th:text="#{refinery.quality}" style="background: transparent; padding: 0.25rem 0.5rem;">Qualität</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr th:each="good : ${order.goods}" style="background: transparent;">
+                                                        <td th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}" style="padding: 0.25rem 0.5rem; border-bottom: none;">Material</td>
+                                                        <td th:text="${good.outputQuantity != null ? #numbers.formatDecimal(good.outputQuantity, 1, 3) : '-'}" style="padding: 0.25rem 0.5rem; border-bottom: none;">Menge</td>
+                                                        <td th:text="${good.quality != null ? good.quality : '-'}" style="padding: 0.25rem 0.5rem; border-bottom: none;">Qualität</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}" style="padding: 0.5rem; display: block;">-</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+
+                    <!-- Inventory Entries -->
+                    <details class="hud-details" open th:if="${mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries)}">
+                        <summary th:text="#{mission.inventory_entries}">Lagereinträge</summary>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{inventory.user}">Nutzer</th>
+                                        <th th:text="#{inventory.location}">Standort</th>
+                                        <th th:text="#{inventory.material}">Material</th>
+                                        <th th:text="#{inventory.amount}">Menge</th>
+                                        <th th:text="#{inventory.quality}">Qualität</th>
+                                        <th th:text="#{inventory.order}">Auftrag</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="item : ${mission.inventoryEntries}">
+                                        <td th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
+                                        <td th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
+                                        <td th:text="${item.material != null ? item.material.name : '-'}">Material</td>
+                                        <td th:text="${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 3) : '-'}">Menge</td>
+                                        <td th:text="${item.quality != null ? item.quality : '-'}">Qualität</td>
+                                        <td th:text="${item.jobOrderDisplayId != null ? '#' + item.jobOrderDisplayId : '-'}">Auftrag</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+            </div> <!-- End mission-columns-container -->
+</div> <!-- End page-wrapper -->
+
+    <!-- Add Participant Modal -->
+    <div id="participant-modal" class="modal" th:style="${openModal == 'participant-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}">
+        <div class="modal-content hud-box">
+            <span class="close-participant-modal close-modal">&times;</span>
+            <h2 th:text="#{mission.participant.add}">Teilnehmer hinzufügen</h2>
+            <form th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
+                <div class="form-group" sec:authorize="isAnonymous()">
+                    <label th:text="#{mission.participant.name}">Name</label>
+                    <input type="text" name="guestName" th:value="*{guestName}" required>
+                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group" style="position: relative;" sec:authorize="isAuthenticated()">
+                    <label th:text="#{mission.participant.name}">Name</label>
+                    <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.guest_name_placeholder}">
+                    <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
+                    <div id="participant-search-results" class="autocomplete-items"></div>
+                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{admin.mission_data.squadrons}">Staffel</label>
+                    <select name="squadronId" id="participant-squadron">
+                        <option value="">-</option>
+                        <option th:if="${squadrons}" th:each="sq : ${squadrons}" th:value="${sq.id}" th:text="${sq.name}" th:selected="${participantForm.squadronId != null and participantForm.squadronId.toString() == sq.id.toString()}">IRIDIUM</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label th:text="#{mission.participant.desired_job}">Job</label>
+                    <select name="desiredJobTypeId">
+                        <option value="">-</option>
+                        <option th:if="${jobTypes}" th:each="job : ${jobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${participantForm.desiredJobTypeId != null and participantForm.desiredJobTypeId.toString() == job.id.toString()}">Fleet Commander</option>
+                    </select>
+                </div>
+                
+                
+                <div class="form-group">
+                    <label th:text="#{mission.participant.comment}">Kommentar</label>
+                    <textarea name="comment" rows="3" th:text="*{comment}"></textarea>
+                    <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+    <!-- Edit Participant Modal -->
+    <div id="edit-participant-modal" class="modal" style="display:none;" th:if="${!isNew}">
+        <div class="modal-content hud-box">
+            <span class="close-edit-participant-modal close-modal">&times;</span>
+            <h2 th:text="#{members.edit}">Bearbeiten</h2>
+            <form id="edit-participant-form" method="post" th:action="${modalAction != null && openModal == 'edit-participant-modal'} ? ${modalAction} : @{/missions}">
+                <input type="hidden" name="version" id="edit-participant-version">
+                <div class="form-group">
+                    <label th:text="#{mission.participant.desired_job}">Job</label>
+                    <select name="desiredJobTypeId" id="edit-job">
+                        <option value="">-</option>
+                        <option th:if="${jobTypes}" th:each="job : ${jobTypes}" th:value="${job.id}" th:text="${job.name}">Pilot</option>
+                    </select>
+                </div>
+
+                <div class="form-group" th:if="${mission.canEdit}">
+                    <label th:text="#{mission.participant.planned_job}">Zugewiesener Job</label>
+                    <select name="plannedMissionJobTypeId" id="edit-planned-job">
+                        <option value="">-</option>
+                        <option th:if="${jobTypes}" th:each="job : ${jobTypes}" th:value="${job.id}" th:text="${job.name}">Pilot</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{admin.mission_data.squadrons}">Staffel</label>
+                    <select name="squadronId" id="edit-squadron">
+                        <option value="">-</option>
+                        <option th:if="${squadrons}" th:each="sq : ${squadrons}" th:value="${sq.id}" th:text="${sq.name}">Alpha</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{mission.participant.payout_preference}">Auszahlungsart</label>
+                    <select name="payoutPreference" id="edit-payout-preference">
+                        <option value="PAYOUT" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
+                        <option value="DONATE" th:text="#{mission.payout.preference.donate}">Spenden</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{mission.participant.comment}">Kommentar</label>
+                    <textarea name="comment" id="edit-comment" rows="3"></textarea>
+                </div>
+
+                <input type="hidden" name="startTime" id="edit-participant-start-time-hidden">
+                <input type="hidden" name="endTime" id="edit-participant-end-time-hidden">
+                
+                <div class="form-group" th:if="${mission.canEdit}">
+                    <label th:text="#{mission.participant.start_time}">Startzeit</label>
+                    <input type="datetime-local" id="edit-participant-start-time-ui">
+                </div>
+
+                <div class="form-group" th:if="${mission.canEdit}">
+                    <label th:text="#{mission.participant.end_time}">Endzeit</label>
+                    <input type="datetime-local" id="edit-participant-end-time-ui">
+                </div>
+                
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+    <!-- Add Unit Modal -->
+    <div id="add-unit-modal" class="modal" th:style="${openModal == 'unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}">
+        <div class="modal-content hud-box" 
+             th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
+             th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
+            <span class="close-add-unit-modal close-modal">&times;</span>
+            <h2 th:text="#{mission.unit.add}">Einheit hinzufügen</h2>
+            <form th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
+                <div class="form-group">
+                    <label th:text="#{mission.unit.name}">Name</label>
+                    <input type="text" name="name" th:value="*{name}" required>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Schiffstyp</label>
+                    <select name="shipTypeId" id="add-unit-shiptype">
+                        <option value="" selected>-</option>
+                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.name}">ShipType</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.ship}">Schiff (optional)</label>
+                    <select name="shipId" id="add-unit-ship" disabled>
+                        <option value="" selected>-</option>
+                        <option th:each="ship : ${allShips}" 
+                                th:value="${ship.id}" 
+                                th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
+                                th:data-type-id="${ship.shipType.id}"
+                                hidden disabled>Ship</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.frequency}">Frequenz</label>
+                    <input type="number" step="0.01" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
+                    <label for="hvu-check" style="margin:0;" th:text="#{mission.unit.hvu}">HVU</label>
+                </div>
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Frequency Modal -->
+    <div id="frequency-modal" class="modal" style="display:none;" th:if="${!isNew}">
+        <div class="modal-content hud-box">
+            <span class="close-frequency-modal close-modal">&times;</span>
+            <h2 th:text="#{admin.mission_data.frequency_types}">Frequenz zuweisen</h2>
+            <form id="frequency-form" method="post" th:action="@{/missions}">
+                <input type="hidden" name="frequencyTypeId" id="freq-type-id" value="">
+                <div class="form-group">
+                    <label th:text="#{mission.unit.frequency}">Frequenz (z.B. 123.45)</label>
+                    <input type="number" step="0.01" min="0" max="999.99" name="value" id="freq-value" required>
+                </div>
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Unit Modal -->
+    <div id="edit-unit-modal" class="modal" th:style="${openModal == 'edit-unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}">
+        <div class="modal-content hud-box" 
+             th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
+             th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
+            <span class="close-edit-unit-modal close-modal">&times;</span>
+            <h2 th:text="#{mission.unit.edit}">Einheit bearbeiten</h2>
+            <form id="edit-unit-form" method="post" th:action="${modalAction != null && openModal == 'edit-unit-modal'} ? ${modalAction} : @{/missions}" th:object="${unitForm}">
+                <div class="form-group">
+                    <label th:text="#{mission.unit.name}">Name</label>
+                    <input type="text" name="name" id="edit-unit-name" th:value="*{name}" required>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Schiffstyp</label>
+                    <select name="shipTypeId" id="edit-unit-shiptype">
+                        <option value="" selected>-</option>
+                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.name}">ShipType</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.ship}">Schiff (optional)</label>
+                    <select name="shipId" id="edit-unit-ship" disabled>
+                        <option value="">-</option>
+                        <option th:each="ship : ${allShips}" 
+                                th:value="${ship.id}" 
+                                th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
+                                th:data-type-id="${ship.shipType.id}"
+                                hidden disabled>Ship</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.frequency}">Frequenz</label>
+                    <input type="number" step="0.01" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
+                    <label for="edit-unit-hvu" style="margin:0;" th:text="#{mission.unit.hvu}">HVU</label>
+                </div>
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Crew Modal -->
+    <div id="assign-crew-modal" class="modal" th:style="${openModal == 'assign-crew-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}">
+        <div class="modal-content hud-box">
+            <span class="close-assign-crew-modal close-modal">&times;</span>
+            <h2 th:text="#{mission.unit.assign_crew}">Crew zuweisen</h2>
+            <form id="assign-crew-form" method="post" th:action="${modalAction != null && openModal == 'assign-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
+                <div class="form-group">
+                    <label th:text="#{mission.participant.name}">Teilnehmer</label>
+                    <select name="participantId" required>
+                        <option value="" disabled selected>-</option>
+                        <option th:each="p : ${mission?.participants}"
+                                th:value="${p?.id}" 
+                                th:text="${p?.user != null ? (!#strings.isEmpty(p.user.displayName) ? p.user.displayName : p.user.username) : p?.guestName}" th:selected="${crewForm.participantId == p?.id}">User</option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{admin.mission_data.job_types}">Aufgaben</label>
+                    <select name="jobTypeIds" multiple style="height: 100px;">
+                        <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
+                    </select>
+                    <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
+                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Crew Modal -->
+    <div id="edit-crew-modal" class="modal" th:style="${openModal == 'edit-crew-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}">
+        <div class="modal-content hud-box">
+            <span class="close-edit-crew-modal close-modal">&times;</span>
+            <h2 th:text="#{mission.unit.edit_crew}">Crew bearbeiten</h2>
+            <form id="edit-crew-form" method="post" th:action="${modalAction != null && openModal == 'edit-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
+                <div class="form-group">
+                    <label th:text="#{admin.mission_data.job_types}">Aufgaben</label>
+                    <select name="jobTypeIds" id="edit-crew-jobs" multiple style="height: 100px;">
+                        <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
+                    </select>
+                    <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
+                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Finance Entry Modal -->
+    <div id="finance-modal" class="modal" th:style="${openModal == 'finance-entry-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}">
+        <div class="modal-content hud-box">
+            <span class="close-finance-modal close-modal" onclick="document.getElementById('finance-modal').style.display='none';">&times;</span>
+            <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzufügen</h2>
+            <form th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
+                <div class="form-group">
+                    <label th:text="#{mission.finance.user}">Nutzer</label>
+                    <select name="participantId" required>
+                        <option value="" disabled selected th:text="#{general.select_placeholder}">- Bitte wählen -</option>
+                        <option th:each="p : ${participants}"
+                                th:value="${p.id}" 
+                                th:text="${p.user != null ? p.user.effectiveName : p.guestName}"
+                                th:selected="${financeForm.participantId != null and financeForm.participantId.toString() == p.id.toString()}"></option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{mission.finance.type}">Typ</label>
+                    <select name="type" required>
+                        <option value="INCOME" th:text="#{mission.finance.type.income}" th:selected="${financeForm.type != null and financeForm.type.name() == 'INCOME'}">Einnahme</option>
+                        <option value="EXPENSE" th:text="#{mission.finance.type.expense}" th:selected="${financeForm.type != null and financeForm.type.name() == 'EXPENSE'}">Ausgabe</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
+                    <input type="number" step="0.01" min="0" name="amount" th:value="*{amount}" required>
+                    <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label th:text="#{mission.finance.note}">Notiz</label>
+                    <textarea name="note" rows="2" th:text="*{note}"></textarea>
+                </div>
+                
+                <button type="submit" class="btn" th:text="#{general.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Finance Entry Modal -->
+    <div id="edit-finance-entry-modal" class="modal" th:style="${openModal == 'edit-finance-entry-modal' ? 'display:flex;' : 'display:none;'}" sec:authorize="isAuthenticated()" th:if="${!isNew}">
+        <div class="modal-content hud-box">
+            <span class="close-edit-finance-modal close-modal" onclick="document.getElementById('edit-finance-entry-modal').style.display='none';">&times;</span>
+            <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
+            <form id="edit-finance-form" method="post" th:action="${modalAction != null && openModal == 'edit-finance-entry-modal'} ? ${modalAction} : @{/missions}">
+                <input type="hidden" id="edit-finance-version" name="version">
+                
+                <div class="form-group">
+                    <label th:text="#{mission.finance.type}">Typ</label>
+                    <select name="type" id="edit-finance-type" required>
+                        <option value="INCOME" th:text="#{mission.finance.type.income}">Einnahme</option>
+                        <option value="EXPENSE" th:text="#{mission.finance.type.expense}">Ausgabe</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
+                    <input type="number" step="0.01" min="0" name="amount" id="edit-finance-amount" required>
+                </div>
+                
+                <div class="form-group">
+                    <label th:text="#{mission.finance.note}">Notiz</label>
+                    <textarea name="note" id="edit-finance-note" rows="2"></textarea>
+                </div>
+                
+                <button type="submit" class="btn" th:text="#{general.save}">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
+        <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+            <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
+            <p th:text="#{info.delete.confirm.message}" style="margin-bottom: 2rem;">Wirklich löschen?</p>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <form id="delete-confirm-form" th:action="@{/missions}" method="post" style="margin:0;">
+                    <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                </form>
+            </div>
+        </div>
+    </div>
+<script th:inline="javascript">
+    const MSG_ERROR_PAYOUT_UPDATE = /*[[#{error.mission.payout.update}]]*/ 'Error updating payout preference';
+    const MSG_ERROR_PERMISSION_DENIED = /*[[#{error.permission.denied}]]*/ 'Permission denied';
+    const MSG_ERROR_MANAGER_ADD = /*[[#{error.mission.manager.add}]]*/ 'Error adding manager';
+    const MSG_ERROR_MANAGER_REMOVE = /*[[#{error.mission.manager.remove}]]*/ 'Error removing manager';
+    const MSG_SUCCESS_MANAGER_ADD = /*[[#{notification.success.mission.manager.add}]]*/ 'Manager added';
+    const MSG_SUCCESS_MANAGER_REMOVE = /*[[#{notification.success.mission.manager.remove}]]*/ 'Manager removed';
+    const MSG_SUCCESS_OWNER_CHANGE = /*[[#{mission.owner.success}]]*/ 'Owner changed successfully';
+    const MSG_ERROR_OWNER_CHANGE = /*[[#{error.mission.owner.change}]]*/ 'Error changing owner';
+    const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.owner.confirm}]]*/ 'Are you sure you want to change the owner?';
+    const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
+    const missionId = /*[[${mission?.id?.toString()}]]*/ null;
+    window.missionId = missionId;
+    console.log('Mission ID initialized:', missionId);
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Restore column states
+        ['col-details', 'col-organisation', 'col-participants', 'col-units', 'col-economy', 'col-finance'].forEach(colId => {
+            const col = document.getElementById(colId);
+            if (col && localStorage.getItem('mission-' + colId + '-collapsed') === 'true') {
+                col.classList.add('collapsed');
+            } else if (col && localStorage.getItem('mission-' + colId + '-collapsed') === 'false') {
+                col.classList.remove('collapsed');
+            }
+        });
+        // Modal Logic
+        const pModal = document.getElementById('participant-modal');
+        const pBtn = document.getElementById('add-participant-btn');
+        const pClose = document.querySelector('.close-participant-modal');
+        
+        if (pBtn && pModal) {
+            pBtn.onclick = function() { pModal.style.display = "flex"; }
+        }
+        if (pClose && pModal) {
+            pClose.onclick = function() { pModal.style.display = "none"; }
+        }
+        
+        // Edit Modal Logic
+        const eModal = document.getElementById('edit-participant-modal');
+        const eForm = document.getElementById('edit-participant-form');
+        const eJob = document.getElementById('edit-job');
+        const ePlannedJob = document.getElementById('edit-planned-job');
+        const eSquadron = document.getElementById('edit-squadron');
+        const eComment = document.getElementById('edit-comment');
+        const eClose = document.querySelector('.close-edit-participant-modal');
+        
+        if (eModal) {
+            document.querySelectorAll('.edit-participant-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    eForm.action = this.getAttribute('data-action');
+                    eJob.value = this.getAttribute('data-job');
+                    if(ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
+                    if(eSquadron) eSquadron.value = this.getAttribute('data-squadron');
+                    eComment.value = this.getAttribute('data-comment');
+                    
+                    const ePayout = document.getElementById('edit-payout-preference');
+                    if(ePayout) ePayout.value = this.getAttribute('data-payout-preference') || 'PAYOUT';
+                    
+                    const eVersion = document.getElementById('edit-participant-version');
+                    const eStartTimeHidden = document.getElementById('edit-participant-start-time-hidden');
+                    const eEndTimeHidden = document.getElementById('edit-participant-end-time-hidden');
+                    const eStartTimeUi = document.getElementById('edit-participant-start-time-ui');
+                    const eEndTimeUi = document.getElementById('edit-participant-end-time-ui');
+                    
+                    if(eVersion) eVersion.value = this.getAttribute('data-version') || '';
+                    
+                    function toLocalISOString(dateStr) {
+                        if (!dateStr || dateStr === 'null') return '';
+                        // Date string is expected to be already in Europe/Berlin format 'YYYY-MM-DDThh:mm'
+                        // Just return it directly for datetime-local input
+                        if (dateStr.length > 16) {
+                            return dateStr.substring(0, 16);
+                        }
+                        return dateStr;
+                    }
+                    
+                    if (eStartTimeHidden) eStartTimeHidden.value = this.getAttribute('data-start-time') || '';
+                    if (eEndTimeHidden) eEndTimeHidden.value = this.getAttribute('data-end-time') || '';
+                    if (eStartTimeUi) eStartTimeUi.value = toLocalISOString(this.getAttribute('data-start-time-formatted'));
+                    if (eEndTimeUi) eEndTimeUi.value = toLocalISOString(this.getAttribute('data-end-time-formatted'));
+
+                    eModal.style.display = 'flex';
+                });
+            });
+            
+            if (eClose) eClose.onclick = function() { eModal.style.display = 'none'; }
+            
+            if (eForm) {
+                eForm.addEventListener('submit', function(e) {
+                    const eStartTimeUi = document.getElementById('edit-participant-start-time-ui');
+                    const eEndTimeUi = document.getElementById('edit-participant-end-time-ui');
+                    const eStartTimeHidden = document.getElementById('edit-participant-start-time-hidden');
+                    const eEndTimeHidden = document.getElementById('edit-participant-end-time-hidden');
+                    
+                    function toUtcISOString(localDateStr) {
+                        // localDateStr is already YYYY-MM-DDThh:mm and will be handled by the server
+                        // Backend will parse this as Europe/Berlin timezone
+                        return localDateStr || '';
+                    }
+                    
+                    // Only overwrite hidden fields if UI fields are rendered (user has permission to edit times)
+                    if (eStartTimeUi !== null && eStartTimeHidden) {
+                        eStartTimeHidden.value = toUtcISOString(eStartTimeUi.value);
+                    }
+                    if (eEndTimeUi !== null && eEndTimeHidden) {
+                        eEndTimeHidden.value = toUtcISOString(eEndTimeUi.value);
+                    }
+                });
+            }
+        }
+
+        const frequencyModal = document.getElementById('frequency-modal');
+        const frequencyForm = document.getElementById('frequency-form');
+        const closeFrequencyModal = document.querySelector('.close-frequency-modal');
+
+        if (frequencyModal) {
+            document.querySelectorAll('.set-freq-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    frequencyForm.action = this.getAttribute('data-action');
+                    document.getElementById('freq-type-id').value = this.getAttribute('data-type-id');
+                    document.getElementById('freq-value').value = '';
+                    frequencyModal.style.display = 'flex';
+                });
+            });
+
+            if (closeFrequencyModal) {
+                closeFrequencyModal.onclick = function() {
+                    frequencyModal.style.display = 'none';
+                }
+            }
+        }
+
+
+        // Autocomplete Logic
+        const searchInput = document.getElementById('participant-search-input');
+        const userIdInput = document.getElementById('participant-user-id');
+        const resultsDiv = document.getElementById('participant-search-results');
+
+        // Delete Modal Logic
+        const deleteModal = document.getElementById('delete-confirm-modal');
+        const deleteForm = document.getElementById('delete-confirm-form');
+        const deleteClose = document.querySelectorAll('.close-delete-modal');
+
+        if (deleteModal) {
+            document.querySelectorAll('.delete-participant-btn, .delete-unit-btn, .delete-crew-btn, .delete-mission-btn, .delete-finance-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    deleteForm.action = this.getAttribute('data-action');
+                    deleteModal.style.display = 'flex';
+                });
+            });
+
+            deleteClose.forEach(btn => {
+                btn.onclick = function() { deleteModal.style.display = 'none'; }
+            });
+        }
+
+        // Add Unit & Crew Logic
+        const addUnitModal = document.getElementById('add-unit-modal');
+        const addUnitBtn = document.getElementById('add-unit-btn');
+        const closeAddUnit = document.querySelector('.close-add-unit-modal');
+
+        if (addUnitBtn && addUnitModal) {
+            addUnitBtn.onclick = function() { addUnitModal.style.display = "flex"; }
+        }
+        if (closeAddUnit && addUnitModal) {
+            closeAddUnit.onclick = function() { addUnitModal.style.display = "none"; }
+        }
+
+        const assignCrewModal = document.getElementById('assign-crew-modal');
+        const assignCrewForm = document.getElementById('assign-crew-form');
+        const closeAssignCrew = document.querySelector('.close-assign-crew-modal');
+
+        const editUnitModal = document.getElementById('edit-unit-modal');
+        const editUnitForm = document.getElementById('edit-unit-form');
+        const closeEditUnit = document.querySelector('.close-edit-unit-modal');
+        const editUnitName = document.getElementById('edit-unit-name');
+        const editUnitShiptype = document.getElementById('edit-unit-shiptype');
+        const editUnitShip = document.getElementById('edit-unit-ship');
+        const editUnitFrequency = document.getElementById('edit-unit-frequency');
+        const editUnitHvu = document.getElementById('edit-unit-hvu');
+
+        if (assignCrewModal) {
+            document.querySelectorAll('.assign-crew-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    assignCrewForm.action = this.getAttribute('data-action');
+                    assignCrewModal.style.display = 'flex';
+                });
+            });
+            if (closeAssignCrew) {
+                closeAssignCrew.onclick = function() { assignCrewModal.style.display = "none"; }
+            }
+        }
+
+        if (editUnitModal) {
+            document.querySelectorAll('.edit-unit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    editUnitForm.action = this.getAttribute('data-action');
+                    editUnitName.value = this.getAttribute('data-name') || '';
+                    const shiptypeVal = this.getAttribute('data-shiptype') || '';
+                    const shipVal = this.getAttribute('data-ship') || '';
+                    const editTypeSelect = document.getElementById("edit-unit-shiptype");
+                    const editShipSelect = document.getElementById("edit-unit-ship");
+                    if (editTypeSelect && editShipSelect) {
+                        editTypeSelect.value = shiptypeVal;
+                        editTypeSelect.dispatchEvent(new Event('change'));
+                        if (shipVal) {
+                            editShipSelect.value = shipVal;
+                        }
+                    }
+                    const freqVal = this.getAttribute('data-frequency');
+                    editUnitFrequency.value = freqVal != null ? freqVal : '';
+                    const hvuVal = this.getAttribute('data-hvu') === 'true';
+                    editUnitHvu.checked = hvuVal;
+                    editUnitModal.style.display = 'flex';
+                });
+            });
+            if (closeEditUnit) {
+                closeEditUnit.onclick = function() { editUnitModal.style.display = 'none'; }
+            }
+        }
+
+        const editCrewModal = document.getElementById('edit-crew-modal');
+        const editCrewForm = document.getElementById('edit-crew-form');
+        const editCrewJobs = document.getElementById('edit-crew-jobs');
+        const closeEditCrew = document.querySelector('.close-edit-crew-modal');
+
+        if (editCrewModal) {
+            document.querySelectorAll('.edit-crew-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    editCrewForm.action = this.getAttribute('data-action');
+                    const jobIds = (this.getAttribute('data-jobs') || '').split(',');
+                    
+                    // Reset selection
+                    for (let i = 0; i < editCrewJobs.options.length; i++) {
+                        editCrewJobs.options[i].selected = false;
+                    }
+                    // Set selection
+                    if (jobIds) {
+                        for (let i = 0; i < editCrewJobs.options.length; i++) {
+                            if (jobIds.includes(editCrewJobs.options[i].value)) {
+                                editCrewJobs.options[i].selected = true;
+                            }
+                        }
+                    }
+                    
+                    editCrewModal.style.display = 'flex';
+                });
+            });
+            if (closeEditCrew) {
+                closeEditCrew.onclick = function() { editCrewModal.style.display = 'none'; }
+            }
+        }
+
+        window.addEventListener('click', function(event) {
+            if (deleteModal && event.target == deleteModal) {
+                deleteModal.style.display = 'none';
+            }
+            if (event.target == pModal) {
+                pModal.style.display = "none";
+            }
+            if (eModal && event.target == eModal) {
+                eModal.style.display = "none";
+            }
+            if (frequencyModal && event.target == frequencyModal) {
+                frequencyModal.style.display = "none";
+            }
+            if (addUnitModal && event.target == addUnitModal) {
+                addUnitModal.style.display = 'none';
+            }
+            if (assignCrewModal && event.target == assignCrewModal) {
+                assignCrewModal.style.display = 'none';
+            }
+            if (editUnitModal && event.target == editUnitModal) {
+                editUnitModal.style.display = 'none';
+            }
+            if (editCrewModal && event.target == editCrewModal) {
+                editCrewModal.style.display = 'none';
+            }
+        });
+
+        if (searchInput && resultsDiv && userIdInput) {
+            let debounceTimer;
+
+            searchInput.addEventListener('input', function(e) {
+                const val = this.value;
+
+                // Reset ID on any input change
+                userIdInput.value = '';
+
+                clearTimeout(debounceTimer);
+
+                if (!val) {
+                    closeAllLists();
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    fetch('/users/search?query=' + encodeURIComponent(val))
+                        .then(response => {
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            return response.json();
+                        })
+                        .then(users => {
+                            closeAllLists();
+                            if (!users || users.length === 0) return;
+
+                            users.forEach(user => {
+                                const div = document.createElement("div");
+                                const regex = new RegExp("(" + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ")", "gi");
+                                const displayName = user.effectiveName;
+                                const nameHighlighted = displayName.replace(regex, "<strong>$1</strong>");
+
+                                div.innerHTML = nameHighlighted;
+
+                                div.addEventListener("click", function(e) {
+                                    searchInput.value = displayName;
+                                    userIdInput.value = user.id;
+                                    closeAllLists();
+                                });
+                                resultsDiv.appendChild(div);
+                            });
+                        })
+                        .catch(err => console.error('Error fetching users:', err));
+                }, 300);
+            });
+
+            function closeAllLists() {
+                while (resultsDiv.firstChild) {
+                    resultsDiv.removeChild(resultsDiv.firstChild);
+                }
+            }
+
+            document.addEventListener("click", function (e) {
+                if (e.target !== searchInput) {
+                    closeAllLists();
+                }
+            });
+        }
+
+    // JS logic for finance user autocomplete removed
+    });
+
+    function setNowToInput(inputId) {
+        const input = document.getElementById(inputId);
+        if (input) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            input.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+    }
+
+    async function changeMissionOwner() {
+        const userId = document.getElementById('new-owner-id').value;
+        if (!userId || userId.trim() === "") {
+            showFrontendErrorToast(typeof MSG_ERROR_USER_REQUIRED !== 'undefined' ? MSG_ERROR_USER_REQUIRED : 'Bitte wählen Sie einen Benutzer aus');
+            return;
+        }
+
+        if (!confirm(typeof MSG_CONFIRM_OWNER_CHANGE !== 'undefined' ? MSG_CONFIRM_OWNER_CHANGE : 'Möchten Sie den Besitzer dieses Einsatzes wirklich ändern?')) {
+            return;
+        }
+
+        try {
+            const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+            if (!currentMissionId) {
+                console.error('Mission ID not found');
+                showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+            const headers = {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            };
+            if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+                headers[csrfHeader] = csrfToken;
+            }
+
+            const cleanMissionId = String(currentMissionId).trim();
+            const cleanUserId = String(userId).trim();
+            
+            const targetUrl = `/missions/${cleanMissionId}/owner/${cleanUserId}`;
+            
+            const resp = await fetch(targetUrl, {
+                method: 'PUT',
+                headers: headers
+            });
+            
+            if (resp.ok) {
+                showFrontendSuccessToast(typeof MSG_SUCCESS_OWNER_CHANGE !== 'undefined' ? MSG_SUCCESS_OWNER_CHANGE : 'Besitzer erfolgreich geändert');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const errorText = await resp.text();
+                showFrontendErrorToast(`${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Status: ${resp.status})`);
+            }
+        } catch (err) {
+            showFrontendErrorToast(`${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Error: ${err.message})`);
+        }
+    }
+
+    async function removeMissionManager(userId) {
+        if (!confirm('Möchten Sie diesen Verwalter wirklich entfernen?')) return;
+        try {
+            const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+            if (!currentMissionId) {
+                console.error('Mission ID not found');
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+            const headers = { 'Accept': 'application/json' };
+            if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+                headers[csrfHeader] = csrfToken;
+            }
+
+            const resp = await fetch(`/missions/${currentMissionId}/managers/${userId}`, {
+                method: 'DELETE',
+                headers: headers
+            });
+            if (resp.ok) {
+                showFrontendSuccessToast(MSG_SUCCESS_MANAGER_REMOVE);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showFrontendErrorToast(MSG_ERROR_MANAGER_REMOVE);
+            }
+        } catch (err) {
+            console.error(err);
+            showFrontendErrorToast(MSG_ERROR_MANAGER_REMOVE);
+        }
+    }
+
+    async function addMissionManager() {
+        const userId = document.getElementById('new-manager-id').value;
+        if (!userId || userId.trim() === "") {
+            showFrontendErrorToast(typeof MSG_ERROR_USER_REQUIRED !== 'undefined' ? MSG_ERROR_USER_REQUIRED : 'Bitte wählen Sie einen Benutzer aus');
+            return;
+        }
+        try {
+            const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+            if (!currentMissionId) {
+                console.error('Mission ID not found');
+                showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+            const headers = { 
+                'Accept': 'application/json'
+            };
+            if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+                headers[csrfHeader] = csrfToken;
+            }
+
+            console.log(`Attempting to add manager ${userId} to mission ${currentMissionId}`);
+            // Ensure IDs are trimmed and no extra characters
+            const cleanMissionId = String(currentMissionId).trim();
+            const cleanUserId = String(userId).trim();
+            
+            const targetUrl = `/missions/${cleanMissionId}/managers/${cleanUserId}`;
+            console.log(`POSTing to: ${targetUrl}`);
+            
+            const resp = await fetch(targetUrl, {
+                method: 'POST',
+                headers: headers
+            });
+            
+            if (resp.ok) {
+                console.log('Successfully added manager');
+                showFrontendSuccessToast(MSG_SUCCESS_MANAGER_ADD);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const errorText = await resp.text();
+                console.error(`Failed to add manager. Status: ${resp.status}, Body: ${errorText}`);
+                showFrontendErrorToast(`${MSG_ERROR_MANAGER_ADD} (Status: ${resp.status})`);
+            }
+        } catch (err) {
+            console.error('Network or unexpected error:', err);
+            showFrontendErrorToast(`${MSG_ERROR_MANAGER_ADD} (Error: ${err.message})`);
+        }
+    }
+
+    function toggleColumn(colId) {
+        const col = document.getElementById(colId);
+        if (col) {
+            col.classList.toggle('collapsed');
+            localStorage.setItem('mission-' + colId + '-collapsed', col.classList.contains('collapsed'));
+        }
+    }
+
+    function updatePayoutPreference(selectElement) {
+        const url = selectElement.getAttribute('data-payout-url');
+        const value = selectElement.value;
+        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+            headers[csrfHeader] = csrfToken;
+        }
+
+        fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ preference: value })
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    showFrontendErrorToast(MSG_ERROR_PERMISSION_DENIED);
+                } else {
+                    showFrontendErrorToast(MSG_ERROR_PAYOUT_UPDATE);
+                }
+                selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
+            } else {
+                selectElement.setAttribute('data-original-value', value);
+                const participantId = selectElement.getAttribute('data-participant-id');
+                if (participantId) {
+                    document.querySelectorAll('.edit-participant-btn[data-participant-id="' + participantId + '"]').forEach(btn => {
+                        btn.setAttribute('data-payout-preference', value);
+                    });
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showFrontendErrorToast(MSG_ERROR_PAYOUT_UPDATE);
+        });
+    }
+
+    function toggleUnit(contentId, headerDiv) {
+        const content = document.getElementById(contentId);
+        const icon = headerDiv.querySelector('.unit-toggle-icon');
+        const summaryId = contentId.replace('unit-content-', 'unit-summary-');
+        const summary = document.getElementById(summaryId);
+        
+        if (content) {
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                if (summary) summary.style.display = 'none';
+                if (icon) icon.textContent = '-';
+                localStorage.setItem('mission-' + contentId + '-collapsed', 'false');
+            } else {
+                content.style.display = 'none';
+                if (summary) summary.style.display = 'flex';
+                if (icon) icon.textContent = '+';
+                localStorage.setItem('mission-' + contentId + '-collapsed', 'true');
+            }
+        }
+    }
+
+    </script>
+    <script th:inline="javascript" th:if="${!isNew}">
+    function openEditFinanceModal(id, note, type, amount, version) {
+        document.getElementById('edit-finance-form').action = '/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update';
+        document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
+        document.getElementById('edit-finance-type').value = type;
+        document.getElementById('edit-finance-amount').value = amount;
+        document.getElementById('edit-finance-version').value = version;
+        document.getElementById('edit-finance-entry-modal').style.display = 'flex';
+    }
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.unit-content').forEach(content => {
+            const isCollapsed = localStorage.getItem('mission-' + content.id + '-collapsed') === 'true';
+            if (isCollapsed) {
+                content.style.display = 'none';
+                const summaryId = content.id.replace('unit-content-', 'unit-summary-');
+                const summary = document.getElementById(summaryId);
+                if (summary) summary.style.display = 'flex';
+                
+                const parentBox = content.closest('.hud-box');
+                if (parentBox) {
+                    const icon = parentBox.querySelector('.unit-toggle-icon');
+                    if (icon) icon.textContent = '+';
+                }
+            }
+        });
+
+        function setupShipFilter(typeSelectId, shipSelectId) {
+            const typeSelect = document.getElementById(typeSelectId);
+            const shipSelect = document.getElementById(shipSelectId);
+            if (!typeSelect || !shipSelect) return;
+
+            function filterShips(resetShip = true) {
+                const selectedType = typeSelect.value;
+                if (!selectedType) {
+                    shipSelect.disabled = true;
+                    if (resetShip) shipSelect.value = "";
+                } else {
+                    shipSelect.disabled = false;
+                }
+
+                Array.from(shipSelect.options).forEach(opt => {
+                    if (!opt.value) return;
+                    if (opt.dataset.typeId === selectedType) {
+                        opt.hidden = false;
+                        opt.disabled = false;
+                    } else {
+                        opt.hidden = true;
+                        opt.disabled = true;
+                        if (resetShip && shipSelect.value === opt.value) {
+                            shipSelect.value = "";
+                        }
+                    }
+                });
+            }
+
+            typeSelect.addEventListener("change", () => filterShips(true));
+
+            const modal = typeSelect.closest('.modal-content');
+            if (modal) {
+                const initialType = modal.dataset.initShiptype;
+                const initialShip = modal.dataset.initShip;
+                if (initialType) {
+                    typeSelect.value = initialType;
+                    filterShips(false);
+                    if (initialShip) {
+                        shipSelect.value = initialShip;
+                    }
+                }
+            }
+        }
+
+        setupShipFilter("add-unit-shiptype", "add-unit-ship");
+        setupShipFilter("edit-unit-shiptype", "edit-unit-ship");
+    });
+</script>
+</body>
+</html>

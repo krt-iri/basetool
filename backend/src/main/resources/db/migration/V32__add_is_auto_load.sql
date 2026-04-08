@@ -1,0 +1,1 @@
+ALTER TABLE terminal ADD COLUMN is_auto_load BOOLEAN;

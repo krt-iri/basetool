@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.locations.title} + ' - ' + #{app.title}">Orte - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .data-section {
+            margin-bottom: 3rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.8rem;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.locations.title}">Orte verwalten</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <!-- Locations Section -->
+        <div class="data-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 th:text="#{admin.locations.locations}">Orte</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterLocations" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('locationsTable', this.value)" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+            <table id="locationsTable">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.location.name}">Name</th>
+                        <th th:text="#{admin.location.description}">Beschreibung</th>
+                        <th>Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="loc : ${locations}">
+                        <td th:text="${loc.name}">Name</td>
+                        <td th:text="${loc.description}">Desc</td>
+                        <td>
+                            <div style="display:flex; gap:0.5rem;">
+                                <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
+                                    <input type="hidden" name="hidden" th:value="${!loc.hidden}">
+                                    <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/autocomplete.js}"></script>
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        const locationNames = /*[[${locations.![name]}]]*/ [];
+        const inpLocations = document.getElementById("filterLocations");
+        if(inpLocations) krtAutocomplete(inpLocations, locationNames);
+    });
+
+    function filterTable(tableId, query) {
+        var filter = query.toUpperCase();
+        var table = document.getElementById(tableId);
+        var tr = table.getElementsByTagName("tr");
+        for (var i = 1; i < tr.length; i++) {
+            var td = tr[i].getElementsByTagName("td")[0]; // Name is in the first column
+            if (td) {
+                var txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Scripts removed as modals are no longer used
+    });
+</script>
+</body>
+</html>

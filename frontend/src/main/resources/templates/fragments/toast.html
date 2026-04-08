@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="toast">
+    <!-- Login Notification Toast -->
+    <div th:if="${showLoginNotification}"
+         id="loginNotification"
+         class="notification-toast"
+         th:data-duration="${notificationDuration}">
+        <h4 th:text="#{notification.title}">Authentication Confirmed</h4>
+        <p th:text="#{notification.authentication}">You are successfully authenticated. You can now access your data.</p>
+    </div>
+
+    <!-- General Success Toast -->
+    <div th:if="${successToast}"
+         id="successNotification"
+         class="notification-toast"
+         data-duration="5000">
+        <h4 th:text="#{notification.success.title}">Aktion erfolgreich</h4>
+        <p th:text="#{${successToast}}"></p>
+    </div>
+
+    <!-- General Success Toast (Text) -->
+    <div th:if="${success}"
+         id="successNotificationText"
+         class="notification-toast"
+         data-duration="5000">
+        <h4 th:text="#{notification.success.title}">Aktion erfolgreich</h4>
+        <p th:text="${!#strings.isEmpty(success)} ? #{${success}} : #{notification.success.title}"></p>
+    </div>
+
+    <!-- General Success Toast (Param) -->
+    <div th:if="${param.success}"
+         id="successNotificationParam"
+         class="notification-toast"
+         data-duration="5000">
+        <h4 th:text="#{notification.success.title}">Aktion erfolgreich</h4>
+        <p th:text="${!#strings.isEmpty(param.success[0])} ? #{${param.success[0]}} : #{notification.success.title}"></p>
+    </div>
+
+    <!-- General Error Toast -->
+    <div th:if="${errorToast}"
+         id="errorNotification"
+         class="notification-toast error-toast"
+         data-duration="7000">
+        <h4 th:text="#{notification.error.title}">Aktion fehlgeschlagen</h4>
+        <p th:text="#{${errorToast}}"></p>
+    </div>
+
+    <!-- General Error Toast (Text) -->
+    <div th:if="${error}"
+         id="errorNotificationText"
+         class="notification-toast error-toast"
+         data-duration="7000">
+        <h4 th:text="#{notification.error.title}">Aktion fehlgeschlagen</h4>
+        <p th:text="${!#strings.isEmpty(error)} ? #{${error}} : #{notification.error.title}"></p>
+    </div>
+
+    <!-- General Error Toast (Param) -->
+    <div th:if="${param.error}"
+         id="errorNotificationParam"
+         class="notification-toast error-toast"
+         data-duration="7000">
+        <h4 th:text="#{notification.error.title}">Aktion fehlgeschlagen</h4>
+        <p th:text="${!#strings.isEmpty(param.error[0])} ? #{${param.error[0]}} : #{notification.error.title}"></p>
+    </div>
+
+    <script th:inline="javascript">
+        function initToasts() {
+            const toasts = document.querySelectorAll('.notification-toast:not(.initialized)');
+            toasts.forEach(toast => {
+                toast.classList.add('initialized');
+                // Show shortly after load
+                setTimeout(() => {
+                    toast.classList.add('visible');
+                }, 100);
+
+                // Hide after duration
+                const duration = parseInt(toast.getAttribute('data-duration')) || 5000;
+                setTimeout(() => {
+                    toast.classList.remove('visible');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            });
+        }
+
+        window.showFrontendErrorToast = function(message) {
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast error-toast';
+            toast.setAttribute('data-duration', '7000');
+            
+            const title = document.createElement('h4');
+            title.textContent = /*[[#{notification.error.title}]]*/ 'Aktion fehlgeschlagen';
+            
+            const p = document.createElement('p');
+            p.textContent = message;
+            
+            toast.appendChild(title);
+            toast.appendChild(p);
+            document.body.appendChild(toast);
+            
+            initToasts();
+        };
+
+        window.showFrontendSuccessToast = function(message) {
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.setAttribute('data-duration', '5000');
+            
+            const title = document.createElement('h4');
+            title.textContent = /*[[#{notification.success.title}]]*/ 'Aktion erfolgreich';
+            
+            const p = document.createElement('p');
+            p.textContent = message;
+            
+            toast.appendChild(title);
+            toast.appendChild(p);
+            document.body.appendChild(toast);
+            
+            initToasts();
+        };
+
+        document.addEventListener('DOMContentLoaded', initToasts);
+    </script>
+</th:block>
+</body>
+</html>

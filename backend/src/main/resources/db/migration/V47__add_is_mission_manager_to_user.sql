@@ -1,0 +1,1 @@
+ALTER TABLE app_user ADD COLUMN is_mission_manager BOOLEAN NOT NULL DEFAULT FALSE;

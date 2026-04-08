@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{nav.materials} + ' - ' + #{app.title}">Materialien - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .material-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+        }
+        
+        .material-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(231, 126, 35, 0.2);
+        }
+
+        .material-title {
+            font-family: var(--font-body);
+            font-weight: 700;
+            color: var(--color-primary);
+            font-size: 1.2rem;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        
+        .price-info {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-body);
+            color: var(--color-gray-1);
+        }
+        
+        .price-label {
+            font-size: 0.8rem;
+            color: var(--color-gray-2);
+        }
+
+        .price-value {
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            max-width: 400px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.8rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{nav.materials}">Materialien</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+        <div class="form-group" style="position: relative;">
+            <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" onkeyup="filterMaterials()" autocomplete="off">
+        </div>
+
+        <div th:each="entry : ${materialsByKind}" class="kind-group" style="margin-top: 1.5rem;">
+            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-gray-4); padding: 0.5rem 1rem;" onclick="toggleKindGroup(this)">
+                <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
+                <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
+            </div>
+            
+            <div class="grid-auto-cards materialsGrid" style="margin-top: 1rem; display: none;">
+                <a th:href="@{/materials/{id}(id=${mat.id})}" th:each="mat : ${entry.value}" class="hud-box material-card">
+                    <h3 class="material-title">
+                        <span th:if="${mat.isIllegal == true}" style="color: #e74c3c; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
+                    </h3>
+                    
+                    <div class="price-info">
+                        <div>
+                            <div class="price-label" th:text="#{materials.minPriceBuy}">Min. Einkaufspreis</div>
+                            <div class="price-value" th:text="${mat.minPriceBuy != null ? #numbers.formatInteger(mat.minPriceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="price-label" th:text="#{materials.maxPriceSell}">Max. Verkaufspreis</div>
+                            <div class="price-value" th:text="${mat.maxPriceSell != null ? #numbers.formatInteger(mat.maxPriceSell, 1, 'POINT') + ' aUEC' : '-'}">-</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+        
+        <div id="noResultsMsg" style="display: none; text-align: center; color: var(--color-gray-2); margin-top: 2rem;" th:text="#{materials.list.noResults}">
+            Keine Materialien gefunden.
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/autocomplete.js}"></script>
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        const materialNames = /*[[${materials.![name]}]]*/ [];
+        const inp = document.getElementById("materialFilter");
+        if(inp) krtAutocomplete(inp, materialNames);
+    });
+
+    function toggleKindGroup(element) {
+        var content = element.nextElementSibling;
+        var icon = element.querySelector('.toggle-icon');
+        if (content.style.display === "none" || content.style.display === "") {
+            content.style.display = "grid"; // or block depending on css, grid-auto-cards needs grid
+            icon.textContent = "−";
+        } else {
+            content.style.display = "none";
+            icon.textContent = "+";
+        }
+    }
+
+    function filterMaterials() {
+        var input = document.getElementById("materialFilter");
+        var filter = input.value.toUpperCase();
+        var groups = document.getElementsByClassName("kind-group");
+        var totalVisibleCount = 0;
+
+        for (var j = 0; j < groups.length; j++) {
+            var group = groups[j];
+            var cards = group.getElementsByClassName("material-card");
+            var visibleInGroup = 0;
+
+            for (var i = 0; i < cards.length; i++) {
+                var title = cards[i].getElementsByClassName("material-title")[0];
+                if (title) {
+                    var txtValue = title.textContent || title.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        cards[i].style.display = "";
+                        visibleInGroup++;
+                    } else {
+                        cards[i].style.display = "none";
+                    }
+                }       
+            }
+            
+            if (visibleInGroup === 0) {
+                group.style.display = "none";
+            } else {
+                group.style.display = "";
+                totalVisibleCount += visibleInGroup;
+                
+                // If filtering is active, auto-expand groups
+                var content = group.querySelector('.materialsGrid');
+                var icon = group.querySelector('.toggle-icon');
+                if (filter.length > 0) {
+                    content.style.display = "grid";
+                    icon.textContent = "−";
+                }
+            }
+        }
+        
+        var noResults = document.getElementById("noResultsMsg");
+        if(totalVisibleCount === 0) {
+            noResults.style.display = "block";
+        } else {
+            noResults.style.display = "none";
+        }
+    }
+</script>
+</body>
+</html>

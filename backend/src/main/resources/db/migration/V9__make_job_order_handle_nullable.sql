@@ -1,0 +1,1 @@
+ALTER TABLE job_order ALTER COLUMN handle DROP NOT NULL;

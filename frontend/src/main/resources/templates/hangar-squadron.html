@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{hangar.squadron.title} + ' - ' + #{app.title}">Staffelübersicht - IRIDIUM Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{hangar.squadron.title}">Staffelübersicht</h1>
+        <a th:href="@{/hangar}" class="btn btn-secondary" th:text="#{hangar.back}">Zurück zum Hangar</a>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+        <style>
+            .details-row {
+                display: none;
+            }
+            tr:has(details[open]) + .details-row {
+                display: table-row;
+            }
+            .details-row td {
+                border-left: 2px solid var(--color-primary) !important;
+                padding: 0 !important;
+                background-color: rgba(0, 0, 0, 0.1);
+            }
+            .sub-table {
+                width: 100%;
+                margin: 0;
+                border-collapse: collapse;
+                border: none !important;
+            }
+            .sub-table th {
+                background-color: rgba(231, 126, 35, 0.05) !important;
+                color: var(--color-primary) !important;
+                font-family: var(--font-headline) !important;
+                font-size: 0.7rem !important;
+                letter-spacing: 0.05em;
+                padding: 0.5rem 1rem !important;
+                border-bottom: 1px solid rgba(231, 126, 35, 0.2) !important;
+                text-transform: uppercase;
+            }
+            .sub-table td {
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+                border-bottom: 1px solid var(--color-gray-3) !important;
+                color: var(--color-gray-1) !important;
+            }
+            .sub-table tr:last-child td {
+                border-bottom: none !important;
+            }
+            .sub-table tr:hover {
+                background-color: rgba(231, 126, 35, 0.05) !important;
+            }
+        </style>
+
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{hangar.ship.type}">Schiffstyp</th>
+                <th th:text="#{hangar.squadron.count}">Anzahl</th>
+                <th th:text="#{general.actions}" style="white-space: nowrap;">Aktionen</th>
+            </tr>
+            </thead>
+            <tbody>
+            <th:block th:each="item : ${overview}">
+            <tr>
+                <td th:text="${item.shipType.name}" style="vertical-align: top; padding-top: 1rem;">Typ</td>
+                <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
+                <td style="vertical-align: top; padding-top: 0.5rem;">
+                    <details sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:if="${item.details != null and !item.details.isEmpty()}">
+                        <summary class="btn" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
+                    </details>
+                </td>
+            </tr>
+            <tr class="details-row" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:if="${item.details != null and !item.details.isEmpty()}">
+                <td colspan="3" style="padding: 0;">
+                    <table class="sub-table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{hangar.ship.owner}">Besitzer</th>
+                            <th th:text="#{hangar.ship.location}">Standort</th>
+                            <th th:text="#{hangar.ship.fitted}">Einsatzbereit</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="detail : ${item.details}">
+                            <td th:text="${detail.ownerName}">Owner</td>
+                            <td th:text="${detail.locationName != null ? detail.locationName : '-'}">Location</td>
+                            <td>
+                                <span th:text="${detail.fitted} ? #{hangar.ship.yes} : #{hangar.ship.no}"
+                                      th:style="${detail.fitted} ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c;'">Ja/Nein</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            </th:block>
+            <tr th:if="${#lists.isEmpty(overview)}">
+                <td colspan="3" style="text-align: center;" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

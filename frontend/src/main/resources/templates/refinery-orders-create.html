@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{refineryorder.create.title} + ' - ' + #{app.title}">Neuer Raffinerieauftrag - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style>
+            .form-container {
+                max-width: 800px;
+            }
+            .form-group {
+                margin-bottom: 1.5rem;
+            }
+            .form-group label {
+                display: block;
+                margin-bottom: 0.5rem;
+                color: var(--color-primary);
+                font-family: var(--font-body);
+                font-weight: bold;
+                font-size: 0.9rem;
+            }
+            .form-group input, .form-group select, .form-group textarea {
+                width: 100%;
+                padding: 0.75rem;
+                background-color: var(--color-gray-4);
+                border: 1px solid var(--color-gray-3);
+                color: var(--color-gray-1);
+                font-family: var(--font-body);
+                box-sizing: border-box;
+            }
+            .material-row {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                align-items: flex-end;
+            }
+            @media (max-width: 768px) {
+                .material-row {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+            }
+        </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{refineryorder.create.title}">Neuer Raffinerieauftrag</h1>
+        <div style="display: flex; gap: 0.5rem; align-items: center;" sec:authorize="isAuthenticated()">
+            <a th:href="@{/refinery-orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
+        </div>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${errorToast}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${errorToast}__}">Fehler</p>
+        </div>
+
+        <div class="form-container">
+            <form th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}">
+                
+                <div class="material-row" style="margin-top: 1.5rem;">
+                    <div class="form-group" style="flex: 3; margin-bottom: 0;">
+                        <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
+                        <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
+                        </select>
+                        <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
+                    </div>
+
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="expenses" th:text="#{refineryorder.form.expenses}">Kosten (aUEC)</label>
+                        <input type="number" id="expenses" th:field="*{expenses}" min="1">
+                    </div>
+                </div>
+
+                <div class="material-row" style="margin-top: 1.5rem;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="startedAtLocal" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="hidden" id="startedAt" th:field="*{startedAt}">
+                            <input type="datetime-local" id="startedAtLocal" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="setStartedAtNow()" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label th:text="#{refineryorder.form.duration}">Dauer</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" th:placeholder="#{refineryorder.form.duration.hours}" style="flex: 1;">
+                            <span style="color: var(--color-gray-2);">h</span>
+                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" th:placeholder="#{refineryorder.form.duration.minutes}" style="flex: 1;">
+                            <span style="color: var(--color-gray-2);">m</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
+                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                            <span>-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="material-row" style="margin-top: 1.5rem;">
+                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
+                        <select id="locationId" th:field="*{locationId}" required>
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
+                        <select id="missionId" th:field="*{missionId}">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="mis : ${missions}" th:value="${mis.id}" th:text="${mis.name}"></option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <label for="status" th:text="#{refineryorder.form.status}">Status</label>
+                        <select id="status" th:field="*{status}">
+                            <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
+                            <option value="IN_PROGRESS" th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</option>
+                            <option value="COMPLETED" th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</option>
+                            <option value="CANCELED" th:text="#{refineryorder.status.CANCELED}">Abgebrochen</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="material-row" style="margin-top: 1.5rem;">
+                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
+                        <select id="refiningMethodId" th:field="*{refiningMethodId}" onchange="updateMethodRatings()">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="method : ${methods}" th:value="${method.id}" th:text="${method.name}" 
+                                th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
+                        </select>
+                    </div>
+                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); border-radius: 4px; min-height: 44px;">
+                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                            <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
+                            <span id="ratingYieldVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                            <span th:text="#{refineryorder.rating.cost}">Kosten</span>
+                            <span id="ratingCostVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                            <span th:text="#{refineryorder.rating.speed}">Dauer</span>
+                            <span id="ratingSpeedVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
+                    <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
+                </div>
+                
+                <div id="materials-container">
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem; position: relative;">
+                        <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" onclick="removeMaterialRow(this)" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                        
+                        <div class="material-row">
+                            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                                <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required onchange="updateOutputMaterial(this)">
+                                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW'}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'inputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge</label>
+                                <input type="text" inputmode="numeric" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required>
+                            </div>
+                        </div>
+
+                        <div class="material-row" style="margin-top: 1.5rem;">
+                            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                                <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
+                                <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" style="opacity: 0.7;">-</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
+                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" oninput="calcScu(this.getAttribute('data-index'))">
+                            </div>
+
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
+                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-5); cursor: not-allowed;">
+                            </div>
+                            
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'quality_' + ${stat.index}" th:text="#{refineryorder.form.material.quality}">Qualität</label>
+                                <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                    <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript">
+    const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
+
+    function calcScu(index) {
+        const unitInput = document.getElementById('outputQuantity_' + index);
+        const scuInput = document.getElementById('outputQuantityScu_' + index);
+        if (unitInput && scuInput) {
+            let valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
+            const val = parseFloat(valStr);
+            if (!isNaN(val)) {
+                const scu = val / 100.0;
+                scuInput.value = scu.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            } else {
+                scuInput.value = '';
+            }
+        }
+    }
+
+    function updateOutputMaterial(selectElement) {
+        const entryBlock = selectElement.closest('.material-entry');
+        const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        
+        if (selectedOption) {
+            const refinedName = selectedOption.getAttribute('data-refined-name');
+            if (refinedName) {
+                outputDisplay.innerText = refinedName;
+                outputDisplay.style.opacity = '1';
+            } else {
+                outputDisplay.innerText = '-';
+                outputDisplay.style.opacity = '0.7';
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputSelects = document.querySelectorAll('select[id^="inputMaterialId_"]');
+        inputSelects.forEach(select => {
+            if(select.value) {
+                updateOutputMaterial(select);
+            }
+        });
+    });
+
+    function setStartedAtNow() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('startedAtLocal').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        updateEndsAt();
+    }
+
+    function addMaterialRow() {
+        const container = document.getElementById('materials-container');
+        const entries = container.querySelectorAll('.material-entry');
+        const count = entries.length;
+        
+        const template = entries[0].cloneNode(true);
+        
+        if (!template.querySelector('.remove-btn')) {
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-secondary remove-btn';
+            removeBtn.style.cssText = 'position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+            removeBtn.innerText = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
+            removeBtn.onclick = function() { removeMaterialRow(this); };
+            template.appendChild(removeBtn);
+        }
+        
+        const inputs = template.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            if (input.id) {
+                input.id = input.id.replace(/_\d+$/, '_' + count);
+            }
+            if (input.name) {
+                input.name = input.name.replace(/\[\d+\]/, '[' + count + ']');
+            }
+            if (input.tagName.toLowerCase() === 'select') {
+                input.selectedIndex = 0;
+            } else {
+                input.value = '';
+            }
+        });
+        
+        const displaySpan = template.querySelector('span[id^="outputMaterialDisplay_"]');
+        if (displaySpan) {
+            displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + count);
+            displaySpan.innerText = '-';
+            displaySpan.style.opacity = '0.7';
+        }
+        
+        const outputUnitInput = template.querySelector('input[id="outputQuantity_' + count + '"]');
+        if (outputUnitInput) {
+            outputUnitInput.setAttribute('oninput', 'calcScu(' + count + ')');
+        }
+        
+        const labels = template.querySelectorAll('label');
+        labels.forEach(label => {
+            const forAttr = label.getAttribute('for');
+            if (forAttr) {
+                label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + count));
+            }
+        });
+        
+        container.appendChild(template);
+    }
+    
+    function removeMaterialRow(button) {
+        const entry = button.closest('.material-entry');
+        entry.remove();
+        
+        const container = document.getElementById('materials-container');
+        const entries = container.querySelectorAll('.material-entry');
+        entries.forEach((entry, index) => {
+            const inputs = entry.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (input.id) {
+                    input.id = input.id.replace(/_\d+$/, '_' + index);
+                }
+                if (input.name) {
+                    input.name = input.name.replace(/\[\d+\]/, '[' + index + ']');
+                }
+            });
+            const labels = entry.querySelectorAll('label');
+            labels.forEach(label => {
+                const forAttr = label.getAttribute('for');
+                if (forAttr) {
+                    label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + index));
+                }
+            });
+        });
+    }
+
+    function updateMethodRatings() {
+        const methodSelect = document.getElementById('refiningMethodId');
+        const ratingsDiv = document.getElementById('methodRatings');
+        if (!methodSelect || !ratingsDiv) return;
+        
+        const selectedOption = methodSelect.options[methodSelect.selectedIndex];
+        
+        const ratingLevels = {
+            1: /*[[#{refining.rating.level.1}]]*/ 'Niedrig',
+            2: /*[[#{refining.rating.level.2}]]*/ 'Mittel',
+            3: /*[[#{refining.rating.level.3}]]*/ 'Hoch'
+        };
+        
+        const speedLevels = {
+            1: /*[[#{refining.rating.speed.1}]]*/ 'Langsam',
+            2: /*[[#{refining.rating.speed.2}]]*/ 'Mittel',
+            3: /*[[#{refining.rating.speed.3}]]*/ 'Schnell'
+        };
+        
+        if (selectedOption && selectedOption.value !== "") {
+            document.getElementById('ratingYieldVal').innerText = ratingLevels[selectedOption.getAttribute('data-yield')] || '-';
+            document.getElementById('ratingCostVal').innerText = ratingLevels[selectedOption.getAttribute('data-cost')] || '-';
+            document.getElementById('ratingSpeedVal').innerText = speedLevels[selectedOption.getAttribute('data-speed')] || '-';
+            ratingsDiv.style.display = 'flex';
+        } else {
+            ratingsDiv.style.display = 'none';
+        }
+    }
+
+    function updateEndsAt() {
+        const startedAtInput = document.getElementById('startedAtLocal');
+        const durationHoursInput = document.getElementById('durationHours');
+        const durationMinutesInput = document.getElementById('durationMinutes');
+        const endsAtDisplay = document.querySelector('#endsAtDisplay span');
+        
+        if (!startedAtInput || !durationHoursInput || !durationMinutesInput || !endsAtDisplay) return;
+        
+        const startedAt = startedAtInput.value;
+        const hours = parseInt(durationHoursInput.value) || 0;
+        const minutes = parseInt(durationMinutesInput.value) || 0;
+        
+        if (startedAt) {
+            const startDate = new Date(startedAt);
+            if (!isNaN(startDate)) {
+                const totalMinutes = (hours * 60) + minutes;
+                const endDate = new Date(startDate.getTime() + totalMinutes * 60000);
+                
+                const day = String(endDate.getDate()).padStart(2, '0');
+                const month = String(endDate.getMonth() + 1).padStart(2, '0');
+                const year = endDate.getFullYear();
+                const hoursDisplay = String(endDate.getHours()).padStart(2, '0');
+                const minutesDisplay = String(endDate.getMinutes()).padStart(2, '0');
+                
+                endsAtDisplay.innerText = `${day}.${month}.${year} ${hoursDisplay}:${minutesDisplay}`;
+            } else {
+                endsAtDisplay.innerText = '-';
+            }
+        } else {
+            endsAtDisplay.innerText = '-';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const hiddenStartedAt = document.getElementById('startedAt');
+        const startedAtLocal = document.getElementById('startedAtLocal');
+        const dHours = document.getElementById('durationHours');
+        const dMinutes = document.getElementById('durationMinutes');
+        
+        if (hiddenStartedAt && startedAtLocal && hiddenStartedAt.value) {
+            const date = new Date(hiddenStartedAt.value);
+            if (!isNaN(date)) {
+                const pad = num => String(num).padStart(2, '0');
+                startedAtLocal.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            }
+        }
+        
+        if (startedAtLocal) startedAtLocal.addEventListener('input', updateEndsAt);
+        if (dHours) dHours.addEventListener('input', updateEndsAt);
+        if (dMinutes) dMinutes.addEventListener('input', updateEndsAt);
+        
+        updateEndsAt();
+    });
+
+    document.querySelector('form').addEventListener('submit', function() {
+        const local = document.getElementById('startedAtLocal');
+        const hidden = document.getElementById('startedAt');
+        if (local && hidden && local.value) {
+            hidden.value = new Date(local.value).toISOString();
+        } else if (hidden) {
+            hidden.value = '';
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateMethodRatings();
+        const entries = document.querySelectorAll('.material-entry');
+        entries.forEach((_, index) => {
+            calcScu(index);
+        });
+    });
+</script>
+</body>
+</html>

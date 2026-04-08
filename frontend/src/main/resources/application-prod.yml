@@ -1,0 +1,22 @@
+# ===================================================================
+# Production Configuration for Frontend
+# 
+# JVM Tuning Recommendations (apply via JAVA_TOOL_OPTIONS in Docker):
+#   -XX:+UseContainerSupport
+#   -XX:MaxRAMPercentage=75.0
+#   -XX:InitialRAMPercentage=50.0
+#   -XX:+HeapDumpOnOutOfMemoryError
+#   -XX:HeapDumpPath=/tmp/heapdump.hprof
+# ===================================================================
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.iri-base.org/realms/iri}
+
+spring.thymeleaf.cache: true
+
+app:
+  backend-url: ${BACKEND_URL:https://backend:11261}

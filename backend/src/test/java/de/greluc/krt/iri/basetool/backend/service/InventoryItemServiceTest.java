@@ -1,0 +1,333 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.iri.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
+import de.greluc.krt.iri.basetool.backend.model.Location;
+import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.*;
+import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.CheckoutType;
+import de.greluc.krt.iri.basetool.backend.model.FinanceType;
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class InventoryItemServiceTest {
+
+    @Mock
+    private InventoryItemRepository inventoryItemRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private MaterialRepository materialRepository;
+    @Mock
+    private LocationRepository locationRepository;
+    @Mock
+    private JobOrderRepository jobOrderRepository;
+    @Mock
+    private MissionRepository missionRepository;
+    @Mock
+    private MissionFinanceEntryRepository missionFinanceEntryRepository;
+    @Mock
+    private MissionParticipantRepository missionParticipantRepository;
+    @Mock
+    private InventoryItemMapper inventoryItemMapper;
+
+    @Mock
+    private MaterialMapper materialMapper;
+
+    @InjectMocks
+    private InventoryItemService inventoryItemService;
+
+    @Test
+    void getAggregatedInventory_shouldReturnPage() {
+        Object[] obj = new Object[]{new Material(), 10.0, 5L};
+        Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
+        when(inventoryItemRepository.getAggregatedInventory(any(Pageable.class))).thenReturn(page);
+        when(materialMapper.toDto(any())).thenReturn(null);
+        
+        Page<AggregatedInventoryDto> result = inventoryItemService.getAggregatedInventory(Pageable.unpaged());
+        
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(10, result.getContent().get(0).quality());
+        assertEquals(5L, result.getContent().get(0).amount());
+    }
+
+    @Test
+    void getInventoryByMaterial_shouldReturnPage() {
+        UUID materialId = UUID.randomUUID();
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
+        when(inventoryItemRepository.findByMaterialAndPersonalFalse(any(), any())).thenReturn(new PageImpl<>(List.of(new InventoryItem())));
+        when(inventoryItemMapper.toDto(any())).thenReturn(null);
+
+        Page<InventoryItemDto> result = inventoryItemService.getInventoryByMaterial(materialId, Pageable.unpaged());
+        
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getUserInventory_shouldReturnPage() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(new User()));
+        when(inventoryItemRepository.findByUser(any(), any())).thenReturn(new PageImpl<>(List.of(new InventoryItem())));
+        when(inventoryItemMapper.toDto(any())).thenReturn(null);
+
+        Page<InventoryItemDto> result = inventoryItemService.getUserInventory(userId, Pageable.unpaged());
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
+        when(inventoryItemRepository.findGlobalByFilters(eq(false), eq(null), eq(null), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(new InventoryItem())));
+        when(inventoryItemMapper.toDto(any())).thenReturn(null);
+
+        Page<InventoryItemDto> result = inventoryItemService.getAllInventory(null, null, Pageable.unpaged());
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void createInventoryItem_shouldCreateItem() {
+        UUID userId = UUID.randomUUID();
+        UUID materialId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+
+        InventoryItemCreateDto dto = new InventoryItemCreateDto(userId, materialId, locationId, 100, 10.0, false, null, null);
+        
+        User user = new User();
+        user.setId(userId);
+        
+        Material material = new Material();
+        material.setId(materialId);
+
+        Location location = new Location();
+        location.setId(locationId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        
+        InventoryItem savedItem = new InventoryItem();
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(savedItem);
+        
+        InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, null, null, false, null, null, null, null, null);
+        when(inventoryItemMapper.toDto(savedItem)).thenReturn(expectedDto);
+
+        InventoryItemDto result = inventoryItemService.createInventoryItem(dto, userId, false);
+
+        assertNotNull(result);
+        verify(inventoryItemRepository).save(any(InventoryItem.class));
+    }
+
+    @Test
+    void createInventoryItem_shouldThrowAccessDenied_whenCreatingForOtherUserAsNonAdmin() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID targetUserId = UUID.randomUUID();
+        InventoryItemCreateDto dto = new InventoryItemCreateDto(targetUserId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null);
+
+        assertThrows(AccessDeniedException.class, () -> inventoryItemService.createInventoryItem(dto, currentUserId, false));
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldSubtractAmount_whenNotDepleted() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setAmount(10.0);
+        User user = new User();
+        user.setId(currentUserId);
+        existingItem.setUser(user);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        
+        inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false);
+
+        assertEquals(5.0, existingItem.getAmount());
+        verify(inventoryItemRepository).save(existingItem);
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
+        UUID itemId = UUID.randomUUID();
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L);
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> 
+            inventoryItemService.bookOutInventoryItem(itemId, dto, UUID.randomUUID(), false));
+    }
+    
+    @Test
+    void bookOutInventoryItem_shouldCreateNewItem_whenTargetUserProvided() {
+        UUID itemId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        UUID targetUserId = UUID.randomUUID();
+
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L);
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setAmount(10.0);
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        existingItem.setUser(owner);
+
+        User targetUser = new User();
+        targetUser.setId(targetUserId);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+
+        inventoryItemService.bookOutInventoryItem(itemId, dto, adminId, true);
+
+        verify(inventoryItemRepository, times(2)).save(any(InventoryItem.class));
+        assertEquals(5.0, existingItem.getAmount());
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldThrowAccessDenied_whenUserIsNotOwnerAndNotAdmin() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        User user = new User();
+        user.setId(UUID.randomUUID()); // different user
+        existingItem.setUser(user);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        assertThrows(AccessDeniedException.class, () -> 
+            inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false));
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldDelete_whenDepleted() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setAmount(10.0);
+        existingItem.setVersion(1L);
+        User user = new User();
+        user.setId(currentUserId);
+        existingItem.setUser(user);
+
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false);
+
+        verify(inventoryItemRepository).delete(existingItem);
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldThrowBadRequest_whenAmountExceedsAvailable() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setAmount(10.0);
+        existingItem.setVersion(1L);
+        User user = new User();
+        user.setId(currentUserId);
+        existingItem.setUser(user);
+
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        assertThrows(ResponseStatusException.class, () -> 
+            inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false));
+    }
+    @Test
+    void bookOutInventoryItem_shouldCreateFinanceEntry_whenSoldFromMission() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+        UUID missionId = UUID.randomUUID();
+        
+        InventoryItemBookOutDto dto = new InventoryItemBookOutDto(5.0, null, null, CheckoutType.SELL, "Terminal 1", new java.math.BigDecimal("100.50"), 1L);
+        
+        Mission mission = new Mission();
+        mission.setId(missionId);
+        
+        Material material = new Material();
+        material.setName("Test Material");
+        
+        User user = new User();
+        user.setId(currentUserId);
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setAmount(10.0);
+        existingItem.setUser(user);
+        existingItem.setMission(mission);
+        existingItem.setMaterial(material);
+
+        MissionParticipant participant = new MissionParticipant();
+        participant.setUser(user);
+        participant.setMission(mission);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(missionParticipantRepository.findByMissionIdAndUserId(missionId, currentUserId)).thenReturn(Optional.of(participant));
+
+        inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false);
+
+        verify(inventoryItemRepository).save(existingItem);
+        assertEquals(5.0, existingItem.getAmount());
+        
+        verify(missionFinanceEntryRepository).save(any(MissionFinanceEntry.class));
+    }
+}

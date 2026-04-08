@@ -1,0 +1,164 @@
+# Development Guidelines for IRIDIUM Basetool
+
+These guidelines are meant to assist advanced developers contributing to the IRIDIUM Basetool project (Squadron management tool for "DAS KARTELL").
+
+## 1. Build and Configuration Instructions
+
+The project consists of two Spring Boot modules: `backend` and `frontend`.
+- **Java Version:** 25
+- **Spring Boot Version:** 4.0.3
+- **Build Tool:** Gradle 9.4.0 (Kotlin DSL)
+- **Dependency Management:** Managed via `refreshVersions`. Do not manually edit dependency versions in `build.gradle.kts`; instead, update them in the `versions.properties` file.
+
+### Local Development Setup
+
+To run the application locally without full Docker containerization, use the `dev` profile (default):
+
+1.  **Database Startup:**
+    Start the PostgreSQL instance via Docker Compose:
+    ```bash
+    docker-compose up -d db
+    ```
+    - Database Name: `krt_basetool`
+    - Credentials: `krt_user` / `krt_password` (Port: `5432`),
+
+2.  **Keycloak (Authentication):**
+    Ensure access to a Keycloak server. The default `KEYCLOAK_ISSUER_URI` is `https://keycloak.iri-base.org/realms/iri`. If running locally, you must override this environment variable if required.
+
+3.  **Run Backend:**
+    ```bash
+    ./gradlew :backend:bootRun
+    ```
+    *(Backend will be accessible at http://localhost:10261)*
+
+4.  **Run Frontend:**
+    Ensure `BACKEND_URL` points to the backend (default: `http://localhost:10261`).
+    ```bash
+    ./gradlew :frontend:bootRun
+    ```
+    *(Frontend will be accessible at http://localhost:8080)*
+
+## 2. Testing Information
+
+### Configuring and Running Tests
+Both modules use JUnit and Spring Boot Test for the testing infrastructure.
+- Tests can be executed using Gradle:
+  - Backend tests: `./gradlew :backend:test`
+  - Frontend tests: `./gradlew :frontend:test`
+  - All tests: `./gradlew test`
+
+### Guidelines on Adding and Executing New Tests
+- **Location:** Put tests in the same package structure under `src/test/java/` corresponding to the tested class in `src/main/java/`.
+- **Naming Convention:** Use the `*Test` suffix for test classes (e.g., `UserServiceTest`).
+- **Structure:** Use the Given/When/Then pattern (or Arrange/Act/Assert) to cleanly structure tests.
+- **Dependencies:** Mock complex or external dependencies (e.g., using `@Mock` and `@InjectMocks` with Mockito).
+
+### Simple Test Example
+Below is a simple test class demonstrating the recommended basic structure:
+
+```java
+package de.greluc.krt.iri.basetool.backend;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class GuidelinesExampleTest {
+
+    @Test
+    void shouldPassExampleTest() {
+        // Given
+        boolean condition = true;
+        
+        // When
+        // Execute the method under test
+        
+        // Then
+        assertTrue(condition, "This is a demonstration test for guidelines.");
+    }
+}
+```
+
+### Use gradle to execute tests
+To run all the tests, use the following command in the terminal:
+```bash
+./gradlew test
+```
+
+## 3. Additional Development Information
+
+### Code Style and Corporate Design
+The application adheres strictly to the "DAS KARTELL" Corporate Design Manual:
+- **Primary Brand Color:** `#E77E23` (Orange).
+- **Backgrounds:** Dark Mode Aesthetic (Predominantly Black `#000000` or Dark Gray `#141414`).
+- **Typography:** 
+  - Headlines: `Ethnocentric` (Uppercase/All-Caps ONLY, apply optical kerning).
+  - Body: `Lato` (Light 300 for standard, Bold 700 for emphasis).
+- **Visual Aesthetic:** Sci-Fi, Space Organization, Technical HUD Interface with geometric shapes (rings, triangles) and thin technical markers.
+- **UI Components:** Do not use native browser/external windows (e.g., `confirm()` or `alert()` dialogs). All UI elements, including confirmation dialogues, must be built using KRT-styled components (e.g., custom modals or toasts) in accordance with the styleguide.
+
+### Responsive Design & Device Classes
+- **CRITICAL JUNIE RULE - RESPONSIVE DESIGN:** Junie must actively ensure that all frontend layout changes and new UI components are fully responsive and optimized for four distinct device classes: Smartphone (up to 768px), Tablet (768px - 1024px), Desktop (1024px - 1400px/1600px), and Ultra Wide Desktop (1600px+).
+- **Mobile & Touch (Smartphone & Tablet):** Always consider touch interactions ("Fat-Finger" optimization, minimum click target height of 44px). Use CSS media queries to adapt layouts (e.g., converting multi-column grids to single-column, enabling horizontal scrolling for tables).
+- **Desktop & Ultra Wide Desktop:** Utilize available space efficiently on large screens (e.g., permanently docked sidebars, auto-fit CSS grids for cards/dashboards) while restricting text line lengths (e.g., `max-width: 80ch` on `p` tags) for readability.
+
+## 4. Best Practices for Software and Libraries
+
+### Java & Spring Boot
+- **Immutability:** Use `record` classes for DTOs (Data Transfer Objects) and immutable configuration wrappers.
+- **Dependency Injection:** Use constructor injection instead of `@Autowired` field injection for better testability and final fields. Favor Lombok's `@RequiredArgsConstructor`.
+- **Modern Java Features:** Utilize `switch` expressions, pattern matching (`instanceof` and `switch`), and sealed classes where applicable to ensure type safety and exhaustiveness.
+- **Logging:** Use Lombok's `@Slf4j` annotation for logging instead of manual logger instantiations.
+- **Lombok:** Maximize the use of Lombok annotations (e.g., `@Getter`, `@Setter`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Data`) to avoid boilerplate code wherever applicable.
+- **JetBrains Annotations:** Utilize JetBrains Annotations (e.g., `@NotNull`, `@Nullable`, `@Contract`) everywhere possible to explicitly state nullability contracts, prevent `NullPointerException`s and reduce boilerplate null-checks.
+
+### API Design
+- **Consistent Date/Time/Zone Handling:** All data fields storing time and/or date must always be processed and stored in UTC (e.g., using `Instant` or `OffsetDateTime`). The frontend display must always be converted to the user's local timezone. Document timezone conversion for the display layer and write serialization tests.
+- **Pagination & Sorting:** All endpoints that return lists or collections of data MUST implement server-side pagination and sorting using Spring Data's `Pageable`. Use a wrapper like `PageResponse` to include metadata (total elements, pages, current page) and validate sorting fields against an explicit whitelist to prevent unstable sorting or information disclosure.
+- **CRITICAL JUNIE RULE - USE DTOs ONLY:** Junie must actively ensure that ONLY DTO `record` classes are used at all API interfaces (Controllers/Services). Never leak direct JPA database entities to the outside. Create missing DTOs and use a central mapper (e.g., MapStruct) for Entity↔DTO conversion. Ensure that no circular references occur when defining DTOs or mappings (e.g., use `@Mapping(ignore = true)` appropriately to break loops). Always define mappers as Spring components (`@Mapper(componentModel = "spring")`). ALL request DTOs for write operations must have appropriate Jakarta-Constraints (e.g., `@NotBlank`, `@NotNull`, `@Min`, `@Max`) in the records.
+- **Validation & Error Handling:** Ensure validation using `jakarta.validation` in Request DTOs and consistent error responses (RFC7807 / Problem Details).
+  - Use a consistent error format based on RFC7807 (`application/problem+json`).
+  - Controllers MUST use the `@Valid` annotation for all RequestBody parameters that involve DTOs for write operations (POST, PUT, PATCH).
+  - Extend the global exception handling (`GlobalExceptionHandler`) with Problem responses, including `type`, `title`, `status`, `detail`, `instance`.
+  - Document the format in OpenAPI and adapt frontend error display.
+  - Avoid hardcoding URLs (e.g., for problem types) in `GlobalExceptionHandler`; use central properties instead.
+
+### Localization & Internationalization (i18n)
+- **CRITICAL JUNIE RULE - DYNAMIC TRANSLATION ONLY:** Junie must actively ensure across the entire project that absolutely every text the user gets to see (labels, buttons, tooltips, error messages, flash messages, alerts, etc.) is part of the dynamic translation via `messages.properties`. No exceptions. Never insert or leave hardcoded strings in HTML templates, JavaScript, or Java controllers.
+- **UTF-8 Encoding for German Umlauts:** German umlauts (ä, ö, ü, Ä, Ö, Ü, ß) in the translation files (`.properties`) must always use their Unicode UTF-8 codes (e.g., `\u00e4` for `ä`) to guarantee correct display in the frontend.
+- **No Hardcoded Strings:** All texts visible to the user (including error messages, placeholders, titles, or similar) must be translated via the message system (translation files) and must not be hardcoded in the code (HTML/Java).
+
+### Database (PostgreSQL)
+- **Performance:** Avoid N+1 query issues by utilizing `JOIN FETCH`, `@EntityGraph`, or Spring Data Projections when fetching entities with relationships.
+- **Migrations:** All schema changes MUST be managed exclusively via Flyway. Hibernate's `ddl-auto` must always be set to `validate` (or `none`) in all environments. Never use `update` or `create`. Always create a new Flyway migration script (e.g., `V<version>__<description>.sql`) in `backend/src/main/resources/db/migration` for any database schema changes.
+
+### Multi-User Concurrency & Data Isolation
+- **CRITICAL JUNIE RULE - MULTI-USER DATA ISOLATION:** Junie must actively ensure that users can only see and modify their own data unless they have elevated privileges (e.g., `ADMIN`, `OFFICER`). Controller and Service layers must rigorously enforce this using token subjects (JWT) and Role-Based Access Control (`@PreAuthorize`).
+  - Filter database queries in the service layer by the `sub` (User ID) from the JWT.
+  - For unauthenticated users (guests), only the minimum required data may be returned. Sensible fields (e.g., email, real name, internal orders/items) MUST be explicitly cleared or filtered in the controller (e.g., using a `cleanupForGuest` method) to prevent information disclosure.
+- **CRITICAL JUNIE RULE - CONCURRENCY AND OPTIMISTIC LOCKING:** To prevent "Lost Updates" in a multi-user environment, all DTOs used for updating existing entities MUST include the `version` field from the database entity. Frontend requests must transmit this `version` to trigger Spring Data JPA's Optimistic Locking (`ObjectOptimisticLockingFailureException` -> `409 Conflict`) upon concurrent modifications.
+- **Pessimistic Locking for Bulk Updates:** Race conditions in critical bulk update operations (like shifting priorities or reordering elements) must be avoided by using explicit table or row locks (e.g., `@Lock(LockModeType.PESSIMISTIC_WRITE)` in JPA) or safe atomic database operations.
+
+### Security (Keycloak / Spring Security)
+- **Role-Based Access Control:** Handle authorization centrally via Method Security annotations (e.g., `@PreAuthorize("hasRole('ADMIN')")`). Keep logic out of controllers. Roles mapped from JWT are prefixed with `ROLE_` and converted to uppercase.
+
+## 5. Documentation Guidelines
+
+- **Project Documentation:** The `README.md` and `CHANGELOG.md` must be kept up-to-date with new architecture decisions, features, and environment variable requirements.
+- **API Documentation:** 
+  - All REST endpoints must be documented using SpringDoc OpenAPI annotations (e.g., `@Operation`, `@ApiResponses`).
+  - Keep Swagger UI (`http://localhost:10261/swagger-ui.html`) synchronized with code changes by updating endpoint models and parameter descriptions.
+  - Keep Swagger openapi.json synchronized with code changes by updating endpoint models and parameter descriptions.
+- **Code Comments:** Use Javadoc for complex business logic to document *why* a particular approach was chosen, rather than just *what* the code does. Standard boilerplate getters/setters or obvious implementations don't need Javadoc.
+
+### Configuration Properties & HTTP Client Resilience
+- **Type-safe Configuration:** Migrate relevant `application-*.yml` settings to type-safe `@ConfigurationProperties` classes with `@Validated` (e.g., Keycloak URIs, Backend URLs, Limits).
+- **Configuration Validation:** Add constraints (`@NotBlank`, `@URL`, `@Min/@Max`) and test misconfigurations during startup (`test` profile).
+- **WebClient Centralization:** Centralize `WebClient` configuration (Base URL, Default Headers, Timeouts for Connect/Read/Write).
+- **Resilience:** Integrate Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead) for backend calls from the `frontend` module.
+- **Error Path Testing:** Write tests with `MockWebServer`/`WireMock` for error paths.
+
+### API Versioning & Deprecation
+- **Semantic Versioning:** All REST API endpoints must be versioned semantically (e.g., `/api/v1/...`). Breaking changes require a new version (e.g., `/api/v2/...`).
+- **Deprecation Policy:** When an endpoint is deprecated, annotate it with `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/...")` (or use `@Deprecated`).
+  - This custom annotation automatically sets the `Deprecation`, `Sunset`, and `Link` HTTP headers via `DeprecationInterceptor`.
+  - The `OpenApiDeprecationConfig` customizer ensures the deprecation, sunset date, and migration path are documented in the OpenAPI specification.

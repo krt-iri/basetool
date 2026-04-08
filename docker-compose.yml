@@ -1,0 +1,250 @@
+x-db-backend: &db-backend-template
+  image: postgres:18-alpine
+  environment:
+    POSTGRES_DB: ${POSTGRES_DB}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    PGPORT: 15432
+    PGDATA: /var/lib/postgresql/data/pgdata
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -p 15432"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  volumes:
+    - /var/iri/db-backend:/var/lib/postgresql/data
+
+x-db-keycloak: &db-keycloak-template
+  image: postgres:18-alpine
+  environment:
+    POSTGRES_DB: ${KC_POSTGRES_DB}
+    POSTGRES_USER: ${KC_POSTGRES_USER}
+    POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD}
+    PGPORT: 15433
+    PGDATA: /var/lib/postgresql/data/pgdata
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${KC_POSTGRES_USER} -d ${KC_POSTGRES_DB} -p 15433"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  volumes:
+    - /var/iri/db-keycloak:/var/lib/postgresql/data
+
+x-keycloak: &keycloak-template
+  image: quay.io/keycloak/keycloak:26.5
+  command: start --proxy-headers xforwarded
+  environment:
+    KC_HOSTNAME: keycloak.iri-base.org
+    KC_HOSTNAME_URL: https://keycloak.iri-base.org
+    KC_HOSTNAME_ADMIN_URL: https://keycloak.iri-base.org
+    KC_HOSTNAME_STRICT: "true"
+    KC_HOSTNAME_STRICT_HTTPS: "true"
+    KC_HEALTH_ENABLED: "true"
+    KC_HTTP_ENABLED: "true"
+    KC_HTTP_PORT: 18080
+    KC_DB: postgres
+    KC_DB_URL: jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB}
+    KC_DB_USERNAME: ${KC_POSTGRES_USER}
+    KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD}
+    KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+    KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}
+  healthcheck:
+    test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+    interval: 10s
+    timeout: 10s
+    retries: 15
+    start_period: 30s
+  volumes:
+    - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
+    - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+
+x-backend: &backend-template
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  restart: always
+  environment:
+    SPRING_PROFILES_ACTIVE: prod
+    SERVER_PORT: 11261
+    SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB}
+    SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+    SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof
+  volumes:
+    - /var/iri/backend:/tmp
+
+x-frontend: &frontend-template
+  build:
+    context: .
+    dockerfile: frontend/Dockerfile
+  restart: always
+  environment:
+    SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+    SERVER_PORT: 18081
+    KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
+    BACKEND_URL: https://backend:11261
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof
+  volumes:
+    - /var/iri/frontend:/tmp
+
+services:
+  db-backend:
+    <<: *db-backend-template
+    profiles: ["prod"]
+    networks:
+      - net-db-backend
+
+  db-backend-dev:
+    <<: *db-backend-template
+    profiles: ["dev"]
+    ports:
+      - "15432:15432"
+    networks:
+      net-db-backend:
+        aliases:
+          - db-backend
+
+  db-keycloak:
+    <<: *db-keycloak-template
+    profiles: ["prod"]
+    networks:
+      - net-db-keycloak
+
+  db-keycloak-dev:
+    <<: *db-keycloak-template
+    profiles: ["dev"]
+    ports:
+      - "15433:15433"
+    networks:
+      net-db-keycloak:
+        aliases:
+          - db-keycloak
+
+  keycloak:
+    <<: *keycloak-template
+    profiles: ["prod"]
+    depends_on:
+      db-keycloak:
+        condition: service_healthy
+    networks:
+      - net-db-keycloak
+      - net-proxy-keycloak
+      - net-backend-keycloak
+
+  keycloak-dev:
+    <<: *keycloak-template
+    command: start-dev --import-realm --proxy-headers xforwarded
+    profiles: ["dev"]
+    ports:
+      - "18080:18080"
+    depends_on:
+      db-keycloak-dev:
+        condition: service_healthy
+    networks:
+      net-db-keycloak:
+        aliases:
+          - keycloak
+      net-proxy-keycloak:
+        aliases:
+          - keycloak
+      net-backend-keycloak:
+        aliases:
+          - keycloak
+
+  backend:
+    <<: *backend-template
+    profiles: ["prod"]
+    depends_on:
+      db-backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - net-db-backend
+      - net-backend-frontend
+      - net-backend-keycloak
+
+  backend-dev:
+    <<: *backend-template
+    profiles: ["dev"]
+    ports:
+      - "11261:11261"
+    depends_on:
+      db-backend-dev:
+        condition: service_healthy
+      keycloak-dev:
+        condition: service_healthy
+    networks:
+      net-db-backend:
+        aliases:
+          - backend
+      net-backend-frontend:
+        aliases:
+          - backend
+      net-backend-keycloak:
+        aliases:
+          - backend
+
+  frontend:
+    <<: *frontend-template
+    profiles: ["prod"]
+    depends_on:
+      backend:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    networks:
+      - net-backend-frontend
+      - net-proxy-frontend
+      - net-backend-keycloak
+
+  frontend-dev:
+    <<: *frontend-template
+    profiles: ["dev"]
+    ports:
+      - "18081:18081"
+    depends_on:
+      backend-dev:
+        condition: service_started
+      keycloak-dev:
+        condition: service_healthy
+    networks:
+      net-backend-frontend:
+        aliases:
+          - frontend
+      net-proxy-frontend:
+        aliases:
+          - frontend
+      net-backend-keycloak:
+        aliases:
+          - frontend
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    ports:
+      - "80:80"     # Frontend / Keycloak HTTP Traffic
+      - "443:443"    # Frontend / Keycloak HTTPS Traffic
+      - "10081:81"     # NGINX Proxy Manager Admin Web UI
+    environment:
+      DB_SQLITE_FILE: "/data/database.sqlite"
+    volumes:
+      - /var/iri/npm/data:/data
+      - /var/iri/npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - net-proxy-frontend
+      - net-proxy-keycloak
+
+networks:
+  net-db-backend:
+    driver: bridge
+  net-db-keycloak:
+    driver: bridge
+  net-backend-frontend:
+    driver: bridge
+  net-proxy-frontend:
+    driver: bridge
+  net-proxy-keycloak:
+    driver: bridge
+  net-backend-keycloak:
+    driver: bridge

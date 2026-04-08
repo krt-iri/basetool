@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{error.404.title} + ' - ' + #{app.title}">Signal Lost - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .error-container {
+            text-align: center;
+            border: 2px solid var(--color-primary);
+            box-shadow: 0 0 15px rgba(231, 126, 35, 0.2);
+        }
+        .error-code {
+            font-family: var(--font-headline);
+            font-size: 4rem;
+            color: var(--color-primary);
+            margin-bottom: 0.5rem;
+        }
+        .error-title {
+            font-family: var(--font-headline);
+            font-size: 2rem;
+            color: var(--color-gray-1);
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+        }
+        .error-message {
+            font-size: 1.2rem;
+            color: var(--color-gray-1);
+            margin-bottom: 2rem;
+        }
+        .btn-return {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            background-color: var(--color-primary);
+            color: var(--color-bg-black);
+            font-family: var(--font-headline);
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .btn-return:hover {
+            background-color: var(--color-accent-light);
+            box-shadow: 0 0 10px var(--color-accent-light);
+        }
+        /* Make sure main takes full screen if no sidebar */
+        main {
+            margin-left: 0 !important;
+            padding-top: 80px;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand" style="margin-left: 1rem;">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="greeting hud-box error-container">
+        <div class="error-code">404</div>
+        <div class="error-title" th:text="#{error.404.title}">Signal Lost</div>
+        <p class="error-message" th:text="#{error.404.message}">The requested coordinates are invalid or the sector has been redacted.</p>
+        <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>
+    </div>
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    });
+</script>
+</body>
+</html>

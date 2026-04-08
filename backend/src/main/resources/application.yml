@@ -1,0 +1,78 @@
+server:
+  tomcat:
+    relaxed-query-chars: "{,},[,]"
+    relaxed-path-chars: "{,},[,]"
+  max-http-request-header-size: 65536
+  http2:
+    enabled: true
+  error:
+    whitelabel:
+      enabled: false
+  port: 11261
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: basetool
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/problem+json,text/html,text/plain,text/css,application/javascript,application/xml,image/svg+xml
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  application:
+    name: backend
+  messages:
+    fallback-to-system-locale: false
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 365d
+          must-revalidate: true
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1800000
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+    hibernate:
+      ddl-auto: validate
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+
+app:
+  keycloak:
+    sync:
+      enabled: true
+      interval: 1m
+      admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080}
+      realm: ${KEYCLOAK_REALM:iri}
+      client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
+      client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:u3HM0oSRHae0KT1f9jEuakiBf1gYIxNb}
+  rate-limit:
+    enabled: true
+    paths:
+      - /api/v1/admin/**
+    capacity: 100
+    refillTokens: 100
+    refillPeriod: 1m
+
+

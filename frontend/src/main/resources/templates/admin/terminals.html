@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.terminals.title} + ' - ' + #{app.title}">Terminals - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .data-section {
+            margin-bottom: 3rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.8rem;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.terminals.title}">Terminals verwalten</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <!-- Terminals Section -->
+        <div class="data-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 th:text="#{admin.terminals.terminals}">Terminals</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterTerminals" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('terminalsTable', this.value)" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+            <table id="terminalsTable">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.terminal.name}">Name</th>
+                        <th th:text="#{admin.terminal.nickname}">Nickname</th>
+                        <th th:text="#{admin.terminal.system}">System</th>
+                        <th th:text="#{general.action}">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="term : ${terminals}">
+                        <td th:text="${term.name}">Name</td>
+                        <td th:text="${term.nickname}">Nickname</td>
+                        <td th:text="${term.starSystemName}">System</td>
+                        <td>
+                            <div style="display:flex; gap:0.5rem;">
+                                <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/terminals/{id}/toggle-visibility(id=${term.id})}" style="margin: 0;">
+                                    <input type="hidden" name="hidden" th:value="${!term.hidden}">
+                                    <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'" th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/autocomplete.js}"></script>
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        const terminalNames = /*[[${terminals.![name]}]]*/ [];
+        const inpTerminals = document.getElementById("filterTerminals");
+        if(inpTerminals) krtAutocomplete(inpTerminals, terminalNames);
+    });
+
+    function filterTable(tableId, query) {
+        var filter = query.toUpperCase();
+        var table = document.getElementById(tableId);
+        var tr = table.getElementsByTagName("tr");
+        for (var i = 1; i < tr.length; i++) {
+            var td = tr[i].getElementsByTagName("td")[0]; // Name is in the first column
+            if (td) {
+                var txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+    }
+</script>
+</body>
+</html>

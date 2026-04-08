@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="${material != null ? material.name : 'Material'} + ' - ' + #{app.title}">Material Detail - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .material-title {
+            font-family: var(--font-body);
+            font-weight: 700;
+            color: var(--color-primary);
+            font-size: 1.5rem;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .data-section {
+            margin-top: 2rem;
+        }
+
+        .number-cell {
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            max-width: 400px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:if="${material != null}" th:text="${material.name}">Material Name</h1>
+        <h1 th:if="${material == null}">Material nicht gefunden</h1>
+        <a th:href="@{/materials}" class="btn btn-secondary">Zurück zur Übersicht</a>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+        <div th:if="${material != null}">
+            <div style="margin-bottom: 2rem; color: var(--color-gray-1); font-family: var(--font-body);">
+                <p th:if="${material.description != null && !material.description.isEmpty()}" th:text="${material.description}">Beschreibung...</p>
+            </div>
+
+            <div class="data-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;">Preise und Terminals</h2>
+                    <div class="form-group" style="margin: 0; position: relative;">
+                        <input type="text" id="terminalFilter" placeholder="Terminal suchen..." onkeyup="filterTerminals()" autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                <table class="data-table" id="priceTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" onclick="sortTable(0)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                                <div style="display: flex; align-items: center; justify-content: flex-start;">
+                                    <span th:text="#{materials.detail.th.terminal}">Terminal</span>
+                                    <span class="sort-icon" id="sort-icon-0" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                </div>
+                            </th>
+                            <th class="sortable-header" onclick="sortTable(1)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                                <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                    <span th:text="#{materials.detail.th.priceBuy}">Einkaufspreis</span>
+                                    <span class="sort-icon" id="sort-icon-1" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                </div>
+                            </th>
+                            <th class="sortable-header" onclick="sortTable(2)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                                <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                    <span th:text="#{materials.detail.th.priceSell}">Verkaufspreis</span>
+                                    <span class="sort-icon" id="sort-icon-2" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="price : ${prices}">
+                            <td class="terminal-name" th:text="${price.terminalName}">Area18</td>
+                            <td class="number-cell" th:text="${price.priceBuy != null && price.priceBuy > 0 ? #numbers.formatInteger(price.priceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</td>
+                            <td class="number-cell" th:text="${price.priceSell != null && price.priceSell > 0 ? #numbers.formatInteger(price.priceSell, 1, 'POINT') + ' aUEC' : '-'}">-</td>
+                        </tr>
+                        <tr id="noDataRow" th:if="${prices == null || prices.isEmpty()}">
+                            <td colspan="3" style="text-align: center; font-style: italic;" th:text="#{materials.detail.noData}">Keine Preisdaten verfügbar.</td>
+                        </tr>
+                        <tr id="noResultsRow" style="display: none;" th:unless="${prices == null || prices.isEmpty()}">
+                            <td colspan="3" style="text-align: center; font-style: italic; color: var(--color-gray-2);" th:text="#{materials.detail.noResults}">Keine Terminals gefunden.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/autocomplete.js}"></script>
+<script th:inline="javascript">
+    function sortTable(n) {
+        var table = document.getElementById("priceTable");
+        var rows, switching, i, x, y, shouldSwitch, dir;
+        switching = true;
+        
+        dir = table.getAttribute("data-sort-dir") === "asc" ? "desc" : "asc";
+        if (table.getAttribute("data-sort-col") !== n.toString()) {
+            dir = "asc";
+        }
+        table.setAttribute("data-sort-dir", dir);
+        table.setAttribute("data-sort-col", n);
+        
+        while (switching) {
+            switching = false;
+            rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+            
+            for (i = 0; i < (rows.length - 1); i++) {
+                if (rows[i].id === "noResultsRow" || rows[i].id === "noDataRow") continue;
+                if (rows[i+1].id === "noResultsRow" || rows[i+1].id === "noDataRow") continue;
+
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("td")[n];
+                y = rows[i+1].getElementsByTagName("td")[n];
+                
+                if (!x || !y) continue;
+
+                var valX = x.textContent || x.innerText;
+                var valY = y.textContent || y.innerText;
+                
+                if (n === 1 || n === 2) {
+                    var numX = parseFloat(valX.replace(/[^0-9,-]/g, '').replace(',', '.'));
+                    var numY = parseFloat(valY.replace(/[^0-9,-]/g, '').replace(',', '.'));
+                    if (isNaN(numX)) numX = -1; 
+                    if (isNaN(numY)) numY = -1;
+                    
+                    if (dir === "asc") {
+                        if (numX > numY) { shouldSwitch = true; break; }
+                    } else {
+                        if (numX < numY) { shouldSwitch = true; break; }
+                    }
+                } else {
+                    if (dir === "asc") {
+                        if (valX.toLowerCase() > valY.toLowerCase()) { shouldSwitch = true; break; }
+                    } else {
+                        if (valX.toLowerCase() < valY.toLowerCase()) { shouldSwitch = true; break; }
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+            }
+        }
+        updateSortIndicators(n, dir);
+    }
+
+    function updateSortIndicators(columnIndex, direction) {
+        for (var i = 0; i <= 2; i++) {
+            var iconElement = document.getElementById("sort-icon-" + i);
+            if (iconElement) {
+                if (i === columnIndex) {
+                    iconElement.innerHTML = direction === 'asc' ? '▲' : '▼';
+                    iconElement.style.color = 'var(--color-primary)';
+                } else {
+                    iconElement.innerHTML = '↕';
+                    iconElement.style.color = 'var(--color-gray-2)';
+                }
+            }
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const terminalNames = /*[[${prices != null ? prices.![terminalName] : null}]]*/ [];
+        const uniqueTerminals = [...new Set(terminalNames || [])];
+        const inp = document.getElementById("terminalFilter");
+        if(inp) krtAutocomplete(inp, uniqueTerminals);
+    });
+
+    function filterTerminals() {
+        var input = document.getElementById("terminalFilter");
+        var filter = input.value.toUpperCase();
+        var table = document.getElementById("priceTable");
+        var tr = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+        var visibleCount = 0;
+
+        for (var i = 0; i < tr.length; i++) {
+            if (tr[i].id === "noResultsRow" || tr[i].id === "noDataRow") continue;
+            
+            var td = tr[i].getElementsByClassName("terminal-name")[0];
+            if (td) {
+                var txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                    visibleCount++;
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+        
+        var noResults = document.getElementById("noResultsRow");
+        if (noResults) {
+            if(visibleCount === 0 && tr.length > (document.getElementById("noDataRow") ? 1 : 0)) {
+                noResults.style.display = "";
+            } else {
+                noResults.style.display = "none";
+            }
+        }
+    }
+</script>
+</body>
+</html>

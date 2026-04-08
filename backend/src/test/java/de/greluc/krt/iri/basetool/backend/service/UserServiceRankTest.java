@@ -1,0 +1,106 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.model.Role;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceRankTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private InventoryItemRepository inventoryItemRepository;
+    @Mock
+    private ShipRepository shipRepository;
+    @Mock
+    private RefineryOrderRepository refineryOrderRepository;
+    @Mock
+    private MissionRepository missionRepository;
+    @Mock
+    private JobOrderRepository jobOrderRepository;
+    @Mock
+    private MissionParticipantRepository missionParticipantRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    @Test
+    void updateUserAttributes_Officer_InvalidRank_ShouldThrow() {
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setVersion(0L);
+        Role officerRole = new Role();
+        officerRole.setName("OFFICER");
+        user.setRoles(Set.of(officerRole));
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        // Officer rank must be 1-12. Trying 13.
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUserAttributes(id, 13, null, null, 0L));
+    }
+
+    @Test
+    void updateUserAttributes_Officer_ValidRank_ShouldPass() {
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setVersion(0L);
+        Role officerRole = new Role();
+        officerRole.setName("OFFICER");
+        user.setRoles(Set.of(officerRole));
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        userService.updateUserAttributes(id, 5, null, null, 0L);
+    }
+
+    @Test
+    void updateUserAttributes_SquadronMember_InvalidRank_ShouldThrow() {
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setVersion(0L);
+        Role memberRole = new Role();
+        memberRole.setName("SQUADRON_MEMBER");
+        user.setRoles(Set.of(memberRole));
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        // Member rank must be 13-20. Trying 5.
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUserAttributes(id, 5, null, null, 0L));
+    }
+
+    @Test
+    void updateUserAttributes_SquadronMember_ValidRank_ShouldPass() {
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setVersion(0L);
+        Role memberRole = new Role();
+        memberRole.setName("SQUADRON_MEMBER");
+        user.setRoles(Set.of(memberRole));
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        userService.updateUserAttributes(id, 15, null, null, 0L);
+    }
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{app.title} + ' - ' + #{impressum.title}">IRIDIUM Basetool - Impressum</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="hud-box" style="margin-top: 2rem;">
+        <h1 th:text="#{impressum.title}">Impressum</h1>
+        <p th:text="#{impressum.p1}">Angaben gem\u00e4\u00df \u00a7 5 DDG</p>
+        
+        <p>
+            <span th:text="#{impressum.address.name}">Lucas Greuloch</span><br>
+            <span th:text="#{impressum.address.street}">Stauffenbergallee 20a</span><br>
+            <span th:text="#{impressum.address.city}">56410 Montabaur</span><br>
+        </p>
+
+        <p>
+            <strong th:text="#{impressum.represented_by}">Vertreten durch:</strong><br>
+            <span th:text="#{impressum.address.name}">Lucas Greuloch</span><br>
+        </p>
+
+        <p>
+            <strong th:text="#{impressum.contact}">Kontakt:</strong><br>
+            <span th:text="#{impressum.contact.phone}">Telefon: 0170-9677429</span><br>
+            <span th:text="#{impressum.contact.email_label}">E-Mail:</span> <a th:href="'mailto:' + #{impressum.contact.email_value}" th:text="#{impressum.contact.email_value}">lucas.greuloch@pm.me</a>
+        </p>
+
+        <p>
+            <strong th:text="#{impressum.dispute}">Verbraucherstreitbeilegung / Universalschlichtungsstelle</strong><br>
+            <span th:text="#{impressum.dispute.text}">Wir nehmen nicht an Streitbeilegungsverfahren...</span>
+        </p>
+
+        <p>
+            <strong th:text="#{impressum.liability}">Haftungsausschluss:</strong><br><br>
+            <strong th:text="#{impressum.liability.content}">Haftung f\u00fcr Inhalte</strong><br>
+            <span th:text="#{impressum.liability.content.text}">Die Inhalte unserer Seiten...</span><br><br>
+            
+            <strong th:text="#{impressum.liability.links}">Haftung f\u00fcr Links</strong><br>
+            <span th:text="#{impressum.liability.links.text}">Unser Angebot enth\u00e4lt Links...</span><br><br>
+            
+            <strong th:text="#{impressum.liability.copyright}">Urheberrecht</strong><br>
+            <span th:text="#{impressum.liability.copyright.text}">Die durch die Seitenbetreiber...</span>
+        </p>
+
+        <p>
+            <span th:text="#{impressum.credits_prefix}">Erstellt mit</span> <a href="https://impressum-generator.de" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_generator}">Impressum-Generator.de</a><span th:text="#{impressum.credits_middle}">, dem Tool f\u00fcr Impressum und</span> <a href="https://impressum-generator.de/datenschutz-generator" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_privacy}">Datenschutz-Erkl\u00e4rung</a><span th:text="#{impressum.credits_suffix}">. Nach einer Vorlage der</span> <a href="https://www.kanzlei-hasselbach.de/" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_lawyer}">Kanzlei Hasselbach</a><span th:text="#{impressum.credits_end}">.</span>
+        </p>
+    </div>
+</main>
+</body>
+</html>

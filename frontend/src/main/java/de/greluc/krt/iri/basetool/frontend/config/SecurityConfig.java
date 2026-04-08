@@ -1,0 +1,159 @@
+package de.greluc.krt.iri.basetool.frontend.config;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
+import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
+import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.DefaultHttpSecurityExpressionHandler;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
+@Slf4j
+public class SecurityConfig {
+    private final RequestLoggingFilter requestLoggingFilter;
+    private final BackendRoleSyncFilter backendRoleSyncFilter;
+
+    @Bean
+    public static RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.fromHierarchy("""
+                ROLE_ADMIN > ROLE_LOGISTICIAN
+                ROLE_OFFICER > ROLE_LOGISTICIAN
+                ROLE_ADMIN > ROLE_MISSION_MANAGER
+                ROLE_OFFICER > ROLE_MISSION_MANAGER
+                """);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, ClientRegistrationRepository clientRegistrationRepository, RoleHierarchy roleHierarchy) throws Exception {
+        OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler =
+                new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
+
+        // Sets the `post_logout_redirect_uri` parameter to the base URL of the application
+        oidcLogoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}");
+
+        http
+            .addFilterBefore(requestLoggingFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
+            .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers(
+                    "/missions/**",
+                    "/operations/**"
+                )
+            )
+            .headers(headers -> {
+                headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"));
+                headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
+                headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+                headers.addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Permissions-Policy", "geolocation=(), camera=(), microphone=(), fullscreen=()"));
+                headers.contentTypeOptions(Customizer.withDefaults());
+            })
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/missions/*/managers", "/missions/*/managers/*").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/missions/*/managers/*").authenticated()
+                .requestMatchers("/", "/error", "/css/**", "/js/**", "/images/**", "/logos/**", "/fonts/**", "/impressum", "/privacy", "/terms").permitAll()
+                .requestMatchers("/missions", "/missions/").permitAll()
+                .requestMatchers("/missions/**").permitAll() // Still permitAll for general access, @PreAuthorize or logic inside handles details
+                .requestMatchers("/operations", "/operations/").permitAll()
+                .requestMatchers("/operations/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .loginPage("/oauth2/authorization/keycloak")
+                .failureUrl("/?error")
+                .authorizationEndpoint(auth -> auth.authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository)))
+                .userInfoEndpoint(userInfo -> userInfo.userAuthoritiesMapper(userAuthoritiesMapper()))
+            )
+            .logout(logout -> logout
+                .logoutRequestMatcher(request -> request.getRequestURI().equals(request.getContextPath() + "/logout"))
+                .logoutSuccessHandler(oidcLogoutSuccessHandler)
+            );
+        return http.build();
+    }
+
+    private OAuth2AuthorizationRequestResolver authorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository) {
+        DefaultOAuth2AuthorizationRequestResolver defaultResolver = 
+                new DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository, "/oauth2/authorization");
+
+        return new OAuth2AuthorizationRequestResolver() {
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
+                OAuth2AuthorizationRequest req = defaultResolver.resolve(request);
+                return customizeAuthorizationRequest(req, request);
+            }
+
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
+                OAuth2AuthorizationRequest req = defaultResolver.resolve(request, clientRegistrationId);
+                return customizeAuthorizationRequest(req, request);
+            }
+
+            private OAuth2AuthorizationRequest customizeAuthorizationRequest(OAuth2AuthorizationRequest req, HttpServletRequest request) {
+                if (req == null) {
+                    return null;
+                }
+                java.util.Locale locale = org.springframework.web.servlet.support.RequestContextUtils.getLocale(request);
+                Map<String, Object> additionalParameters = new java.util.HashMap<>(req.getAdditionalParameters());
+                additionalParameters.put("ui_locales", locale.getLanguage());
+                return OAuth2AuthorizationRequest.from(req).additionalParameters(additionalParameters).build();
+            }
+        };
+    }
+
+    @Bean
+    @SuppressWarnings("unchecked")
+    public GrantedAuthoritiesMapper userAuthoritiesMapper() {
+        return (authorities) -> {
+            Set<GrantedAuthority> mappedAuthorities = new HashSet<>();
+
+            authorities.forEach(authority -> {
+                mappedAuthorities.add(authority);
+                if (authority instanceof OidcUserAuthority oidcUserAuthority) {
+                    log.debug("OidcUserAuthority attributes: {}", oidcUserAuthority.getAttributes());
+                    Map<String, Object> realmAccess = (Map<String, Object>) oidcUserAuthority.getAttributes().get("realm_access");
+                    if (realmAccess != null && realmAccess.containsKey("roles")) {
+                        Collection<String> roles = (Collection<String>) realmAccess.get("roles");
+                        log.info("Mapping realm roles from Keycloak: {}", roles);
+                        roles.forEach(role -> {
+                            String mappedRole = "ROLE_" + role.toUpperCase().replace(" ", "_");
+                            log.debug("Mapped role: {}", mappedRole);
+                            mappedAuthorities.add(new SimpleGrantedAuthority(mappedRole));
+                        });
+                    }
+                }
+            });
+
+            return mappedAuthorities;
+        };
+    }
+}

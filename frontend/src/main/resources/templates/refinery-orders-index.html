@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{nav.refinery}">Raffinerie</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{nav.refinery}">Raffinerieaufträge</h1>
+        <a th:href="@{/refinery-orders/create}" class="btn" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <form id="filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
+            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
+                <span th:text="#{refineryorder.status.OPEN}">Offen</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
+                <span th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
+                <span th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
+                <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.25rem; padding-left: 1rem; border-left: 1px solid var(--color-primary-dark);">
+                <input type="checkbox" name="onlyMine" value="true" th:checked="${onlyMine}">
+                <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Aufträge</span>
+            </label>
+            <button type="submit" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
+        </form>
+
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{refineryorder.index.id}">ID</th>
+                <th th:text="#{refineryorder.index.owner}">Besitzer</th>
+                <th th:text="#{refineryorder.index.status}">Status</th>
+                <th th:text="#{refineryorder.index.startedAt}">Gestartet</th>
+                <th th:text="#{refineryorder.index.endsAt}">Ende</th>
+                <th th:text="#{refineryorder.index.location}">Ort</th>
+                <th th:text="#{refineryorder.index.mission}">Einsatz</th>
+                <th th:text="#{refineryorder.index.materials}">Materialien</th>
+                <th th:text="#{refineryorder.index.actions}">Aktionen</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="order : ${orders}">
+                <td style="white-space: nowrap;">
+                    <span class="refinery-order-id-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${#strings.substring(order.id, #strings.length(order.id) - 4)}"></span>
+                </td>
+                <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}"></td>
+                <td th:text="${order.status != null ? #messages.msg('refineryorder.status.' + order.status) : '-'}"></td>
+                <td style="white-space: nowrap;">
+                    <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${#temporals.format(order.startedAt, 'dd.MM.yy HH:mm')}"></span>
+                </td>
+                <td style="white-space: nowrap;">
+                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yy HH:mm') : '-'}"></span>
+                </td>
+                <td th:text="${order.location != null ? order.location.name : '-'}"></td>
+                <td th:text="${order.mission != null ? order.mission.name : '-'}"></td>
+                <td>
+                    <span th:each="mat, iterStat : ${order.goods}" th:text="${mat.inputMaterial != null ? mat.inputMaterial.name : '-'} + ${!iterStat.last ? ', ' : ''}"></span>
+                </td>
+                <td style="white-space: nowrap;">
+                    <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn" th:text="#{refineryorder.action.details}">Details</a>
+                </td>
+            </tr>
+            <tr th:if="${orders.empty}">
+                <td colspan="9" style="text-align: center;" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript">
+    function updateRefineryOrderColors() {
+        const nowMs = new Date().getTime();
+        document.querySelectorAll('.refinery-order-id-display').forEach(el => {
+            const utcMsStr = el.getAttribute('data-utc');
+            
+            if (utcMsStr && utcMsStr !== 'null') {
+                const endsAtMs = parseInt(utcMsStr, 10);
+                if (!isNaN(endsAtMs) && nowMs > endsAtMs) {
+                    el.style.color = '#2ecc71';
+                    el.style.fontWeight = 'bold';
+                }
+            }
+        });
+    }
+
+    function formatLocalDates() {
+        document.querySelectorAll('.local-datetime-display').forEach(el => {
+            const utcMsStr = el.getAttribute('data-utc');
+            if (utcMsStr && utcMsStr !== 'null') {
+                const date = new Date(parseInt(utcMsStr, 10));
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = String(date.getFullYear()).slice(-2);
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    el.innerText = `${day}.${month}.${year} ${hours}:${minutes}`;
+                }
+            } else {
+                el.innerText = '-';
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        formatLocalDates();
+        updateRefineryOrderColors();
+        setInterval(updateRefineryOrderColors, 10000);
+    });
+</script>
+</body>
+</html>

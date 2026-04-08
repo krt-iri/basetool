@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{app.title} + ' - ' + #{privacy.title}">IRIDIUM Basetool - Datenschutz</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="hud-box" style="margin-top: 2rem;">
+        <h1 th:text="#{privacy.title}">Datenschutzerklärung</h1>
+        <p th:text="#{privacy.example_text}">Dies ist die Datenschutzerklärung der Plattform.</p>
+    </div>
+</main>
+</body>
+</html>

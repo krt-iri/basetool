@@ -1,0 +1,1 @@
+ALTER TABLE job_order ADD COLUMN display_id SERIAL;

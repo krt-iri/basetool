@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title>Lagerverwaltung - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .actions-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .material-select {
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Lagerverwaltung</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+            <h3 style="font-family: 'Lato', sans-serif; font-weight: 700; margin: 0;" th:text="#{inventory.overview.aggregated}">Aggregiertes Staffellager</h3>
+            <div class="actions-bar" style="margin-bottom: 0;">
+                <a th:href="@{/inventory/my}" class="btn" th:text="#{inventory.overview.my}">Mein Lager</a>
+                <a th:href="@{/inventory/all}" class="btn" th:text="#{inventory.overview.global}">Globales Lager</a>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <div class="table-responsive">
+            <table class="krt-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Ø Qualität</th>
+                        <th>Gesamtmenge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${aggregated}"
+                        th:data-href="@{/inventory/all(materialIds=${item.material.id})}"
+                        onclick="window.location.href=this.getAttribute('data-href')"
+                        style="cursor: pointer;" class="clickable-row">
+                        <td th:text="${item.material.name}" style="color: var(--color-primary);">Material</td>
+                        <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 2) : '0.00'}">100.00</td>
+                        <td th:text="${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 3) : '0.000'}">10</td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(aggregated)}">
+                        <td colspan="3" style="text-align: center; color: var(--color-gray-2);">Keine Einträge vorhanden.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+            
+            <div th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></div>
+            
+        </div>
+    </div>
+</main>
+<th:block th:replace="~{fragments/toast :: toast}" />
+</body>
+</html>

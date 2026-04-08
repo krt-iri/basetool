@@ -1,0 +1,1 @@
+ALTER TABLE material ADD COLUMN quantity_type VARCHAR(20) DEFAULT 'SCU';

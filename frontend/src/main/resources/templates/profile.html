@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{profile.title} + ' - ' + #{app.title}">User Profile - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .profile-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .profile-row {
+            display: flex;
+            border-bottom: 1px solid var(--color-gray-3);
+            padding-bottom: 0.5rem;
+        }
+        .profile-label {
+            font-family: var(--font-body);
+            color: var(--color-primary);
+            width: 200px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .profile-value {
+            color: var(--color-gray-1);
+            font-size: 1.1rem;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{profile.title}">User Profile</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div class="profile-details">
+            <div class="profile-row">
+                <span class="profile-label" th:text="#{profile.username}">Username</span>
+                <span class="profile-value" th:text="${username}">username</span>
+            </div>
+            <div class="profile-row">
+                <span class="profile-label" th:text="#{profile.firstname}">First Name</span>
+                <span class="profile-value" th:text="${firstName}">First</span>
+            </div>
+            <div class="profile-row">
+                <span class="profile-label" th:text="#{profile.lastname}">Last Name</span>
+                <span class="profile-value" th:text="${lastName}">Last</span>
+            </div>
+            <div class="profile-row">
+                <span class="profile-label" th:text="#{profile.email}">Email</span>
+                <span class="profile-value" th:text="${email}">email@example.com</span>
+            </div>
+            <div class="profile-row" th:if="${rank}">
+                <span class="profile-label" th:text="#{profile.rank}">Rank</span>
+                <span class="profile-value" th:text="${rank}">10</span>
+            </div>
+            <div class="profile-row" style="align-items: flex-start;">
+                <span class="profile-label" th:text="#{profile.custom_data}" style="padding-top: 0.5rem;">Custom Data</span>
+                <form th:action="@{/profile/description}" method="post" style="flex: 1;" th:object="${profileDescriptionForm}">
+                    <input type="hidden" name="version" th:field="*{version}">
+                    <div style="margin-bottom: 1rem;">
+                        <label for="displayName" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.display_name}">Display Name</label>
+                        <input type="text" id="displayName" name="displayName" th:field="*{displayName}" style="width: 100%; max-width: 400px; padding: 0.5rem;" />
+                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-dept-combat); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    </div>
+                    <div>
+                        <label for="description" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.description}">Description</label>
+                        <textarea id="description" name="description" rows="5" th:text="*{description}"></textarea>
+                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <button type="submit" class="btn" th:text="#{profile.save_custom_data}">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <a th:href="${keycloakAccountUrl}" class="btn" target="_blank" th:text="#{profile.edit_link}">Edit in Keycloak</a>
+            <a th:href="@{/}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
+        </div>
+    </div>
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    });
+</script>
+</body>
+</html>

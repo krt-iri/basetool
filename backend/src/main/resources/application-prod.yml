@@ -1,0 +1,36 @@
+# ===================================================================
+# Production Configuration for Backend
+# 
+# JVM Tuning Recommendations (apply via JAVA_TOOL_OPTIONS in Docker):
+#   -XX:+UseContainerSupport
+#   -XX:MaxRAMPercentage=75.0
+#   -XX:InitialRAMPercentage=50.0
+#   -XX:+HeapDumpOnOutOfMemoryError
+#   -XX:HeapDumpPath=/tmp/heapdump.hprof
+# ===================================================================
+spring:
+  datasource:
+    url: jdbc:postgresql://db-backend:15432/krt_basetool
+    username: krt_user
+    password: krt_password
+    hikari:
+      # Conservative Connection Pool Defaults for Production
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.iri-base.org/realms/iri}

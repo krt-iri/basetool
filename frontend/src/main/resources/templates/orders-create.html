@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{orders.create.title} + ' - ' + #{app.title}">Neuer Auftrag - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .form-container {
+            max-width: 800px;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: 'Lato', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+        .material-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: flex-end;
+        }
+        details.scmdb-import summary::-webkit-details-marker {
+            display: none;
+        }
+        details.scmdb-import summary {
+            list-style: none;
+            cursor: pointer;
+            color: var(--color-primary);
+            font-family: 'Lato', sans-serif;
+            font-weight: 700;
+            outline: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        details.scmdb-import summary::before {
+            content: '▶';
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 0.8rem;
+        }
+        details.scmdb-import[open] summary::before {
+            transform: rotate(90deg);
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 th:text="#{orders.create.title}">Neuer Auftrag</h1>
+        <div style="display: flex; gap: 0.5rem; align-items: center;" sec:authorize="isAuthenticated()">
+            <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
+        </div>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+        
+        <div th:if="${success}" class="hud-box" style="background-color: rgba(46, 204, 113, 0.1); border-color: #2ecc71; margin-bottom: 1rem;">
+            <p style="color: #2ecc71;" th:text="#{__${success}__}">Erfolg</p>
+        </div>
+
+        <div class="form-container">
+            <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
+                
+                <div class="form-group">
+                    <label for="squadron" th:text="#{orders.create.squadron}">Staffel</label>
+                    <select id="squadron" th:field="*{squadron}" required>
+                        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                        <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
+                    <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
+                </div>
+                
+                <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.materials.title}">Materialien</h3>
+                
+                <details class="form-group scmdb-import" style="border: 1px dashed var(--color-primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+                    <summary th:text="#{orders.create.scmdb.label}">scmdb.net Export</summary>
+                    <div style="margin-top: 1rem;">
+                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" style="width: 100%; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); padding: 0.75rem; box-sizing: border-box; resize: vertical;"></textarea>
+                        <button type="button" class="btn btn-secondary" style="margin-top: 1rem; width: 100%;" onclick="importFromScmdb()" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
+                    </div>
+                </details>
+                
+                <div id="materials-container">
+                    <div class="material-row" th:each="mat, stat : *{materials}">
+                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                            <label th:text="#{orders.create.material}">Material</label>
+                            <select th:field="*{materials[__${stat.index}__].materialId}" required>
+                                <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
+                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="0" max="999" required>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label th:text="#{orders.create.amount}">Menge</label>
+                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" step="0.001" min="0" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" style="margin-top: 1rem;" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Template for new material options -->
+    <select id="material-options-template" style="display: none;">
+        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+        <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+    </select>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    let materialIndex = /*[[${jobOrderForm.materials.size()}]]*/ 1;
+    
+    function importFromScmdb() {
+        const text = document.getElementById('scmdb-import-text').value;
+        const lines = text.split('\n');
+        const materialOptions = document.getElementById('material-options-template').options;
+        
+        let foundAny = false;
+        let unknownMaterials = [];
+        
+        // Regex für SCU (Spitzhacke): ⛏ Name — Menge SCU (oder ähnliche Trennzeichen)
+        const scuRegex = /⛏\s*(.+?)\s*[—–\-]\s*([\d,.]+)\s*SCU/i;
+        // Regex für Stück (Diamant): 💎 Name × Menge (oder ähnliche Trennzeichen)
+        const pieceRegex = /💎\s*(.+?)\s*[×x*]\s*([\d,.]+)/i;
+        
+        for (let line of lines) {
+            line = line.trim();
+            if (!line) continue;
+            
+            let match = line.match(scuRegex) || line.match(pieceRegex);
+            
+            if (match) {
+                const materialName = match[1].trim().toLowerCase();
+                let amount = match[2].replace(',', '.'); // Komma zu Punkt für JS parseFloat
+                
+                // Finde materialId im Template
+                let materialId = null;
+                for (let i = 0; i < materialOptions.length; i++) {
+                    const optionText = materialOptions[i].text.trim().toLowerCase();
+                    if (optionText === materialName) {
+                        materialId = materialOptions[i].value;
+                        break;
+                    }
+                }
+                
+                if (materialId) {
+                    const container = document.getElementById('materials-container');
+                    let targetRow = null;
+                    
+                    // Beim ersten gefundenen Material prüfen, ob die erste Zeile leer ist
+                    if (!foundAny) {
+                        const rows = container.getElementsByClassName('material-row');
+                        if (rows.length > 0) {
+                            const firstSelect = rows[0].querySelector('select');
+                            if (!firstSelect.value) {
+                                targetRow = rows[0];
+                            }
+                        }
+                    }
+                    
+                    if (!targetRow) {
+                        addMaterialRow();
+                        targetRow = container.lastElementChild;
+                    }
+                    
+                    const select = targetRow.querySelector('select');
+                    const inputs = targetRow.querySelectorAll('input[type="number"]');
+                    const qualityInput = inputs[0];
+                    const amountInput = inputs[1];
+                    
+                    select.value = materialId;
+                    amountInput.value = amount;
+                    qualityInput.value = 100;
+                    
+                    foundAny = true;
+                } else {
+                    unknownMaterials.push(match[1].trim());
+                }
+            }
+        }
+        
+        if (foundAny) {
+            document.getElementById('scmdb-import-text').value = '';
+            let successMsg = /*[[#{orders.create.scmdb.success}]]*/ 'Materialien erfolgreich extrahiert.';
+            if (unknownMaterials.length > 0) {
+                successMsg += ' (' + (/*[[#{orders.create.scmdb.error.some_unknown}]]*/ 'einige unbekannt') + ': ' + unknownMaterials.join(', ') + ')';
+            }
+            
+            if (window.showFrontendSuccessToast) {
+                window.showFrontendSuccessToast(successMsg);
+            }
+        } else {
+            let errorMsg = /*[[#{orders.create.scmdb.error.no_match}]]*/ 'Keine bekannten Materialien im Export gefunden.';
+            if (unknownMaterials.length > 0) {
+                errorMsg = (/*[[#{orders.create.scmdb.error.not_found}]]*/ 'Folgende Materialien wurden nicht im System gefunden') + ': ' + unknownMaterials.join(', ');
+            }
+            
+            if (window.showFrontendErrorToast) {
+                window.showFrontendErrorToast(errorMsg);
+            }
+        }
+    }
+    
+    function addMaterialRow() {
+        const container = document.getElementById('materials-container');
+        
+        const row = document.createElement('div');
+        row.className = 'material-row';
+        
+        const options = document.getElementById('material-options-template').innerHTML;
+        
+        row.innerHTML = `
+            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                <select name="materials[${materialIndex}].materialId" required>${options}</select>
+            </div>
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <input type="number" name="materials[${materialIndex}].minQuality" value="100" step="1" min="0" max="999" required>
+            </div>
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
+            </div>
+        `;
+        
+        container.appendChild(row);
+        materialIndex++;
+    }
+    /*]]>*/
+</script>
+</body>
+</html>

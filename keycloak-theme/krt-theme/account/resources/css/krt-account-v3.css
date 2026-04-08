@@ -1,0 +1,256 @@
+/* Fonts */
+@font-face {
+    font-family: 'Ethnocentric';
+    src: url('../fonts/Ethnocentric Rg.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Lato';
+    src: url('../fonts/Lato-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+:root {
+    /* KRT Base Colors */
+    --color-primary: #E77E23;
+    --color-bg-black: #000000;
+    --color-bg-dark-gray: #141414;
+    
+    --color-accent-light: #EEB64B;
+    --color-accent-dark: #C45C00;
+    
+    --color-gray-1: #D2D2D2;
+    --color-gray-2: #646464;
+    --color-gray-3: #282828;
+    --color-gray-4: #141414;
+    
+    --font-headline: 'Ethnocentric', sans-serif;
+    --font-body: 'Lato', sans-serif;
+
+    /* PatternFly Overrides to enforce simple CSS design */
+    --pf-v5-global--FontFamily--sans-serif: var(--font-body);
+    --pf-v5-global--FontFamily--heading--sans-serif: var(--font-headline);
+    --pf-v5-global--primary-color--100: var(--color-primary);
+    --pf-v5-global--primary-color--200: var(--color-accent-dark);
+    --pf-v5-global--BackgroundColor--100: var(--color-bg-dark-gray);
+    --pf-v5-global--BackgroundColor--200: var(--color-bg-black);
+    --pf-v5-global--BackgroundColor--dark-100: var(--color-bg-black);
+    --pf-v5-global--Color--100: var(--color-gray-1);
+    --pf-v5-global--Color--200: var(--color-gray-2);
+}
+
+/* Hard reset for all backgrounds to remove the orange grid completely */
+body, html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section, 
+.pf-v5-c-page, .pf-v5-c-page__main, .pf-v5-c-page__main-section, 
+.pf-v6-c-page, .pf-v6-c-page__main, .pf-v6-c-page__main-section,
+.keycloak-account-page, [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
+    background-image: none !important;
+    background-color: var(--color-bg-dark-gray) !important;
+}
+
+[class*="pf-c-background"]::before,
+[class*="pf-v5-c-background"]::before,
+[class*="pf-v6-c-background"]::before,
+[class*="pf-c-background"]::after,
+[class*="pf-v5-c-background"]::after,
+[class*="pf-v6-c-background"]::after,
+.pf-c-background-image::before,
+.pf-v5-c-background-image::before,
+.pf-v6-c-background-image::before {
+    background-image: none !important;
+    display: none !important;
+}
+
+* {
+    --pf-c-background-image--BackgroundImage: none !important;
+    --pf-c-background-image--BackgroundImage-2x: none !important;
+    --pf-c-background-image--BackgroundImage-sm: none !important;
+    --pf-c-background-image--BackgroundImage-sm-2x: none !important;
+    --pf-c-background-image--BackgroundImage-lg: none !important;
+    --pf-c-background-image--Filter: none !important;
+    
+    --pf-v5-c-background-image--BackgroundImage: none !important;
+    --pf-v5-c-background-image--BackgroundImage-2x: none !important;
+    --pf-v5-c-background-image--BackgroundImage-sm: none !important;
+    --pf-v5-c-background-image--BackgroundImage-sm-2x: none !important;
+    --pf-v5-c-background-image--BackgroundImage-lg: none !important;
+    --pf-v5-c-background-image--Filter: none !important;
+    
+    --pf-v6-c-background-image--BackgroundImage: none !important;
+    --pf-v6-c-background-image--BackgroundImage-2x: none !important;
+    --pf-v6-c-background-image--BackgroundImage-sm: none !important;
+    --pf-v6-c-background-image--BackgroundImage-sm-2x: none !important;
+    --pf-v6-c-background-image--BackgroundImage-lg: none !important;
+    --pf-v6-c-background-image--Filter: none !important;
+}
+
+/* Typography Overrides */
+h1, h2, h3, h4, h5, h6, .pf-v5-c-title, .pf-v6-c-title {
+    font-family: var(--font-headline) !important;
+    color: var(--color-primary) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    font-weight: normal !important;
+}
+
+a, .pf-v5-c-button--m-link {
+    color: var(--color-primary) !important;
+    text-decoration: none !important;
+}
+
+a:hover, .pf-v5-c-button--m-link:hover {
+    color: var(--color-accent-light) !important;
+}
+
+/* Sidebar / Navigation styling to match KRT frontend */
+.pf-v5-c-nav__link, .pf-v6-c-nav__link {
+    color: var(--color-gray-1) !important;
+    font-family: var(--font-headline) !important;
+    text-transform: uppercase !important;
+    font-size: 0.85em !important;
+    letter-spacing: 1px !important;
+    border-left: 3px solid transparent !important;
+}
+
+.pf-v5-c-nav__item.pf-m-current > .pf-v5-c-nav__link,
+.pf-v6-c-nav__item.pf-m-current > .pf-v6-c-nav__link,
+.pf-v5-c-nav__link.pf-m-current,
+.pf-v6-c-nav__link.pf-m-current,
+.pf-v5-c-nav__link:hover, .pf-v6-c-nav__link:hover {
+    color: var(--color-primary) !important;
+    background-color: var(--color-bg-black) !important;
+    border-left: 3px solid var(--color-primary) !important;
+}
+
+/* Force override of PatternFly active state pseudo elements which cause the blue border */
+.pf-v5-c-nav__link.pf-m-current::after,
+.pf-v6-c-nav__link.pf-m-current::after,
+.pf-v5-c-nav__item.pf-m-current > .pf-v5-c-nav__link::after,
+.pf-v6-c-nav__item.pf-m-current > .pf-v6-c-nav__link::after {
+    border-color: var(--color-primary) !important;
+    display: none !important;
+}
+
+/* Sidebar container */
+.pf-v5-c-page__sidebar, .pf-v6-c-page__sidebar {
+    background-color: var(--color-bg-dark-gray) !important;
+    border-right: 1px solid var(--color-gray-3) !important;
+}
+
+/* Form Container */
+.pf-v5-c-form, .pf-v6-c-form {
+    background-color: var(--color-bg-dark-gray) !important;
+    border: 1px solid var(--color-gray-3) !important;
+    border-top: 3px solid var(--color-primary) !important;
+    padding: 30px !important;
+    position: relative !important;
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
+    margin-bottom: 30px !important;
+}
+
+/* Form HUD corners */
+.pf-v5-c-form::before, .pf-v5-c-form::after, 
+.pf-v6-c-form::before, .pf-v6-c-form::after {
+    content: '' !important;
+    position: absolute !important;
+    width: 15px !important;
+    height: 15px !important;
+    border: 2px solid var(--color-primary) !important;
+    pointer-events: none !important;
+}
+.pf-v5-c-form::before, .pf-v6-c-form::before {
+    top: -2px !important; left: -2px !important;
+    border-right: none !important; border-bottom: none !important;
+}
+.pf-v5-c-form::after, .pf-v6-c-form::after {
+    bottom: -2px !important; right: -2px !important;
+    border-left: none !important; border-top: none !important;
+}
+
+/* Form Labels */
+.pf-v5-c-form__label, .pf-v6-c-form__label {
+    color: var(--color-gray-1) !important;
+    text-transform: uppercase !important;
+    font-size: 0.85em !important;
+    letter-spacing: 1px !important;
+}
+
+/* Form Inputs */
+.pf-v5-c-form-control, .pf-v6-c-form-control,
+.pf-v5-c-form-control input, .pf-v6-c-form-control input,
+.pf-v5-c-text-input, .pf-v6-c-text-input,
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
+    background-color: var(--color-bg-black) !important;
+    border: 1px solid var(--color-gray-2) !important;
+    border-bottom: 2px solid var(--color-primary) !important;
+    color: var(--color-gray-1) !important;
+    font-family: var(--font-body) !important;
+    padding: 12px 15px !important;
+    border-radius: 0 !important;
+}
+
+.pf-v5-c-form-control:focus, .pf-v6-c-form-control:focus,
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
+}
+
+/* Buttons */
+.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary {
+    background-color: var(--color-primary) !important;
+    color: var(--color-bg-black) !important;
+    font-family: var(--font-headline) !important;
+    text-transform: uppercase !important;
+    border-radius: 0 !important;
+    border: none !important;
+    letter-spacing: 1px !important;
+    padding: 12px 25px !important;
+}
+
+.pf-v5-c-button.pf-m-primary:hover, .pf-v6-c-button.pf-m-primary:hover {
+    background-color: var(--color-accent-dark) !important;
+}
+
+.pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary {
+    background-color: transparent !important;
+    color: var(--color-primary) !important;
+    border: 1px solid var(--color-primary) !important;
+    font-family: var(--font-headline) !important;
+    text-transform: uppercase !important;
+    border-radius: 0 !important;
+    letter-spacing: 1px !important;
+}
+
+.pf-v5-c-button.pf-m-secondary:hover, .pf-v6-c-button.pf-m-secondary:hover {
+    background-color: rgba(231, 126, 35, 0.1) !important;
+}
+
+/* Cards (if any) */
+.pf-v5-c-card, .pf-v6-c-card {
+    background-color: var(--color-bg-dark-gray) !important;
+    border: 1px solid var(--color-gray-3) !important;
+    border-radius: 0 !important;
+}
+
+/* Brand/Header */
+.pf-v5-c-page__header, .pf-v6-c-page__header {
+    background-color: var(--color-bg-dark-gray) !important;
+    border-bottom: 2px solid var(--color-primary) !important;
+}

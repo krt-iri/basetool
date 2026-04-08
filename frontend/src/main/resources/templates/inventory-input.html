@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title>Neuer Lagereintrag - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .form-container {
+            max-width: 600px;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: 'Lato', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Neuer Lagereintrag</h1>
+    </div>
+
+    <div class="hud-box" style="margin-top: 2rem;">
+        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
+            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+
+        <div class="form-container">
+            <form th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
+                <div th:if="${#fields.hasErrors('*')}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem; padding: 1rem;">
+                    <ul style="color: #e74c3c; margin: 0; padding-left: 1.5rem; font-family: var(--font-body);">
+                        <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
+                    </ul>
+                </div>
+                <input type="hidden" th:field="*{isGlobal}" />
+                
+                <div class="form-group" th:if="*{isGlobal}">
+                    <label for="userId">Nutzer zuordnen</label>
+                    <select id="userId" th:field="*{userId}">
+                        <option value="">-- Eigener Eintrag --</option>
+                        <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="materialId">Material</label>
+                    <select id="materialId" th:field="*{materialId}" required>
+                        <option value="">-- Bitte wählen --</option>
+                        <option th:each="mat : ${materials}" th:value="${mat.id}" th:text="${mat.name}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="locationId">Ort</label>
+                    <select id="locationId" th:field="*{locationId}" required>
+                        <option value="">-- Bitte wählen --</option>
+                        <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="quality">Qualität</label>
+                    <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="amount">Menge</label>
+                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="missionId" th:text="#{inventory.mission}">Einsatz zuordnen (optional)</label>
+                    <select id="missionId" th:field="*{missionId}">
+                        <option value="" th:text="#{inventory.mission.select}">-- Kein Einsatz --</option>
+                        <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.name}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="jobOrderId">Auftrag zuordnen (optional)</label>
+                    <select id="jobOrderId" th:field="*{jobOrderId}">
+                        <option value="">-- Kein Auftrag --</option>
+                        <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.squadron + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group" th:unless="*{isGlobal}" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                    <input type="checkbox" id="personal" th:field="*{personal}" style="width: auto; margin: 0;">
+                    <label for="personal" th:text="#{inventory.personal.label}" style="margin: 0; display: inline-block;">Als persönlicher Eintrag markieren</label>
+                    <span style="font-size: 0.8rem; color: var(--color-gray-2); margin-left: 0.5rem;" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</span>
+                </div>
+                
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn" th:text="#{general.save}">Speichern</button>
+                    <a th:href="@{/inventory}" onclick="history.back(); return false;" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{general.cancel}">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const matSelect = document.getElementById('materialId');
+        if (matSelect) {
+            matSelect.addEventListener('change', function() {
+                filterJobOrdersByMaterial(this.value);
+            });
+            // Initial filter if a material is already selected
+            if (matSelect.value) {
+                filterJobOrdersByMaterial(matSelect.value);
+            } else {
+                // If no material is selected, show all job orders initially
+                filterJobOrdersByMaterial('');
+            }
+        }
+    });
+
+    function filterJobOrdersByMaterial(matId) {
+        const jobSelect = document.getElementById('jobOrderId');
+        if (!jobSelect) return;
+        
+        let hasSelectedValidOption = false;
+        
+        for (let i = 1; i < jobSelect.options.length; i++) {
+            const option = jobSelect.options[i];
+            
+            if (!matId) {
+                // If no material is selected, show all active orders
+                option.style.display = '';
+                option.disabled = false;
+                if (option.selected) hasSelectedValidOption = true;
+            } else {
+                const materialsStr = option.getAttribute('data-materials');
+                if (materialsStr) {
+                    const materials = materialsStr.split(',');
+                    if (materials.includes(matId)) {
+                        option.style.display = '';
+                        option.disabled = false;
+                        if (option.selected) hasSelectedValidOption = true;
+                    } else {
+                        option.style.display = 'none';
+                        option.disabled = true;
+                    }
+                } else {
+                    option.style.display = 'none';
+                    option.disabled = true;
+                }
+            }
+        }
+        
+        if (jobSelect.selectedIndex > 0 && !hasSelectedValidOption) {
+            jobSelect.value = "";
+        }
+    }
+</script>
+</body>
+</html>
