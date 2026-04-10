@@ -172,6 +172,9 @@ public class RefineryOrderService {
         order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : java.time.Instant.now());
         order.setDurationMinutes(details.getDurationMinutes());
         order.setExpenses(details.getExpenses());
+        if (details.getStatus() != null) {
+            order.setStatus(details.getStatus());
+        }
 
         // Update goods
         if (details.getGoods() != null) {
@@ -229,6 +232,10 @@ public class RefineryOrderService {
     public void storeRefineryOrder(@NotNull UUID userId, @NotNull UUID orderId, @NotNull RefineryOrderStoreDto dto, boolean isLogistician) {
         RefineryOrder order = getRefineryOrder(orderId);
 
+        if (order.getStatus() == de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.COMPLETED) {
+            throw new IllegalStateException("Refinery order is already completed and stored.");
+        }
+
         if (!isLogistician && (order.getOwner() == null || order.getOwner().getId() == null || !order.getOwner().getId().equals(userId))) {
             throw new AccessDeniedException("Access denied: You do not own this refinery order");
         }
@@ -240,28 +247,46 @@ public class RefineryOrderService {
             de.greluc.krt.iri.basetool.backend.model.Location loc = locationRepository.findById(itemDto.locationId())
                 .orElseThrow(() -> new RuntimeException("Location not found: " + itemDto.locationId()));
                 
-            InventoryItem item = new InventoryItem();
+            User assignee;
             if (itemDto.userId() != null) {
-                User assignee = userRepository.findById(itemDto.userId())
+                assignee = userRepository.findById(itemDto.userId())
                     .orElseThrow(() -> new RuntimeException("User not found: " + itemDto.userId()));
-                item.setUser(assignee);
             } else {
-                item.setUser(order.getOwner());
+                assignee = order.getOwner();
             }
 
+            de.greluc.krt.iri.basetool.backend.model.JobOrder jobOrder = null;
             if (itemDto.jobOrderId() != null) {
-                de.greluc.krt.iri.basetool.backend.model.JobOrder jobOrder = jobOrderRepository.findById(itemDto.jobOrderId())
+                jobOrder = jobOrderRepository.findById(itemDto.jobOrderId())
                     .orElseThrow(() -> new RuntimeException("JobOrder not found: " + itemDto.jobOrderId()));
-                item.setJobOrder(jobOrder);
             }
 
-            item.setMaterial(mat);
-            item.setLocation(loc);
-            item.setQuality(itemDto.quality());
-            item.setAmount(itemDto.amount());
-            item.setMission(order.getMission());
-            
-            inventoryItemRepository.save(item);
+            java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+                assignee,
+                mat,
+                loc,
+                itemDto.quality(),
+                order.getMission(),
+                jobOrder,
+                false
+            );
+
+            if (existingItemOpt.isPresent()) {
+                InventoryItem existingItem = existingItemOpt.get();
+                existingItem.setAmount(existingItem.getAmount() + itemDto.amount());
+                inventoryItemRepository.save(existingItem);
+            } else {
+                InventoryItem item = new InventoryItem();
+                item.setUser(assignee);
+                item.setJobOrder(jobOrder);
+                item.setMaterial(mat);
+                item.setLocation(loc);
+                item.setQuality(itemDto.quality());
+                item.setAmount(itemDto.amount());
+                item.setMission(order.getMission());
+                
+                inventoryItemRepository.save(item);
+            }
         }
 
         order.setStatus(de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.COMPLETED);

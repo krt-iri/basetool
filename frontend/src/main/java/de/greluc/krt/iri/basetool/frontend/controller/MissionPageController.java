@@ -222,11 +222,11 @@ public class MissionPageController {
             model.addAttribute("participationPercentages", participationPercentages);
             
             // Build frequency lookup
-            Map<UUID, MissionFrequencyDto> frequencyByTypeId = new java.util.HashMap<>();
+            Map<String, MissionFrequencyDto> frequencyByTypeId = new java.util.HashMap<>();
             if (mission.frequencies() != null) {
                 for (MissionFrequencyDto f : mission.frequencies()) {
                     if (f.frequencyTypeId() != null) {
-                        frequencyByTypeId.put(f.frequencyTypeId(), f);
+                        frequencyByTypeId.put(f.frequencyTypeId().toString(), f);
                     }
                 }
             }

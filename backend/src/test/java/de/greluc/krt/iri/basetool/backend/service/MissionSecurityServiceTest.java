@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,12 @@ class MissionSecurityServiceTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private MissionParticipantRepository missionParticipantRepository;
+
+    @Mock
+    private de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository missionFinanceEntryRepository;
+
     private RoleHierarchy roleHierarchy;
 
     @InjectMocks
@@ -47,7 +54,7 @@ class MissionSecurityServiceTest {
     @BeforeEach
     void setUp() {
         roleHierarchy = de.greluc.krt.iri.basetool.backend.config.SecurityConfig.roleHierarchy();
-        missionSecurityService = new MissionSecurityService(missionRepository, userService, roleHierarchy);
+        missionSecurityService = new MissionSecurityService(missionRepository, userService, roleHierarchy, missionParticipantRepository, missionFinanceEntryRepository);
         
         missionId = UUID.randomUUID();
         userId = UUID.randomUUID();

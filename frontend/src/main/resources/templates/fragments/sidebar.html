@@ -137,6 +137,23 @@
                     }
                 }
             });
+
+            // Generic Auto-Submit for filter forms
+            const filterForm = document.getElementById('filter-form');
+            if (filterForm) {
+                const filterInputs = filterForm.querySelectorAll('input, select');
+                filterInputs.forEach(input => {
+                    input.addEventListener('change', function() {
+                        filterForm.submit();
+                    });
+                });
+                
+                // Hide submit button for Non-JS Fallback
+                const submitBtn = filterForm.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.style.display = 'none';
+                }
+            }
         });
     </script>
     <th:block th:replace="~{fragments/toast :: toast}" />

@@ -37,6 +37,10 @@ public class UserService {
     private final JobOrderRepository jobOrderRepository;
     private final MissionParticipantRepository missionParticipantRepository;
 
+    public boolean isUsernameOrDisplayNameTaken(@NotNull String name) {
+        return userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(name, name).isPresent();
+    }
+
     @NotNull
     public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
         String sub = jwt.getSubject();

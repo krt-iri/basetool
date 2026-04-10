@@ -37,7 +37,7 @@ public class AnnouncementController {
 
     @PutMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
-    public AnnouncementDto updateAnnouncement(@RequestBody @NotNull AnnouncementRequest request) {
+    public AnnouncementDto updateAnnouncement(@RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
         return announcementMapper.toDto(announcementService.updateAnnouncement(request.getContent(), request.getVersion()));
     }
 
@@ -47,9 +47,11 @@ public class AnnouncementController {
         announcementService.deleteAnnouncement();
     }
 
-    @Data
+    @lombok.Data
     public static class AnnouncementRequest {
+        @jakarta.validation.constraints.NotBlank
         private String content;
+        @jakarta.validation.constraints.NotNull
         private Long version;
     }
 }

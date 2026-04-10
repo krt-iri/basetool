@@ -175,6 +175,7 @@ public class InventoryPageController {
             } else {
                 form.setIsGlobal(false);
             }
+            form.setSource(source);
             model.addAttribute("inventoryForm", form);
         } else {
             form = (InventoryForm) model.getAttribute("inventoryForm");
@@ -222,7 +223,15 @@ public class InventoryPageController {
             redirectAttributes.addFlashAttribute("inventoryForm", form);
             return "redirect:/inventory/input";
         }
-        // Redirect back to main page as required: "beim speichern wird er zurück auf die startseite der lagerverwaltung geführt."
+        
+        if ("my".equals(form.getSource())) {
+            return "redirect:/inventory/my";
+        } else if ("admin".equals(form.getSource())) {
+            return "redirect:/inventory/all";
+        } else if ("aggregated".equals(form.getSource())) {
+            return "redirect:/inventory";
+        }
+        
         return "redirect:/inventory";
     }
 
@@ -255,6 +264,23 @@ public class InventoryPageController {
             redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
         }
         return "redirect:" + redirectPath;
+    }
+
+    @PutMapping("/{id}/update-associations")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<Void> updateAssociations(
+            @PathVariable @NotNull UUID id,
+            @RequestBody @Valid InventoryItemUpdateDto dto) {
+        try {
+            backendApiClient.put("/api/v1/inventory/" + id, dto, Void.class);
+            return org.springframework.http.ResponseEntity.ok().build();
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            log.error("Failed to update inventory item associations: {}", e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("Failed to update inventory item associations", e);
+            return org.springframework.http.ResponseEntity.status(500).build();
+        }
     }
 
     private List<de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto> fetchUsers() {

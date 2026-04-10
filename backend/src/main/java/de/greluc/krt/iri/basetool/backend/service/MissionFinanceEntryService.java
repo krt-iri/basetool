@@ -16,6 +16,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -89,11 +90,10 @@ public class MissionFinanceEntryService {
     }
 
     @Transactional
+    @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
     public MissionFinanceEntryDto updateEntry(UUID entryId, MissionFinanceEntryUpdateDto dto) {
         MissionFinanceEntry entry = financeEntryRepository.findById(entryId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Finance entry not found"));
-
-        checkEditPermission(entry);
 
         // Optimistic Locking Check
         if (!entry.getVersion().equals(dto.version())) {
@@ -109,41 +109,12 @@ public class MissionFinanceEntryService {
     }
 
     @Transactional
+    @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
     public void deleteEntry(UUID entryId) {
         MissionFinanceEntry entry = financeEntryRepository.findById(entryId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Finance entry not found"));
 
-        checkEditPermission(entry);
-
         financeEntryRepository.delete(entry);
     }
 
-    private void checkEditPermission(MissionFinanceEntry entry) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        // Check if user is ADMIN or OFFICER
-        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
-        
-        if (isAdminOrOfficer) {
-            return;
-        }
-
-        // Must be the owner of the entry (if the participant has a linked user account)
-        UUID currentUserId = userService.getUserIdFromJwt(jwt);
-        if (entry.getParticipant().getUser() == null || !entry.getParticipant().getUser().getId().equals(currentUserId)) {
-            throw new AccessDeniedException("You can only edit your own finance entries.");
-        }
-
-        // Must be a registered participant of this mission
-        boolean isParticipant = participantRepository.findByMissionIdAndUserId(
-                entry.getMission().getId(), currentUserId).isPresent();
-                
-        if (!isParticipant) {
-            throw new AccessDeniedException("You must be registered for this mission to edit your finance entries.");
-        }
-    }
 }

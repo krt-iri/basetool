@@ -1,7 +1,11 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,72 @@ public class MissionSecurityService {
     private final MissionRepository missionRepository;
     private final UserService userService;
     private final RoleHierarchy roleHierarchy;
+    private final MissionParticipantRepository missionParticipantRepository;
+    private final MissionFinanceEntryRepository missionFinanceEntryRepository;
+
+    @Transactional(readOnly = true)
+    public boolean canAccessParticipant(UUID missionId, UUID participantId, Authentication authentication) {
+        MissionParticipant p = missionParticipantRepository.findById(participantId)
+                .orElseThrow(() -> new RuntimeException("Participant not found"));
+
+        if (!p.getMission().getId().equals(missionId)) {
+            log.warn("Mission ID mismatch: {} != {}", p.getMission().getId(), missionId);
+            return false;
+        }
+
+        if (p.getUser() == null) {
+            return true;
+        }
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        // Handle anonymous authentication correctly
+        boolean isAnonymous = "anonymousUser".equals(authentication.getPrincipal());
+
+        boolean canManage = !isAnonymous && (
+                authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER")) ||
+                canManageMission(missionId, authentication)
+        );
+
+        UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (isAnonymous) {
+            return false;
+        }
+        if (!canManage && (currentUserId == null || !p.getUser().getId().equals(currentUserId))) {
+            return false;
+        }
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canEditFinanceEntry(UUID entryId, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        MissionFinanceEntry entry = missionFinanceEntryRepository.findById(entryId)
+                .orElseThrow(() -> new RuntimeException("Finance entry not found"));
+
+        // Check if user is ADMIN or OFFICER
+        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
+        
+        if (isAdminOrOfficer) {
+            return true;
+        }
+
+        // Must be the owner of the entry (if the participant has a linked user account)
+        UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (currentUserId == null || entry.getParticipant().getUser() == null || !entry.getParticipant().getUser().getId().equals(currentUserId)) {
+            return false;
+        }
+
+        // Must be a registered participant of this mission
+        return missionParticipantRepository.findByMissionIdAndUserId(
+                entry.getMission().getId(), currentUserId).isPresent();
+    }
 
     @Transactional(readOnly = true)
     public boolean canManageMission(UUID missionId, Authentication authentication) {

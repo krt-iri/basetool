@@ -85,7 +85,7 @@ class MissionFrontendSecurityTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
+    @WithMockUser(roles = "SQUADRON_MEMBER")
     void testMissionsList_User_ShouldSeeCreateButton() throws Exception {
         mockMvc.perform(get("/missions"))
                 .andExpect(status().isOk())

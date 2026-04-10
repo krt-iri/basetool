@@ -33,5 +33,7 @@ public class InventoryForm {
     private Boolean isGlobal;
     private Boolean personal = false;
 
+    private String source;
+
     private Long version;
 }

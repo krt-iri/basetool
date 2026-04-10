@@ -23,7 +23,7 @@ public class ProfitCalculationPageController {
     private final BackendApiClient backendApiClient;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('USER', 'OFFICER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
     public String showProfitCalculationPage(Model model) {
         log.debug("Showing profit calculation page");
         try {

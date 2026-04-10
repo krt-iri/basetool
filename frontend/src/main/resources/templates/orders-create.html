@@ -95,6 +95,7 @@
 
         <div class="form-container">
             <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
+                <input type="hidden" th:field="*{source}" />
                 
                 <div class="form-group">
                     <label for="squadron" th:text="#{orders.create.squadron}">Staffel</label>

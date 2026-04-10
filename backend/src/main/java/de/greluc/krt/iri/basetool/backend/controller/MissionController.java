@@ -293,9 +293,9 @@ public class MissionController {
     }
 
     @PutMapping("/{id}/participants/{participantId}")
+    @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
     @Operation(summary = "Update a participant")
     public MissionDto updateParticipant(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request, Authentication authentication) {
-        checkParticipantAccess(id, participantId, authentication);
         return missionMapper.toDto(missionService.updateParticipantAttributes(id, participantId,
                 request.desiredMissionJobTypeId(),
                 request.plannedMissionJobTypeId(),
@@ -304,27 +304,28 @@ public class MissionController {
                 request.endTime(),
                 request.squadronId(),
                 request.payoutPreference(),
+                request.guestName(),
                 request.version()));
     }
 
     @PostMapping("/{id}/participants/{participantId}/check-in")
+    @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
     @Operation(summary = "Check in a participant")
     public MissionDto checkInParticipant(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, Authentication authentication) {
-        checkParticipantAccess(id, participantId, authentication);
         return missionMapper.toDto(missionService.checkIn(id, participantId));
     }
 
     @PostMapping("/{id}/participants/{participantId}/check-out")
+    @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
     @Operation(summary = "Check out a participant")
     public MissionDto checkOutParticipant(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, Authentication authentication) {
-        checkParticipantAccess(id, participantId, authentication);
         return missionMapper.toDto(missionService.checkOut(id, participantId));
     }
 
     @PutMapping("/{id}/participants/{participantId}/payout-preference")
+    @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
     @Operation(summary = "Update payout preference for a participant")
     public MissionDto updatePayoutPreference(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request, Authentication authentication) {
-        checkParticipantAccess(id, participantId, authentication);
         return missionMapper.toDto(missionService.updatePayoutPreference(id, participantId, request.preference()));
     }
 
@@ -336,33 +337,12 @@ public class MissionController {
     }
 
     @DeleteMapping("/{id}/participants/{participantId}")
+    @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
     @Operation(summary = "Remove a participant")
     public MissionDto removeParticipant(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, Authentication authentication) {
-        checkParticipantAccess(id, participantId, authentication);
         return missionMapper.toDto(missionService.removeParticipant(id, participantId));
     }
 
-    private void checkParticipantAccess(UUID missionId, UUID participantId, Authentication authentication) {
-        var p = missionService.getParticipant(missionId, participantId);
-        boolean isAnonymous = authentication == null ||
-                !authentication.isAuthenticated() ||
-                (authentication.getPrincipal() instanceof String s && "anonymousUser".equals(s));
-
-        boolean canManage = !isAnonymous && (
-                authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER")) ||
-                missionSecurityService.canManageMission(missionId, authentication)
-        );
-
-        UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
-        if (p.getUser() != null) {
-            if (isAnonymous) {
-                throw new AccessDeniedException("Guests cannot modify registered user participants.");
-            }
-            if (!canManage && (currentUserId == null || !p.getUser().getId().equals(currentUserId))) {
-                throw new AccessDeniedException("You cannot modify other registered user participants.");
-            }
-        }
-    }
 
     @PostMapping("/{id}/participants/add")
     @Operation(summary = "Add a participant (public)")
@@ -375,6 +355,10 @@ public class MissionController {
 
         if (jwt == null && finalUserId != null) {
             throw new AccessDeniedException("Anonymous users cannot add registered users.");
+        }
+
+        if (request.guestName() != null && !request.guestName().isBlank() && userService.isUsernameOrDisplayNameTaken(request.guestName())) {
+             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Guest name is already taken.");
         }
 
         return missionMapper.toDto(missionService.addParticipant(id, finalUserId, request.guestName(), request.desiredJobTypeId(), request.comment(), request.squadronId()));

@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddCrewRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.AddParticipantPublicRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.*;
@@ -57,6 +58,9 @@ class MissionValidationTest {
     @Autowired
     private JobTypeRepository jobTypeRepository;
 
+    @Autowired
+    private SquadronRepository squadronRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
@@ -67,6 +71,7 @@ class MissionValidationTest {
     private MissionUnit missionShip;
     private JobType taskJobType;
     private JobType crewJobType;
+    private Squadron testSquadron;
 
     @BeforeEach
     void setUp() {
@@ -80,12 +85,18 @@ class MissionValidationTest {
         officerUser.setUsername("officer1");
         userRepository.save(officerUser);
 
+        testSquadron = new Squadron();
+        testSquadron.setName("Test Sq");
+        testSquadron.setShorthand("TS");
+        testSquadron = squadronRepository.save(testSquadron);
+
         ShipType st = new ShipType();
         st.setName("Fighter");
         shipTypeRepository.save(st);
 
         Ship ship = new Ship();
         ship.setName("Test Ship");
+        ship.setInsurance("10");
         ship.setOwner(officerUser);
         ship.setShipType(st);
         shipRepository.save(ship);
@@ -133,7 +144,7 @@ class MissionValidationTest {
     @Test
     void testUpdateParticipant_WithCrewArchetypeAsDesired_ShouldReturn400() throws Exception {
         UpdateParticipantRequest request = new UpdateParticipantRequest(
-                crewJobType.getId(), null, "Invalid Update", null, null, null, null, null);
+                crewJobType.getId(), null, "Invalid Update", null, null, null, null, null, 0L);
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(officerUser))
                 .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -146,7 +157,7 @@ class MissionValidationTest {
     @Test
     void testUpdateParticipant_WithCrewArchetypeAsPlanned_ShouldReturn400() throws Exception {
         UpdateParticipantRequest request = new UpdateParticipantRequest(
-                null, crewJobType.getId(), "Invalid Update", null, null, null, null, null);
+                null, crewJobType.getId(), "Invalid Update", null, null, null, null, null, 0L);
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(officerUser))
                 .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -154,5 +165,29 @@ class MissionValidationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testAddParticipantPublic_GuestNameTaken_ShouldReturn400() throws Exception {
+        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
+            null, "officer1", null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testAddParticipantPublic_GuestNameUnique_ShouldReturn200() throws Exception {
+        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
+            null, "UniqueGuestName", taskJobType.getId(), "Comment", testSquadron.getId()
+        );
+
+        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
     }
 }

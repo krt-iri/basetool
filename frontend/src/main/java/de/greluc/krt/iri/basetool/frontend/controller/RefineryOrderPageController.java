@@ -84,17 +84,23 @@ public class RefineryOrderPageController {
 
     @GetMapping("/create")
     @PreAuthorize("isAuthenticated()")
-    public String viewCreateForm(Model model, @AuthenticationPrincipal OidcUser principal) {
+    public String viewCreateForm(@RequestParam(required = false) String source, Model model, @AuthenticationPrincipal OidcUser principal) {
         boolean isLogistician = isLogistician(principal);
         model.addAttribute("isLogistician", isLogistician);
 
         if (!model.containsAttribute("refineryOrderForm")) {
             RefineryOrderForm form = new RefineryOrderForm();
+            form.setSource(source);
             UUID currentUserId = getCurrentUserId(principal);
             if (currentUserId != null) {
                 form.setOwnerId(currentUserId);
             }
             model.addAttribute("refineryOrderForm", form);
+        } else {
+            RefineryOrderForm form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
+            if (form != null && form.getSource() == null) {
+                form.setSource(source);
+            }
         }
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("methods", fetchMethods());
@@ -111,7 +117,7 @@ public class RefineryOrderPageController {
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
             redirectAttributes.addFlashAttribute("refineryOrderForm", form);
-            return "redirect:/refinery-orders/create";
+            return "redirect:/refinery-orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
         }
         try {
             List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto = new ArrayList<>();
@@ -126,7 +132,7 @@ public class RefineryOrderPageController {
             if (goodsDto.isEmpty()) {
                 redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.material.invalid");
                 redirectAttributes.addFlashAttribute("refineryOrderForm", form);
-                return "redirect:/refinery-orders/create";
+                return "redirect:/refinery-orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
             }
             
             OffsetDateTime startedAtTime;
@@ -164,13 +170,17 @@ public class RefineryOrderPageController {
 
             backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
             redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.create");
+            
+            if ("index".equals(form.getSource())) {
+                return "redirect:/refinery-orders";
+            }
+            return "redirect:/refinery-orders";
         } catch (Exception e) {
             log.error("Failed to create refinery order", e);
             redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
             redirectAttributes.addFlashAttribute("refineryOrderForm", form);
-            return "redirect:/refinery-orders/create";
+            return "redirect:/refinery-orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
         }
-        return "redirect:/refinery-orders";
     }
 
     @GetMapping("/{id}")
@@ -251,6 +261,9 @@ public class RefineryOrderPageController {
                                 double scuAmount = 0.0;
                                 if (good.outputQuantity() != null) {
                                     scuAmount = good.outputQuantity() / 100.0;
+                                    sItem.setAmountFixed(true);
+                                } else {
+                                    sItem.setAmountFixed(false);
                                 }
                                 sItem.setAmount(scuAmount);
                                 

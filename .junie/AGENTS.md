@@ -6,7 +6,7 @@ These guidelines are meant to assist advanced developers contributing to the IRI
 
 The project consists of two Spring Boot modules: `backend` and `frontend`.
 - **Java Version:** 25
-- **Spring Boot Version:** 4.0.3
+- **Spring Boot Version:** 4.0.5
 - **Build Tool:** Gradle 9.4.0 (Kotlin DSL)
 - **Dependency Management:** Managed via `refreshVersions`. Do not manually edit dependency versions in `build.gradle.kts`; instead, update them in the `versions.properties` file.
 
@@ -42,12 +42,14 @@ To run the application locally without full Docker containerization, use the `de
 
 ### Configuring and Running Tests
 Both modules use JUnit and Spring Boot Test for the testing infrastructure.
-- Tests can be executed using Gradle:
+- **CRITICAL JUNIE RULE - GRADLE FOR TESTS ONLY:** Junie must actively ensure: ONLY USE GRADLE TO EXECUTE TESTS! (e.g., `./gradlew test`). Under no circumstances use internal IDE test runners or other execution methods.
+- Tests must be executed using Gradle:
   - Backend tests: `./gradlew :backend:test`
   - Frontend tests: `./gradlew :frontend:test`
   - All tests: `./gradlew test`
 
 ### Guidelines on Adding and Executing New Tests
+- **CRITICAL JUNIE RULE - MANDATORY TESTS FOR NEW FEATURES:** Junie must actively ensure that for every new functionality, corresponding tests MUST be written without exception.
 - **Location:** Put tests in the same package structure under `src/test/java/` corresponding to the tested class in `src/main/java/`.
 - **Naming Convention:** Use the `*Test` suffix for test classes (e.g., `UserServiceTest`).
 - **Structure:** Use the Given/When/Then pattern (or Arrange/Act/Assert) to cleanly structure tests.
@@ -143,6 +145,7 @@ The application adheres strictly to the "DAS KARTELL" Corporate Design Manual:
 
 ## 5. Documentation Guidelines
 
+- **CRITICAL JUNIE RULE - MAINTAIN CHANGELOG:** Junie must actively ensure that all changes (features, bug fixes, adjustments) are documented in the `CHANGELOG.md` without exception.
 - **Project Documentation:** The `README.md` and `CHANGELOG.md` must be kept up-to-date with new architecture decisions, features, and environment variable requirements.
 - **API Documentation:** 
   - All REST endpoints must be documented using SpringDoc OpenAPI annotations (e.g., `@Operation`, `@ApiResponses`).

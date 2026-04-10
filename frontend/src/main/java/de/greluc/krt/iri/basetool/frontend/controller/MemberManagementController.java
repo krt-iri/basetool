@@ -68,7 +68,7 @@ public class MemberManagementController {
     }
 
     @GetMapping("/{id}/edit")
-    public String editMember(@PathVariable @NotNull UUID id, Model model, RedirectAttributes redirectAttributes) {
+    public String editMember(@PathVariable @NotNull UUID id, @RequestParam(required = false) String source, Model model, RedirectAttributes redirectAttributes) {
         try {
             UserDto user = backendApiClient.get(
                     "/api/v1/users/" + id,
@@ -76,7 +76,12 @@ public class MemberManagementController {
             );
             model.addAttribute("user", user);
             if (!model.containsAttribute("memberEditForm")) {
-                model.addAttribute("memberEditForm", new MemberEditForm(user.rank(), user.description(), user.displayName(), user.version()));
+                model.addAttribute("memberEditForm", new MemberEditForm(user.rank(), user.description(), user.displayName(), user.version(), source));
+            } else {
+                MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
+                if (form != null && form.source() == null) {
+                    model.addAttribute("memberEditForm", new MemberEditForm(form.rank(), form.description(), form.displayName(), form.version(), source));
+                }
             }
             return "member-edit";
         } catch (Exception e) {
@@ -94,16 +99,19 @@ public class MemberManagementController {
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.memberEditForm", bindingResult);
             redirectAttributes.addFlashAttribute("memberEditForm", form);
-            return "redirect:/members/" + id + "/edit";
+            return "redirect:/members/" + id + "/edit" + (form.source() != null ? "?source=" + form.source() : "");
         }
         try {
             UserAttributesUpdateDto body = new UserAttributesUpdateDto(form.rank(), form.description(), form.displayName(), form.version());
             backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
             redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+            if ("profile".equals(form.source())) {
+                return "redirect:/profile";
+            }
         } catch (Exception e) {
             log.error("Update failed", e);
             redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
-            return "redirect:/members/" + id + "/edit";
+            return "redirect:/members/" + id + "/edit" + (form.source() != null ? "?source=" + form.source() : "");
         }
         return "redirect:/members";
     }

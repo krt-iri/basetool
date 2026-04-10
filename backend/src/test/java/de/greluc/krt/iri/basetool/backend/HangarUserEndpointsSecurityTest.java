@@ -77,7 +77,7 @@ class HangarUserEndpointsSecurityTest {
     void testMyShips_NoReadAllowed() throws Exception {
         mockMvc.perform(get("/api/v1/hangar/my-ships")
                         .with(jwt().jwt(j -> j.subject(user.getId().toString()))
-                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
                 .andExpect(status().isOk());
     }
 

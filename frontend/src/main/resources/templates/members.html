@@ -80,7 +80,7 @@
                     </td>
                     <td>
                         <div style="display: flex; gap: 0.5rem;">
-                            <a th:href="@{/members/{id}/edit(id=${user.id})}" class="btn" th:text="#{members.edit}">Bearbeiten</a>
+                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn" th:text="#{members.edit}">Bearbeiten</a>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
                                     class="btn danger"
                                     th:data-user-id="${user.id}"

@@ -13,6 +13,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 
 import java.util.*;
 
@@ -87,53 +90,58 @@ public class AdminMaterialsPageController {
         return "redirect:/admin/materials";
     }
 
-    @PostMapping("/{id}/category")
-    public String updateMaterialCategory(@PathVariable @NotNull UUID id, @RequestParam(required = false) UUID categoryId, RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    @PutMapping("/{id}/ajax")
+    public ResponseEntity<MaterialDto> updateMaterialAjax(
+            @PathVariable @NotNull UUID id,
+            @Valid @RequestBody MaterialUpdateAjaxRequest request) {
         try {
             MaterialDto currentMaterial = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
-            MaterialCategoryDto category = null;
-            if (categoryId != null) {
-                category = backendApiClient.get("/api/v1/material-categories/" + categoryId, MaterialCategoryDto.class);
+            
+            MaterialCategoryDto category = currentMaterial.category();
+            MaterialDto refinedMaterial = currentMaterial.refinedMaterial();
+            String quantityType = currentMaterial.quantityType();
+            
+            if ("CATEGORY".equals(request.updateType())) {
+                if (request.categoryId() != null) {
+                    category = backendApiClient.get("/api/v1/material-categories/" + request.categoryId(), MaterialCategoryDto.class);
+                } else {
+                    category = null;
+                }
+            } else if ("REFINED".equals(request.updateType())) {
+                if (request.refinedMaterialId() != null) {
+                    refinedMaterial = backendApiClient.get("/api/v1/materials/" + request.refinedMaterialId(), MaterialDto.class);
+                } else {
+                    refinedMaterial = null;
+                }
+            } else if ("QUANTITY_TYPE".equals(request.updateType())) {
+                quantityType = request.quantityType();
+            } else {
+                return ResponseEntity.badRequest().build();
             }
-            MaterialDto body = new MaterialDto(id, currentMaterial.idCommodity(), currentMaterial.name(), currentMaterial.type(), currentMaterial.quantityType(), currentMaterial.description(), currentMaterial.refinedMaterial(), category, currentMaterial.isIllegal(), currentMaterial.isVolatileQt(), currentMaterial.isVolatileTime(), currentMaterial.version());
+            
+            MaterialDto body = new MaterialDto(
+                id, 
+                currentMaterial.idCommodity(), 
+                currentMaterial.name(), 
+                currentMaterial.type(), 
+                quantityType, 
+                currentMaterial.description(), 
+                refinedMaterial, 
+                category, 
+                currentMaterial.isIllegal(), 
+                currentMaterial.isVolatileQt(), 
+                currentMaterial.isVolatileTime(), 
+                request.version()
+            );
+            
             backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-            redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+            MaterialDto updatedMaterial = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+            return ResponseEntity.ok(updatedMaterial);
         } catch (Exception e) {
-            log.error("Update material category failed", e);
-            redirectAttributes.addFlashAttribute("errorToast", "Update failed");
+            log.error("Ajax update material failed", e);
+            // In case of OptimisticLocking, backend usually returns 409 Conflict
+            return ResponseEntity.status(500).build();
         }
-        return "redirect:/admin/materials";
-    }
-
-    @PostMapping("/{id}/refined")
-    public String updateRefinedMaterial(@PathVariable @NotNull UUID id, @RequestParam(required = false) UUID refinedMaterialId, RedirectAttributes redirectAttributes) {
-        try {
-            MaterialDto currentMaterial = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
-            MaterialDto refinedMaterial = null;
-            if (refinedMaterialId != null) {
-                refinedMaterial = backendApiClient.get("/api/v1/materials/" + refinedMaterialId, MaterialDto.class);
-            }
-            MaterialDto body = new MaterialDto(id, currentMaterial.idCommodity(), currentMaterial.name(), currentMaterial.type(), currentMaterial.quantityType(), currentMaterial.description(), refinedMaterial, currentMaterial.category(), currentMaterial.isIllegal(), currentMaterial.isVolatileQt(), currentMaterial.isVolatileTime(), currentMaterial.version());
-            backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-            redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-        } catch (Exception e) {
-            log.error("Update refined material failed", e);
-            return "redirect:/admin/materials?error=UpdateFailed";
-        }
-        return "redirect:/admin/materials";
-    }
-
-    @PostMapping("/{id}/quantity-type")
-    public String updateQuantityType(@PathVariable @NotNull UUID id, @RequestParam String quantityType, RedirectAttributes redirectAttributes) {
-        try {
-            MaterialDto currentMaterial = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
-            MaterialDto body = new MaterialDto(id, currentMaterial.idCommodity(), currentMaterial.name(), currentMaterial.type(), quantityType, currentMaterial.description(), currentMaterial.refinedMaterial(), currentMaterial.category(), currentMaterial.isIllegal(), currentMaterial.isVolatileQt(), currentMaterial.isVolatileTime(), currentMaterial.version());
-            backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-            redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-        } catch (Exception e) {
-            log.error("Update quantity type failed", e);
-            redirectAttributes.addFlashAttribute("errorToast", "Update failed");
-        }
-        return "redirect:/admin/materials";
     }
 }

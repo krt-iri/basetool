@@ -23,7 +23,7 @@
 <main>
     <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
         <h1 th:text="#{nav.refinery}">Raffinerieaufträge</h1>
-        <a th:href="@{/refinery-orders/create}" class="btn" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
+        <a th:href="@{/refinery-orders/create(source='index')}" class="btn" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
     </div>
 
     <div class="hud-box" style="margin-top: 2rem;">

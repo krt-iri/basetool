@@ -185,4 +185,45 @@ class InventoryPageControllerTest {
         assertEquals("redirect:/inventory/all", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
     }
+
+    @Test
+    void updateAssociations_shouldReturnOkOnSuccess() {
+        UUID id = UUID.randomUUID();
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+
+        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+
+        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(backendApiClient).put(eq("/api/v1/inventory/" + id), eq(dto), eq(Void.class));
+    }
+
+    @Test
+    void updateAssociations_shouldReturnStatusFromWebClientResponseException() {
+        UUID id = UUID.randomUUID();
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+
+        org.springframework.web.reactive.function.client.WebClientResponseException exception = 
+            org.springframework.web.reactive.function.client.WebClientResponseException.create(
+                409, "Conflict", org.springframework.http.HttpHeaders.EMPTY, null, null
+            );
+        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenThrow(exception);
+
+        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+
+        assertEquals(409, response.getStatusCode().value());
+    }
+
+    @Test
+    void updateAssociations_shouldReturn500OnGenericException() {
+        UUID id = UUID.randomUUID();
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+
+        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenThrow(new RuntimeException("Generic error"));
+
+        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+
+        assertEquals(500, response.getStatusCode().value());
+    }
 }

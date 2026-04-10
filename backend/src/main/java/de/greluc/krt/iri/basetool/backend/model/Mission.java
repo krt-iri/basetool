@@ -14,7 +14,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"participants", "assignedUnits", "subMissions"})
+@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries"})
 public class Mission extends AbstractEntity<UUID> {
 
     @Id
@@ -49,6 +49,9 @@ public class Mission extends AbstractEntity<UUID> {
 
     @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<MissionFrequency> frequencies = new HashSet<>();
+
+    @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
 
     @ManyToOne
     @JoinColumn(name = "parent_mission_id")

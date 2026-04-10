@@ -147,28 +147,117 @@ public class InventoryItemService {
         Location location = locationRepository.findById(dto.locationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
 
+        Mission mission = null;
+        if (dto.missionId() != null) {
+            mission = missionRepository.findById(dto.missionId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
+        }
+
+        JobOrder jobOrder = null;
+        if (dto.jobOrderId() != null) {
+            jobOrder = jobOrderRepository.findById(dto.jobOrderId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+        }
+
+        Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
+
+        if (Boolean.TRUE.equals(isPersonal) && (mission != null || jobOrder != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Personal items cannot be assigned to a mission or job order");
+        }
+
+        java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+            user,
+            material,
+            location,
+            dto.quality(),
+            mission,
+            jobOrder,
+            isPersonal
+        );
+
+        if (existingItemOpt.isPresent()) {
+            InventoryItem existingItem = existingItemOpt.get();
+            existingItem.setAmount(existingItem.getAmount() + dto.amount());
+            return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
+        }
+
         InventoryItem item = new InventoryItem();
         item.setUser(user);
         item.setMaterial(material);
         item.setLocation(location);
         item.setQuality(dto.quality());
         item.setAmount(dto.amount());
-        item.setPersonal(dto.personal() != null ? dto.personal() : false);
+        item.setPersonal(isPersonal);
+        item.setMission(mission);
+        item.setJobOrder(jobOrder);
 
-        if (Boolean.TRUE.equals(item.getPersonal()) && (dto.missionId() != null || dto.jobOrderId() != null)) {
+        return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    }
+
+    @Transactional
+    public InventoryItemDto updateInventoryItem(UUID id, InventoryItemUpdateDto dto, UUID currentUserId, boolean isLogistician) {
+        InventoryItem item = inventoryItemRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+
+        if (!item.getUser().getId().equals(currentUserId)) {
+            if (item.getPersonal() || !isLogistician) {
+                throw new AccessDeniedException("You are not allowed to update this inventory item");
+            }
+        }
+
+        if (dto.version() != null && item.getVersion() != null && !item.getVersion().equals(dto.version())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(InventoryItem.class, id);
+        }
+
+        Boolean isPersonal = dto.personal() != null ? dto.personal() : item.getPersonal();
+        item.setPersonal(isPersonal);
+
+        if (Boolean.TRUE.equals(isPersonal) && (dto.missionId() != null || dto.jobOrderId() != null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Personal items cannot be assigned to a mission or job order");
+        }
+
+        Material material = materialRepository.findById(dto.materialId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
+        item.setMaterial(material);
+
+        Location location = locationRepository.findById(dto.locationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+        item.setLocation(location);
+
+        item.setQuality(dto.quality());
+        item.setAmount(dto.amount());
+
+        if (dto.jobOrderId() != null) {
+            JobOrder jobOrder = jobOrderRepository.findById(dto.jobOrderId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+            item.setJobOrder(jobOrder);
+        } else {
+            item.setJobOrder(null);
         }
 
         if (dto.missionId() != null) {
             Mission mission = missionRepository.findById(dto.missionId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
             item.setMission(mission);
+        } else {
+            item.setMission(null);
         }
 
-        if (dto.jobOrderId() != null) {
-            JobOrder jobOrder = jobOrderRepository.findById(dto.jobOrderId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
-            item.setJobOrder(jobOrder);
+        java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+                item.getUser(),
+                item.getMaterial(),
+                item.getLocation(),
+                item.getQuality(),
+                item.getMission(),
+                item.getJobOrder(),
+                item.getPersonal()
+        );
+
+        if (existingItemOpt.isPresent() && !existingItemOpt.get().getId().equals(item.getId())) {
+            InventoryItem existingItem = existingItemOpt.get();
+            existingItem.setAmount(existingItem.getAmount() + item.getAmount());
+            inventoryItemRepository.delete(item);
+            return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
         }
 
         return inventoryItemMapper.toDto(inventoryItemRepository.save(item));

@@ -121,9 +121,16 @@ public class JobOrderPageController {
     }
 
     @GetMapping("/create")
-    public String viewCreateForm(Model model) {
+    public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
         if (!model.containsAttribute("jobOrderForm")) {
-            model.addAttribute("jobOrderForm", new JobOrderForm());
+            JobOrderForm form = new JobOrderForm();
+            form.setSource(source);
+            model.addAttribute("jobOrderForm", form);
+        } else {
+            JobOrderForm form = (JobOrderForm) model.getAttribute("jobOrderForm");
+            if (form != null && form.getSource() == null) {
+                form.setSource(source);
+            }
         }
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("squadrons", fetchSquadrons());
@@ -141,19 +148,25 @@ public class JobOrderPageController {
             if (materials.isEmpty()) {
                 redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
                 redirectAttributes.addFlashAttribute("jobOrderForm", form);
-                return "redirect:/orders/create";
+                return "redirect:/orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
             }
 
             CreateJobOrderDto dto = new CreateJobOrderDto(form.getSquadron(), form.getHandle(), materials, form.getVersion());
             backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
             redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
+            
+            if ("index".equals(form.getSource())) {
+                return "redirect:/orders";
+            }
+            // fallback
+            return "redirect:/orders";
         } catch (Exception e) {
             log.error("Failed to create order", e);
             log.error("Failed to create job order", e);
             redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
             redirectAttributes.addFlashAttribute("jobOrderForm", form);
+            return "redirect:/orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
         }
-        return "redirect:/orders/create";
     }
 
     @PostMapping("/{id}/priority")

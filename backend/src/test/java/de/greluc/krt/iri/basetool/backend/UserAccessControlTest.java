@@ -42,7 +42,7 @@ public class UserAccessControlTest {
     @Test
     void testSearchUsers_Authenticated_Forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/users/search").param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
                 .andExpect(status().isForbidden());
     }
 

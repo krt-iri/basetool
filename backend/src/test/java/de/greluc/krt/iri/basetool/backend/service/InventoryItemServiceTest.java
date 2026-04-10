@@ -330,4 +330,132 @@ class InventoryItemServiceTest {
         
         verify(missionFinanceEntryRepository).save(any(MissionFinanceEntry.class));
     }
+
+    @Test
+    void updateInventoryItem_shouldUpdateAssociations_whenValidRequest() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+        UUID newJobOrderId = UUID.randomUUID();
+        UUID newMissionId = UUID.randomUUID();
+
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, newJobOrderId, newMissionId, 1L
+        );
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setPersonal(false);
+        User user = new User();
+        user.setId(currentUserId);
+        existingItem.setUser(user);
+
+        JobOrder jobOrder = new JobOrder();
+        jobOrder.setId(newJobOrderId);
+
+        Mission mission = new Mission();
+        mission.setId(newMissionId);
+        
+        Material material = new Material();
+        material.setId(dto.materialId());
+        
+        Location location = new Location();
+        location.setId(dto.locationId());
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
+        when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
+        when(jobOrderRepository.findById(newJobOrderId)).thenReturn(Optional.of(jobOrder));
+        when(missionRepository.findById(newMissionId)).thenReturn(Optional.of(mission));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(existingItem);
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
+
+        verify(inventoryItemRepository).save(existingItem);
+        assertEquals(newJobOrderId, existingItem.getJobOrder().getId());
+        assertEquals(newMissionId, existingItem.getMission().getId());
+    }
+
+    @Test
+    void updateInventoryItem_shouldThrowAccessDenied_whenUserLacksPermissions() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L
+        );
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setPersonal(false); // Global inventory
+        User owner = new User();
+        owner.setId(UUID.randomUUID()); // different user
+        existingItem.setUser(owner);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        assertThrows(AccessDeniedException.class, () -> 
+            inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
+    }
+
+    @Test
+    void updateInventoryItem_shouldAllowLogisticianToUpdateGlobalInventory() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L
+        );
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(1L);
+        existingItem.setPersonal(false); // Global inventory
+        User owner = new User();
+        owner.setId(UUID.randomUUID()); // different user
+        existingItem.setUser(owner);
+        
+        Material material = new Material();
+        material.setId(dto.materialId());
+        
+        Location location = new Location();
+        location.setId(dto.locationId());
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
+        when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(existingItem);
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        // isLogistician = true
+        inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, true);
+
+        verify(inventoryItemRepository).save(existingItem);
+        assertNull(existingItem.getJobOrder());
+        assertNull(existingItem.getMission());
+    }
+
+    @Test
+    void updateInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L // outdated version
+        );
+
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(itemId);
+        existingItem.setVersion(2L); // newer version in DB
+        User user = new User();
+        user.setId(currentUserId);
+        existingItem.setUser(user);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> 
+            inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
+    }
 }

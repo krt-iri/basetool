@@ -58,7 +58,7 @@ public class SecurityHardeningIntegrationTest {
     @Test
     void testUserSearch_RegularUser_Forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/users/search").param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -72,7 +72,7 @@ public class SecurityHardeningIntegrationTest {
     @Test
     void testInventoryAggregated_RegularUser_Forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/inventory/aggregated")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -80,7 +80,7 @@ public class SecurityHardeningIntegrationTest {
     void testInventoryMyInventory_RegularUser_Ok() throws Exception {
         mockMvc.perform(get("/api/v1/inventory/my-inventory")
                 .with(jwt().jwt(j -> j.subject(regularUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
                 .andExpect(status().isOk());
     }
 
@@ -89,7 +89,7 @@ public class SecurityHardeningIntegrationTest {
         mockMvc.perform(post("/api/v1/missions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\": \"Member Mission\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
                 .andExpect(status().isOk());
     }
 

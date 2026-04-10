@@ -86,6 +86,8 @@ public class SecurityConfig {
                 .requestMatchers("/missions/**").permitAll() // Still permitAll for general access, @PreAuthorize or logic inside handles details
                 .requestMatchers("/operations", "/operations/").permitAll()
                 .requestMatchers("/operations/**").permitAll()
+                .requestMatchers("/orders", "/orders/").permitAll()
+                .requestMatchers("/orders/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2

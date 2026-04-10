@@ -19,6 +19,7 @@ server:
     mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
   servlet:
     session:
+      timeout: 12h
       cookie:
         secure: true
         http-only: true
@@ -58,7 +59,7 @@ spring:
           keycloak:
             client-id: basetool-frontend
             client-authentication-method: none
-            scope: openid, profile, email, roles
+            scope: openid, profile, email, roles, offline_access
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:

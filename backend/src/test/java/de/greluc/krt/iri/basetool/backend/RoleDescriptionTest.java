@@ -91,7 +91,7 @@ class RoleDescriptionTest {
 
         mockMvc.perform(put("/api/v1/admin/roles/" + testRole.getName() + "/description")
                 .with(jwt().jwt(builder -> builder.subject(regularUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))) // Not ADMIN
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))) // Not ADMIN
                 .contentType(MediaType.TEXT_PLAIN)
                 .content(newDescription))
                 .andExpect(status().isForbidden());

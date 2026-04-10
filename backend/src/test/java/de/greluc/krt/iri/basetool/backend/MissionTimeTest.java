@@ -173,7 +173,7 @@ class MissionTimeTest {
 
         // Try to set participant start before mission start - now allowed
         UpdateParticipantRequest request = new UpdateParticipantRequest(
-                null, null, null, missionStart.minus(1, ChronoUnit.HOURS), null, null, null, null);
+                null, null, null, null, missionStart.minus(1, ChronoUnit.HOURS), null, null, null, 0L);
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(memberUser))
                 .with(jwt().jwt(builder -> builder.subject(memberUser.getId().toString()))) // Self update
@@ -189,7 +189,7 @@ class MissionTimeTest {
         missionRepository.save(mission);
 
         UpdateParticipantRequest request = new UpdateParticipantRequest(
-                null, null, null, missionStart.plus(1, ChronoUnit.HOURS), null, null, null, null);
+                null, null, null, null, missionStart.plus(1, ChronoUnit.HOURS), null, null, null, 0L);
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(memberUser))
                 .with(jwt().jwt(builder -> builder.subject(memberUser.getId().toString())))

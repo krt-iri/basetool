@@ -86,7 +86,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(
-                    "/api/v1/missions", "/api/v1/missions/**",
                     "/api/v1/frequency-types", "/api/v1/frequency-types/**",
                     "/api/v1/locations", "/api/v1/locations/**",
                     "/api/v1/job-types", "/api/v1/job-types/**",
@@ -98,6 +97,11 @@ public class SecurityConfig {
                     "/api/v1/squadrons", "/api/v1/squadrons/**",
                     "/api/v1/star-systems", "/api/v1/star-systems/**"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/missions/next").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/missions/search").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/missions/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/missions", "/api/v1/missions/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/missions").permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/refinery-orders/mission/**",
                     "/api/v1/system/**",

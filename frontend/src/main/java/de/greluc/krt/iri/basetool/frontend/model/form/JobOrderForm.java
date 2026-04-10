@@ -11,6 +11,7 @@ public class JobOrderForm {
     private String squadron;
     private String handle;
     private Long version;
+    private String source;
     private List<JobOrderMaterialForm> materials = new ArrayList<>();
 
     public JobOrderForm() {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title>Neuer Lagereintrag - IRIDIUM Basetool</title>
+    <title th:text="#{inventory.input.title} + ' - IRIDIUM Basetool'">Lagereintrag einbuchen - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .form-container {
@@ -49,7 +49,7 @@
 
 <main>
     <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>Neuer Lagereintrag</h1>
+        <h1 th:text="#{inventory.input.title}">Lagereintrag einbuchen</h1>
     </div>
 
     <div class="hud-box" style="margin-top: 2rem;">
@@ -66,6 +66,7 @@
                     </ul>
                 </div>
                 <input type="hidden" th:field="*{isGlobal}" />
+                <input type="hidden" th:field="*{source}" />
                 
                 <div class="form-group" th:if="*{isGlobal}">
                     <label for="userId">Nutzer zuordnen</label>

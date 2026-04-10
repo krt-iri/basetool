@@ -5,9 +5,13 @@ import java.util.UUID;
 
 public record MissionFrequencyDto(
         UUID id,
-        UUID frequencyTypeId,
-        String name,
+        FrequencyTypeRef frequencyType,
         BigDecimal value,
         Long version
 ) {
+    public record FrequencyTypeRef(UUID id, String name) {}
+
+    public UUID frequencyTypeId() {
+        return frequencyType != null ? frequencyType.id() : null;
+    }
 }

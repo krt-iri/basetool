@@ -340,7 +340,7 @@
                                 <strong th:text="${leadType.name}" style="color: var(--color-gray-1);">Role</strong>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                <span th:each="p : ${participantsByLeadType[leadType['id']]}"
+                                <span th:each="p : ${participantsByLeadType[#strings.toString(leadType.id)]}"
                                 th:text="${p['user'] != null ? p['user']['effectiveName'] : p['guestName']}"
                                       style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
                             </div>
@@ -378,7 +378,7 @@
             </div>
             <div class="col-content">
                 <div class="hud-box">
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;" th:if="${!isNew and mission.canEdit}">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
                         <button id="add-participant-btn" class="btn" th:text="#{mission.participant.add}">Hinzufügen</button>
                     </div>
         <div class="table-responsive">

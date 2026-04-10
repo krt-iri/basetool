@@ -76,7 +76,7 @@ public class UserController {
     }
 
     @PutMapping("/me/description")
-    public UserDto updateMyDescription(@AuthenticationPrincipal Jwt jwt, @RequestBody @NotNull UserDescriptionRequest request) {
+    public UserDto updateMyDescription(@AuthenticationPrincipal Jwt jwt, @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
         return userMapper.toDto(userService.updateUserDescription(userService.getUserIdFromJwt(jwt), request.getDescription(), request.getDisplayName(), request.getVersion()));
     }
 
@@ -87,7 +87,7 @@ public class UserController {
 
     @PutMapping("/{id}/attributes")
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
-    public UserDto updateUserAttributes(@PathVariable @NotNull UUID id, @RequestBody @NotNull UserAttributesRequest request) {
+    public UserDto updateUserAttributes(@PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
         return userMapper.toDto(userService.updateUserAttributes(id, request.getRank(), request.getDescription(), request.getDisplayName(), request.getVersion()));
     }
 
@@ -111,9 +111,11 @@ public class UserController {
 
     @lombok.Data
     public static class UserAttributesRequest {
+        @jakarta.validation.constraints.NotNull
         private Integer rank;
         private String description;
         private String displayName;
+        @jakarta.validation.constraints.NotNull
         private Long version;
     }
 
@@ -121,6 +123,7 @@ public class UserController {
     public static class UserDescriptionRequest {
         private String description;
         private String displayName;
+        @jakarta.validation.constraints.NotNull
         private Long version;
     }
 }

@@ -70,6 +70,7 @@
         
         <form th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
+            <input type="hidden" name="source" th:field="*{source}">
             <div class="form-group">
                 <label th:text="#{profile.rank}">Rang</label>
                 <select name="rank">

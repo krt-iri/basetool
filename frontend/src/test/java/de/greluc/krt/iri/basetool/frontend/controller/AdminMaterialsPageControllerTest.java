@@ -8,6 +8,9 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
+import org.springframework.http.ResponseEntity;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +23,30 @@ import static org.mockito.Mockito.when;
 
 @SuppressWarnings("unchecked")
 class AdminMaterialsPageControllerTest {
+
+    @Test
+    void updateMaterialAjax_ShouldUpdateAndReturnMaterial() {
+        // Arrange
+        BackendApiClient backendApiClient = mock(BackendApiClient.class);
+        AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+        
+        UUID matId = UUID.randomUUID();
+        MaterialDto currentMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, 1L);
+        MaterialDto updatedMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, 2L);
+        
+        when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
+            .thenReturn(currentMaterial)
+            .thenReturn(updatedMaterial);
+            
+        MaterialUpdateAjaxRequest request = new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", 1L);
+        
+        // Act
+        ResponseEntity<MaterialDto> response = controller.updateMaterialAjax(matId, request);
+        
+        // Assert
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(updatedMaterial, response.getBody());
+    }
 
     @Test
     void listMaterials_ShouldSortListsAscendingByName() {

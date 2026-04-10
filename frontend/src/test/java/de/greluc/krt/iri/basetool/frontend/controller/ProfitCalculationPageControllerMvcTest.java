@@ -48,7 +48,7 @@ class ProfitCalculationPageControllerMvcTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "SQUADRON_MEMBER")
     void showProfitCalculationPage_ShouldSetDefaultShipId_WhenC2IsPresent() throws Exception {
         // Given
         UUID c2Id = UUID.randomUUID();
@@ -72,7 +72,7 @@ class ProfitCalculationPageControllerMvcTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "SQUADRON_MEMBER")
     void showProfitCalculationPage_ShouldNotSetDefaultShipId_WhenC2IsMissing() throws Exception {
         // Given
         ShipTypeDto titan = new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 8, false);
@@ -93,7 +93,7 @@ class ProfitCalculationPageControllerMvcTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "SQUADRON_MEMBER")
     void showProfitCalculationPage_ShouldFilterShipsWithZeroScu() throws Exception {
         // Given
         UUID titanId = UUID.randomUUID();

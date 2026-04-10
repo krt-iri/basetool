@@ -12,6 +12,7 @@ import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MissionService {
@@ -152,6 +154,25 @@ public class MissionService {
     public void deleteMission(@NotNull UUID missionId) {
         Mission mission = missionRepository.findById(missionId)
                 .orElseThrow(() -> new RuntimeException("Mission not found"));
+                
+        // Entkoppeln von Inventareinträgen (damit diese nicht gelöscht werden, aber die FK-Verletzung vermieden wird)
+        if (mission.getInventoryEntries() != null) {
+            mission.getInventoryEntries().forEach(entry -> entry.setMission(null));
+            mission.getInventoryEntries().clear();
+        }
+
+        // Entkoppeln von Raffinerie-Aufträgen
+        if (mission.getRefineryOrders() != null) {
+            mission.getRefineryOrders().forEach(order -> order.setMission(null));
+            mission.getRefineryOrders().clear();
+        }
+
+        // Entkoppeln von Sub-Missionen
+        if (mission.getSubMissions() != null) {
+            mission.getSubMissions().forEach(sub -> sub.setParent(null));
+            mission.getSubMissions().clear();
+        }
+
         missionRepository.delete(mission);
     }
 
@@ -279,7 +300,7 @@ public class MissionService {
     public Mission updateParticipantAttributes(@NotNull UUID missionId, @NotNull UUID participantId, UUID desiredMissionJobTypeId,
                                                UUID plannedMissionJobTypeId, String comment,
                                                Instant startTime, Instant endTime,
-                                               UUID squadronId, PayoutPreference payoutPreference, Long version) {
+                                               UUID squadronId, PayoutPreference payoutPreference, String guestName, Long version) {
         Mission mission = missionRepository.findById(missionId)
             .orElseThrow(() -> new RuntimeException("Mission not found"));
 
@@ -313,6 +334,10 @@ public class MissionService {
              // Registered users always belong to IRI
              squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
         } else {
+            log.info("Updating guest participant: {} with name: {}", participant.getId(), guestName);
+            if (guestName != null) {
+                participant.setGuestName(guestName);
+            }
             if (squadronId != null) {
                  Squadron sq = squadronRepository.findById(squadronId)
                      .orElseThrow(() -> new RuntimeException("Squadron not found"));

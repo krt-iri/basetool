@@ -113,6 +113,15 @@ public class InventoryItemController {
         inventoryItemService.bookOutInventoryItem(id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
     }
 
+    @PutMapping("/{id}")
+    public InventoryItemDto updateInventoryItem(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable @NotNull UUID id,
+            @RequestBody @Valid InventoryItemUpdateDto dto) {
+        boolean isLogistician = isLogisticianOrAbove();
+        return inventoryItemService.updateInventoryItem(id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
+    }
+
     private boolean isLogisticianOrAbove() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null) {

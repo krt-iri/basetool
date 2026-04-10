@@ -373,7 +373,7 @@ class RefineryOrderTest {
         System.out.println("[DEBUG_LOG] Request JSON: " + json);
         
         org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/refinery-orders")
-                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString())).authorities(new SimpleGrantedAuthority("ROLE_USER")))
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString())).authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
                 .andReturn();

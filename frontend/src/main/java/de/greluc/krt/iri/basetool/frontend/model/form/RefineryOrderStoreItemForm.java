@@ -29,6 +29,8 @@ public class RefineryOrderStoreItemForm {
     @NumberFormat(pattern = "#,##0.000")
     private Double amount;
     
+    private boolean amountFixed;
+    
     private UUID userId;
     
     private UUID jobOrderId;

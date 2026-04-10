@@ -96,4 +96,18 @@ class InventoryPageControllerMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("Neuen Eintrag erfassen"))));
     }
+
+    @Test
+    @WithMockUser(roles = "MEMBER")
+    void viewAllInventory_ShouldRenderBookOutButtonWithDynamicLabels() throws Exception {
+        when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
+        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/inventory/all"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"bookOutSubmitBtn\"")))
+                .andExpect(content().string(containsString("data-text-discard=\"Ausbuchen\"")))
+                .andExpect(content().string(containsString("data-text-transfer=\"Umbuchen\"")))
+                .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")));
+    }
 }

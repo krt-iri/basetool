@@ -242,44 +242,50 @@
                 <span class="close" onclick="closeStoreModal()" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
             </div>
             
-            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}">
-                <div th:each="item, stat : *{items}" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
-                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
-                    
-                    <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
-                    <input type="hidden" th:field="*{items[__${stat.index}__].materialName}" />
-                    
-                    <div class="material-row">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label th:for="'storeAmount_' + ${stat.index}" th:text="#{inventory.form.amount}">Menge</label>
-                            <input type="text" inputmode="decimal" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" required>
+            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerText='WIRD GESPEICHERT...';">
+                <div id="storeItemsContainer">
+                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
+                            <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" onclick="duplicateStoreItem(this)" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
-                            <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
+                        
+                        <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
+                        <input type="hidden" th:field="*{items[__${stat.index}__].materialName}" />
+                        <input type="hidden" th:field="*{items[__${stat.index}__].amountFixed}" />
+                        
+                        <div class="material-row">
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'storeAmount_' + ${stat.index}" th:text="#{inventory.form.amount}">Menge</label>
+                                <input type="text" inputmode="decimal" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:readonly="*{items[__${stat.index}__].amountFixed}" th:classappend="*{items[__${stat.index}__].amountFixed} ? 'readonly-input' : ''" required>
+                            </div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
+                                <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
+                            </div>
                         </div>
-                    </div>
-                    <div class="material-row" style="margin-top: 1rem;">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>
-                            <select th:id="'storeLocation_' + ${stat.index}" th:field="*{items[__${stat.index}__].locationId}" required>
+                        <div class="material-row" style="margin-top: 1rem;">
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>
+                                <select th:id="'storeLocation_' + ${stat.index}" th:field="*{items[__${stat.index}__].locationId}" required>
+                                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                    <option th:each="loc : ${allLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
+                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required>
+                                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                            <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
+                            <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="loc : ${allLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                                <option th:each="jo : ${jobOrders}" th:if="${jo.materials != null and !jo.materials.isEmpty() and #lists.contains(jo.materials.![material.id], item.materialId)}" th:value="${jo.id}" th:text="${jo.displayId} + ' - ' + ${jo.squadron}"></option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
-                            <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required>
-                                <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
-                        <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
-                        <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
-                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="jo : ${jobOrders}" th:if="${jo.materials != null and !jo.materials.isEmpty() and #lists.contains(jo.materials.![material.id], item.materialId)}" th:value="${jo.id}" th:text="${jo.displayId} + ' - ' + ${jo.squadron}"></option>
-                        </select>
                     </div>
                 </div>
                 
@@ -320,6 +326,69 @@
 
     function openStoreModal() {
         document.getElementById('storeModal').style.display = 'flex';
+    }
+
+    function duplicateStoreItem(btn) {
+        const container = document.getElementById('storeItemsContainer');
+        const blockToCopy = btn.closest('.store-item-block');
+        const newBlock = blockToCopy.cloneNode(true);
+        
+        const allBlocks = container.querySelectorAll('.store-item-block');
+        const newIndex = allBlocks.length;
+        
+        const nameRegex = /items\[\d+\]/g;
+        
+        newBlock.querySelectorAll('input, select').forEach(el => {
+            if (el.name) {
+                el.name = el.name.replace(nameRegex, `items[${newIndex}]`);
+            }
+            if (el.id) {
+                el.id = el.id.replace(/_\d+$/, `_${newIndex}`);
+            }
+            if (el.id && el.id.startsWith('storeAmount_')) {
+                el.value = '';
+            }
+        });
+        
+        newBlock.querySelectorAll('label').forEach(el => {
+            if (el.htmlFor) {
+                el.htmlFor = el.htmlFor.replace(/_\d+$/, `_${newIndex}`);
+            }
+        });
+        
+        const btnInNewBlock = newBlock.querySelector('button');
+        if (btnInNewBlock) {
+            btnInNewBlock.textContent = '-';
+            btnInNewBlock.onclick = function() {
+                newBlock.remove();
+                reindexStoreItems();
+            };
+            btnInNewBlock.setAttribute('title', 'Aufteilung entfernen');
+        }
+        
+        blockToCopy.after(newBlock);
+        reindexStoreItems();
+    }
+
+    function reindexStoreItems() {
+        const container = document.getElementById('storeItemsContainer');
+        const allBlocks = container.querySelectorAll('.store-item-block');
+        allBlocks.forEach((block, index) => {
+            const nameRegex = /items\[\d+\]/g;
+            block.querySelectorAll('input, select').forEach(el => {
+                if (el.name) {
+                    el.name = el.name.replace(nameRegex, `items[${index}]`);
+                }
+                if (el.id) {
+                    el.id = el.id.replace(/_\d+$/, `_${index}`);
+                }
+            });
+            block.querySelectorAll('label').forEach(el => {
+                if (el.htmlFor) {
+                    el.htmlFor = el.htmlFor.replace(/_\d+$/, `_${index}`);
+                }
+            });
+        });
     }
 
     function updateOutputMaterial(selectElement) {

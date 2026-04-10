@@ -23,6 +23,7 @@ public class RefineryOrderForm {
     private UUID missionId;
     private de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus status;
     private Long version;
+    private String source;
     @Valid
     private List<RefineryGoodForm> goods = new ArrayList<>();
     

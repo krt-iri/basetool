@@ -3,6 +3,9 @@ package de.greluc.krt.iri.basetool.backend.repository;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.Location;
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -57,6 +60,25 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @Modifying
     @Query("UPDATE InventoryItem i SET i.mission = null WHERE i.mission.id IN :missionIds")
     void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
+
+    @Query("SELECT i FROM InventoryItem i WHERE " +
+           "i.user = :user AND " +
+           "i.material = :material AND " +
+           "i.location = :location AND " +
+           "i.quality = :quality AND " +
+           "((i.mission IS NULL AND :mission IS NULL) OR (i.mission = :mission)) AND " +
+           "((i.jobOrder IS NULL AND :jobOrder IS NULL) OR (i.jobOrder = :jobOrder)) AND " +
+           "((i.personal IS NULL AND :personal IS NULL) OR (i.personal = :personal))")
+    java.util.Optional<InventoryItem> findMatchingInventoryItem(
+            @Param("user") User user,
+            @Param("material") Material material,
+            @Param("location") Location location,
+            @Param("quality") Integer quality,
+            @Param("mission") Mission mission,
+            @Param("jobOrder") JobOrder jobOrder,
+            @Param("personal") Boolean personal
+    );
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE InventoryItem i SET i.user = :newUser WHERE i.user = :oldUser")
     void updateOwner(@org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User oldUser, @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User newUser);

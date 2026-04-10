@@ -22,7 +22,7 @@ public class ProfitCalculationController {
     private final ProfitCalculationService profitCalculationService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('USER', 'OFFICER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
     public List<ProfitCalculationDto> getProfitCalculation(
             @RequestParam UUID shipId,
             @RequestParam(required = false) List<String> starSystemNames) {

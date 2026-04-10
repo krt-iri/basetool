@@ -1,4 +1,4 @@
-package de.greluc.krt.iri.basetool.frontend.controller;
+﻿package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;
@@ -66,9 +66,9 @@ class MissionSecurityRenderingTest {
                 Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
         );
 
-        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
                 .thenReturn(mission);
-        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+        when(backendApiClient.getCached(anyString(), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), anyBoolean()))
                 .thenReturn(Collections.emptyList());
 
         // Anonymously access the mission detail page
@@ -95,9 +95,9 @@ class MissionSecurityRenderingTest {
                 Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
         );
 
-        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
                 .thenReturn(mission);
-        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+        when(backendApiClient.getCached(anyString(), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), anyBoolean()))
                 .thenReturn(Collections.emptyList());
 
         // Authenticated as Admin
@@ -121,9 +121,9 @@ class MissionSecurityRenderingTest {
                 Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
         );
 
-        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
                 .thenReturn(mission);
-        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+        when(backendApiClient.getCached(anyString(), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), anyBoolean()))
                 .thenReturn(Collections.emptyList());
 
         // Authenticated as another user
@@ -148,9 +148,9 @@ class MissionSecurityRenderingTest {
                 Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
         );
 
-        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
                 .thenReturn(mission);
-        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+        when(backendApiClient.getCached(anyString(), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), anyBoolean()))
                 .thenReturn(Collections.emptyList());
 
         // Authenticated as the participant user
