@@ -46,6 +46,9 @@ class JobOrderServiceTest {
     @Mock
     private JobOrderMapper jobOrderMapper;
 
+    @Mock
+    private de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
+
     @InjectMocks
     private JobOrderService jobOrderService;
 
@@ -81,7 +84,7 @@ class JobOrderServiceTest {
         jobOrder.addMaterial(jom);
 
         JobOrderMaterialDto jomDto = new JobOrderMaterialDto(jom.getId(), materialDto, 100, 50.0, null, 1L);
-        baseJobOrderDto = new JobOrderDto(orderId, 1, "Alpha", "Tester", 1, JobOrderStatus.OPEN, List.of(jomDto), List.of(), Instant.now(), 1L);
+        baseJobOrderDto = new JobOrderDto(orderId, 1, "Alpha", "Tester", 1, JobOrderStatus.OPEN, List.of(jomDto), List.of(), List.of(), Instant.now(), 1L);
     }
 
     @Test
@@ -238,5 +241,62 @@ class JobOrderServiceTest {
             jobOrderService.updateJobOrder(orderId, updateDto);
         });
         verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    }
+
+    @Test
+    void updateJobOrder_ShouldUpdateFieldsAndUnlinkRemovedMaterials() {
+        // Given
+        UUID newMaterialId = UUID.randomUUID();
+        Material newMaterial = new Material();
+        newMaterial.setId(newMaterialId);
+        
+        CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 100, 50.0);
+        CreateJobOrderDto updateDto = new CreateJobOrderDto("Beta", "NewTester", List.of(updateMat), null);
+
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
+        when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+        when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+        // When
+        jobOrderService.updateJobOrder(orderId, updateDto);
+
+        // Then
+        assertEquals("Beta", jobOrder.getSquadron());
+        assertEquals("NewTester", jobOrder.getHandle());
+        
+        // Check if the old material was unlinked
+        verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+        
+        // Verify save
+        verify(jobOrderRepository).save(jobOrder);
+    }
+    @Test
+    void getInventoryItemsForJobOrderMaterial_ShouldReturnMappedDtos() {
+        // Given
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem item = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        item.setId(UUID.randomUUID());
+        item.setAmount(10.0);
+
+        de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto itemDto = 
+            new de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto(
+                item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, 1L);
+
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(inventoryItemRepository.findByJobOrderIdAndMaterialId(orderId, materialId)).thenReturn(List.of(item));
+        when(inventoryItemMapper.toDto(item)).thenReturn(itemDto);
+
+        // When
+        List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> result = jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(itemDto.id(), result.get(0).id());
+        verify(jobOrderRepository).findById(orderId);
+        verify(materialRepository).findById(materialId);
+        verify(inventoryItemRepository).findByJobOrderIdAndMaterialId(orderId, materialId);
+        verify(inventoryItemMapper).toDto(item);
     }
 }

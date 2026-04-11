@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.*;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,11 +17,18 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Arrays;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Controller
 @RequestMapping("/orders")
@@ -33,9 +41,22 @@ public class JobOrderPageController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public String viewOrders(@RequestParam(required = false) List<String> status, Model model) {
+    public String viewOrders(
+            @RequestParam(required = false) List<String> status,
+            @CookieValue(name = "orders_filter_status", required = false) String cookieStatus,
+            HttpServletResponse response,
+            Model model) {
         if (status == null || status.isEmpty()) {
-            status = List.of("OPEN", "IN_PROGRESS");
+            if (cookieStatus != null && !cookieStatus.isBlank()) {
+                status = Arrays.asList(cookieStatus.split("_"));
+            } else {
+                status = List.of("OPEN", "IN_PROGRESS");
+            }
+        } else {
+            Cookie cookie = new Cookie("orders_filter_status", String.join("_", status));
+            cookie.setPath("/orders");
+            cookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
+            response.addCookie(cookie);
         }
 
         List<JobOrderDto> orders = new ArrayList<>();
@@ -91,6 +112,29 @@ public class JobOrderPageController {
             
             if (canAssign) {
                 model.addAttribute("users", fetchUsers());
+                model.addAttribute("materials", fetchMaterials());
+                model.addAttribute("squadrons", fetchSquadrons());
+                
+                if (!model.containsAttribute("jobOrderForm")) {
+                    JobOrderForm form = new JobOrderForm();
+                    form.setSquadron(order.squadron());
+                    form.setHandle(order.handle());
+                    form.setVersion(order.version());
+                    form.getMaterials().clear();
+                    if (order.materials() != null) {
+                        for (de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderMaterialDto mat : order.materials()) {
+                            JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
+                            mf.setMaterialId(mat.material().id());
+                            mf.setMinQuality(mat.minQuality());
+                            mf.setAmount(mat.amount());
+                            form.getMaterials().add(mf);
+                        }
+                    }
+                    if (form.getMaterials().isEmpty()) {
+                        form.getMaterials().add(new JobOrderForm.JobOrderMaterialForm());
+                    }
+                    model.addAttribute("jobOrderForm", form);
+                }
             } else {
                 model.addAttribute("users", new ArrayList<>());
             }
@@ -111,6 +155,13 @@ public class JobOrderPageController {
             }
             model.addAttribute("ageYellowDays", yellowDays);
             model.addAttribute("ageRedDays", redDays);
+
+            if (!model.containsAttribute("handoverForm")) {
+                JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
+                handoverForm.setHandoverTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+                handoverForm.setRecipientSquadron(order.squadron());
+                model.addAttribute("handoverForm", handoverForm);
+            }
         } catch (Exception e) {
             log.error("Failed to fetch order", e);
             log.error("Failed to load job order", e);
@@ -138,7 +189,7 @@ public class JobOrderPageController {
     }
 
     @PostMapping("/create")
-    public String createOrder(@ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
+    public String createOrder(@ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes, @AuthenticationPrincipal OidcUser principal) {
         try {
             List<CreateJobOrderMaterialDto> materials = form.getMaterials().stream()
                     .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
@@ -155,6 +206,9 @@ public class JobOrderPageController {
             backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
             redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
             
+            if (principal == null) {
+                return "redirect:/orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
+            }
             if ("index".equals(form.getSource())) {
                 return "redirect:/orders";
             }
@@ -196,6 +250,33 @@ public class JobOrderPageController {
         return "redirect:/orders/" + id;
     }
 
+    @PostMapping("/{id}/update")
+    @PreAuthorize("hasRole('LOGISTICIAN')")
+    public String updateOrder(@PathVariable UUID id, @ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
+        try {
+            List<CreateJobOrderMaterialDto> materials = form.getMaterials().stream()
+                    .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+                    .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+                    .collect(Collectors.toList());
+
+            if (materials.isEmpty()) {
+                redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
+                redirectAttributes.addFlashAttribute("jobOrderForm", form);
+                return "redirect:/orders/" + id;
+            }
+
+            CreateJobOrderDto dto = new CreateJobOrderDto(form.getSquadron(), form.getHandle(), materials, form.getVersion());
+            backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+            redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
+            return "redirect:/orders/" + id;
+        } catch (Exception e) {
+            log.error("Failed to update order", e);
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+            redirectAttributes.addFlashAttribute("jobOrderForm", form);
+            return "redirect:/orders/" + id;
+        }
+    }
+
     @PostMapping("/{id}/delete")
     @PreAuthorize("isAuthenticated()")
     public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
@@ -223,6 +304,46 @@ public class JobOrderPageController {
         return "redirect:/orders/" + id;
     }
 
+    @PostMapping("/{id}/handovers")
+    @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+    public String createHandover(@PathVariable UUID id, @ModelAttribute("handoverForm") JobOrderHandoverForm form, RedirectAttributes redirectAttributes) {
+        try {
+            List<JobOrderHandoverItemCreateDto> items = form.getItems().stream()
+                    .filter(item -> item.getInventoryItemId() != null && item.getAmount() != null && item.getAmount() > 0)
+                    .map(item -> new JobOrderHandoverItemCreateDto(item.getInventoryItemId(), item.getAmount()))
+                    .collect(Collectors.toList());
+
+            if (items.isEmpty()) {
+                redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
+                return "redirect:/orders/" + id;
+            }
+
+            Instant handoverTime = Instant.now();
+            if (form.getHandoverTime() != null && !form.getHandoverTime().isBlank()) {
+                try {
+                    handoverTime = LocalDateTime.parse(form.getHandoverTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            .atZone(ZoneId.systemDefault()).toInstant();
+                } catch (Exception e) {
+                    log.warn("Could not parse handoverTime {}, using now()", form.getHandoverTime());
+                }
+            }
+
+            JobOrderHandoverCreateDto dto = new JobOrderHandoverCreateDto(
+                    handoverTime,
+                    form.getRecipientHandle(),
+                    form.getRecipientSquadron(),
+                    items
+            );
+
+            backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
+            redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
+        } catch (Exception e) {
+            log.error("Failed to create handover", e);
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+        }
+        return "redirect:/orders/" + id;
+    }
+
     @PostMapping("/{id}/assignees/remove")
     @PreAuthorize("isAuthenticated()")
     public String removeAssignee(@PathVariable UUID id, @RequestParam UUID userId, RedirectAttributes redirectAttributes) {
@@ -234,6 +355,19 @@ public class JobOrderPageController {
             redirectAttributes.addFlashAttribute("errorToast", "error.joborder.assignee.remove");
         }
         return "redirect:/orders/" + id;
+    }
+
+    @GetMapping("/{id}/materials/{matId}/inventory")
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public List<InventoryItemDto> getInventoryItemsForMaterial(
+            @PathVariable UUID id, @PathVariable UUID matId) {
+        try {
+            return backendApiClient.get("/api/v1/orders/" + id + "/materials/" + matId + "/inventory", new ParameterizedTypeReference<>() {});
+        } catch (Exception e) {
+            log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load inventory items");
+        }
     }
 
     private List<UserDto> fetchUsers() {

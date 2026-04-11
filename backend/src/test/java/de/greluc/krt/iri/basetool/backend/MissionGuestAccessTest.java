@@ -84,7 +84,7 @@ class MissionGuestAccessTest {
         // Fetch valid participant ID from DB (hibernate might assign one)
         p = mission.getParticipants().iterator().next();
 
-        String updateJson = "{\"desiredMissionJobTypeId\": \"" + testJobType.getId() + "\", \"comment\": \"Hacked\"}";
+        String updateJson = "{\"desiredMissionJobTypeId\": \"" + testJobType.getId() + "\", \"comment\": \"Hacked\", \"version\": 0}";
 
         // Anonymous request (no with(jwt()))
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
@@ -120,7 +120,7 @@ class MissionGuestAccessTest {
         
         p = mission.getParticipants().iterator().next();
 
-        String updateJson = "{\"desiredMissionJobTypeId\": \"" + testJobType.getId() + "\", \"comment\": \"Guest Update\"}";
+        String updateJson = "{\"desiredMissionJobTypeId\": \"" + testJobType.getId() + "\", \"comment\": \"Guest Update\", \"version\": 0}";
 
         // Anonymous request
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())

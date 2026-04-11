@@ -268,7 +268,7 @@
                             <tbody>
                                 <tr th:each="payout : ${operationPayouts}">
                                     <td th:text="${payout.participantName}">User</td>
-                                    <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()">0,00%</td>
+                                    <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'NONE', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()">0,00%</td>
                                     <td>
                                         <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
                                         <span th:if="${payout.payoutPreference.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</span>
@@ -293,7 +293,7 @@
                         <div style="margin-bottom: 1.5rem; text-align: center;">
                             <h3 style="margin: 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-primary);">
                                 <span th:text="#{operation.finances.total}">Gesamtergebnis</span>: 
-                                <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'POINT', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
+                                <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'NONE', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
                             </h3>
                         </div>
 
@@ -305,7 +305,7 @@
                                      onclick="toggleMissionFinances(this.getAttribute('data-mission-id'))">
                                     <strong style="color: var(--color-primary);" th:text="${msnFin.missionName}">Mission Name</strong>
                                     <span>
-                                        <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                        <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
                                         <span class="toggle-icon-msn" style="margin-left: 10px;">▼</span>
                                     </span>
                                 </div>
@@ -327,7 +327,7 @@
                                                 </td>
                                                 <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
                                                 <td th:text="${entry.note}">Notiz</td>
-                                                <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'"
+                                                <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'"
                                                     th:class="${entry.type.name() == 'INCOME'} ? 'text-success' : 'text-danger'"
                                                     style="text-align: right;">0,00 aUEC</td>
                                             </tr>
@@ -337,7 +337,7 @@
                                                 </td>
                                                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                                 <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color:var(--color-primary);text-decoration:none;">Raffinerieauftrag</a></td>
-                                                <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC'" class="text-danger" style="text-align: right;">0,00 aUEC</td>
+                                                <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'NONE', 2, 'COMMA')} + ' aUEC'" class="text-danger" style="text-align: right;">0,00 aUEC</td>
                                             </tr>
                                         </tbody>
                                     </table>

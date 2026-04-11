@@ -21,9 +21,6 @@
   }, {
     "name" : "Orders",
     "description" : "Operations related to job orders"
-  }, {
-    "name" : "Mission Types",
-    "description" : "Endpoints for managing Mission Types (Einsatzarten)"
   } ],
   "paths" : {
     "/api/v1/users/{id}/attributes" : {
@@ -3770,384 +3767,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/MissionDto"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/mission-types/{id}" : {
-      "get" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Get Mission Type by ID",
-        "operationId" : "getMissionTypeById",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "headers" : {
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MissionTypeDto"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Update an existing Mission Type",
-        "operationId" : "updateMissionType",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MissionTypeUpdateDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MissionTypeDto"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Delete a Mission Type",
-        "operationId" : "deleteMissionType",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "204" : {
-            "description" : "No Content"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/mission-types/{id}/sort" : {
-      "put" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Update the sorted ShipType list of a Mission Type",
-        "operationId" : "updateSortOrder",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MissionTypeSortUpdateDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MissionTypeDto"
                 }
               }
             }
@@ -8119,6 +7738,105 @@
         }
       }
     },
+    "/api/v1/orders/{id}/handovers" : {
+      "post" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Create a job order handover",
+        "description" : "Logs a handover of materials for this job order.",
+        "operationId" : "createHandover",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JobOrderHandoverCreateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderHandoverDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/assignees/{userId}" : {
       "post" : {
         "tags" : [ "Orders" ],
@@ -9725,197 +9443,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/MissionDto"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/mission-types" : {
-      "get" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Get all Mission Types with pagination",
-        "operationId" : "getAllMissionTypes",
-        "parameters" : [ {
-          "name" : "pageable",
-          "in" : "query",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "headers" : {
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageMissionTypeDto"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Create a new Mission Type",
-        "operationId" : "createMissionType",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MissionTypeCreateDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "description" : "Created",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MissionTypeDto"
                 }
               }
             }
@@ -13849,6 +13376,123 @@
         }
       }
     },
+    "/api/v1/orders/{id}/materials/{matId}/inventory" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Get inventory items for a job order material",
+        "description" : "Returns all inventory items linked to a specific material in a job order.",
+        "operationId" : "getInventoryItemsForJobOrderMaterial",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "matId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/InventoryItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/lookup" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -14661,105 +14305,6 @@
                   "type" : "array",
                   "items" : {
                     "$ref" : "#/components/schemas/MissionReferenceDto"
-                  }
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/mission-types/all" : {
-      "get" : {
-        "tags" : [ "Mission Types" ],
-        "summary" : "Get all Mission Types as a list",
-        "operationId" : "getAllMissionTypesList",
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "headers" : {
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/MissionTypeDto"
                   }
                 }
               }
@@ -17768,6 +17313,54 @@
         },
         "required" : [ "amount", "materialId", "minQuality" ]
       },
+      "InventoryItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialReferenceDto"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationReferenceDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "personal" : {
+            "type" : "boolean"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderDisplayId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "missionName" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "JobOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -17805,9 +17398,79 @@
               "$ref" : "#/components/schemas/UserDto"
             }
           },
+          "handovers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderHandoverDto"
+            }
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderHandoverDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "handoverTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recipientHandle" : {
+            "type" : "string"
+          },
+          "recipientSquadron" : {
+            "type" : "string"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderHandoverItemDto"
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderHandoverItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderHandoverId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "inventoryItem" : {
+            "$ref" : "#/components/schemas/InventoryItemDto"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
           },
           "version" : {
             "type" : "integer",
@@ -17840,6 +17503,34 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "LocationReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MaterialReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantityType" : {
+            "type" : "string",
+            "enum" : [ "SCU", "PIECE" ]
           }
         }
       },
@@ -17921,54 +17612,6 @@
           }
         }
       },
-      "InventoryItemDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "user" : {
-            "$ref" : "#/components/schemas/UserReferenceDto"
-          },
-          "material" : {
-            "$ref" : "#/components/schemas/MaterialReferenceDto"
-          },
-          "location" : {
-            "$ref" : "#/components/schemas/LocationReferenceDto"
-          },
-          "quality" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "amount" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "personal" : {
-            "type" : "boolean"
-          },
-          "jobOrderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "jobOrderDisplayId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "missionName" : {
-            "type" : "string"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
-      },
       "JobTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -18003,30 +17646,6 @@
           }
         },
         "required" : [ "archetype", "name" ]
-      },
-      "LocationReferenceDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          }
-        }
-      },
-      "MaterialReferenceDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          }
-        }
       },
       "MissionCrewDto" : {
         "type" : "object",
@@ -18151,9 +17770,6 @@
           "canManageManagers" : {
             "type" : "boolean"
           },
-          "missionType" : {
-            "$ref" : "#/components/schemas/MissionTypeDto"
-          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -18220,37 +17836,6 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
-          }
-        }
-      },
-      "MissionTypeDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "sortedShipTypeIds" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string",
-              "format" : "uuid"
-            }
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
           }
         }
       },
@@ -18351,11 +17936,9 @@
               "type" : "string",
               "format" : "uuid"
             },
-            "minItems" : 1,
             "uniqueItems" : true
           }
-        },
-        "required" : [ "jobTypeIds" ]
+        }
       },
       "UpdateParticipantRequest" : {
         "type" : "object",
@@ -18407,37 +17990,6 @@
         },
         "required" : [ "preference" ]
       },
-      "MissionTypeUpdateDto" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string",
-            "minLength" : 1
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "name", "version" ]
-      },
-      "MissionTypeSortUpdateDto" : {
-        "type" : "object",
-        "properties" : {
-          "sortedShipTypeIds" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string",
-              "format" : "uuid"
-            }
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "sortedShipTypeIds", "version" ]
-      },
       "InventoryItemUpdateDto" : {
         "type" : "object",
         "properties" : {
@@ -18457,8 +18009,7 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double",
-            "minimum" : 0
+            "format" : "double"
           },
           "personal" : {
             "type" : "boolean"
@@ -18650,8 +18201,7 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double",
-            "minimum" : 0
+            "format" : "double"
           },
           "userId" : {
             "type" : "string",
@@ -18663,6 +18213,44 @@
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
+      },
+      "JobOrderHandoverCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "handoverTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recipientHandle" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "recipientSquadron" : {
+            "type" : "string"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderHandoverItemCreateDto"
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [ "handoverTime", "items", "recipientHandle" ]
+      },
+      "JobOrderHandoverItemCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "inventoryItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "amount", "inventoryItemId" ]
       },
       "OperationCreateDto" : {
         "type" : "object",
@@ -18694,11 +18282,10 @@
               "type" : "string",
               "format" : "uuid"
             },
-            "minItems" : 1,
             "uniqueItems" : true
           }
         },
-        "required" : [ "jobTypeIds", "participantId" ]
+        "required" : [ "participantId" ]
       },
       "AddParticipantRequest" : {
         "type" : "object",
@@ -18731,8 +18318,7 @@
             "type" : "string",
             "format" : "uuid"
           }
-        },
-        "required" : [ "desiredJobTypeId", "squadronId" ]
+        }
       },
       "AddFrequencyRequest" : {
         "type" : "object",
@@ -18746,16 +18332,6 @@
           }
         },
         "required" : [ "frequencyTypeId", "value" ]
-      },
-      "MissionTypeCreateDto" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string",
-            "minLength" : 1
-          }
-        },
-        "required" : [ "name" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",
@@ -18780,8 +18356,7 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double",
-            "minimum" : 0
+            "format" : "double"
           },
           "personal" : {
             "type" : "boolean"
@@ -19359,9 +18934,6 @@
           "operation" : {
             "$ref" : "#/components/schemas/OperationDto"
           },
-          "missionType" : {
-            "$ref" : "#/components/schemas/MissionTypeDto"
-          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -19452,92 +19024,6 @@
             "items" : {
               "type" : "string"
             }
-          }
-        }
-      },
-      "PageMissionTypeDto" : {
-        "type" : "object",
-        "properties" : {
-          "totalElements" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "totalPages" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/MissionTypeDto"
-            }
-          },
-          "number" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "sort" : {
-            "$ref" : "#/components/schemas/SortObject"
-          },
-          "numberOfElements" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "first" : {
-            "type" : "boolean"
-          },
-          "last" : {
-            "type" : "boolean"
-          },
-          "pageable" : {
-            "$ref" : "#/components/schemas/PageableObject"
-          },
-          "empty" : {
-            "type" : "boolean"
-          }
-        }
-      },
-      "PageableObject" : {
-        "type" : "object",
-        "properties" : {
-          "offset" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "sort" : {
-            "$ref" : "#/components/schemas/SortObject"
-          },
-          "pageSize" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "pageNumber" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "unpaged" : {
-            "type" : "boolean"
-          },
-          "paged" : {
-            "type" : "boolean"
-          }
-        }
-      },
-      "SortObject" : {
-        "type" : "object",
-        "properties" : {
-          "empty" : {
-            "type" : "boolean"
-          },
-          "sorted" : {
-            "type" : "boolean"
-          },
-          "unsorted" : {
-            "type" : "boolean"
           }
         }
       },

@@ -42,7 +42,7 @@ public class JobOrder extends AbstractEntity<UUID> {
 
     @OneToMany(mappedBy = "jobOrder", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
-    private List<JobOrderMaterial> materials = new ArrayList<>();
+    private Set<JobOrderMaterial> materials = new HashSet<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -52,6 +52,10 @@ public class JobOrder extends AbstractEntity<UUID> {
     )
     @Builder.Default
     private Set<User> assignees = new HashSet<>();
+    
+    @OneToMany(mappedBy = "jobOrder", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<JobOrderHandover> handovers = new HashSet<>();
     
     public void addMaterial(JobOrderMaterial material) {
         materials.add(material);

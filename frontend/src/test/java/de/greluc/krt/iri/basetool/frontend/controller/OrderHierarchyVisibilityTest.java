@@ -53,7 +53,7 @@ class OrderHierarchyVisibilityTest {
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         // Erforderlich: UUID,Integer,String,String,Integer,String,List<JobOrderMaterialDto>,List<UserDto>,Instant,Long
-        JobOrderDto order = new JobOrderDto(orderId, 1, "SQR", "Handle", 1, "OPEN", java.util.List.of(), java.util.List.of(), java.time.Instant.now(), 1L);
+        JobOrderDto order = new JobOrderDto(orderId, 1, "SQR", "Handle", 1, "OPEN", java.util.List.of(), java.util.List.of(), java.util.List.of(), java.time.Instant.now(), 1L);
         
         when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class))).thenReturn(order);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class))).thenReturn(null);
@@ -67,6 +67,6 @@ class OrderHierarchyVisibilityTest {
 
         mockMvc.perform(get("/orders/" + orderId).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authToken)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Update"))); // The status update button for LOGISTICIAN
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Bearbeiten"))); // The edit button for LOGISTICIAN
     }
 }

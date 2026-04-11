@@ -13,6 +13,7 @@ public record JobOrderDto(
         String status,
         List<JobOrderMaterialDto> materials,
         List<UserDto> assignees,
+        List<JobOrderHandoverDto> handovers,
         Instant createdAt,
         Long version
 ) {}

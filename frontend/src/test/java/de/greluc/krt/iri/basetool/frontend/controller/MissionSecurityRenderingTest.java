@@ -1,4 +1,4 @@
-﻿package de.greluc.krt.iri.basetool.frontend.controller;
+package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;

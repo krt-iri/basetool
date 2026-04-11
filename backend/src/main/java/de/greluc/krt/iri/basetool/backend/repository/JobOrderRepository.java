@@ -19,11 +19,14 @@ import java.util.UUID;
 @Repository
 public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
 
-    @EntityGraph(attributePaths = {"materials", "materials.material"})
+    @EntityGraph(attributePaths = {"materials", "materials.material", "handovers", "handovers.items", "handovers.items.material", "assignees"})
+    Optional<JobOrder> findById(UUID id);
+    
+    @EntityGraph(attributePaths = {"materials", "materials.material", "handovers", "handovers.items", "handovers.items.material"})
     @Query("SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId DESC")
     List<JobOrder> findAllActiveWithMaterials();
 
-    @EntityGraph(attributePaths = {"materials", "assignees"})
+    @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
     Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
 
     @Query("SELECT MAX(o.priority) FROM JobOrder o")

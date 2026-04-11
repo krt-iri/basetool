@@ -99,13 +99,13 @@ class MissionAccessControlTest {
     }
 
     @Test
-    void testCreateMission_Unauthenticated_Allowed() throws Exception {
+    void testCreateMission_Unauthenticated_Forbidden() throws Exception {
         String json = "{\"name\": \"Anonymous Mission\", \"status\": \"PLANNED\", \"version\": 0}";
 
         mockMvc.perform(post("/api/v1/missions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test

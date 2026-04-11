@@ -83,7 +83,14 @@
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>
                 <td th:text="${order.mission != null ? order.mission.name : '-'}"></td>
                 <td>
-                    <span th:each="mat, iterStat : ${order.goods}" th:text="${mat.inputMaterial != null ? mat.inputMaterial.name : '-'} + ${!iterStat.last ? ', ' : ''}"></span>
+                    <span th:with="uniqueMaterials=${new java.util.LinkedHashSet()}">
+                        <th:block th:each="mat : ${order.goods}">
+                            <th:block th:if="${mat.inputMaterial != null}">
+                                <span th:text="${uniqueMaterials.add(mat.inputMaterial.name) ? '' : ''}" th:remove="all"></span>
+                            </th:block>
+                        </th:block>
+                        <span th:each="matName, iterStat : ${uniqueMaterials}" th:text="${matName} + ${!iterStat.last ? ', ' : ''}"></span>
+                    </span>
                 </td>
                 <td style="white-space: nowrap;">
                     <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn" th:text="#{refineryorder.action.details}">Details</a>

@@ -116,7 +116,10 @@
                             <tr th:each="mat : ${order.materials}">
                                 <td th:text="${mat.material.name}" th:title="${mat.material.name}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
                                 <td th:text="${mat.minQuality}" style="border-bottom: none; white-space: nowrap;"></td>
-                                <td th:text="${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 3) : '0.000'}" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td style="border-bottom: none; white-space: nowrap;" th:switch="${mat.material.quantityType}">
+                                    <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
+                                    <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                </td>
                                 <td th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
                             </tr>
                         </tbody>
@@ -144,33 +147,6 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', () => {
-        const filterForm = document.getElementById('filter-form');
-        if (filterForm) {
-            filterForm.addEventListener('submit', () => {
-                const checkedStatuses = Array.from(filterForm.querySelectorAll('input[name="status"]:checked')).map(cb => cb.value);
-                localStorage.setItem('orders_filter_status', JSON.stringify(checkedStatuses));
-            });
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasParams = Array.from(urlParams.keys()).length > 0;
-            if (!hasParams) {
-                const savedStatusesStr = localStorage.getItem('orders_filter_status');
-                if (savedStatusesStr) {
-                    try {
-                        const savedStatuses = JSON.parse(savedStatusesStr);
-                        if (Array.isArray(savedStatuses) && savedStatuses.length > 0) {
-                            const newParams = new URLSearchParams();
-                            savedStatuses.forEach(s => newParams.append('status', s));
-                            window.location.search = newParams.toString();
-                            return;
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse saved statuses', e);
-                    }
-                }
-            }
-        }
-
         const yellowDays = /*[[${ageYellowDays}]]*/ 30;
         const redDays = /*[[${ageRedDays}]]*/ 90;
         const now = new Date();

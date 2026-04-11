@@ -80,7 +80,7 @@ class InventoryLogisticianSyncTest {
         // When & Then
         mockMvc.perform(get("/inventory/all").with(authentication(auth)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Neuen Eintrag erfassen")));
+                .andExpect(content().string(containsString("Einbuchen")));
     }
 
     @Test
@@ -102,7 +102,7 @@ class InventoryLogisticianSyncTest {
         // When & Then
         mockMvc.perform(get("/inventory/all").with(authentication(auth)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("Neuen Eintrag erfassen"))));
+                .andExpect(content().string(not(containsString("Einbuchen"))));
     }
 
     @Test
@@ -124,6 +124,6 @@ class InventoryLogisticianSyncTest {
         // When & Then
         mockMvc.perform(get("/inventory/all").with(authentication(auth)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Neuen Eintrag erfassen")));
+                .andExpect(content().string(containsString("Einbuchen")));
     }
 }

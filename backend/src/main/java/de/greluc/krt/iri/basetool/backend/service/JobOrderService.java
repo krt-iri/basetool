@@ -36,6 +36,7 @@ public class JobOrderService {
     private final InventoryItemRepository inventoryItemRepository;
     private final UserRepository userRepository;
     private final JobOrderMapper jobOrderMapper;
+    private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
     @Transactional
     public JobOrderDto createJobOrder(CreateJobOrderDto createDto) {
@@ -94,6 +95,18 @@ public class JobOrderService {
         JobOrder jobOrder = jobOrderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
         return mapToDtoWithStock(jobOrder);
+    }
+
+    @Transactional(readOnly = true)
+    public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
+        JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found: " + materialId));
+
+        return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
+                .map(inventoryItemMapper::toDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -171,6 +184,20 @@ public class JobOrderService {
 
         jobOrder.setSquadron(updateDto.squadron());
         jobOrder.setHandle(updateDto.handle());
+
+        List<UUID> newMaterialIds = updateDto.materials().stream()
+                .map(CreateJobOrderMaterialDto::materialId)
+                .toList();
+
+        List<UUID> removedMaterialIds = jobOrder.getMaterials().stream()
+                .map(mat -> mat.getMaterial().getId())
+                .filter(matId -> !newMaterialIds.contains(matId))
+                .toList();
+
+        for (UUID removedId : removedMaterialIds) {
+            inventoryItemRepository.unlinkJobOrderMaterial(jobOrder.getId(), removedId);
+        }
+
         jobOrder.getMaterials().clear();
 
         for (CreateJobOrderMaterialDto matDto : updateDto.materials()) {
@@ -257,6 +284,6 @@ public class JobOrderService {
             );
         }).toList();
         
-        return new JobOrderDto(baseDto.id(), baseDto.displayId(), baseDto.squadron(), baseDto.handle(), baseDto.priority(), baseDto.status(), updatedMaterials, baseDto.assignees(), baseDto.createdAt(), baseDto.version());
+        return new JobOrderDto(baseDto.id(), baseDto.displayId(), baseDto.squadron(), baseDto.handle(), baseDto.priority(), baseDto.status(), updatedMaterials, baseDto.assignees(), baseDto.handovers(), baseDto.createdAt(), baseDto.version());
     }
 }

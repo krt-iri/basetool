@@ -244,7 +244,7 @@
             const val = parseFloat(valStr);
             if (!isNaN(val)) {
                 const scu = val / 100.0;
-                scuInput.value = scu.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                scuInput.value = scu.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3, useGrouping: false });
             } else {
                 scuInput.value = '';
             }

@@ -16,6 +16,8 @@ public class RefineryOrderStoreItemForm {
     
     private String materialName;
     
+    private String quantityType;
+    
     @NotNull
     private UUID locationId;
     
@@ -26,10 +28,9 @@ public class RefineryOrderStoreItemForm {
     
     @NotNull
     @Min(0)
-    @NumberFormat(pattern = "#,##0.000")
     private Double amount;
     
-    private boolean amountFixed;
+    private Boolean amountFixed;
     
     private UUID userId;
     

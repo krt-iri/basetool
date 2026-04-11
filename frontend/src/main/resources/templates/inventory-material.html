@@ -70,7 +70,10 @@
                         <td th:text="${item.user.effectiveName}">Username</td>
                         <td th:text="${item.location.name}">Ort</td>
                         <td th:text="${item.quality}">100</td>
-                        <td th:text="${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 3) : '0.000'}">10.5</td>
+                        <td th:switch="${item.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                        </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(items)}">
                         <td colspan="4" style="text-align: center; color: var(--color-gray-2);">Keine Einträge für dieses Material gefunden.</td>

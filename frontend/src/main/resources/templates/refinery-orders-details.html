@@ -253,11 +253,16 @@
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialName}" />
                         <input type="hidden" th:field="*{items[__${stat.index}__].amountFixed}" />
+                        <input type="hidden" th:field="*{items[__${stat.index}__].quantityType}" />
                         
                         <div class="material-row">
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                                <label th:for="'storeAmount_' + ${stat.index}" th:text="#{inventory.form.amount}">Menge</label>
-                                <input type="text" inputmode="decimal" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:readonly="*{items[__${stat.index}__].amountFixed}" th:classappend="*{items[__${stat.index}__].amountFixed} ? 'readonly-input' : ''" required>
+                                <label th:for="'storeAmount_' + ${stat.index}">
+                                    <span th:text="#{inventory.form.amount}">Menge</span>
+                                    <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
+                                    <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
+                                </label>
+                                <input type="number" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" th:readonly="*{items[__${stat.index}__].amountFixed}" th:classappend="*{items[__${stat.index}__].amountFixed} ? 'readonly-input' : ''" required>
                             </div>
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
@@ -310,7 +315,7 @@
             const val = parseInt(valStr);
             if (!isNaN(val)) {
                 const scu = val / 100.0;
-                scuInput.value = scu.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                scuInput.value = scu.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3, useGrouping: false });
             } else {
                 scuInput.value = '';
             }

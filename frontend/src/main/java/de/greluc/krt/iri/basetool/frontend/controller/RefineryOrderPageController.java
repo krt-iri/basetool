@@ -135,21 +135,25 @@ public class RefineryOrderPageController {
                 return "redirect:/refinery-orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
             }
             
-            OffsetDateTime startedAtTime;
+            java.time.Instant startedAtTime;
             if (form.getStartedAt() != null && !form.getStartedAt().trim().isEmpty()) {
                 String input = form.getStartedAt().trim();
                 if (input.length() == 10) {
                     // Falls nur ein Datum (YYYY-MM-DD) gesendet wird
-                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toOffsetDateTime();
+                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
                 } else if (input.length() == 16) {
                     // Falls Datum + Zeit (YYYY-MM-DDTHH:mm) ohne Sekunden gesendet wird
-                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime();
+                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toInstant();
                 } else {
                     // Fallback parse
-                    startedAtTime = OffsetDateTime.parse(input);
+                    try {
+                        startedAtTime = java.time.OffsetDateTime.parse(input).toInstant();
+                    } catch (Exception e) {
+                        startedAtTime = java.time.Instant.parse(input);
+                    }
                 }
             } else {
-                startedAtTime = OffsetDateTime.now();
+                startedAtTime = java.time.Instant.now();
             }
 
             RefineryOrderDto orderDto = new RefineryOrderDto(
@@ -158,7 +162,7 @@ public class RefineryOrderPageController {
                     form.getLocationId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(form.getLocationId(), null, null, false, null) : null,
                     form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null) : null,
                     startedAtTime,
-                    (form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0),
+                    (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
                     form.getExpenses(),
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
@@ -205,11 +209,11 @@ public class RefineryOrderPageController {
                     RefineryOrderForm form = new RefineryOrderForm();
                     
                     if (orderDto.startedAt() != null) {
-                        form.setStartedAt(orderDto.startedAt().toInstant().toString());
+                        form.setStartedAt(orderDto.startedAt().toString());
                     }
                     if (orderDto.durationMinutes() != null) {
-                        form.setDurationHours(orderDto.durationMinutes() / 60);
-                        form.setDurationMinutes(orderDto.durationMinutes() % 60);
+                        form.setDurationHours((int) (orderDto.durationMinutes() / 60));
+                        form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
                     }
                     form.setExpenses(orderDto.expenses());
                     if (orderDto.location() != null) {
@@ -258,14 +262,27 @@ public class RefineryOrderPageController {
                                 sItem.setMaterialId(good.outputMaterial().id());
                                 sItem.setMaterialName(good.outputMaterial().name());
                                 
-                                double scuAmount = 0.0;
+                                double amount = 0.0;
                                 if (good.outputQuantity() != null) {
-                                    scuAmount = good.outputQuantity() / 100.0;
+                                    if ("SCU".equals(good.outputMaterial().quantityType())) {
+                                        java.math.RoundingMode rm;
+                                        try {
+                                            rm = java.math.RoundingMode.valueOf(roundingMode);
+                                        } catch(Exception e) {
+                                            rm = java.math.RoundingMode.HALF_UP;
+                                        }
+                                        amount = java.math.BigDecimal.valueOf(good.outputQuantity() / 100.0)
+                                                .setScale(3, rm)
+                                                .doubleValue();
+                                    } else {
+                                        amount = good.outputQuantity();
+                                    }
                                     sItem.setAmountFixed(true);
                                 } else {
                                     sItem.setAmountFixed(false);
                                 }
-                                sItem.setAmount(scuAmount);
+                                sItem.setAmount(amount);
+                                sItem.setQuantityType(good.outputMaterial().quantityType());
                                 
                                 sItem.setQuality(good.quality() != null ? good.quality() : 0);
                                 if (orderDto.location() != null) {
@@ -322,18 +339,22 @@ public class RefineryOrderPageController {
                 return "redirect:/refinery-orders/" + id;
             }
 
-            OffsetDateTime startedAtTime;
+            java.time.Instant startedAtTime;
             if (form.getStartedAt() != null && !form.getStartedAt().trim().isEmpty()) {
                 String input = form.getStartedAt().trim();
                 if (input.length() == 10) {
-                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toOffsetDateTime();
+                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
                 } else if (input.length() == 16) {
-                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime();
+                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toInstant();
                 } else {
-                    startedAtTime = OffsetDateTime.parse(input);
+                    try {
+                        startedAtTime = java.time.OffsetDateTime.parse(input).toInstant();
+                    } catch (Exception e) {
+                        startedAtTime = java.time.Instant.parse(input);
+                    }
                 }
             } else {
-                startedAtTime = OffsetDateTime.now();
+                startedAtTime = java.time.Instant.now();
             }
 
             RefineryOrderDto orderDto = new RefineryOrderDto(
@@ -342,7 +363,7 @@ public class RefineryOrderPageController {
                     form.getLocationId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(form.getLocationId(), null, null, false, null) : null,
                     form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null) : null,
                     startedAtTime,
-                    (form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0),
+                    (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
                     form.getExpenses(),
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
@@ -405,7 +426,7 @@ public class RefineryOrderPageController {
             redirectAttributes.addFlashAttribute("showStoreModal", true);
             return "redirect:/refinery-orders/" + id;
         }
-        return "redirect:/inventory";
+        return "redirect:/refinery-orders";
     }
 
     private List<MaterialDto> fetchMaterials() {
@@ -458,7 +479,7 @@ public class RefineryOrderPageController {
 
     private List<MissionListDto> fetchMissions() {
         try {
-            PageResponse<MissionListDto> p = backendApiClient.get("/api/v1/missions?size=1000", new ParameterizedTypeReference<>() {}, true);
+            PageResponse<MissionListDto> p = backendApiClient.get("/api/v1/missions?size=1000", new ParameterizedTypeReference<>() {});
             if (p != null && p.content() != null) {
                 return new ArrayList<>(p.content());
             }

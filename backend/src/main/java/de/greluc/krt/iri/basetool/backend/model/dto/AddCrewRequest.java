@@ -8,7 +8,6 @@ import java.util.UUID;
 public record AddCrewRequest(
         @NotNull
         UUID participantId,
-        @NotEmpty
         Set<UUID> jobTypeIds
 ) {
 }

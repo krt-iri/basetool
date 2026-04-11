@@ -4,5 +4,6 @@ import java.util.UUID;
 
 public record MaterialReferenceDto(
         UUID id,
-        String name
+        String name,
+        String quantityType
 ) {}

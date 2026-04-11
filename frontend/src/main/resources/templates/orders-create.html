@@ -131,7 +131,7 @@
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="0" max="999" required>
+                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="0" max="1000" required>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label th:text="#{orders.create.amount}">Menge</label>
@@ -266,7 +266,7 @@
                 <select name="materials[${materialIndex}].materialId" required>${options}</select>
             </div>
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="number" name="materials[${materialIndex}].minQuality" value="100" step="1" min="0" max="999" required>
+                <input type="number" name="materials[${materialIndex}].minQuality" value="100" step="1" min="0" max="1000" required>
             </div>
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                 <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>

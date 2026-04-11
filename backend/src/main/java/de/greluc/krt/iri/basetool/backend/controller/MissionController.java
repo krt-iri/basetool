@@ -275,14 +275,16 @@ public class MissionController {
     @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
     @Operation(summary = "Add crew to a mission unit")
     public MissionDto addCrew(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionUnitId, @RequestBody @jakarta.validation.Valid @NotNull AddCrewRequest request) {
-        return missionMapper.toDto(missionService.addCrewToShip(id, missionUnitId, request.participantId(), request.jobTypeIds()));
+        java.util.Set<UUID> jobTypeIds = request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
+        return missionMapper.toDto(missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds));
     }
 
     @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
     @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
     @Operation(summary = "Update crew in a mission unit")
     public MissionDto updateCrew(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionUnitId, @PathVariable @NotNull UUID crewId, @RequestBody @jakarta.validation.Valid @NotNull UpdateCrewRequest request) {
-        return missionMapper.toDto(missionService.updateCrewInShip(id, missionUnitId, crewId, request.jobTypeIds()));
+        java.util.Set<UUID> jobTypeIds = request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
+        return missionMapper.toDto(missionService.updateCrewInShip(id, missionUnitId, crewId, jobTypeIds));
     }
 
     @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
@@ -357,7 +359,7 @@ public class MissionController {
             throw new AccessDeniedException("Anonymous users cannot add registered users.");
         }
 
-        if (request.guestName() != null && !request.guestName().isBlank() && userService.isUsernameOrDisplayNameTaken(request.guestName())) {
+        if (finalUserId == null && request.guestName() != null && !request.guestName().isBlank() && userService.isUsernameOrDisplayNameTaken(request.guestName())) {
              throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Guest name is already taken.");
         }
 

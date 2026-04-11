@@ -79,8 +79,8 @@
                 <div class="form-group">
                     <label for="materialId">Material</label>
                     <select id="materialId" th:field="*{materialId}" required>
-                        <option value="">-- Bitte wählen --</option>
-                        <option th:each="mat : ${materials}" th:value="${mat.id}" th:text="${mat.name}"></option>
+                        <option value="" data-quantity-type="">-- Bitte wählen --</option>
+                        <option th:each="mat : ${materials}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
                     </select>
                 </div>
                 
@@ -98,7 +98,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="amount">Menge</label>
+                    <label for="amount">Menge <span id="amount-unit"></span></label>
                     <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 
@@ -134,22 +134,43 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script>
+<script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', function() {
         const matSelect = document.getElementById('materialId');
         if (matSelect) {
             matSelect.addEventListener('change', function() {
                 filterJobOrdersByMaterial(this.value);
+                updateAmountFieldForMaterial(this);
             });
             // Initial filter if a material is already selected
             if (matSelect.value) {
                 filterJobOrdersByMaterial(matSelect.value);
+                updateAmountFieldForMaterial(matSelect);
             } else {
                 // If no material is selected, show all job orders initially
                 filterJobOrdersByMaterial('');
             }
         }
     });
+
+    function updateAmountFieldForMaterial(selectElement) {
+        const amountInput = document.getElementById('amount');
+        const unitSpan = document.getElementById('amount-unit');
+        if (!amountInput || !selectElement.selectedOptions || selectElement.selectedOptions.length === 0) return;
+        
+        const qtType = selectElement.selectedOptions[0].getAttribute('data-quantity-type');
+        
+        if (qtType === 'PIECE') {
+            amountInput.setAttribute('step', '1');
+            unitSpan.textContent = '([[#{material.quantity.piece}]])';
+        } else if (qtType === 'SCU') {
+            amountInput.setAttribute('step', '0.001');
+            unitSpan.textContent = '([[#{material.quantity.scu}]])';
+        } else {
+            amountInput.setAttribute('step', '0.001');
+            unitSpan.textContent = '';
+        }
+    }
 
     function filterJobOrdersByMaterial(matId) {
         const jobSelect = document.getElementById('jobOrderId');

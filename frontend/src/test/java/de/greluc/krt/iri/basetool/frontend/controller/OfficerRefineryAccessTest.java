@@ -99,7 +99,7 @@ class OfficerRefineryAccessTest {
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(officerDto);
 
         UserReferenceDto ownerRef = new UserReferenceDto(otherUserId, "other", "Other", "Other", null);
-        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, ownerRef, null, null, OffsetDateTime.now(), 60, 1000, null, Collections.emptyList(), RefineryOrderStatus.OPEN, 1L);
+        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, ownerRef, null, null, java.time.Instant.now(), 60L, 1000.0, null, Collections.emptyList(), RefineryOrderStatus.OPEN, 1L);
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(orderDto);
         
         when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class))).thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));

@@ -84,7 +84,7 @@
 
         <div style="overflow-x: auto;">
             <div class="table-responsive">
-            <table class="krt-table">
+            <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
                     <tr>
                         <th style="width: 40px;"></th>
@@ -96,12 +96,15 @@
                     </tr>
                 </thead>
                 <tbody th:each="group : ${groupedItems}">
-                    <tr class="group-header" style="cursor: pointer; background-color: rgba(255,255,255,0.05);" onclick="toggleGroup(this)">
+                    <tr class="group-header" style="cursor: pointer; background-color: rgba(255,255,255,0.05);" onclick="toggleGroup(this)" th:data-material-id="${group.material.id}">
                         <td style="text-align: center;"><span class="toggle-icon" style="color: var(--color-primary); font-size: 1.2rem;">▶</span></td>
                         <td th:text="${group.material.name}" style="font-weight: bold; color: var(--color-primary);">Material</td>
-                        <td th:text="${group.averageQuality != null ? #numbers.formatDecimal(group.averageQuality, 1, 2) : '0.00'}">95.50</td>
+                        <td th:text="${group.averageQuality != null ? #numbers.formatDecimal(group.averageQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">95.50</td>
                         <td th:text="${group.maxQuality}">100</td>
-                        <td th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 3) : '0.000'}">10.5</td>
+                        <td th:switch="${group.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                            <span th:case="*" th:text="|${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                        </td>
                         <td></td>
                     </tr>
                     <tr class="group-items" style="display: none;">
@@ -121,7 +124,10 @@
                                     <tr th:each="item : ${group.items}">
                                         <td style="padding-left: 2rem;" th:text="${item.location.name}">Ort</td>
                                         <td th:text="${item.quality}">100</td>
-                                        <td th:text="${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 3) : '0.000'}">10.5</td>
+                                        <td th:switch="${item.material.quantityType}">
+                                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                                        </td>
                                         <td>
                                             <select class="association-select" style="width: 100%; padding: 0.5rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-primary); color: var(--color-gray-1); min-height: 44px;"
                                                     th:data-id="${item.id}"
@@ -168,9 +174,10 @@
                                                         th:data-amount="${item.amount}"
                                                         th:data-version="${item.version}"
                                                         th:data-material-id="${item.material.id}"
+                                                        th:data-quantity-type="${item.material.quantityType}"
                                                         th:data-user-id="${item.user.id}"
                                                         th:data-location-id="${item.location.id}"
-                                                        onclick="openBookOutModal(this.getAttribute('data-id'), this.getAttribute('data-amount'), this.getAttribute('data-version'), this.getAttribute('data-material-id'), this.getAttribute('data-user-id'), this.getAttribute('data-location-id'))" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
+                                                        onclick="openBookOutModal(this.getAttribute('data-id'), this.getAttribute('data-amount'), this.getAttribute('data-version'), this.getAttribute('data-material-id'), this.getAttribute('data-user-id'), this.getAttribute('data-location-id'), this.getAttribute('data-quantity-type'))" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -279,16 +286,57 @@
     function toggleGroup(row) {
         const nextRow = row.nextElementSibling;
         const icon = row.querySelector('.toggle-icon');
+        const materialId = row.getAttribute('data-material-id');
+        const table = row.closest('table');
+        const userId = table ? table.getAttribute('data-user-id') : 'unknown';
+        const storageKey = 'expanded_rows_lager_' + userId;
+
         if (nextRow && nextRow.classList.contains('group-items')) {
+            let expandedRows = [];
+            try { expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch(e) { console.warn('LocalStorage error', e); }
+            
             if (nextRow.style.display === 'none') {
                 nextRow.style.display = 'table-row';
                 icon.textContent = '▼';
+                if (materialId && !expandedRows.includes(materialId)) {
+                    expandedRows.push(materialId);
+                    try { localStorage.setItem(storageKey, JSON.stringify(expandedRows)); } catch(e) { console.warn('LocalStorage error', e); }
+                }
             } else {
                 nextRow.style.display = 'none';
                 icon.textContent = '▶';
+                if (materialId) {
+                    expandedRows = expandedRows.filter(id => id !== materialId);
+                    try { localStorage.setItem(storageKey, JSON.stringify(expandedRows)); } catch(e) { console.warn('LocalStorage error', e); }
+                }
             }
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const table = document.getElementById('inventoryTable');
+        if (table) {
+            const userId = table.getAttribute('data-user-id');
+            if (userId && userId !== 'unknown') {
+                const storageKey = 'expanded_rows_lager_' + userId;
+                let expandedRows = [];
+                try { expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch(e) {}
+                if (expandedRows.length > 0) {
+                    document.querySelectorAll('.group-header').forEach(function(row) {
+                        const materialId = row.getAttribute('data-material-id');
+                        if (materialId && expandedRows.includes(materialId)) {
+                            const nextRow = row.nextElementSibling;
+                            const icon = row.querySelector('.toggle-icon');
+                            if (nextRow && nextRow.classList.contains('group-items')) {
+                                nextRow.style.display = 'table-row';
+                                icon.textContent = '▼';
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    });
 
     function updateAmountFromTarget() {
         const targetAmountInput = document.getElementById('targetAmount');
@@ -366,9 +414,20 @@
         }
     }
 
-    function openBookOutModal(id, amount, version, materialId, userId, locationId) {
+    function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
         document.getElementById('bookOutForm').action = '/inventory/' + id + '/book-out';
-        document.getElementById('amount').value = amount;
+        
+        const amountInput = document.getElementById('amount');
+        const targetAmountInput = document.getElementById('targetAmount');
+        if (quantityType === 'PIECE') {
+            amountInput.setAttribute('step', '1');
+            targetAmountInput.setAttribute('step', '1');
+        } else {
+            amountInput.setAttribute('step', '0.001');
+            targetAmountInput.setAttribute('step', '0.001');
+        }
+        
+        amountInput.value = amount;
         document.getElementById('amount').max = amount;
         document.getElementById('targetAmount').value = 0;
         document.getElementById('maxAmount').value = amount;

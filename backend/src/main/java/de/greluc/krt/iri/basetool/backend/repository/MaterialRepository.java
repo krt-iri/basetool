@@ -16,7 +16,7 @@ import java.util.UUID;
 @Repository
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
     
-    @Query("SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name) FROM Material m ORDER BY m.name")
+    @Query("SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name, m.quantityType) FROM Material m ORDER BY m.name")
     List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
     
     Optional<Material> findByIdCommodity(Integer idCommodity);

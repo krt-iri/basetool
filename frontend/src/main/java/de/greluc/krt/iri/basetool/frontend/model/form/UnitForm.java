@@ -9,6 +9,6 @@ public record UnitForm(
     @NotBlank(message = "{validation.name.required}") @Size(max=255) String name,
     UUID shipTypeId,
     UUID shipId,
-    boolean highValueUnit,
+    Boolean highValueUnit,
     Double frequency
 ) {}

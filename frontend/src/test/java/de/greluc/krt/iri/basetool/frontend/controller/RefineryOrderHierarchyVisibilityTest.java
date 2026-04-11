@@ -58,7 +58,7 @@ class RefineryOrderHierarchyVisibilityTest {
         RefineryOrderDto order = new RefineryOrderDto(
                 orderId,
                 new UserReferenceDto(ownerId, "Owner", null, null, null),
-                null, null, OffsetDateTime.now(), 60, 100, null, List.of(), RefineryOrderStatus.OPEN, 1L
+                null, null, java.time.Instant.now(), 60L, 100.0, null, List.of(), RefineryOrderStatus.OPEN, 1L
         );
         
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);

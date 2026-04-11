@@ -15,6 +15,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import java.util.Optional;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -47,6 +51,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
            "FROM InventoryItem i WHERE i.personal = false GROUP BY i.material")
     Page<Object[]> getAggregatedInventory(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"user", "location", "material"})
+    List<InventoryItem> findByJobOrderIdAndMaterialId(UUID jobOrderId, UUID materialId);
+
     @Query(value = "SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item " +
            "WHERE material_id = :materialId " +
            "AND job_order_id = :jobOrderId " +
@@ -56,6 +63,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @Modifying
     @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId")
     void unlinkJobOrder(@Param("jobOrderId") UUID jobOrderId);
+
+    @Modifying
+    @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND i.material.id = :materialId")
+    void unlinkJobOrderMaterial(@Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
     @Modifying
     @Query("UPDATE InventoryItem i SET i.mission = null WHERE i.mission.id IN :missionIds")
@@ -82,4 +93,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE InventoryItem i SET i.user = :newUser WHERE i.user = :oldUser")
     void updateOwner(@org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User oldUser, @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User newUser);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
+    Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 }

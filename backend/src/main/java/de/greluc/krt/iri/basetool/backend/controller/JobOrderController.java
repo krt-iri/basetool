@@ -5,6 +5,9 @@ import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,8 +40,17 @@ import java.util.UUID;
 @Tag(name = "Orders", description = "Operations related to job orders")
 public class JobOrderController {
     private final JobOrderService jobOrderService;
+    private final JobOrderHandoverService jobOrderHandoverService;
     private final UserService userService;
     private final RoleHierarchy roleHierarchy;
+
+    @PostMapping("/{id}/handovers")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a job order handover", description = "Logs a handover of materials for this job order.")
+    @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+    public JobOrderHandoverDto createHandover(@PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
+        return jobOrderHandoverService.createHandover(id, dto);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -75,6 +87,14 @@ public class JobOrderController {
     @Transactional(readOnly = true)
     public JobOrderDto getJobOrderById(@PathVariable UUID id) {
         return jobOrderService.getJobOrderById(id);
+    }
+
+    @GetMapping("/{id}/materials/{matId}/inventory")
+    @Operation(summary = "Get inventory items for a job order material", description = "Returns all inventory items linked to a specific material in a job order.")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> getInventoryItemsForJobOrderMaterial(@PathVariable UUID id, @PathVariable UUID matId) {
+        return jobOrderService.getInventoryItemsForJobOrderMaterial(id, matId);
     }
 
     @PutMapping("/{id}/status")

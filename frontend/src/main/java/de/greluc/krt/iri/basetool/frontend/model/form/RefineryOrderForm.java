@@ -16,7 +16,7 @@ public class RefineryOrderForm {
     @Min(0)
     private Integer durationMinutes;
     @Positive
-    private Integer expenses;
+    private Double expenses;
     private UUID ownerId;
     private UUID refiningMethodId;
     private UUID locationId;

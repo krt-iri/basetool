@@ -25,6 +25,8 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
+            <button sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" type="button" class="btn" style="background-color: var(--color-primary); color: #000;" th:text="#{orders.detail.handover}" onclick="openHandoverModal()">Übergabe protokollieren</button>
+            <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" onclick="document.getElementById('edit-modal').style.display='flex'">Bearbeiten</button>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" style="margin: 0;">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>
@@ -62,19 +64,18 @@
             <div>
                 <strong th:text="#{orders.index.status}">Status</strong><br>
                 <!-- DEBUG: Authorities: [[${#authentication.authorities}]] -->
-                <div style="margin-top: 0.25rem;">
+                <div sec:authorize="!hasRole('LOGISTICIAN')" style="margin-top: 0.25rem;">
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
                 </div>
                 <div sec:authorize="hasRole('LOGISTICIAN')" style="margin-top: 0.75rem;">
                     <!-- DEBUG: LOGISTICIAN check passed -->
-                    <form th:action="@{/orders/{id}/status(id=${order.id})}" method="post" style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; flex-wrap: wrap;">
-                        <select name="status" style="background: var(--color-gray-4); color: white; border: 1px solid var(--color-gray-3); padding: 0.25rem;">
+                    <form id="status-form" class="no-track" th:action="@{/orders/{id}/status(id=${order.id})}" method="post" style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; flex-wrap: wrap;">
+                        <select name="status" onchange="updateStatus(this)" style="background: var(--color-gray-4); color: white; border: 1px solid var(--color-gray-3); padding: 0.25rem;">
                             <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
                             <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
                             <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
                             <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
                         </select>
-                        <button type="submit" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{orders.detail.status.update}">Update</button>
                     </form>
                 </div>
             </div>
@@ -93,11 +94,23 @@
             </tr>
             </thead>
             <tbody>
-            <tr th:each="mat : ${order.materials}">
+            <tr th:each="mat : ${order.materials}" 
+                class="material-row" 
+                th:data-order-id="${order.id}" 
+                th:data-material-id="${mat.material.id}" 
+                th:data-amount-type="${mat.material.quantityType}" 
+                onclick="toggleInventory(this)" 
+                style="cursor: pointer;">
                 <td th:text="${mat.material.name}"></td>
                 <td th:text="${mat.minQuality}"></td>
-                <td th:text="${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 3) : '0.000'}"></td>
-                <td th:text="${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 3) : '0.000'}"></td>
+                <td th:switch="${mat.material.quantityType}">
+                    <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                </td>
+                <td th:switch="${mat.material.quantityType}">
+                    <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                </td>
                 <td>
                     <span th:if="${mat.currentStock >= mat.amount}" style="color: #2ecc71;" th:text="'✓ ' + #{orders.detail.status.fulfilled}">✓ Erfüllt</span>
                     <span th:if="${mat.currentStock < mat.amount}" style="color: #e74c3c;" th:text="'✗ ' + #{orders.detail.status.missing}">✗ Fehlend</span>
@@ -105,6 +118,39 @@
             </tr>
             </tbody>
         </table>
+        </div>
+        
+        <div th:if="${order.handovers != null and !order.handovers.isEmpty()}" style="margin-top: 2rem;">
+            <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
+                        <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
+                        <th th:text="#{orders.detail.handover.squadron}">Staffel</th>
+                        <th th:text="#{orders.detail.handover.items}">Materialien</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="ho : ${order.handovers}">
+                        <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
+                        <td th:text="${ho.recipientHandle}"></td>
+                        <td th:text="${ho.recipientSquadron != null ? ho.recipientSquadron : '-'}"></td>
+                        <td>
+                            <ul style="list-style-type: none; padding: 0; margin: 0;">
+                                <li th:each="item : ${ho.items}">
+                                    <span th:text="${item.material.name}"></span>
+                                    <span th:text="' (Qual. ' + ${item.quality} + ')'"></span>:
+                                    <span th:if="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}|"></span>
+                                    <span th:unless="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                </li>
+                            </ul>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
@@ -146,7 +192,196 @@
     </div>
 </main>
 
+<div sec:authorize="hasRole('LOGISTICIAN')" id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" onclick="document.getElementById('edit-modal').style.display='none'">&times;</button>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
+        
+        <form th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
+            <input type="hidden" th:field="*{version}">
+            
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="squadron" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Staffel</label>
+                <select id="squadron" th:field="*{squadron}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                    <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
+                    <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="handle" th:text="#{orders.detail.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Handle (Ingame-Name)</label>
+                <input type="text" id="handle" th:field="*{handle}" style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+            </div>
+
+            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Materialien</h3>
+            <div id="materials-container">
+                <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-gray-4); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                    <div>
+                        <label th:text="#{orders.material.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Material</label>
+                        <select th:field="*{materials[__${stat.index}__].materialId}" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                            <option value="" disabled selected>-- Material wählen --</option>
+                            <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+                        </select>
+                    </div>
+                    <div>
+                        <label th:text="#{orders.material.minQuality}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Min. Qualität</label>
+                        <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" min="0" max="1000" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                    </div>
+                    <div>
+                        <label th:text="#{orders.material.amount}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Menge (SCU)</label>
+                        <input type="number" step="0.001" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary remove-material-btn" style="background: rgba(231,76,60,0.1); border-color: #e74c3c; color: #e74c3c; padding: 0.5rem;" th:text="#{orders.detail.material.remove}">Entfernen</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="button" id="add-material-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="submit" class="btn" th:text="#{orders.detail.save}">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="material-delete-confirm-modal" class="modal" style="display: none; z-index: 1050;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 400px; position: relative; text-align: center;">
+        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
+        <p style="margin-bottom: 2rem;" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('material-delete-confirm-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
+            <button type="button" class="btn" style="background: rgba(231,76,60,0.1); border-color: #e74c3c; color: #e74c3c;" onclick="confirmRemoveMaterial()" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
+<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="handover-modal" class="modal" style="display: none;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" onclick="document.getElementById('handover-modal').style.display='none'">&times;</button>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
+
+        <form th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="handoverTime" th:text="#{orders.handover.time}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Zeitpunkt der Übergabe</label>
+                <input type="datetime-local" id="handoverTime" th:field="*{handoverTime}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="recipientHandle" th:text="#{orders.handover.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Empfänger (Handle)</label>
+                <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="recipientSquadron" th:text="#{orders.handover.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Staffel des Empfängers</label>
+                <select id="recipientSquadron" th:field="*{recipientSquadron}" style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                    <option value="" th:text="#{orders.handover.selectSquadron}">-- Optional --</option>
+                    <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
+                </select>
+            </div>
+
+            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.handover.materials}">Übergebenes Material</h3>
+            <div id="handover-items-container">
+            </div>
+
+            <button type="button" id="add-handover-item-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" onclick="addHandoverItemRow()" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('handover-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="submit" class="btn" th:text="#{orders.detail.save}">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    let cachedInventoryItems = [];
+    let isInventoryCached = false;
+
+    async function openHandoverModal() {
+        document.getElementById('handover-modal').style.display = 'flex';
+        if (!isInventoryCached) {
+            try {
+                const materials = document.querySelectorAll('.material-row[data-material-id]');
+                let promises = Array.from(materials).map(row => {
+                    const orderId = row.dataset.orderId;
+                    const matId = row.dataset.materialId;
+                    if (orderId && matId) {
+                        return fetch(`/orders/${orderId}/materials/${matId}/inventory`)
+                                .then(res => res.json());
+                    }
+                    return Promise.resolve([]);
+                });
+                const results = await Promise.all(promises);
+                results.forEach(arr => {
+                    if (arr && arr.length > 0) {
+                        cachedInventoryItems.push(...arr);
+                    }
+                });
+                isInventoryCached = true;
+            } catch (e) {
+                console.error('Failed to load inventory items for handover', e);
+            }
+        }
+    }
+
+    function addHandoverItemRow() {
+        const container = document.getElementById('handover-items-container');
+        const index = container.children.length;
+        
+        const row = document.createElement('div');
+        row.className = 'handover-item-row';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '2fr 1fr auto';
+        row.style.gap = '1rem';
+        row.style.alignItems = 'end';
+        row.style.marginBottom = '1rem';
+        row.style.background = 'var(--color-gray-4)';
+        row.style.padding = '1rem';
+        row.style.border = '1px solid var(--color-gray-3)';
+
+        let options = '<option value="" disabled selected>-- Lagereintrag wählen --</option>';
+        const labelPiece = '[(#{material.quantity.piece})]';
+        const labelScu = '[(#{material.quantity.scu})]';
+        cachedInventoryItems.forEach(inv => {
+            const isPiece = inv.material && inv.material.quantityType === 'PIECE';
+            const qtyLabel = isPiece ? labelPiece : labelScu;
+            const formattedAmount = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
+            options += `<option value="${inv.id}">${inv.material.name} (Qual. ${inv.quality}) - ${formattedAmount} ${qtyLabel} von ${inv.user.effectiveName}</option>`;
+        });
+
+        row.innerHTML = `
+            <div>
+                <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Lagereintrag</label>
+                <select name="items[${index}].inventoryItemId" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                    ${options}
+                </select>
+            </div>
+            <div>
+                <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Menge (SCU)</label>
+                <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary" style="background: rgba(231,76,60,0.1); border-color: #e74c3c; color: #e74c3c; padding: 0.5rem;" onclick="this.parentElement.parentElement.remove(); updateHandoverIndexes();">Entfernen</button>
+            </div>
+        `;
+        container.appendChild(row);
+    }
+
+    function updateHandoverIndexes() {
+        const rows = document.querySelectorAll('.handover-item-row');
+        rows.forEach((row, index) => {
+            const select = row.querySelector('select');
+            const input = row.querySelector('input');
+            if (select) select.name = 'items[' + index + '].inventoryItemId';
+            if (input) input.name = 'items[' + index + '].amount';
+        });
+    }
+</script>
+
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', () => {
         const dateSpan = document.getElementById('created-date-span');
@@ -175,7 +410,204 @@
                 }
             }
         }
+        
+        document.querySelectorAll('.handover-time-span').forEach(el => {
+            const utcDateStr = el.getAttribute('data-utc');
+            if (utcDateStr) {
+                const dateObj = new Date(utcDateStr);
+                if (!isNaN(dateObj)) {
+                    el.textContent = dateObj.toLocaleString([], {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+            }
+        });
+
+        // Material Row Management
+        const materialsContainer = document.getElementById('materials-container');
+        const addMaterialBtn = document.getElementById('add-material-btn');
+        if (addMaterialBtn && materialsContainer) {
+            addMaterialBtn.addEventListener('click', () => {
+                const rows = materialsContainer.querySelectorAll('.material-row');
+                const nextIndex = rows.length;
+                if (nextIndex > 0) {
+                    const templateRow = rows[0];
+                    const newRow = templateRow.cloneNode(true);
+                    
+                    const selects = newRow.querySelectorAll('select');
+                    selects.forEach(select => {
+                        const name = select.getAttribute('name');
+                        if (name) {
+                            select.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
+                            select.setAttribute('id', select.getAttribute('id').replace(/\d+/, nextIndex));
+                            select.value = '';
+                        }
+                    });
+                    
+                    const inputs = newRow.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        const name = input.getAttribute('name');
+                        if (name) {
+                            input.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
+                            input.setAttribute('id', input.getAttribute('id').replace(/\d+/, nextIndex));
+                            if (input.type === 'number' && input.name.includes('minQuality')) {
+                                input.value = '100';
+                            } else {
+                                input.value = '';
+                            }
+                        }
+                    });
+                    
+                    materialsContainer.appendChild(newRow);
+                }
+            });
+
+            materialsContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-material-btn')) {
+                    const row = e.target.closest('.material-row');
+                    if (materialsContainer.querySelectorAll('.material-row').length > 1) {
+                        document.getElementById('material-delete-confirm-modal').style.display = 'flex';
+                        window.materialRowToDelete = row;
+                    } else {
+                        showToast('Fehler', 'Es muss mindestens ein Material im Auftrag verbleiben.', 'error');
+                    }
+                }
+            });
+            
+            window.confirmRemoveMaterial = function() {
+                if (window.materialRowToDelete) {
+                    window.materialRowToDelete.remove();
+                    reindexMaterials();
+                    window.materialRowToDelete = null;
+                }
+                document.getElementById('material-delete-confirm-modal').style.display = 'none';
+            };
+            
+            function reindexMaterials() {
+                const rows = materialsContainer.querySelectorAll('.material-row');
+                rows.forEach((row, index) => {
+                    const inputs = row.querySelectorAll('input, select');
+                    inputs.forEach(input => {
+                        const name = input.getAttribute('name');
+                        if (name) {
+                            input.setAttribute('name', name.replace(/\[\d+\]/, '[' + index + ']'));
+                            if (input.getAttribute('id')) {
+                                input.setAttribute('id', input.getAttribute('id').replace(/\d+/, index));
+                            }
+                        }
+                    });
+                });
+            }
+        }
     });
+
+    function updateStatus(selectElement) {
+        const form = document.getElementById('status-form');
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            redirect: 'manual'
+        }).then(res => {
+            showToast('Erfolg', 'Status aktualisiert', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        }).catch(err => {
+            showToast('Fehler', 'Status konnte nicht aktualisiert werden', 'error');
+        });
+    }
+
+    const MSG_OWNER = '[(#{orders.detail.inventory.owner})]';
+    const MSG_LOCATION = '[(#{orders.detail.inventory.location})]';
+    const MSG_QUALITY = '[(#{orders.detail.inventory.quality})]';
+    const MSG_QUANTITY = '[(#{orders.detail.inventory.quantity})]';
+    const MSG_LOADING_INVENTORY = '[(#{orders.detail.inventory.loading})]';
+    const MSG_EMPTY_INVENTORY = '[(#{orders.detail.inventory.empty})]';
+
+    async function toggleInventory(row) {
+        const orderId = row.getAttribute('data-order-id');
+        const materialId = row.getAttribute('data-material-id');
+        const amountType = row.getAttribute('data-amount-type');
+        
+        let nextRow = row.nextElementSibling;
+        if (nextRow && nextRow.classList.contains('inventory-details-row')) {
+            nextRow.remove();
+            return;
+        }
+
+        const detailsRow = document.createElement('tr');
+        detailsRow.classList.add('inventory-details-row');
+        detailsRow.innerHTML = `
+            <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+                <div style="font-style: italic; color: var(--color-gray-2);">${MSG_LOADING_INVENTORY}</div>
+            </td>
+        `;
+        row.parentNode.insertBefore(detailsRow, row.nextSibling);
+
+        try {
+            const response = await fetch('/orders/' + orderId + '/materials/' + materialId + '/inventory');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const items = await response.json();
+            
+            if (items.length === 0) {
+                detailsRow.innerHTML = `
+                    <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+                        <div style="font-style: italic; color: var(--color-gray-2);">${MSG_EMPTY_INVENTORY}</div>
+                    </td>
+                `;
+                return;
+            }
+
+            let html = `
+                <td colspan="5" style="padding: 0;">
+                    <div style="background: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-top: none;">
+                        <div class="table-responsive">
+                            <table class="data-table" style="margin: 0; border: none; background: transparent;">
+                                <thead>
+                                    <tr>
+                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_OWNER}</th>
+                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_LOCATION}</th>
+                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_QUALITY}</th>
+                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_QUANTITY}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            for (const item of items) {
+                const ownerName = item.user ? item.user.effectiveName : '-';
+                const locationName = item.location ? item.location.name : '-';
+                const quality = item.quality !== null ? item.quality : '-';
+                const quantity = (item.amount !== null ? item.amount.toFixed(3) : '0.000') + ' ' + (amountType ? amountType : '');
+                
+                html += `
+                                    <tr>
+                                        <td>${ownerName}</td>
+                                        <td>${locationName}</td>
+                                        <td>${quality}</td>
+                                        <td>${quantity}</td>
+                                    </tr>
+                `;
+            }
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            `;
+            
+            detailsRow.innerHTML = html;
+        } catch (error) {
+            console.error('Error fetching inventory items:', error);
+            detailsRow.innerHTML = `
+                <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+                    <div style="color: var(--color-danger);">Fehler beim Laden der Lagereinträge.</div>
+                </td>
+            `;
+        }
+    }
 </script>
 </body>
 </html>

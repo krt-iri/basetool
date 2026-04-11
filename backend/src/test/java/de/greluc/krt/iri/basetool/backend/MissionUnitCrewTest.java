@@ -111,7 +111,8 @@ class MissionUnitCrewTest {
     @Test
     void testAssignGuestAsCrew() throws Exception {
         // 1. Add Guest Participant
-        String joinJson = "{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\"}";
+        Squadron sq = squadronRepository.findAll().iterator().next();
+        String joinJson = String.format("{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\", \"desiredJobTypeId\": \"%s\", \"squadronId\": \"%s\"}", crewJob.getId(), sq.getId());
         mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(joinJson))

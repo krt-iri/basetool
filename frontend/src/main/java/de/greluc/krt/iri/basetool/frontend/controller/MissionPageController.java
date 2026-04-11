@@ -357,9 +357,9 @@ public class MissionPageController {
                     );
                     model.addAttribute("financeSum", financeSum);
 
-                    List<RefineryOrderDto> refineryOrders = backendApiClient.get(
+                    List<RefineryOrderListDto> refineryOrders = backendApiClient.get(
                             "/api/v1/refinery-orders/mission/" + id,
-                            new ParameterizedTypeReference<List<RefineryOrderDto>>() {},
+                            new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
                             false
                     );
                     model.addAttribute("refineryOrders", refineryOrders);
