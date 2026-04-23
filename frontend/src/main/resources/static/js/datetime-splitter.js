@@ -14,105 +14,132 @@
  *     als Lokalzeit interpretiert (Fallback, rueckwaertskompatibel).
  *   - Beim Schreiben: immer UTC-ISO-Instant mit Sekunden und 'Z'
  *     (z.B. "2026-04-19T14:30:00Z").
+ *
+ * Oeffentliche API (window.krtSyncDatetimeSplitGroup):
+ *   Ermoeglicht das erneute Synchronisieren der sichtbaren date/time-Parts aus
+ *   dem hidden-Wert, nachdem dieser programmatisch gesetzt wurde (z.B. beim
+ *   Oeffnen eines Bearbeiten-Modals). Ohne diesen Aufruf blieben die Parts
+ *   leer, weil der Initialisierungs-Listener nur einmal beim DOMContentLoaded
+ *   laeuft (Ursache fuer leere Check-in/Check-out-Felder im Teilnehmer-Edit).
  */
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.datetime-split-group').forEach(group => {
+(function () {
+    const pad = n => String(n).padStart(2, '0');
+    // Erkennt, ob der Wert bereits Zonen-Information (Z oder +/-HH:MM) traegt.
+    const hasZoneInfo = (val) => /Z$|[+-]\d{2}:?\d{2}$/.test(val);
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const isoLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+    function applyHiddenToParts(hidden, datePart, timePart) {
+        if (!hidden || !datePart || !timePart) return;
+        if (!hidden.value) {
+            datePart.value = '';
+            timePart.value = '';
+            return;
+        }
+        const v = hidden.value.trim();
+        if (isoDateRegex.test(v)) {
+            // Nur Datum, keine Uhrzeit
+            datePart.value = v;
+            timePart.value = '';
+        } else if (hasZoneInfo(v)) {
+            // UTC/Offset -> in Browser-Lokalzeit umrechnen
+            const d = new Date(v);
+            if (!isNaN(d)) {
+                datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+        } else if (isoLocalRegex.test(v)) {
+            // Rueckwaertskompatibel: bereits Lokalzeit-String
+            const parts = v.split('T');
+            datePart.value = parts[0];
+            timePart.value = parts[1].substring(0, 5);
+        } else {
+            // Letzter Fallback: versuchen als Date zu parsen und lokal darzustellen
+            const d = new Date(v);
+            if (!isNaN(d)) {
+                datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+        }
+    }
+
+    function syncGroup(group) {
+        if (!group) return;
         const hidden = group.querySelector('input[type="hidden"]');
         const datePart = group.querySelector('.date-part');
         const timePart = group.querySelector('.time-part');
+        applyHiddenToParts(hidden, datePart, timePart);
+    }
 
-        if (!hidden || !datePart || !timePart) return;
+    // Oeffentlich exponieren, damit Modal-Handler das erneute Synchronisieren
+    // nach einem programmatischen Setzen des Hidden-Wertes ausloesen koennen.
+    window.krtSyncDatetimeSplitGroup = syncGroup;
 
-        const errorDiv = document.createElement('div');
-        errorDiv.style.color = 'var(--color-dept-combat)';
-        errorDiv.style.fontSize = '0.8rem';
-        errorDiv.style.marginTop = '0.2rem';
-        group.appendChild(errorDiv);
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.datetime-split-group').forEach(group => {
+            const hidden = group.querySelector('input[type="hidden"]');
+            const datePart = group.querySelector('.date-part');
+            const timePart = group.querySelector('.time-part');
 
-        const pad = n => String(n).padStart(2, '0');
+            if (!hidden || !datePart || !timePart) return;
 
-        // Erkennt, ob der Wert bereits Zonen-Information (Z oder +/-HH:MM) traegt.
-        const hasZoneInfo = (val) => /Z$|[+-]\d{2}:?\d{2}$/.test(val);
+            const errorDiv = document.createElement('div');
+            errorDiv.style.color = 'var(--color-dept-combat)';
+            errorDiv.style.fontSize = '0.8rem';
+            errorDiv.style.marginTop = '0.2rem';
+            group.appendChild(errorDiv);
 
-        const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        const isoLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+            // Lokale date-/time-Inputs aus dem Hidden-Wert initial befuellen.
+            applyHiddenToParts(hidden, datePart, timePart);
 
-        // Lokale date-/time-Inputs aus dem Hidden-Wert initial befuellen.
-        if (hidden.value) {
-            const v = hidden.value.trim();
-            if (isoDateRegex.test(v)) {
-                // Nur Datum, keine Uhrzeit
-                datePart.value = v;
-                timePart.value = '';
-            } else if (hasZoneInfo(v)) {
-                // UTC/Offset -> in Browser-Lokalzeit umrechnen
-                const d = new Date(v);
-                if (!isNaN(d)) {
-                    datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-                    timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                }
-            } else if (isoLocalRegex.test(v)) {
-                // Rueckwaertskompatibel: bereits Lokalzeit-String
-                const parts = v.split('T');
-                datePart.value = parts[0];
-                timePart.value = parts[1].substring(0, 5);
-            } else {
-                // Letzter Fallback: versuchen als Date zu parsen und lokal darzustellen
-                const d = new Date(v);
-                if (!isNaN(d)) {
-                    datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-                    timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                }
-            }
-        }
-
-        const updateHidden = () => {
-            errorDiv.textContent = '';
-            if (datePart.value && timePart.value) {
-                // Lokale Eingabe -> Date-Objekt -> toISOString() liefert UTC mit 'Z'.
-                const [y, m, d] = datePart.value.split('-').map(Number);
-                const [hh, mm] = timePart.value.split(':').map(Number);
-                const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
-                if (!isNaN(local)) {
-                    hidden.value = local.toISOString();
+            const updateHidden = () => {
+                errorDiv.textContent = '';
+                if (datePart.value && timePart.value) {
+                    // Lokale Eingabe -> Date-Objekt -> toISOString() liefert UTC mit 'Z'.
+                    const [y, m, d] = datePart.value.split('-').map(Number);
+                    const [hh, mm] = timePart.value.split(':').map(Number);
+                    const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
+                    if (!isNaN(local)) {
+                        hidden.value = local.toISOString();
+                    } else {
+                        hidden.value = '';
+                    }
+                } else if (datePart.value) {
+                    // Nur Datum -> als reines Datum (ohne Zone) uebermitteln
+                    hidden.value = datePart.value;
                 } else {
                     hidden.value = '';
                 }
-            } else if (datePart.value) {
-                // Nur Datum -> als reines Datum (ohne Zone) uebermitteln
-                hidden.value = datePart.value;
-            } else {
-                hidden.value = '';
-            }
 
-            if (hidden.value) {
-                const currentDate = new Date();
-                const selectedDate = new Date(hidden.value);
+                if (hidden.value) {
+                    const currentDate = new Date();
+                    const selectedDate = new Date(hidden.value);
 
-                if (group.getAttribute('data-validate-not-past') === 'true') {
-                    if (selectedDate < currentDate) {
-                        errorDiv.textContent = group.getAttribute('data-error-past') || 'Date cannot be in the past.';
+                    if (group.getAttribute('data-validate-not-past') === 'true') {
+                        if (selectedDate < currentDate) {
+                            errorDiv.textContent = group.getAttribute('data-error-past') || 'Date cannot be in the past.';
+                        }
                     }
-                }
 
-                if (group.hasAttribute('data-validate-after')) {
-                    const targetId = group.getAttribute('data-validate-after');
-                    const targetHidden = document.getElementById(targetId);
-                    if (targetHidden && targetHidden.value) {
-                        const targetDate = new Date(targetHidden.value);
-                        if (selectedDate <= targetDate) {
-                            errorDiv.textContent = group.getAttribute('data-error-after') || 'End time must be after start time.';
+                    if (group.hasAttribute('data-validate-after')) {
+                        const targetId = group.getAttribute('data-validate-after');
+                        const targetHidden = document.getElementById(targetId);
+                        if (targetHidden && targetHidden.value) {
+                            const targetDate = new Date(targetHidden.value);
+                            if (selectedDate <= targetDate) {
+                                errorDiv.textContent = group.getAttribute('data-error-after') || 'End time must be after start time.';
+                            }
                         }
                     }
                 }
-            }
 
-            hidden.dispatchEvent(new Event('change'));
-        };
+                hidden.dispatchEvent(new Event('change'));
+            };
 
-        datePart.addEventListener('change', updateHidden);
-        timePart.addEventListener('change', updateHidden);
-        datePart.addEventListener('input', updateHidden);
-        timePart.addEventListener('input', updateHidden);
+            datePart.addEventListener('change', updateHidden);
+            timePart.addEventListener('change', updateHidden);
+            datePart.addEventListener('input', updateHidden);
+            timePart.addEventListener('input', updateHidden);
+        });
     });
-});
+})();

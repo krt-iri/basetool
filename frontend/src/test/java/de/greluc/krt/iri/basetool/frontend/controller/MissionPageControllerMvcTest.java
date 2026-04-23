@@ -145,7 +145,38 @@ class MissionPageControllerMvcTest {
         // This will fail with TemplateProcessingException if the th:onclick syntax is invalid
         mockMvc.perform(get("/missions/" + missionId))
                 .andExpect(status().isOk())
-                .andExpect(view().name("mission-detail"));
+                .andExpect(view().name("mission-detail"))
+                // Responsive panel grid (no horizontal scroll)
+                .andExpect(content().string(containsString("mission-columns-container")))
+                // Accessible collapse buttons with aria-expanded and data-panel-key
+                .andExpect(content().string(containsString("data-panel-key=\"details\"")))
+                .andExpect(content().string(containsString("data-panel-key=\"participants\"")))
+                .andExpect(content().string(containsString("data-panel-key=\"units\"")))
+                .andExpect(content().string(containsString("data-panel-key=\"finance\"")))
+                .andExpect(content().string(containsString("data-panel-toggle=\"col-details\"")))
+                .andExpect(content().string(containsString("aria-expanded=\"true\"")))
+                .andExpect(content().string(containsString("aria-controls=\"col-details-content\"")))
+                // Legacy horizontal-scroll markers must be gone
+                .andExpect(content().string(not(containsString("vertical-title"))))
+                // Content-aware per-panel min-widths so wide tables/action
+                // buttons never overflow their panel; also drives the
+                // 1-column-fallback when two panels don't fit side by side.
+                .andExpect(content().string(containsString("--panel-min-width")))
+                .andExpect(content().string(containsString(
+                        "[data-panel-key=\"participants\"] { --panel-min-width: 1100px;")))
+                .andExpect(content().string(containsString(
+                        "[data-panel-key=\"units\"]        { --panel-min-width: 1100px;")))
+                .andExpect(content().string(containsString(
+                        "[data-panel-key=\"payout\"]       { --panel-min-width: 820px;")))
+                // Ultra-wide breakpoint explicitly caps column count so wide
+                // panels like "participants" never get squeezed on 4K/UHD.
+                .andExpect(content().string(containsString("@media (min-width: 2400px)")))
+                .andExpect(content().string(containsString("@media (min-width: 3600px)")))
+                // Regression guard: .table-responsive must not have a default
+                // overflow-x: auto anymore (that caused intra-panel horizontal
+                // scrolling instead of letting the panel grow wide enough).
+                .andExpect(content().string(not(containsString(
+                        ".mission-column .col-content .table-responsive {\n            width: 100%;\n            /* Intra-panel horizontal scroll is a last-resort fallback"))));
     }
 
     @Test
@@ -173,6 +204,48 @@ class MissionPageControllerMvcTest {
         mockMvc.perform(get("/missions/" + missionId))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Teilnahme (%)")));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void missionDetail_ShouldRenderEditButtonWithCheckInTimes() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        java.time.Instant checkIn = java.time.Instant.parse("2026-02-10T09:30:00Z");
+        java.time.Instant checkOut = java.time.Instant.parse("2026-02-10T11:45:00Z");
+
+        de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto participant =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+                participantId, null, "P1", null, null, null, null,
+                checkIn, checkOut,
+                de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT, 1L
+            );
+
+        MissionDto mission = new MissionDto(
+                missionId, "Repro Mission", null, null, "RUNNING", null, null,
+                java.time.Instant.parse("2026-02-10T09:00:00Z"), null, null, false,
+                java.util.Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 1, 1
+        );
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+            .thenReturn(mission);
+        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+            .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/missions/" + missionId))
+                .andExpect(status().isOk())
+                // Raw UTC timestamps must be present on the edit button
+                .andExpect(content().string(containsString("data-start-time=\"2026-02-10T09:30:00Z\"")))
+                .andExpect(content().string(containsString("data-end-time=\"2026-02-10T11:45:00Z\"")))
+                // Formatted (local-zone) timestamps must also be present and non-empty so the
+                // participant edit modal can pre-populate datetime-local inputs.
+                .andExpect(content().string(not(containsString("data-start-time-formatted=\"\""))))
+                .andExpect(content().string(not(containsString("data-end-time-formatted=\"\""))))
+                // Regression guard: the edit modal must re-sync the datetime-split widget
+                // after programmatically setting the hidden value (otherwise the visible
+                // date/time inputs stay empty even though startTime/endTime are present).
+                .andExpect(content().string(containsString("krtSyncDatetimeSplitGroup")));
     }
 
     @Test
