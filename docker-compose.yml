@@ -31,7 +31,7 @@ x-db-keycloak: &db-keycloak-template
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
-  image: quay.io/keycloak/keycloak:26.5
+  image: quay.io/keycloak/keycloak:26.6
   command: start --proxy-headers xforwarded
   environment:
     KC_HOSTNAME: keycloak.iri-base.org
