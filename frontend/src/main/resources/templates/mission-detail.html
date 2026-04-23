@@ -492,14 +492,18 @@
                             <div>
                                 <strong th:text="${freqType.name}" style="color: var(--color-gray-1);">Freq</strong>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; align-items: center;" th:with="f=${frequencyByTypeId[freqType.id]}">
-                                <span th:if="${f != null}"
-                                      th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}"
-                                      style="color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">123.45</span>
-                                
+                            <div style="display: flex; gap: 0.5rem; align-items: center;"
+                                 th:with="f=${frequencyByTypeId[freqType.id]}"
+                                 th:attr="data-freq-type-id=${freqType.id}">
+                                <span class="freq-value-display"
+                                      th:attr="data-freq-type-id=${freqType.id}"
+                                      th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
+                                      th:style="${f != null ? 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;' : 'display:none;'}">123.45</span>
+
                                 <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-secondary set-freq-btn"
-                                        th:data-action="@{/missions/{id}/frequencies(id=${mission.id})}"
+                                        th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
                                         th:data-type-id="${freqType.id}"
+                                        th:data-current-value="${f != null ? f.value : ''}"
                                         th:text="#{members.edit}">Edit</button>
                             </div>
                         </div>
@@ -551,10 +555,10 @@
                     </td>
                     <td>
                         <div style="display:flex; gap:0.5rem;" th:if="${mission.canEdit or (authUserId != null and p?.user != null and p.user.id.toString() == authUserId) or (p?.user == null)}">
-                            <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}">
+                            <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                                 <button type="submit" class="btn btn-success" th:text="#{mission.participant.checkin}" th:title="#{mission.participant.checkin.tooltip}">Check-In</button>
                             </form>
-                            <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}">
+                            <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form" data-participant-action="check-out" th:data-participant-id="${p?.id}">
                                 <button type="submit" class="btn" th:text="#{mission.participant.checkout}">Check-Out</button>
                             </form>
                             <button type="button" class="btn edit-participant-btn"
@@ -575,6 +579,8 @@
                             
                             <button type="button" class="btn btn-secondary delete-participant-btn" 
                                     th:data-action="@{/missions/{id}/participants/{pId}/delete(id=${mission.id}, pId=${p?.id})}"
+                                    th:data-participant-id="${p?.id}"
+                                    data-sub-section="participant"
                                     th:text="#{info.delete}">Delete</button>
                         </div>
                     </td>
@@ -618,10 +624,12 @@
                             <button th:if="${mission.canEdit}" class="btn assign-crew-btn"
                                     th:data-unit-id="${unit.id}" 
                                     th:data-action="@{/missions/{id}/units/{uId}/crew(id=${mission.id}, uId=${unit.id})}"
+                                    th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/ajax(id=${mission.id}, uId=${unit.id})}"
                                     th:text="#{mission.unit.assign_crew}">Crew zuweisen</button>
                             <button th:if="${mission.canEdit}"
                                     class="btn edit-unit-btn"
                                     th:data-action="@{/missions/{id}/units/{uId}/update(id=${mission.id}, uId=${unit.id})}"
+                                    th:data-unit-id="${unit.id}"
                                     th:data-name="${unit.name}"
                                     th:data-shiptype="${unit.shipType != null ? unit.shipType.id : ''}"
                                     th:data-ship="${unit.ship != null ? unit.ship.id : ''}"
@@ -630,6 +638,8 @@
                                     th:text="#{members.edit}">Edit</button>
                             <button th:if="${mission.canEdit}" type="button" class="btn btn-secondary delete-unit-btn"
                                     th:data-action="@{/missions/{id}/units/{uId}/delete(id=${mission.id}, uId=${unit.id})}"
+                                    th:data-unit-id="${unit.id}"
+                                    data-sub-section="unit"
                                     th:text="#{info.delete}">Delete</button>
                         </div>
                     </div>
@@ -665,10 +675,17 @@
                                         <div style="display:flex; gap:0.5rem;">
                                             <button type="button" class="btn edit-crew-btn"
                                                     th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/update(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:data-unit-id="${unit.id}"
+                                                    th:data-crew-id="${c.id}"
                                                     th:data-jobs="${c.jobTypes != null ? #strings.listJoin(c.jobTypes.![id], ',') : ''}"
                                                     th:text="#{members.edit}">Edit</button>
                                             <button type="button" class="btn btn-secondary delete-crew-btn" 
                                                     th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/delete(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
+                                                    th:data-unit-id="${unit.id}"
+                                                    th:data-crew-id="${c.id}"
+                                                    data-sub-section="crew"
                                                     th:text="#{info.delete}">Delete</button>
                                         </div>
                                     </td>
@@ -908,7 +925,7 @@
         <div class="modal-content hud-box">
             <span class="close-participant-modal close-modal">&times;</span>
             <h2 th:text="#{mission.participant.add}">Teilnehmer hinzufügen</h2>
-            <form th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
+            <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="form-group" sec:authorize="isAnonymous()">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" name="guestName" th:value="*{guestName}" required>
@@ -1025,7 +1042,7 @@
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
             <span class="close-add-unit-modal close-modal">&times;</span>
             <h2 th:text="#{mission.unit.add}">Einheit hinzufügen</h2>
-            <form th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
+            <form id="add-unit-form" th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
                 <div class="form-group">
                     <label th:text="#{mission.unit.name}">Name</label>
                     <input type="text" name="name" th:value="*{name}" required>
@@ -1267,8 +1284,38 @@
     const MSG_SUCCESS_MANAGER_REMOVE = /*[[#{notification.success.mission.manager.remove}]]*/ 'Manager removed';
     const MSG_SUCCESS_OWNER_CHANGE = /*[[#{mission.owner.success}]]*/ 'Owner changed successfully';
     const MSG_ERROR_OWNER_CHANGE = /*[[#{error.mission.owner.change}]]*/ 'Error changing owner';
-    const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.owner.confirm}]]*/ 'Are you sure you want to change the owner?';
+    const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.confirm.owner.change}]]*/ 'Are you sure you want to change the owner of this mission?';
+    const MSG_CONFIRM_MANAGER_REMOVE = /*[[#{mission.confirm.manager.remove}]]*/ 'Do you really want to remove this manager?';
     const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
+    // i18n dictionary consumed by mission-subresource.js (patchSubResource/syncVersion/handleProblem).
+    // All user-visible strings must come from messages.properties (AGENTS.md: no hardcoded UI text).
+    window.MISSION_SUBRES_I18N = {
+        'mission.save.section.ok': /*[[#{mission.save.section.ok}]]*/ 'Saved.',
+        'mission.save.section.error': /*[[#{mission.save.section.error}]]*/ 'Save failed.',
+        'mission.save.section.participant': /*[[#{mission.save.section.participant}]]*/ 'Participant',
+        'mission.save.section.unit': /*[[#{mission.save.section.unit}]]*/ 'Unit',
+        'mission.save.section.crew': /*[[#{mission.save.section.crew}]]*/ 'Crew',
+        'mission.save.section.frequency': /*[[#{mission.save.section.frequency}]]*/ 'Frequency',
+        'mission.save.section.manager': /*[[#{mission.save.section.manager}]]*/ 'Manager',
+        'mission.save.section.owner': /*[[#{mission.save.section.owner}]]*/ 'Owner',
+        'mission.save.section.core': /*[[#{mission.save.section.core}]]*/ 'Core data',
+        'mission.save.section.schedule': /*[[#{mission.save.section.schedule}]]*/ 'Schedule',
+        'mission.save.section.flags': /*[[#{mission.save.section.flags}]]*/ 'Flags',
+        'mission.conflict.toast.title': /*[[#{mission.conflict.toast.title}]]*/ 'Conflict',
+        'mission.conflict.toast.detail': /*[[#{mission.conflict.toast.detail}]]*/ 'The data was changed in the meantime.',
+        'mission.conflict.section.participant': /*[[#{mission.conflict.section.participant}]]*/ 'Participant',
+        'mission.conflict.section.unit': /*[[#{mission.conflict.section.unit}]]*/ 'Unit',
+        'mission.conflict.section.crew': /*[[#{mission.conflict.section.crew}]]*/ 'Crew',
+        'mission.conflict.section.frequency': /*[[#{mission.conflict.section.frequency}]]*/ 'Frequency',
+        'mission.conflict.section.manager': /*[[#{mission.conflict.section.manager}]]*/ 'Manager',
+        'mission.conflict.section.owner': /*[[#{mission.conflict.section.owner}]]*/ 'Owner',
+        'mission.conflict.section.core': /*[[#{mission.conflict.section.core}]]*/ 'Core data',
+        'mission.conflict.section.schedule': /*[[#{mission.conflict.section.schedule}]]*/ 'Schedule',
+        'mission.conflict.section.flags': /*[[#{mission.conflict.section.flags}]]*/ 'Flags',
+        'mission.conflict.action.reload': /*[[#{mission.conflict.action.reload}]]*/ 'Load current values',
+        'mission.conflict.action.reload.question': /*[[#{mission.conflict.action.reload.question}]]*/ 'Load current values?',
+        'mission.conflict.action.dismiss': /*[[#{mission.conflict.action.dismiss}]]*/ 'Dismiss'
+    };
     window.MSG_MISSION_ACTUAL_TIME_ERROR = /*[[#{mission.actual_time.error}]]*/ 'Fehler beim Speichern der tats\u00e4chlichen Zeit.';
     window.MSG_MISSION_ACTUAL_TIME_CONFLICT = /*[[#{mission.actual_time.conflict}]]*/ 'Konflikt: Die Daten wurden zwischenzeitlich ge\u00e4ndert. Seite wird neu geladen.';
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
@@ -1359,6 +1406,7 @@
             document.querySelectorAll('.edit-participant-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     eForm.action = this.getAttribute('data-action');
+                    eForm.setAttribute('data-participant-id', this.getAttribute('data-participant-id') || '');
                     eJob.value = this.getAttribute('data-job');
                     if(ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
                     if(eSquadron) {
@@ -1446,9 +1494,12 @@
         if (frequencyModal) {
             document.querySelectorAll('.set-freq-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    frequencyForm.action = this.getAttribute('data-action');
-                    document.getElementById('freq-type-id').value = this.getAttribute('data-type-id');
-                    document.getElementById('freq-value').value = '';
+                    // Paket 3B: AJAX submission via MissionSubresource
+                    frequencyForm.setAttribute('data-action', this.getAttribute('data-action'));
+                    const typeId = this.getAttribute('data-type-id');
+                    document.getElementById('freq-type-id').value = typeId;
+                    const current = this.getAttribute('data-current-value') || '';
+                    document.getElementById('freq-value').value = current;
                     frequencyModal.style.display = 'flex';
                 });
             });
@@ -1457,6 +1508,47 @@
                 closeFrequencyModal.onclick = function() {
                     frequencyModal.style.display = 'none';
                 }
+            }
+
+            // Paket 3B: intercept submit and call PUT /frequencies/ajax, then
+            // update the displayed value in place without a full page reload.
+            if (frequencyForm) {
+                frequencyForm.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    const url = frequencyForm.getAttribute('data-action');
+                    if (!url || !window.MissionSubresource) {
+                        frequencyForm.submit();
+                        return;
+                    }
+                    const typeId = document.getElementById('freq-type-id').value;
+                    const rawValue = document.getElementById('freq-value').value;
+                    const parsed = Number.parseFloat(rawValue);
+                    if (!typeId || Number.isNaN(parsed)) {
+                        return;
+                    }
+                    const result = await window.MissionSubresource.patchSubResource({
+                        method: 'PUT',
+                        url: url,
+                        payload: { frequencyTypeId: typeId, value: parsed },
+                        sectionKey: 'frequency'
+                    });
+                    if (result.ok) {
+                        if (Array.isArray(result.body)) {
+                            const match = result.body.find(f => f && f.frequencyType && f.frequencyType.id === typeId);
+                            const display = document.querySelector('.freq-value-display[data-freq-type-id="' + typeId + '"]');
+                            const editBtn = document.querySelector('.set-freq-btn[data-type-id="' + typeId + '"]');
+                            if (display && match) {
+                                const formatted = Number(match.value).toFixed(2);
+                                display.textContent = formatted;
+                                display.style.cssText = 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;';
+                            }
+                            if (editBtn && match) {
+                                editBtn.setAttribute('data-current-value', String(match.value));
+                            }
+                        }
+                        frequencyModal.style.display = 'none';
+                    }
+                });
             }
         }
 
@@ -1475,6 +1567,26 @@
             document.querySelectorAll('.delete-participant-btn, .delete-unit-btn, .delete-crew-btn, .delete-mission-btn, .delete-finance-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     deleteForm.action = this.getAttribute('data-action');
+                    // Paket 3C: propagate AJAX-capable sub-section metadata so the
+                    // shared delete-confirm-form submit handler can route to the
+                    // appropriate /ajax endpoint (no page reload, no parent-version bump).
+                    const subSection = this.getAttribute('data-sub-section') || '';
+                    let subId;
+                    if (subSection === 'crew') {
+                        // Crew delete needs BOTH unitId and crewId; the primary subId
+                        // is the crewId, the unit is stored as auxiliary metadata so the
+                        // AJAX handler can build the nested URL /units/{u}/crew/{c}/ajax.
+                        subId = this.getAttribute('data-crew-id') || '';
+                        deleteForm.setAttribute('data-sub-unit-id', this.getAttribute('data-unit-id') || '');
+                    } else {
+                        subId = this.getAttribute('data-unit-id')
+                            || this.getAttribute('data-participant-id')
+                            || this.getAttribute('data-crew-id')
+                            || '';
+                        deleteForm.removeAttribute('data-sub-unit-id');
+                    }
+                    deleteForm.setAttribute('data-sub-section', subSection);
+                    deleteForm.setAttribute('data-sub-id', subId);
                     deleteModal.style.display = 'flex';
                 });
             });
@@ -1513,6 +1625,10 @@
             document.querySelectorAll('.assign-crew-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     assignCrewForm.action = this.getAttribute('data-action');
+                    // Paket 3C (Option c - Crew): propagate AJAX target + unit id so
+                    // wireCrewAjax can route the submit through the /slim endpoint.
+                    assignCrewForm.setAttribute('data-ajax-action', this.getAttribute('data-action-ajax') || '');
+                    assignCrewForm.setAttribute('data-unit-id', this.getAttribute('data-unit-id') || '');
                     assignCrewModal.style.display = 'flex';
                 });
             });
@@ -1525,6 +1641,7 @@
             document.querySelectorAll('.edit-unit-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     editUnitForm.action = this.getAttribute('data-action');
+                    editUnitForm.setAttribute('data-unit-id', this.getAttribute('data-unit-id') || '');
                     editUnitName.value = this.getAttribute('data-name') || '';
                     const shiptypeVal = this.getAttribute('data-shiptype') || '';
                     const shipVal = this.getAttribute('data-ship') || '';
@@ -1549,6 +1666,208 @@
             }
         }
 
+        // --- Paket 3C: Units via AJAX (MissionSubresource) -----------------------
+        // Writes to units, crew and other sub-panels go through the backend's /slim
+        // endpoints via dedicated frontend /ajax proxy routes. On success the page
+        // is reloaded so that the server-rendered Thymeleaf view reflects the new
+        // state; because the backend no longer bumps the parent Mission.version
+        // when a sub-aggregate is written (Option A), concurrent users editing OTHER
+        // sub-panels keep their in-flight changes and are not hit by a spurious 409.
+        (function wireUnitAjax() {
+            if (!window.MissionSubresource || !window.missionId) {
+                return;
+            }
+            const addForm = document.getElementById('add-unit-form');
+            if (addForm) {
+                addForm.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+                    const fd = new FormData(addForm);
+                    const payload = {
+                        name: fd.get('name') || '',
+                        shipTypeId: fd.get('shipTypeId') || null,
+                        shipId: fd.get('shipId') || null,
+                        highValueUnit: fd.get('highValueUnit') === 'true',
+                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'POST',
+                        url: '/missions/' + window.missionId + '/units/ajax',
+                        payload: payload,
+                        sectionKey: 'unit'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            const editForm = document.getElementById('edit-unit-form');
+            if (editForm) {
+                editForm.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+                    const unitId = editForm.getAttribute('data-unit-id');
+                    if (!unitId) {
+                        // No AJAX target -> fall back to classical submit so the user is not blocked.
+                        editForm.submit();
+                        return;
+                    }
+                    const fd = new FormData(editForm);
+                    const payload = {
+                        name: fd.get('name') || '',
+                        shipTypeId: fd.get('shipTypeId') || null,
+                        shipId: fd.get('shipId') || null,
+                        highValueUnit: fd.get('highValueUnit') === 'true',
+                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'PUT',
+                        url: '/missions/' + window.missionId + '/units/' + unitId + '/ajax',
+                        payload: payload,
+                        sectionKey: 'unit'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            // Delete flow: intercept the shared delete-confirm form only when
+            // a unit delete triggered it (data-sub-section="unit").
+            const dForm = document.getElementById('delete-confirm-form');
+            if (dForm) {
+                dForm.addEventListener('submit', async function (ev) {
+                    const sub = dForm.getAttribute('data-sub-section');
+                    const subId = dForm.getAttribute('data-sub-id');
+                    if (sub !== 'unit' || !subId) {
+                        return; // let the classical POST run for non-unit deletes
+                    }
+                    ev.preventDefault();
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'DELETE',
+                        url: '/missions/' + window.missionId + '/units/' + subId + '/ajax',
+                        sectionKey: 'unit'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+        })();
+
+        // --- Paket 3C (Option b): Participants via AJAX (MissionSubresource) ----
+        // Same pattern as wireUnitAjax: intercept add/edit/delete + check-in/check-out
+        // submits and route them through the backend's /slim participant endpoints
+        // via dedicated frontend /ajax proxy routes. On success the page is reloaded
+        // so the server-rendered Thymeleaf view reflects the new state; because the
+        // backend no longer bumps Mission.version when a participant is written
+        // (Option A), concurrent users editing OTHER sub-panels keep their in-flight
+        // changes and are not hit by a spurious 409.
+        (function wireParticipantAjax() {
+            if (!window.MissionSubresource || !window.missionId) {
+                return;
+            }
+
+            // Add form: POST /missions/{id}/participants/ajax
+            const addForm = document.getElementById('add-participant-form');
+            if (addForm) {
+                addForm.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+                    const fd = new FormData(addForm);
+                    const payload = {
+                        userId: fd.get('userId') || null,
+                        guestName: fd.get('guestName') || null,
+                        desiredJobTypeId: fd.get('desiredJobTypeId') || null,
+                        squadronId: fd.get('squadronId') || null,
+                        comment: fd.get('comment') || null
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'POST',
+                        url: '/missions/' + window.missionId + '/participants/ajax',
+                        payload: payload,
+                        sectionKey: 'participant'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            // Edit form: PUT /missions/{id}/participants/{pid}/ajax
+            const editForm = document.getElementById('edit-participant-form');
+            if (editForm) {
+                editForm.addEventListener('submit', async function (ev) {
+                    const pId = editForm.getAttribute('data-participant-id');
+                    if (!pId) {
+                        return; // fall back to classical submit
+                    }
+                    ev.preventDefault();
+                    const fd = new FormData(editForm);
+                    const versionRaw = fd.get('version');
+                    const payload = {
+                        desiredMissionJobTypeId: fd.get('desiredJobTypeId') || null,
+                        plannedMissionJobTypeId: fd.get('plannedMissionJobTypeId') || null,
+                        squadronId: fd.get('squadronId') || null,
+                        payoutPreference: fd.get('payoutPreference') || null,
+                        comment: fd.get('comment') || null,
+                        startTime: fd.get('startTime') || null,
+                        endTime: fd.get('endTime') || null,
+                        version: versionRaw ? parseInt(versionRaw, 10) : null
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'PUT',
+                        url: '/missions/' + window.missionId + '/participants/' + pId + '/ajax',
+                        payload: payload,
+                        sectionKey: 'participant'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            // Check-in / Check-out forms (delegated): POST .../check-in/ajax resp. /check-out/ajax
+            document.querySelectorAll('form.participant-action-form').forEach(function (f) {
+                f.addEventListener('submit', async function (ev) {
+                    const pId = f.getAttribute('data-participant-id');
+                    const action = f.getAttribute('data-participant-action');
+                    if (!pId || (action !== 'check-in' && action !== 'check-out')) {
+                        return; // fall back to classical submit
+                    }
+                    ev.preventDefault();
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'POST',
+                        url: '/missions/' + window.missionId + '/participants/' + pId + '/' + action + '/ajax',
+                        sectionKey: 'participant'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            });
+
+            // Delete flow: intercept the shared delete-confirm form when triggered by a
+            // participant delete (data-sub-section="participant").
+            const dForm = document.getElementById('delete-confirm-form');
+            if (dForm) {
+                dForm.addEventListener('submit', async function (ev) {
+                    const sub = dForm.getAttribute('data-sub-section');
+                    const subId = dForm.getAttribute('data-sub-id');
+                    if (sub !== 'participant' || !subId) {
+                        return; // let the classical POST (or unit handler) run
+                    }
+                    ev.preventDefault();
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'DELETE',
+                        url: '/missions/' + window.missionId + '/participants/' + subId + '/ajax',
+                        sectionKey: 'participant'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+        })();
+
         const editCrewModal = document.getElementById('edit-crew-modal');
         const editCrewForm = document.getElementById('edit-crew-form');
         const editCrewJobs = document.getElementById('edit-crew-jobs');
@@ -1558,6 +1877,11 @@
             document.querySelectorAll('.edit-crew-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     editCrewForm.action = this.getAttribute('data-action');
+                    // Paket 3C (Option c - Crew): store AJAX target + unit/crew ids on
+                    // the shared edit-crew-form so wireCrewAjax can intercept the submit.
+                    editCrewForm.setAttribute('data-ajax-action', this.getAttribute('data-action-ajax') || '');
+                    editCrewForm.setAttribute('data-unit-id', this.getAttribute('data-unit-id') || '');
+                    editCrewForm.setAttribute('data-crew-id', this.getAttribute('data-crew-id') || '');
                     const jobIds = (this.getAttribute('data-jobs') || '').split(',');
                     
                     // Reset selection
@@ -1607,6 +1931,102 @@
                 editCrewModal.style.display = 'none';
             }
         });
+
+        // --- Paket 3C (Option c - Crew): Crew via AJAX (MissionSubresource) -----
+        // Intercepts assign-crew-form (add), edit-crew-form (update) and the shared
+        // delete-confirm-form (for data-sub-section="crew") and routes them through
+        // the backend's /slim crew endpoints via dedicated frontend /ajax proxies.
+        // On success the page is reloaded so the server-rendered Thymeleaf view
+        // reflects the new state; because the backend no longer bumps Mission.version
+        // when a crew member is written (Option A), concurrent users editing OTHER
+        // sub-panels keep their in-flight changes and are not hit by a spurious 409.
+        (function wireCrewAjax() {
+            if (!window.MissionSubresource || !window.missionId) {
+                return;
+            }
+
+            function collectJobTypeIds(form) {
+                const select = form.querySelector('select[name="jobTypeIds"]');
+                if (!select) return [];
+                return Array.from(select.selectedOptions || []).map(o => o.value).filter(v => v);
+            }
+
+            // Assign flow: POST /missions/{id}/units/{u}/crew/ajax
+            const addForm = document.getElementById('assign-crew-form');
+            if (addForm) {
+                addForm.addEventListener('submit', async function (ev) {
+                    const ajaxUrl = addForm.getAttribute('data-ajax-action');
+                    const unitId = addForm.getAttribute('data-unit-id');
+                    if (!ajaxUrl || !unitId) {
+                        return; // fall back to classical submit
+                    }
+                    ev.preventDefault();
+                    const fd = new FormData(addForm);
+                    const payload = {
+                        participantId: fd.get('participantId') || null,
+                        jobTypeIds: collectJobTypeIds(addForm)
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'POST',
+                        url: ajaxUrl,
+                        payload: payload,
+                        sectionKey: 'crew'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            // Update flow: PUT /missions/{id}/units/{u}/crew/{c}/ajax
+            const editForm = document.getElementById('edit-crew-form');
+            if (editForm) {
+                editForm.addEventListener('submit', async function (ev) {
+                    const ajaxUrl = editForm.getAttribute('data-ajax-action');
+                    const unitId = editForm.getAttribute('data-unit-id');
+                    const crewId = editForm.getAttribute('data-crew-id');
+                    if (!ajaxUrl || !unitId || !crewId) {
+                        return; // fall back to classical submit
+                    }
+                    ev.preventDefault();
+                    const payload = {
+                        jobTypeIds: collectJobTypeIds(editForm)
+                    };
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'PUT',
+                        url: ajaxUrl,
+                        payload: payload,
+                        sectionKey: 'crew'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            // Delete flow: intercept the shared delete-confirm form when triggered by
+            // a crew delete (data-sub-section="crew"). Requires both unitId and crewId.
+            const dForm = document.getElementById('delete-confirm-form');
+            if (dForm) {
+                dForm.addEventListener('submit', async function (ev) {
+                    const sub = dForm.getAttribute('data-sub-section');
+                    const crewId = dForm.getAttribute('data-sub-id');
+                    const unitId = dForm.getAttribute('data-sub-unit-id');
+                    if (sub !== 'crew' || !crewId || !unitId) {
+                        return; // let the classical POST (or unit/participant handlers) run
+                    }
+                    ev.preventDefault();
+                    const res = await window.MissionSubresource.patchSubResource({
+                        method: 'DELETE',
+                        url: '/missions/' + window.missionId + '/units/' + unitId + '/crew/' + crewId + '/ajax',
+                        sectionKey: 'crew'
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+        })();
 
         if (searchInput && resultsDiv && userIdInput) {
             let debounceTimer;
@@ -1776,7 +2196,13 @@
             return;
         }
 
-        if (!confirm(typeof MSG_CONFIRM_OWNER_CHANGE !== 'undefined' ? MSG_CONFIRM_OWNER_CHANGE : 'Möchten Sie den Besitzer dieses Einsatzes wirklich ändern?')) {
+        const ownerConfirmed = await window.showKrtConfirm(
+            MSG_CONFIRM_OWNER_CHANGE,
+            MSG_CONFIRM_OWNER_CHANGE,
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) || 'OK',
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) || 'Abbrechen'
+        );
+        if (!ownerConfirmed) {
             return;
         }
 
@@ -1801,20 +2227,14 @@
 
             const cleanMissionId = String(currentMissionId).trim();
             const cleanUserId = String(userId).trim();
-            
-            const targetUrl = `/missions/${cleanMissionId}/owner/${cleanUserId}`;
-            
-            const resp = await fetch(targetUrl, {
+
+            const result = await window.MissionSubresource.patchSubResource({
                 method: 'PUT',
-                headers: headers
+                url: `/missions/${cleanMissionId}/owner/${cleanUserId}`,
+                sectionKey: 'owner'
             });
-            
-            if (resp.ok) {
-                showFrontendSuccessToast(typeof MSG_SUCCESS_OWNER_CHANGE !== 'undefined' ? MSG_SUCCESS_OWNER_CHANGE : 'Besitzer erfolgreich geändert');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                const errorText = await resp.text();
-                showFrontendErrorToast(`${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Status: ${resp.status})`);
+            if (result.ok) {
+                setTimeout(() => location.reload(), 800);
             }
         } catch (err) {
             showFrontendErrorToast(`${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Error: ${err.message})`);
@@ -1822,7 +2242,13 @@
     }
 
     async function removeMissionManager(userId) {
-        if (!confirm('Möchten Sie diesen Verwalter wirklich entfernen?')) return;
+        const removeConfirmed = await window.showKrtConfirm(
+            (typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined') ? MSG_CONFIRM_MANAGER_REMOVE : 'Verwalter entfernen?',
+            (typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined') ? MSG_CONFIRM_MANAGER_REMOVE : 'Verwalter entfernen?',
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) || 'OK',
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) || 'Abbrechen'
+        );
+        if (!removeConfirmed) return;
         try {
             const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
             if (!currentMissionId) {
@@ -1830,22 +2256,13 @@
                 return;
             }
 
-            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-            const headers = { 'Accept': 'application/json' };
-            if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-                headers[csrfHeader] = csrfToken;
-            }
-
-            const resp = await fetch(`/missions/${currentMissionId}/managers/${userId}`, {
+            const result = await window.MissionSubresource.patchSubResource({
                 method: 'DELETE',
-                headers: headers
+                url: `/missions/${currentMissionId}/managers/${userId}`,
+                sectionKey: 'manager'
             });
-            if (resp.ok) {
-                showFrontendSuccessToast(MSG_SUCCESS_MANAGER_REMOVE);
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showFrontendErrorToast(MSG_ERROR_MANAGER_REMOVE);
+            if (result.ok) {
+                setTimeout(() => location.reload(), 800);
             }
         } catch (err) {
             console.error(err);
@@ -1867,36 +2284,15 @@
                 return;
             }
 
-            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-            const headers = { 
-                'Accept': 'application/json'
-            };
-            if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-                headers[csrfHeader] = csrfToken;
-            }
-
-            console.log(`Attempting to add manager ${userId} to mission ${currentMissionId}`);
-            // Ensure IDs are trimmed and no extra characters
             const cleanMissionId = String(currentMissionId).trim();
             const cleanUserId = String(userId).trim();
-            
-            const targetUrl = `/missions/${cleanMissionId}/managers/${cleanUserId}`;
-            console.log(`POSTing to: ${targetUrl}`);
-            
-            const resp = await fetch(targetUrl, {
+            const result = await window.MissionSubresource.patchSubResource({
                 method: 'POST',
-                headers: headers
+                url: `/missions/${cleanMissionId}/managers/${cleanUserId}`,
+                sectionKey: 'manager'
             });
-            
-            if (resp.ok) {
-                console.log('Successfully added manager');
-                showFrontendSuccessToast(MSG_SUCCESS_MANAGER_ADD);
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                const errorText = await resp.text();
-                console.error(`Failed to add manager. Status: ${resp.status}, Body: ${errorText}`);
-                showFrontendErrorToast(`${MSG_ERROR_MANAGER_ADD} (Status: ${resp.status})`);
+            if (result.ok) {
+                setTimeout(() => location.reload(), 800);
             }
         } catch (err) {
             console.error('Network or unexpected error:', err);
@@ -2076,5 +2472,7 @@
         setupShipFilter("edit-unit-shiptype", "edit-unit-ship");
     });
 </script>
+<!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
+<script th:src="@{/js/mission-subresource.js}" defer></script>
 </body>
 </html>

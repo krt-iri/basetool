@@ -45,7 +45,6 @@ class MissionServicePayoutTest {
 
         when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
         when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArgument(0));
 
         // When
         Mission updatedMission = missionService.checkIn(missionId, participantId);
@@ -53,7 +52,9 @@ class MissionServicePayoutTest {
         // Then
         MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
         assertNotNull(updatedParticipant.getStartTime(), "Start time should be set");
-        verify(missionRepository).save(mission);
+        // Option A: parent Mission.version must NOT be bumped by a sub-section write.
+        verify(missionRepository, never()).save(any(Mission.class));
+        verify(missionParticipantRepository).save(p);
     }
 
     @Test
@@ -72,7 +73,6 @@ class MissionServicePayoutTest {
 
         when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
         when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArgument(0));
 
         // When
         Mission updatedMission = missionService.checkOut(missionId, participantId);
@@ -80,7 +80,9 @@ class MissionServicePayoutTest {
         // Then
         MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
         assertNotNull(updatedParticipant.getEndTime(), "End time should be set");
-        verify(missionRepository).save(mission);
+        // Option A: parent Mission.version must NOT be bumped by a sub-section write.
+        verify(missionRepository, never()).save(any(Mission.class));
+        verify(missionParticipantRepository).save(p);
     }
 
     @Test
@@ -98,7 +100,6 @@ class MissionServicePayoutTest {
         mission.getParticipants().add(p);
 
         when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArgument(0));
 
         // When
         Mission updatedMission = missionService.updatePayoutPreference(missionId, participantId, PayoutPreference.DONATE);
@@ -106,6 +107,8 @@ class MissionServicePayoutTest {
         // Then
         MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
         assertEquals(PayoutPreference.DONATE, updatedParticipant.getPayoutPreference());
-        verify(missionRepository).save(mission);
+        // Option A: parent Mission.version must NOT be bumped by a sub-section write.
+        verify(missionRepository, never()).save(any(Mission.class));
+        verify(missionParticipantRepository).save(p);
     }
 }

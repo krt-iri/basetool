@@ -409,11 +409,280 @@ class MissionPageControllerMvcTest {
         UUID missionId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
-        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/managers/" + userId), eq(null), eq(String.class), eq(false)))
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/managers/" + userId + "/slim"), eq(null), eq(String.class), eq(false)))
                 .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Error", null, 400));
 
         mockMvc.perform(post("/missions/" + missionId + "/managers/" + userId)
                         .with(csrf()))
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- Paket 3B: Frequencies AJAX endpoints -----------------------------
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void addOrUpdateFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID freqTypeId = UUID.randomUUID();
+        java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+        Map<String, Object> freq = new java.util.HashMap<>();
+        freq.put("id", UUID.randomUUID().toString());
+        Map<String, Object> ft = new java.util.HashMap<>();
+        ft.put("id", freqTypeId.toString());
+        ft.put("name", "Tac");
+        freq.put("frequencyType", ft);
+        freq.put("value", 123.45);
+        freq.put("version", 1);
+        slimResponse.add(freq);
+
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/frequencies/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenReturn(slimResponse);
+
+        String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
+        mockMvc.perform(put("/missions/" + missionId + "/frequencies/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(freqTypeId.toString())));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void addOrUpdateFrequencyAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID freqTypeId = UUID.randomUUID();
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/frequencies/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
+        mockMvc.perform(put("/missions/" + missionId + "/frequencies/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void deleteFrequencyAjax_Success_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID freqId = UUID.randomUUID();
+        when(backendApiClient.delete(eq("/api/v1/missions/" + missionId + "/frequencies/" + freqId + "/slim"),
+                eq(Object.class), eq(false)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        mockMvc.perform(delete("/missions/" + missionId + "/frequencies/" + freqId + "/ajax")
+                        .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    // --- Paket 3C: Units AJAX endpoints -----------------------------------
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void addUnitAjax_WithValidBody_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+        Map<String, Object> unit = new java.util.HashMap<>();
+        unit.put("id", UUID.randomUUID().toString());
+        unit.put("name", "Alpha");
+        unit.put("highValueUnit", false);
+        unit.put("version", 0);
+        slimResponse.add(unit);
+
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/units/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenReturn(slimResponse);
+
+        String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
+        mockMvc.perform(post("/missions/" + missionId + "/units/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Alpha")));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateUnitAjax_WithBackendConflict_ShouldReturn409() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        when(backendApiClient.put(eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
+        mockMvc.perform(put("/missions/" + missionId + "/units/" + unitId + "/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void deleteUnitAjax_Success_ShouldReturn204() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        when(backendApiClient.delete(eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"),
+                eq(Void.class), eq(false)))
+                .thenReturn(null);
+
+        mockMvc.perform(delete("/missions/" + missionId + "/units/" + unitId + "/ajax")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    // --- Paket 3C (Option b): Participants AJAX endpoints ------------------
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void addParticipantAjax_WithValidBody_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+        Map<String, Object> p = new java.util.HashMap<>();
+        p.put("id", UUID.randomUUID().toString());
+        p.put("guestName", "Guest-X");
+        p.put("version", 0);
+        slimResponse.add(p);
+
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/participants/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenReturn(slimResponse);
+
+        String body = "{\"guestName\":\"Guest-X\"}";
+        mockMvc.perform(post("/missions/" + missionId + "/participants/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Guest-X")));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateParticipantAjax_WithBackendConflict_ShouldReturn409() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+        when(backendApiClient.put(eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        String body = "{\"version\":1,\"comment\":\"test\"}";
+        mockMvc.perform(put("/missions/" + missionId + "/participants/" + participantId + "/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void deleteParticipantAjax_Success_ShouldReturn204() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+        when(backendApiClient.delete(eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
+                eq(Void.class), eq(false)))
+                .thenReturn(null);
+
+        mockMvc.perform(delete("/missions/" + missionId + "/participants/" + participantId + "/ajax")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void checkInParticipantAjax_Success_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+        Map<String, Object> slimResponse = new java.util.HashMap<>();
+        slimResponse.put("id", participantId.toString());
+        slimResponse.put("version", 2);
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/check-in/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenReturn(slimResponse);
+
+        mockMvc.perform(post("/missions/" + missionId + "/participants/" + participantId + "/check-in/ajax")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(participantId.toString())));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void checkOutParticipantAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/check-out/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        mockMvc.perform(post("/missions/" + missionId + "/participants/" + participantId + "/check-out/ajax")
+                        .with(csrf()))
+                .andExpect(status().isConflict());
+    }
+
+    // --- Paket 3C (Option c): Crew AJAX endpoints --------------------------
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void addCrewAjax_WithValidBody_ShouldReturn200() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+        Map<String, Object> crew = new java.util.HashMap<>();
+        crew.put("id", UUID.randomUUID().toString());
+        crew.put("participantName", "Alice");
+        crew.put("version", 0);
+        slimResponse.add(crew);
+
+        when(backendApiClient.post(eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenReturn(slimResponse);
+
+        String body = "{\"participantId\":\"" + UUID.randomUUID() + "\",\"jobTypeIds\":[]}";
+        mockMvc.perform(post("/missions/" + missionId + "/units/" + unitId + "/crew/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Alice")));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateCrewAjax_WithBackendConflict_ShouldReturn409() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        UUID crewId = UUID.randomUUID();
+        when(backendApiClient.put(eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
+                any(), eq(Object.class), eq(false)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        String body = "{\"jobTypeIds\":[]}";
+        mockMvc.perform(put("/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/ajax")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void deleteCrewAjax_Success_ShouldReturn204() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        UUID crewId = UUID.randomUUID();
+        when(backendApiClient.delete(eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
+                eq(Void.class), eq(false)))
+                .thenReturn(null);
+
+        mockMvc.perform(delete("/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/ajax")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
     }
 }

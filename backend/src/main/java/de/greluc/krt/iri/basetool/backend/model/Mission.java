@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.*;
+import org.hibernate.annotations.OptimisticLock;
 
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -41,16 +42,20 @@ public class Mission extends AbstractEntity<UUID> {
     private Boolean isInternal = false;
 
     @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OptimisticLock(excluded = true)
     private Set<MissionParticipant> participants = new HashSet<>();
 
     @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("name ASC")
+    @OptimisticLock(excluded = true)
     private Set<MissionUnit> assignedUnits = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OptimisticLock(excluded = true)
     private Set<MissionFrequency> frequencies = new HashSet<>();
 
     @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OptimisticLock(excluded = true)
     private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
 
     @ManyToOne
@@ -59,16 +64,19 @@ public class Mission extends AbstractEntity<UUID> {
     private Mission parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    @OptimisticLock(excluded = true)
     private Set<Mission> subMissions = new HashSet<>();
 
     @OneToMany(mappedBy = "mission")
     @OrderBy("createdAt DESC")
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @OptimisticLock(excluded = true)
     private Set<InventoryItem> inventoryEntries = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "mission")
     @OrderBy("startedAt DESC")
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @OptimisticLock(excluded = true)
     private Set<RefineryOrder> refineryOrders = new LinkedHashSet<>();
 
     @ManyToOne
@@ -77,6 +85,7 @@ public class Mission extends AbstractEntity<UUID> {
 
     @ManyToOne
     @JoinColumn(name = "owner_id")
+    @OptimisticLock(excluded = true)
     private User owner;
 
     @ManyToMany
@@ -85,5 +94,6 @@ public class Mission extends AbstractEntity<UUID> {
             joinColumns = @JoinColumn(name = "mission_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @OptimisticLock(excluded = true)
     private Set<User> managers = new HashSet<>();
 }

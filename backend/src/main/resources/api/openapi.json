@@ -2842,7 +2842,8 @@
       },
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Update a mission",
+        "summary" : "Update a mission (full replace)",
+        "description" : "Aktualisiert den gesamten Einsatz in einem Request. Fuer eine bessere Multi-User-Experience wird empfohlen, stattdessen die Section-PATCH-Endpoints (/core, /schedule, /flags) zu verwenden, damit parallele Aenderungen an anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.",
         "operationId" : "updateMission",
         "parameters" : [ {
           "name" : "id",
@@ -3019,7 +3020,8 @@
     "/api/v1/missions/{id}/units/{unitId}" : {
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Update a mission unit",
+        "summary" : "Update a mission unit (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{unitId}/slim which returns only the updated unit.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/{unitId}/slim`",
         "operationId" : "updateUnit",
         "parameters" : [ {
           "name" : "id",
@@ -3119,11 +3121,13 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       },
       "delete" : {
         "tags" : [ "Missions" ],
-        "summary" : "Delete a mission unit",
+        "summary" : "Delete a mission unit (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{unitId}/slim which returns 204 No Content.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/{unitId}/slim`",
         "operationId" : "deleteUnit",
         "parameters" : [ {
           "name" : "id",
@@ -3213,13 +3217,210 @@
               }
             }
           }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/units/{unitId}/slim" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Update a mission unit (slim response)",
+        "description" : "Updates a unit and returns only the updated unit as a slim DTO.",
+        "operationId" : "updateUnitSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "unitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionUnitDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Delete a mission unit (slim response)",
+        "description" : "Deletes a unit and returns 204 No Content.",
+        "operationId" : "deleteUnitSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "unitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}" : {
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Update crew in a mission unit",
+        "summary" : "Update crew in a mission unit (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns only the updated crew entry.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim`",
         "operationId" : "updateCrew",
         "parameters" : [ {
           "name" : "id",
@@ -3327,11 +3528,13 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       },
       "delete" : {
         "tags" : [ "Missions" ],
-        "summary" : "Remove crew from a mission unit",
+        "summary" : "Remove crew from a mission unit (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns 204 No Content.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim`",
         "operationId" : "removeCrew",
         "parameters" : [ {
           "name" : "id",
@@ -3429,13 +3632,226 @@
               }
             }
           }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Update crew in a mission unit (slim response)",
+        "description" : "Updates a crew member and returns only the updated crew entry as a slim DTO.",
+        "operationId" : "updateCrewSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "missionUnitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "crewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateCrewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionCrewDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Remove crew from a mission unit (slim response)",
+        "description" : "Removes a crew member and returns 204 No Content.",
+        "operationId" : "removeCrewSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "missionUnitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "crewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/missions/{id}/participants/{participantId}" : {
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Update a participant",
+        "summary" : "Update a participant (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/participants/{participantId}/slim which returns only the updated participant.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/{participantId}/slim`",
         "operationId" : "updateParticipant",
         "parameters" : [ {
           "name" : "id",
@@ -3535,11 +3951,13 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       },
       "delete" : {
         "tags" : [ "Missions" ],
-        "summary" : "Remove a participant",
+        "summary" : "Remove a participant (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/participants/{participantId}/slim which returns 204 No Content.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/{participantId}/slim`",
         "operationId" : "removeParticipant",
         "parameters" : [ {
           "name" : "id",
@@ -3629,13 +4047,210 @@
               }
             }
           }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/participants/{participantId}/slim" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Update a participant (slim response)",
+        "description" : "Updates a participant and returns only the updated participant as a slim DTO.",
+        "operationId" : "updateParticipantSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "participantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateParticipantRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionParticipantDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Remove a participant (slim response)",
+        "description" : "Removes a participant and returns 204 No Content.",
+        "operationId" : "removeParticipantSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "participantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/missions/{id}/participants/{participantId}/payout-preference" : {
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Update payout preference for a participant",
+        "summary" : "Update payout preference for a participant (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/participants/{participantId}/payout-preference/slim which returns only the updated participant.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim`",
         "operationId" : "updatePayoutPreference",
         "parameters" : [ {
           "name" : "id",
@@ -3735,14 +4350,222 @@
               }
             }
           }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Update payout preference for a participant (slim response)",
+        "description" : "Updates the payout preference and returns only the updated participant as a slim DTO.",
+        "operationId" : "updatePayoutPreferenceSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "participantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdatePayoutPreferenceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionParticipantDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/owner" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Change the owner of a mission (version-checked)",
+        "description" : "Updates the mission owner through the dedicated MissionOwnership aggregate. The version field in the request body must match the current ownership version (NOT the parent Mission.version) to prevent lost updates on concurrent owner changes. Changing the owner does NOT bump Mission.version, so other users' open forms on the same mission remain valid (Option A / multi-user concurrency).",
+        "operationId" : "updateMissionOwner",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateMissionOwnerRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Owner updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/missions/{id}/owner/{userId}" : {
       "put" : {
         "tags" : [ "Missions" ],
-        "summary" : "Change the owner of a mission",
-        "operationId" : "setMissionOwner",
+        "summary" : "Change the owner of a mission (legacy, deprecated)",
+        "description" : "Legacy endpoint without optimistic lock on the ownership aggregate. Prefer PUT /api/v1/missions/{id}/owner with UpdateMissionOwnerRequest (includes version) to benefit from per-section optimistic locking that does not invalidate other users' open forms on the same mission.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/owner`",
+        "operationId" : "setMissionOwnerLegacy",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -3831,7 +4654,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       }
     },
     "/api/v1/materials/{id}" : {
@@ -8544,7 +9368,8 @@
     "/api/v1/missions/{id}/units" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add a unit to a mission",
+        "summary" : "Add a unit to a mission (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/slim which returns only the updated list of units and avoids parent-coupled payloads (Option A / multi-user concurrency).\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/slim`",
         "operationId" : "addUnit",
         "parameters" : [ {
           "name" : "id",
@@ -8636,13 +9461,15 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       }
     },
     "/api/v1/missions/{id}/units/{missionUnitId}/crew" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add crew to a mission unit",
+        "summary" : "Add crew to a mission unit (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/{missionUnitId}/crew/slim which returns only the crew list of the affected unit.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/units/{missionUnitId}/crew/slim`",
         "operationId" : "addCrew",
         "parameters" : [ {
           "name" : "id",
@@ -8678,6 +9505,219 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Add crew to a mission unit (slim response)",
+        "description" : "Adds a crew member and returns the updated crew list of the affected unit as slim DTOs.",
+        "operationId" : "addCrewSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "missionUnitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddCrewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MissionCrewDto"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/units/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Add a unit to a mission (slim response)",
+        "description" : "Adds a new unit and returns the updated list of units as slim DTOs. Preferred replacement for POST /api/v1/missions/{id}/units to support multi-user concurrency on the mission detail page.",
+        "operationId" : "addUnitSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MissionUnitDto"
+                  }
                 }
               }
             }
@@ -8846,7 +9886,8 @@
     "/api/v1/missions/{id}/participants" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add a participant (admin)",
+        "summary" : "Add a participant (admin, legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/slim which returns only the updated participant list.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/slim`",
         "operationId" : "addParticipant",
         "parameters" : [ {
           "name" : "id",
@@ -8938,13 +9979,15 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       }
     },
     "/api/v1/missions/{id}/participants/{participantId}/check-out" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Check out a participant",
+        "summary" : "Check out a participant (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/{participantId}/check-out/slim which returns only the updated participant.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/{participantId}/check-out/slim`",
         "operationId" : "checkOutParticipant",
         "parameters" : [ {
           "name" : "id",
@@ -9034,13 +10077,112 @@
               }
             }
           }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/participants/{participantId}/check-out/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Check out a participant (slim response)",
+        "description" : "Checks out a participant and returns only the updated participant as a slim DTO.",
+        "operationId" : "checkOutParticipantSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "participantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionParticipantDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/missions/{id}/participants/{participantId}/check-in" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Check in a participant",
+        "summary" : "Check in a participant (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/{participantId}/check-in/slim which returns only the updated participant.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/participants/{participantId}/check-in/slim`",
         "operationId" : "checkInParticipant",
         "parameters" : [ {
           "name" : "id",
@@ -9066,6 +10208,206 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/participants/{participantId}/check-in/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Check in a participant (slim response)",
+        "description" : "Checks in a participant and returns only the updated participant as a slim DTO.",
+        "operationId" : "checkInParticipantSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "participantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionParticipantDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/participants/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Add a participant (admin, slim response)",
+        "description" : "Adds a participant and returns the updated participant list as slim DTOs.",
+        "operationId" : "addParticipantSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddParticipantRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MissionParticipantDto"
+                  }
                 }
               }
             }
@@ -9235,7 +10577,8 @@
     "/api/v1/missions/{id}/managers/{userId}" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add a manager to a mission",
+        "summary" : "Add a manager to a mission (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/managers/{userId}/slim which returns only the updated manager list.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/managers/{userId}/slim`",
         "operationId" : "addManager",
         "parameters" : [ {
           "name" : "id",
@@ -9325,11 +10668,13 @@
               }
             }
           }
-        }
+        },
+        "deprecated" : true
       },
       "delete" : {
         "tags" : [ "Missions" ],
-        "summary" : "Remove a manager from a mission",
+        "summary" : "Remove a manager from a mission (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/managers/{userId}/slim which returns 204 No Content.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/managers/{userId}/slim`",
         "operationId" : "removeManager",
         "parameters" : [ {
           "name" : "id",
@@ -9358,6 +10703,195 @@
                 }
               }
             }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/managers/{userId}/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Add a manager to a mission (slim response)",
+        "description" : "Adds a manager and returns the updated manager list as UserReferenceDto.",
+        "operationId" : "addManagerSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserReferenceDto"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Remove a manager from a mission (slim response)",
+        "description" : "Removes a manager and returns 204 No Content.",
+        "operationId" : "removeManagerSlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
           },
           "400" : {
             "description" : "Bad Request",
@@ -9513,7 +11047,8 @@
     "/api/v1/missions/{id}/frequencies" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add or update a frequency for a mission",
+        "summary" : "Add or update a frequency for a mission (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/frequencies/slim which returns only the updated frequency list.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/frequencies/slim`",
         "operationId" : "addOrUpdateFrequency",
         "parameters" : [ {
           "name" : "id",
@@ -9541,6 +11076,109 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/frequencies/slim" : {
+      "post" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Add or update a frequency for a mission (slim response)",
+        "description" : "Adds or updates a frequency and returns the updated frequency list as slim DTOs.",
+        "operationId" : "addOrUpdateFrequencySlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddFrequencyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MissionFrequencyDto"
+                  }
                 }
               }
             }
@@ -11781,6 +13419,303 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/schedule" : {
+      "patch" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Patch mission schedule section",
+        "description" : "Aktualisiert nur die Zeitplan-Sektion (Meeting-/Planned-/Actual-Zeiten) eines Einsatzes. Parallele Aenderungen an Teilnehmern, Units oder Finanzen fuehren dank entkoppelter Sub-Collections nicht mehr zum Versionskonflikt. Zeitstempel in UTC.",
+        "operationId" : "patchMissionSchedule",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatchMissionScheduleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/flags" : {
+      "patch" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Patch mission flags section",
+        "description" : "Aktualisiert nur die Flags-Sektion (z.B. isInternal) eines Einsatzes.",
+        "operationId" : "patchMissionFlags",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatchMissionFlagsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/core" : {
+      "patch" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Patch mission core section",
+        "description" : "Aktualisiert nur die Stammdaten-Sektion (Name, Beschreibung, Kalenderlink, Status) eines Einsatzes. Andere Sektionen und Sub-Aggregate bleiben unberuehrt. Bei einem Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.",
+        "operationId" : "patchMissionCore",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatchMissionCoreRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
                 }
               }
             }
@@ -16859,7 +18794,8 @@
     "/api/v1/missions/{id}/frequencies/{frequencyId}" : {
       "delete" : {
         "tags" : [ "Missions" ],
-        "summary" : "Remove a frequency from a mission",
+        "summary" : "Remove a frequency from a mission (legacy, deprecated)",
+        "description" : "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/frequencies/{frequencyId}/slim which returns 204 No Content.\n\n**DEPRECATED**\n- Sunset Date: 2026-10-20\n- Replacement: `/api/v1/missions/{id}/frequencies/{frequencyId}/slim`",
         "operationId" : "removeFrequency",
         "parameters" : [ {
           "name" : "id",
@@ -16888,6 +18824,97 @@
                 }
               }
             }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/missions/{id}/frequencies/{frequencyId}/slim" : {
+      "delete" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Remove a frequency from a mission (slim response)",
+        "description" : "Removes a frequency and returns 204 No Content.",
+        "operationId" : "removeFrequencySlim",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "frequencyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
           },
           "400" : {
             "description" : "Bad Request",
@@ -18199,6 +20226,20 @@
         },
         "required" : [ "preference" ]
       },
+      "UpdateMissionOwnerRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "userId", "version" ]
+      },
       "InventoryItemUpdateDto" : {
         "type" : "object",
         "properties" : {
@@ -18659,6 +20700,79 @@
           }
         },
         "required" : [ "amount", "missionId", "participantId", "type" ]
+      },
+      "PatchMissionScheduleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "actualStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "actualEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
+      "PatchMissionFlagsRequest" : {
+        "type" : "object",
+        "properties" : {
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "isInternal", "version" ]
+      },
+      "PatchMissionCoreRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "description" : {
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
+          },
+          "calendarLink" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0
+          },
+          "status" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "name", "version" ]
       },
       "PingResponse" : {
         "type" : "object",

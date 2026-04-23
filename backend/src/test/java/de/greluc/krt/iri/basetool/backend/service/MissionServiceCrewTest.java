@@ -20,6 +20,7 @@ class MissionServiceCrewTest {
     @Mock private MissionRepository missionRepository;
     @Mock private UserRepository userRepository;
     @Mock private MissionParticipantRepository missionParticipantRepository;
+    @Mock private MissionCrewRepository missionCrewRepository;
     @Mock private ShipRepository shipRepository;
     @Mock private JobTypeRepository jobTypeRepository;
     @Mock private SquadronRepository squadronRepository;
@@ -51,7 +52,6 @@ class MissionServiceCrewTest {
 
         when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
         when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(jobType));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Mission updatedMission = missionService.updateCrewInShip(missionId, unitId, crewId, Set.of(jobTypeId));
 
@@ -60,8 +60,10 @@ class MissionServiceCrewTest {
         MissionCrew updatedCrew = updatedUnit.getCrew().iterator().next();
         assertEquals(1, updatedCrew.getJobTypes().size());
         assertEquals(jobTypeId, updatedCrew.getJobTypes().iterator().next().getId());
-        
-        verify(missionRepository).save(mission);
+
+        // Option A: parent Mission.version must NOT be bumped by a sub-section (crew) write.
+        verify(missionRepository, never()).save(any(Mission.class));
+        verify(missionCrewRepository).save(crew);
     }
 
     @Test
@@ -124,15 +126,15 @@ class MissionServiceCrewTest {
         unit.getCrew().add(crew);
 
         when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Mission updatedMission = missionService.removeCrewFromShip(missionId, unitId, crewId);
 
         assertNotNull(updatedMission);
         MissionUnit updatedUnit = updatedMission.getAssignedUnits().iterator().next();
         assertTrue(updatedUnit.getCrew().isEmpty());
-        
-        verify(missionRepository).save(mission);
+
+        // Option A: parent Mission.version must NOT be bumped by a sub-section (crew) write.
+        verify(missionRepository, never()).save(any(Mission.class));
     }
     
     @Test

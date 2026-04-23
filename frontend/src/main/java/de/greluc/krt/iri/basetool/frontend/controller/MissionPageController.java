@@ -927,7 +927,7 @@ public class MissionPageController {
 
             log.info("[DEBUG_LOG] CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
             try {
-                backendApiClient.post("/api/v1/missions/" + missionUuid + "/managers/" + userUuid, null, String.class, false);
+                backendApiClient.post("/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", null, String.class, false);
                 log.info("[DEBUG_LOG] SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
                 return org.springframework.http.ResponseEntity.ok().build();
             } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
@@ -966,7 +966,7 @@ public class MissionPageController {
             }
 
             log.info("[DEBUG_LOG] CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
-            backendApiClient.delete("/api/v1/missions/" + missionUuid + "/managers/" + userUuid, Object.class, false);
+            backendApiClient.delete("/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class, false);
             log.info("[DEBUG_LOG] SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
             return org.springframework.http.ResponseEntity.ok().build();
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
@@ -1030,7 +1030,7 @@ public class MissionPageController {
             body.put("frequencyTypeId", frequencyTypeId);
             body.put("value", value);
 
-            backendApiClient.post("/api/v1/missions/" + id + "/frequencies", body, Void.class);
+            backendApiClient.post("/api/v1/missions/" + id + "/frequencies/slim", body, Void.class);
             redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
         } catch (Exception e) {
             log.error("Add or update frequency failed", e);
@@ -1043,13 +1043,397 @@ public class MissionPageController {
     @PreAuthorize("hasRole('MISSION_MANAGER')")
     public String deleteFrequency(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId, RedirectAttributes redirectAttributes) {
         try {
-            backendApiClient.delete("/api/v1/missions/" + id + "/frequencies/" + frequencyId, Void.class);
+            backendApiClient.delete("/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Void.class);
             redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
         } catch (Exception e) {
             log.error("Delete frequency failed", e);
             return "redirect:/missions/" + id + "?error=error.mission.frequency.delete";
         }
         return "redirect:/missions/" + id;
+    }
+
+    /**
+     * AJAX endpoint for Paket 3B: submits a frequency add/update via the Slim
+     * backend endpoint and returns the resulting slim list as JSON so that the
+     * mission detail page can update the DOM in place without a full reload.
+     * Enables concurrent editing of the frequencies sub-panel without forcing
+     * other users to re-enter their pending changes (Option A).
+     */
+    @org.springframework.web.bind.annotation.PutMapping(
+            value = "/{id}/frequencies/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("hasRole('MISSION_MANAGER')")
+    public org.springframework.http.ResponseEntity<Object> addOrUpdateFrequencyAjax(
+            @PathVariable @NotNull UUID id,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/frequencies/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Add/update frequency (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3B: deletes a frequency via the Slim backend
+     * endpoint and returns the resulting slim list as JSON.
+     */
+    @DeleteMapping(
+            value = "/{id}/frequencies/{frequencyId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("hasRole('MISSION_MANAGER')")
+    public org.springframework.http.ResponseEntity<Object> deleteFrequencyAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID frequencyId) {
+        try {
+            Object result = backendApiClient.delete(
+                    "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim",
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Delete frequency (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C: adds a unit via the Slim backend endpoint
+     * and returns the resulting slim unit list so the mission detail page can
+     * refresh without losing pending input in other sub-panels (Option A).
+     */
+    @PostMapping(
+            value = "/{id}/units/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> addUnitAjax(
+            @PathVariable @NotNull UUID id,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/units/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Add unit (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C: updates a unit via the Slim backend endpoint
+     * and returns the updated slim unit as JSON.
+     */
+    @org.springframework.web.bind.annotation.PutMapping(
+            value = "/{id}/units/{unitId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> updateUnitAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID unitId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.put(
+                    "/api/v1/missions/" + id + "/units/" + unitId + "/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Update unit (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C: deletes a unit via the Slim backend endpoint.
+     */
+    @DeleteMapping(
+            value = "/{id}/units/{unitId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> deleteUnitAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID unitId) {
+        try {
+            backendApiClient.delete(
+                    "/api/v1/missions/" + id + "/units/" + unitId + "/slim",
+                    Void.class,
+                    false);
+            return org.springframework.http.ResponseEntity.noContent().build();
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Delete unit (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option b - Participants): adds a participant via the
+     * Slim backend endpoint and returns the resulting slim participant list so the
+     * mission detail page can refresh without losing pending input in other sub-panels
+     * (Option A: sub-section writes must not bump Mission.version).
+     */
+    @PostMapping(
+            value = "/{id}/participants/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> addParticipantAjax(
+            @PathVariable @NotNull UUID id,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/participants/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Add participant (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option b - Participants): updates a participant via
+     * the Slim backend endpoint and returns the updated slim participant as JSON.
+     */
+    @org.springframework.web.bind.annotation.PutMapping(
+            value = "/{id}/participants/{participantId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> updateParticipantAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID participantId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.put(
+                    "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Update participant (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}", id, participantId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option b - Participants): deletes a participant via
+     * the Slim backend endpoint.
+     */
+    @DeleteMapping(
+            value = "/{id}/participants/{participantId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> deleteParticipantAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID participantId) {
+        try {
+            backendApiClient.delete(
+                    "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
+                    Void.class,
+                    false);
+            return org.springframework.http.ResponseEntity.noContent().build();
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Delete participant (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}", id, participantId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option b - Participants): checks a participant in via
+     * the Slim backend endpoint.
+     */
+    @PostMapping(
+            value = "/{id}/participants/{participantId}/check-in/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> checkInParticipantAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID participantId) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
+                    null,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Check-in participant (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}", id, participantId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option b - Participants): checks a participant out via
+     * the Slim backend endpoint.
+     */
+    @PostMapping(
+            value = "/{id}/participants/{participantId}/check-out/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> checkOutParticipantAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID participantId) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
+                    null,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Check-out participant (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}", id, participantId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option c - Crew): adds a crew member to a unit via
+     * the Slim backend endpoint and returns the resulting slim crew list.
+     */
+    @PostMapping(
+            value = "/{id}/units/{unitId}/crew/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> addCrewAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID unitId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.post(
+                    "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Add crew (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option c - Crew): updates a crew member via
+     * the Slim backend endpoint and returns the updated slim crew entry.
+     */
+    @org.springframework.web.bind.annotation.PutMapping(
+            value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> updateCrewAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID unitId,
+            @PathVariable @NotNull UUID crewId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        try {
+            Object result = backendApiClient.put(
+                    "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+                    body,
+                    Object.class,
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Update crew (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}", id, unitId, crewId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint for Paket 3C (Option c - Crew): deletes a crew member via
+     * the Slim backend endpoint.
+     */
+    @DeleteMapping(
+            value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> deleteCrewAjax(
+            @PathVariable @NotNull UUID id,
+            @PathVariable @NotNull UUID unitId,
+            @PathVariable @NotNull UUID crewId) {
+        try {
+            backendApiClient.delete(
+                    "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+                    Void.class,
+                    false);
+            return org.springframework.http.ResponseEntity.noContent().build();
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Delete crew (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}", id, unitId, crewId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
     }
 
     private String extractParticipantName(MissionParticipantDto participant) {

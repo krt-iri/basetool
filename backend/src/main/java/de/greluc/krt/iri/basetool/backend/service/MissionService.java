@@ -3,9 +3,12 @@ package de.greluc.krt.iri.basetool.backend.service;
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.FrequencyTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionCrewRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFrequencyRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
@@ -40,9 +43,12 @@ public class MissionService {
     private final ShipTypeRepository shipTypeRepository;
     private final JobTypeRepository jobTypeRepository;
     private final MissionParticipantRepository missionParticipantRepository;
+    private final MissionUnitRepository missionUnitRepository;
+    private final MissionCrewRepository missionCrewRepository;
     private final SquadronRepository squadronRepository;
     private final FrequencyTypeRepository frequencyTypeRepository;
     private final MissionFrequencyRepository missionFrequencyRepository;
+    private final MissionOwnershipRepository missionOwnershipRepository;
     private final OperationRepository operationRepository;
     private final UserService userService;
 
@@ -149,6 +155,80 @@ public class MissionService {
         validateMissionTimes(mission);
 
         return missionRepository.save(mission);
+    }
+
+    /**
+     * Aktualisiert ausschliesslich die Stammdaten-Sektion (Core) eines Einsatzes. Sub-Collections
+     * (Teilnehmer, Units, Finanzen) werden nicht beruehrt und inkrementieren dank
+     * {@code @OptimisticLock(excluded = true)} die Parent-Version ebenfalls nicht — dadurch
+     * koennen mehrere Nutzer gleichzeitig an unterschiedlichen Sektionen arbeiten, ohne sich
+     * gegenseitig zu behindern oder Eingaben durch einen 409-Conflict zu verlieren.
+     */
+    @Transactional
+    public Mission updateCoreSection(@NotNull UUID missionId, @NotNull String name, String description,
+                                     String calendarLink, String status, @NotNull Long expectedVersion) {
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() -> new RuntimeException("Mission not found"));
+        assertVersion(mission, expectedVersion, missionId);
+        mission.setName(name);
+        mission.setDescription(description);
+        mission.setCalendarLink(calendarLink);
+        if (status != null) {
+            mission.setStatus(status);
+        }
+        return missionRepository.save(mission);
+    }
+
+    /**
+     * Aktualisiert ausschliesslich die Zeitplan-Sektion (Schedule) eines Einsatzes. Alle
+     * Zeitstempel werden in UTC verarbeitet und gespeichert. Validierung gleich wie beim
+     * Gesamt-Update.
+     */
+    @Transactional
+    public Mission updateScheduleSection(@NotNull UUID missionId, Instant meetingTime,
+                                         Instant plannedStartTime, Instant plannedEndTime,
+                                         Instant actualStartTime, Instant actualEndTime,
+                                         @NotNull Long expectedVersion) {
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() -> new RuntimeException("Mission not found"));
+        assertVersion(mission, expectedVersion, missionId);
+        mission.setMeetingTime(meetingTime);
+        mission.setPlannedStartTime(plannedStartTime);
+        mission.setPlannedEndTime(plannedEndTime);
+        mission.setActualStartTime(actualStartTime);
+        mission.setActualEndTime(actualEndTime);
+
+        if (actualEndTime != null) {
+            for (MissionParticipant participant : mission.getParticipants()) {
+                if (participant.getStartTime() != null) {
+                    if (participant.getEndTime() == null || participant.getEndTime().isAfter(actualEndTime)) {
+                        participant.setEndTime(actualEndTime);
+                    }
+                }
+            }
+        }
+
+        validateMissionTimes(mission);
+        return missionRepository.save(mission);
+    }
+
+    /**
+     * Aktualisiert ausschliesslich die Flags-Sektion eines Einsatzes (z.B. {@code isInternal}).
+     */
+    @Transactional
+    public Mission updateFlagsSection(@NotNull UUID missionId, @NotNull Boolean isInternal,
+                                      @NotNull Long expectedVersion) {
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() -> new RuntimeException("Mission not found"));
+        assertVersion(mission, expectedVersion, missionId);
+        mission.setIsInternal(isInternal);
+        return missionRepository.save(mission);
+    }
+
+    private void assertVersion(@NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+        if (mission.getVersion() != null && !mission.getVersion().equals(expectedVersion)) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Mission.class, missionId);
+        }
     }
 
     @Transactional
@@ -265,9 +345,12 @@ public class MissionService {
 
         mission.getParticipants().add(participant);
         missionParticipantRepository.save(participant);
-        
-        // Return refreshed mission
-        return missionRepository.findById(missionId).orElseThrow();
+        // NOTE: no explicit missionRepository.save(mission) here.
+        // The collection is @OptimisticLock(excluded = true) so Hibernate's dirty-check
+        // on commit persists the new participant (via cascade) without bumping the parent
+        // Mission.version. This is key for the multi-user concurrency design (Option A):
+        // adding a participant must NOT invalidate other users' open forms on the same mission.
+        return mission;
     }
 
 
@@ -290,11 +373,13 @@ public class MissionService {
         
         // Also remove from any crews in this mission
         for (MissionUnit ship : mission.getAssignedUnits()) {
-            ship.getCrew().removeIf(crew -> 
+            ship.getCrew().removeIf(crew ->
                 crew.getParticipant() != null && crew.getParticipant().getId().equals(participantId));
         }
 
-        return missionRepository.save(mission);
+        // NOTE: no explicit missionRepository.save(mission). orphanRemoval + @OptimisticLock(excluded)
+        // on participants/assignedUnits ensures dirty-flush on commit without bumping Mission.version.
+        return mission;
     }
 
     @Transactional
@@ -376,7 +461,9 @@ public class MissionService {
         participant.setStartTime(startTime);
         participant.setEndTime(endTime);
 
-        return missionRepository.save(mission);
+        // Persist the participant explicitly; avoid save(mission) to keep Mission.version stable.
+        missionParticipantRepository.save(participant);
+        return mission;
     }
 
     @Transactional
@@ -387,7 +474,8 @@ public class MissionService {
             throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
         }
         participant.setStartTime(Instant.now());
-        return missionRepository.save(mission);
+        missionParticipantRepository.save(participant);
+        return mission;
     }
 
     @Transactional
@@ -403,7 +491,8 @@ public class MissionService {
         } else {
             participant.setEndTime(Instant.now());
         }
-        return missionRepository.save(mission);
+        missionParticipantRepository.save(participant);
+        return mission;
     }
 
     @Transactional
@@ -419,7 +508,7 @@ public class MissionService {
             missionParticipantRepository.save(participant);
             missionParticipantRepository.flush();
         }
-        return missionRepository.save(mission);
+        return mission;
     }
 
     @Transactional
@@ -465,7 +554,8 @@ public class MissionService {
         }
 
         mission.getAssignedUnits().add(missionUnit);
-        return missionRepository.save(mission);
+        missionUnitRepository.save(missionUnit);
+        return mission;
     }
 
     @Transactional
@@ -516,7 +606,8 @@ public class MissionService {
             missionUnit.setFrequency(null);
         }
 
-        return missionRepository.save(mission);
+        missionUnitRepository.save(missionUnit);
+        return mission;
     }
 
     @Transactional
@@ -530,7 +621,7 @@ public class MissionService {
             throw new RuntimeException("MissionUnit not found in this mission");
         }
 
-        return missionRepository.save(mission);
+        return mission;
     }
 
     @Transactional
@@ -566,8 +657,8 @@ public class MissionService {
         crew.setJobTypes(jobTypes);
 
         missionShip.getCrew().add(crew);
-
-        return missionRepository.save(mission);
+        missionCrewRepository.save(crew);
+        return mission;
     }
 
     @Transactional
@@ -588,7 +679,8 @@ public class MissionService {
         Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
         crew.setJobTypes(jobTypes);
 
-        return missionRepository.save(mission);
+        missionCrewRepository.save(crew);
+        return mission;
     }
 
     @Transactional
@@ -607,7 +699,7 @@ public class MissionService {
             throw new RuntimeException("Crew member not found in this unit");
         }
 
-        return missionRepository.save(mission);
+        return mission;
     }
 
     private Set<JobType> validateAndFetchJobTypes(Set<UUID> jobTypeIds) {
@@ -655,16 +747,19 @@ public class MissionService {
             .findFirst();
 
         if (existingOpt.isPresent()) {
-            existingOpt.get().setValue(value);
+            MissionFrequency existing = existingOpt.get();
+            existing.setValue(value);
+            missionFrequencyRepository.save(existing);
         } else {
             MissionFrequency newFreq = new MissionFrequency();
             newFreq.setMission(mission);
             newFreq.setFrequencyType(frequencyType);
             newFreq.setValue(value);
             mission.getFrequencies().add(newFreq);
+            missionFrequencyRepository.save(newFreq);
         }
 
-        return missionRepository.save(mission);
+        return mission;
     }
 
     @Transactional
@@ -677,7 +772,7 @@ public class MissionService {
             throw new RuntimeException("Frequency not found in this mission");
         }
 
-        return missionRepository.save(mission);
+        return mission;
     }
 
     @Transactional
@@ -687,7 +782,57 @@ public class MissionService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         mission.setOwner(user);
-        return missionRepository.save(mission);
+        // Mission.owner is @OptimisticLock(excluded=true), so this does NOT bump Mission.version.
+        // Sub-level optimistic locking for ownership is provided by the dedicated MissionOwnership
+        // aggregate; see updateMissionOwner(UUID,UUID,Long) below.
+        upsertMissionOwnership(mission, user, null);
+        return mission;
+    }
+
+    /**
+     * Version-checked owner change for multi-user concurrency (Option A). The {@code
+     * expectedOwnershipVersion} must match {@link MissionOwnership#getVersion()}; otherwise a 409
+     * {@link org.springframework.orm.ObjectOptimisticLockingFailureException} is raised.
+     *
+     * <p>This method intentionally does NOT bump {@code Mission.version} (the owner association is
+     * excluded from parent optimistic locking), so concurrent edits on other sections of the same
+     * mission remain unaffected.
+     */
+    @Transactional
+    public Mission updateMissionOwner(
+            @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() -> new RuntimeException("Mission not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        mission.setOwner(user);
+        upsertMissionOwnership(mission, user, expectedOwnershipVersion);
+        return mission;
+    }
+
+    /** Returns the current optimistic-lock version of the mission ownership aggregate (0 if absent). */
+    public long getMissionOwnershipVersion(@NotNull UUID missionId) {
+        return missionOwnershipRepository.findByMissionId(missionId)
+                .map(mo -> mo.getVersion() == null ? 0L : mo.getVersion())
+                .orElse(0L);
+    }
+
+    private void upsertMissionOwnership(Mission mission, User newOwner, Long expectedVersion) {
+        MissionOwnership ownership = missionOwnershipRepository.findByMissionId(mission.getId())
+                .orElseGet(() -> {
+                    MissionOwnership fresh = new MissionOwnership();
+                    fresh.setMission(mission);
+                    return fresh;
+                });
+        if (expectedVersion != null && ownership.getId() != null) {
+            Long currentVersion = ownership.getVersion() == null ? 0L : ownership.getVersion();
+            if (!expectedVersion.equals(currentVersion)) {
+                throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                        MissionOwnership.class, ownership.getId());
+            }
+        }
+        ownership.setOwner(newOwner);
+        missionOwnershipRepository.save(ownership);
     }
 
     @Transactional
@@ -697,7 +842,7 @@ public class MissionService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         mission.getManagers().add(user);
-        return missionRepository.save(mission);
+        return mission;
     }
 
     @Transactional
@@ -705,6 +850,6 @@ public class MissionService {
         Mission mission = missionRepository.findById(missionId)
                 .orElseThrow(() -> new RuntimeException("Mission not found"));
         mission.getManagers().removeIf(u -> u.getId().equals(userId));
-        return missionRepository.save(mission);
+        return mission;
     }
 }
