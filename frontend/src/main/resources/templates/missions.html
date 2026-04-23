@@ -33,14 +33,22 @@
                 <input type="text" id="mission-search" name="search" th:value="${search}" th:placeholder="#{mission.search.placeholder}">
             </div>
             
-            <div style="display:flex; flex-direction:column; gap:0.2rem;">
+            <div style="display:flex; flex-direction:column; gap:0.2rem;" class="datetime-split-group">
                 <label for="mission-start" th:text="#{mission.filter.start}">From</label>
-                <input type="datetime-local" id="mission-start" name="start" th:value="${start}">
+                <input type="hidden" name="start" id="mission-start" th:value="${start}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part">
+                    <input type="time" class="time-part">
+                </div>
             </div>
             
-            <div style="display:flex; flex-direction:column; gap:0.2rem;">
+            <div style="display:flex; flex-direction:column; gap:0.2rem;" class="datetime-split-group" th:attr="data-validate-after='mission-start', data-error-after=#{validation.datetime.after}">
                 <label for="mission-end" th:text="#{mission.filter.end}">To</label>
-                <input type="datetime-local" id="mission-end" name="end" th:value="${end}">
+                <input type="hidden" name="end" id="mission-end" th:value="${end}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part">
+                    <input type="time" class="time-part">
+                </div>
             </div>
 
             <div style="display:flex; flex-direction:column; gap:0.2rem;" sec:authorize="isAuthenticated()">

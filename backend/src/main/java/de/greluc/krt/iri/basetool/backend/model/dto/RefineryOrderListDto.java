@@ -12,6 +12,8 @@ public record RefineryOrderListDto(
         Instant startedAt,
         Long durationMinutes,
         Double expenses,
+        Double oreSales,
+        Double profit,
         RefiningMethodDto refiningMethod,
         String status,
         List<RefineryGoodDto> goods,

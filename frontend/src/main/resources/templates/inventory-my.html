@@ -46,6 +46,118 @@
             color: var(--color-primary);
             text-decoration: none;
         }
+
+        .multi-select-container {
+            position: relative;
+            min-width: 200px;
+        }
+        .multi-select-header {
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-body);
+            min-height: 44px;
+        }
+        .multi-select-header::after {
+            content: '\25BC';
+            font-size: 0.7em;
+            margin-left: 0.5rem;
+        }
+        .multi-select-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-primary);
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        .multi-select-options.open {
+            display: block;
+        }
+        .multi-select-option {
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            color: var(--color-gray-1);
+            margin-bottom: 0;
+            font-family: var(--font-body);
+            white-space: nowrap;
+            min-height: 44px;
+        }
+        .multi-select-option:hover {
+            background-color: var(--color-gray-3);
+        }
+        .multi-select-option input[type="checkbox"] {
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .selected-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        @media (max-width: 768px) {
+            .my-inventory-filter {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            .my-inventory-filter > div { width: 100%; }
+            .multi-select-container { width: 100%; }
+        }
+        /* Notiz-Vorschau im Lagereintrag (KRT HUD-Stil). Bessere Lesbarkeit: deutlich
+           groesserer Text, Border-Left in Primary Orange, dunkler HUD-Hintergrund. */
+        .inventory-note-preview {
+            display: block;
+            margin-top: 0.6rem;
+            padding: 0.5rem 0.75rem;
+            background-color: #141414;
+            border-left: 3px solid var(--color-primary, #E77E23);
+            color: var(--color-gray-1);
+            font-family: 'Lato', sans-serif;
+            font-weight: 300;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 80ch;
+        }
+        .inventory-note-preview .inventory-note-label {
+            display: block;
+            font-family: 'Ethnocentric', 'Lato', sans-serif;
+            font-weight: 700;
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--color-primary, #E77E23);
+            margin-bottom: 0.25rem;
+        }
+        .inventory-note-preview .inventory-note-text {
+            display: block;
+            color: var(--color-gray-1);
+        }
+        @media (max-width: 1024px) {
+            .inventory-note-preview { max-width: 100%; font-size: 1rem; }
+        }
+        @media (max-width: 768px) {
+            .inventory-note-preview { max-width: 100%; font-size: 1rem; padding: 0.6rem 0.75rem; }
+        }
     </style>
     </th:block>
 </head>
@@ -80,9 +192,76 @@
         <div class="actions-bar">
             <a th:href="@{/inventory}" class="btn btn-secondary">&laquo; Zurück zur Staffelübersicht</a>
             <a th:href="@{/inventory/input(source='my')}" class="btn" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
+
+            <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
+                <form th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.material}">Material:</label>
+                        <div class="multi-select-container" id="materialFilterContainer">
+                            <div class="multi-select-header" onclick="toggleMultiSelect('materialOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
+                                <span class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="materialOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="matAll" value="ALL" onchange="toggleSelectAll('matAll', 'matCheck', 'materialHeader'); filterMyInventory();">
+                                </label>
+                                <label class="multi-select-option" th:each="mat : ${materials}">
+                                    <span th:text="${mat.name}">Material</span>
+                                    <input type="checkbox" class="matCheck" name="materialIds" th:value="${mat.id}" th:checked="${selectedMaterialIds != null and selectedMaterialIds.contains(mat.id)}" onchange="updateSelectState('matAll', 'matCheck', 'materialHeader'); filterMyInventory();">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label for="minQuality" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.minQuality}">Qualit\u00e4t \u2265:</label>
+                        <select id="minQuality" name="minQuality" style="padding: 0.5rem; min-height: 44px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" onchange="filterMyInventory();">
+                            <option value="" th:text="#{filter.all}">-- Alle --</option>
+                            <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
+                        <div class="multi-select-container" id="jobOrderFilterContainer">
+                            <div class="multi-select-header" onclick="toggleMultiSelect('jobOrderOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="jobOrderHeader">
+                                <span class="selected-text" id="jobOrderSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="jobOrderOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="jobOrderAll" value="ALL" onchange="toggleSelectAll('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader'); filterMyInventory();">
+                                </label>
+                                <label class="multi-select-option" th:each="jo : ${jobOrders}">
+                                    <span th:text="|#${jo.displayId} - ${jo.handle}|">#1 - handle</span>
+                                    <input type="checkbox" class="jobOrderCheck" name="jobOrderIds" th:value="${jo.id}" th:checked="${selectedJobOrderIds != null and selectedJobOrderIds.contains(jo.id)}" onchange="updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader'); filterMyInventory();">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.mission}">Einsatz:</label>
+                        <div class="multi-select-container" id="missionFilterContainer">
+                            <div class="multi-select-header" onclick="toggleMultiSelect('missionOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="missionHeader">
+                                <span class="selected-text" id="missionSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="missionOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="missionAll" value="ALL" onchange="toggleSelectAll('missionAll', 'missionCheck', 'missionHeader'); filterMyInventory();">
+                                </label>
+                                <label class="multi-select-option" th:each="m : ${missions}">
+                                    <span th:text="${m.plannedStartTime != null} ? |${m.name} - ${#temporals.format(m.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${m.name}">Mission</span>
+                                    <input type="checkbox" class="missionCheck" name="missionIds" th:value="${m.id}" th:checked="${selectedMissionIds != null and selectedMissionIds.contains(m.id)}" onchange="updateSelectState('missionAll', 'missionCheck', 'missionHeader'); filterMyInventory();">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="resetMyInventoryFilter();" style="min-height: 44px;" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
+                </form>
+            </div>
         </div>
 
-        <div style="overflow-x: auto;">
+        <div style="overflow-x: auto;" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
@@ -162,13 +341,13 @@
                                                 <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
                                                 <option th:each="mission : ${missions}"
                                                         th:value="${mission.id}"
-                                                        th:text="${mission.name}"
+                                                        th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
                                                         th:selected="${mission.id == item.missionId}">
                                                 </option>
                                             </select>
                                         </td>
                                         <td>
-                                            <div style="display: flex; gap: 0.5rem;">
+                                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                                                 <button type="button" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
                                                         th:data-id="${item.id}"
                                                         th:data-amount="${item.amount}"
@@ -178,6 +357,23 @@
                                                         th:data-user-id="${item.user.id}"
                                                         th:data-location-id="${item.location.id}"
                                                         onclick="openBookOutModal(this.getAttribute('data-id'), this.getAttribute('data-amount'), this.getAttribute('data-version'), this.getAttribute('data-material-id'), this.getAttribute('data-user-id'), this.getAttribute('data-location-id'), this.getAttribute('data-quantity-type'))" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
+                                                <button type="button" class="btn btn-secondary inventory-note-btn"
+                                                        style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
+                                                        th:data-id="${item.id}"
+                                                        th:data-version="${item.version}"
+                                                        th:data-note="${item.note}"
+                                                        th:classappend="${item.note != null and !#strings.isEmpty(item.note)} ? ' has-note' : ''"
+                                                        onclick="openNoteModal(this)"
+                                                        th:title="${item.note != null and !#strings.isEmpty(item.note)} ? ${item.note} : #{inventory.note.add}"
+                                                        th:text="${item.note != null and !#strings.isEmpty(item.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+                                            </div>
+                                            <div class="inventory-note-preview"
+                                                 th:if="${item.note != null and !#strings.isEmpty(item.note)}"
+                                                 th:attr="data-note-for=${item.id}"
+                                                 th:title="${item.note}"
+                                                 th:aria-label="#{inventory.note.label}">
+                                                <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                                                <span class="inventory-note-text" th:text="${item.note}">Notiz</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -281,8 +477,307 @@
     </div>
 </div>
 
+<div id="noteModal" class="modal" style="display:none;">
+    <div class="modal-content hud-box">
+        <span class="close" onclick="closeNoteModal()">&times;</span>
+        <h2 style="margin-top:0;" th:text="#{inventory.note.label}">Notiz</h2>
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="noteModalTextarea" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.note.label}">Notiz</label>
+            <textarea id="noteModalTextarea" maxlength="1000" rows="6"
+                      th:placeholder="#{inventory.note.placeholder}"
+                      oninput="updateNoteCounter()"
+                      style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); min-height: 44px;"></textarea>
+            <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button type="button" class="btn" style="min-height: 44px;" onclick="saveNote()" th:text="#{inventory.note.save}">Speichern</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 44px;" onclick="removeNote()" th:text="#{inventory.note.remove}">Entfernen</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 44px; margin-left: auto;" onclick="closeNoteModal()" th:text="#{inventory.note.cancel}">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script>
+<script th:inline="javascript">
+    var noteI18n = {
+        saved: /*[[#{inventory.note.success.saved}]]*/ 'Notiz gespeichert',
+        removed: /*[[#{inventory.note.success.removed}]]*/ 'Notiz entfernt',
+        forbidden: /*[[#{inventory.note.error.forbidden}]]*/ 'Keine Berechtigung',
+        conflict: /*[[#{inventory.note.error.conflict}]]*/ 'Konflikt, bitte neu laden',
+        tooLong: /*[[#{inventory.note.error.tooLong}]]*/ 'Notiz zu lang',
+        generic: /*[[#{inventory.note.error.generic}]]*/ 'Fehler beim Speichern der Notiz',
+        add: /*[[#{inventory.note.add}]]*/ 'Notiz hinzuf\u00fcgen',
+        edit: /*[[#{inventory.note.edit}]]*/ 'Notiz bearbeiten',
+        confirmTitle: /*[[#{inventory.note.confirmRemove.title}]]*/ 'Notiz entfernen',
+        confirmMessage: /*[[#{inventory.note.confirmRemove.message}]]*/ 'Notiz wirklich entfernen?'
+    };
+
+    var activeNoteButton = null;
+
+    function openNoteModal(btn) {
+        activeNoteButton = btn;
+        var modal = document.getElementById('noteModal');
+        var ta = document.getElementById('noteModalTextarea');
+        var note = btn.getAttribute('data-note') || '';
+        ta.value = note;
+        updateNoteCounter();
+        modal.style.display = 'block';
+        setTimeout(function () { ta.focus(); }, 0);
+    }
+
+    function closeNoteModal() {
+        var modal = document.getElementById('noteModal');
+        modal.style.display = 'none';
+        activeNoteButton = null;
+    }
+
+    function updateNoteCounter() {
+        var ta = document.getElementById('noteModalTextarea');
+        var counter = document.getElementById('noteModalCounter');
+        if (ta && counter) counter.textContent = (ta.value ? ta.value.length : 0) + ' / 1000';
+    }
+
+    function showInventoryToast(type, msg) {
+        var toast = document.getElementById('toast');
+        if (!toast) { return; }
+        toast.textContent = msg;
+        toast.className = 'toast ' + (type === 'error' ? 'toast-error' : 'toast-success');
+        toast.style.display = 'block';
+        setTimeout(function () { toast.style.display = 'none'; }, 4000);
+    }
+
+    function saveNote() {
+        if (!activeNoteButton) return;
+        var ta = document.getElementById('noteModalTextarea');
+        submitNoteUpdate(ta.value || '');
+    }
+
+    function removeNote() {
+        if (!activeNoteButton) return;
+        if (!window.confirmKrtDialog) {
+            submitNoteUpdate('');
+            return;
+        }
+        window.confirmKrtDialog(noteI18n.confirmTitle, noteI18n.confirmMessage, function () {
+            submitNoteUpdate('');
+        });
+    }
+
+    function submitNoteUpdate(noteValue) {
+        var btn = activeNoteButton;
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        var version = btn.getAttribute('data-version');
+        var csrfToken = (document.querySelector('meta[name="_csrf"]') || {}).content;
+        var csrfHeader = (document.querySelector('meta[name="_csrf_header"]') || {}).content;
+        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
+
+        fetch('/inventory/' + id + '/note', {
+            method: 'PUT',
+            headers: headers,
+            credentials: 'same-origin',
+            body: JSON.stringify({ note: noteValue, version: version == null ? null : Number(version) })
+        }).then(function (resp) {
+            if (resp.ok) {
+                return resp.json().then(function (updated) {
+                    var trimmed = (noteValue || '').trim();
+                    var isEmpty = trimmed.length === 0;
+                    showInventoryToast('success', isEmpty ? noteI18n.removed : noteI18n.saved);
+                    closeNoteModal();
+                    // CRITICAL JUNIE RULE - FRONTEND DOM VERSION SYNC:
+                    // Synchronize the incremented version across ALL DOM elements carrying
+                    // data-id for this item (note button, book-out button, associated selects
+                    // and the note preview) so subsequent edits do not trigger 409 Conflict.
+                    var newVersion = (updated && updated.version != null) ? String(updated.version) : null;
+                    if (newVersion !== null) {
+                        document.querySelectorAll('[data-id="' + id + '"]').forEach(function (el) {
+                            if (el.hasAttribute('data-version')) {
+                                el.setAttribute('data-version', newVersion);
+                            }
+                        });
+                        document.querySelectorAll('[data-note-for="' + id + '"]').forEach(function (el) {
+                            if (el.hasAttribute('data-version')) {
+                                el.setAttribute('data-version', newVersion);
+                            }
+                        });
+                    }
+                    var noteBtns = document.querySelectorAll('button.inventory-note-btn[data-id="' + id + '"]');
+                    noteBtns.forEach(function (b) {
+                        b.setAttribute('data-note', isEmpty ? '' : (updated && updated.note != null ? updated.note : trimmed));
+                        b.textContent = isEmpty ? noteI18n.add : noteI18n.edit;
+                        b.title = isEmpty ? noteI18n.add : (updated && updated.note ? updated.note : trimmed);
+                        if (isEmpty) b.classList.remove('has-note'); else b.classList.add('has-note');
+                    });
+                    var previews = document.querySelectorAll('[data-note-for="' + id + '"]');
+                    previews.forEach(function (p) {
+                        if (isEmpty) {
+                            p.remove();
+                        } else {
+                            var txt = updated && updated.note ? updated.note : trimmed;
+                            var textEl = p.querySelector('.inventory-note-text');
+                            if (textEl) {
+                                textEl.textContent = txt;
+                            } else {
+                                p.textContent = txt;
+                            }
+                            p.title = txt;
+                        }
+                    });
+                }).catch(function () {
+                    // If the JSON parsing or DOM sync fails for any reason, reload the page
+                    // to guarantee consistent data-version attributes (AGENTS.md fallback).
+                    window.location.reload();
+                });
+            } else if (resp.status === 403) {
+                showInventoryToast('error', noteI18n.forbidden);
+            } else if (resp.status === 409) {
+                showInventoryToast('error', noteI18n.conflict);
+                setTimeout(function () { window.location.reload(); }, 1200);
+            } else if (resp.status === 400 || resp.status === 422) {
+                showInventoryToast('error', noteI18n.tooLong);
+            } else {
+                showInventoryToast('error', noteI18n.generic);
+            }
+        }).catch(function () {
+            showInventoryToast('error', noteI18n.generic);
+        });
+    }
+
+    function toggleMultiSelect(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var isOpened = el.classList.contains('open');
+        document.querySelectorAll('.multi-select-options').forEach(function(opt) { opt.classList.remove('open'); });
+        if (!isOpened) el.classList.add('open');
+    }
+
+    function getMsTranslations(headerId) {
+        var header = document.getElementById(headerId);
+        return {
+            allText: header ? (header.getAttribute('data-all') || 'Alle') : 'Alle',
+            selectedTextStr: header ? (header.getAttribute('data-selected') || 'gewählt') : 'gewählt'
+        };
+    }
+
+    function toggleSelectAll(allId, checkClass, headerId) {
+        var isAllChecked = document.getElementById(allId).checked;
+        var checkboxes = document.getElementsByClassName(checkClass);
+        for (var i = 0; i < checkboxes.length; i++) checkboxes[i].checked = isAllChecked;
+        updateMsSelectedText(checkboxes, headerId);
+    }
+
+    function updateSelectState(allId, checkClass, headerId) {
+        var checkboxes = document.getElementsByClassName(checkClass);
+        var allChecked = checkboxes.length > 0;
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (!checkboxes[i].checked) { allChecked = false; break; }
+        }
+        var allEl = document.getElementById(allId);
+        if (allEl) allEl.checked = allChecked;
+        updateMsSelectedText(checkboxes, headerId);
+    }
+
+    function updateMsSelectedText(checkboxes, headerId) {
+        var translations = getMsTranslations(headerId);
+        var count = 0;
+        var firstChecked = null;
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (checkboxes[i].checked) {
+                count++;
+                if (!firstChecked && checkboxes[i].previousElementSibling) {
+                    firstChecked = checkboxes[i].previousElementSibling.innerText;
+                }
+            }
+        }
+        var headerSpan = document.getElementById(headerId).querySelector('.selected-text');
+        if (count === 0) headerSpan.innerText = translations.allText;
+        else if (count === 1) headerSpan.innerText = firstChecked;
+        else headerSpan.innerText = count + ' ' + translations.selectedTextStr;
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.multi-select-container')) {
+            document.querySelectorAll('.multi-select-options').forEach(function(opt) {
+                if (opt.classList.contains('open')) opt.classList.remove('open');
+            });
+        }
+    });
+
+    function collectMyChecked(className) {
+        var boxes = document.getElementsByClassName(className);
+        var values = [];
+        for (var i = 0; i < boxes.length; i++) {
+            if (boxes[i].checked) values.push(boxes[i].value);
+        }
+        return values;
+    }
+
+    function filterMyInventory() {
+        var activeMaterials = collectMyChecked('matCheck');
+        var activeJobOrders = collectMyChecked('jobOrderCheck');
+        var activeMissions = collectMyChecked('missionCheck');
+        var minQualitySelect = document.getElementById('minQuality');
+        var minQuality = minQualitySelect ? minQualitySelect.value : '';
+
+        var container = document.getElementById('myInventoryTableContainer');
+        if (!container) return;
+        container.style.opacity = '0.5';
+        container.style.pointerEvents = 'none';
+
+        var url = new URL(window.location.origin + '/inventory/my');
+        url.searchParams.append('fragment', 'true');
+        activeMaterials.forEach(m => url.searchParams.append('materialIds', m));
+        if (minQuality) url.searchParams.append('minQuality', minQuality);
+        activeJobOrders.forEach(j => url.searchParams.append('jobOrderIds', j));
+        activeMissions.forEach(m => url.searchParams.append('missionIds', m));
+
+        var visibleUrl = new URL(window.location.origin + '/inventory/my');
+        activeMaterials.forEach(m => visibleUrl.searchParams.append('materialIds', m));
+        if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
+        activeJobOrders.forEach(j => visibleUrl.searchParams.append('jobOrderIds', j));
+        activeMissions.forEach(m => visibleUrl.searchParams.append('missionIds', m));
+        try { window.history.replaceState({}, '', visibleUrl.toString()); } catch (e) { /* ignore */ }
+
+        fetch(url, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(response => response.text())
+            .then(html => { container.outerHTML = html; })
+            .catch(error => {
+                console.error('Error fetching filtered personal inventory:', error);
+                container.style.opacity = '1.0';
+                container.style.pointerEvents = 'auto';
+            });
+    }
+
+    function resetMyInventoryFilter() {
+        ['matCheck', 'jobOrderCheck', 'missionCheck'].forEach(function(cls) {
+            var boxes = document.getElementsByClassName(cls);
+            for (var i = 0; i < boxes.length; i++) boxes[i].checked = false;
+        });
+        ['matAll', 'jobOrderAll', 'missionAll'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.checked = false;
+        });
+        var minQualitySelect = document.getElementById('minQuality');
+        if (minQualitySelect) minQualitySelect.value = '';
+        if (document.getElementById('materialHeader')) updateSelectState('matAll', 'matCheck', 'materialHeader');
+        if (document.getElementById('jobOrderHeader')) updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        if (document.getElementById('missionHeader')) updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        filterMyInventory();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementsByClassName('matCheck').length > 0) {
+            updateSelectState('matAll', 'matCheck', 'materialHeader');
+        }
+        if (document.getElementsByClassName('jobOrderCheck').length > 0) {
+            updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        }
+        if (document.getElementsByClassName('missionCheck').length > 0) {
+            updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        }
+    });
+
     function toggleGroup(row) {
         const nextRow = row.nextElementSibling;
         const icon = row.querySelector('.toggle-icon');
@@ -566,6 +1061,11 @@
             if (response.ok) {
                 // Erfolgreich: erhöhe Version für nachfolgende Updates
                 allSelects.forEach(s => s.setAttribute('data-version', version + 1));
+                
+                const bookOutBtn = tr.querySelector('button[onclick*="openBookOutModal"]');
+                if (bookOutBtn) {
+                    bookOutBtn.setAttribute('data-version', version + 1);
+                }
                 
                 if (typeof window.showFrontendSuccessToast === 'function') {
                     window.showFrontendSuccessToast('[[#{success.inventory.update}]]');

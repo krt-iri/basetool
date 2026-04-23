@@ -7,6 +7,10 @@ import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+
 @Mapper(componentModel = "spring", uses = {InventoryItemMapper.class, UserMapper.class, MaterialMapper.class, JobOrderHandoverMapper.class})
 public interface JobOrderMapper {
 
@@ -14,4 +18,17 @@ public interface JobOrderMapper {
 
     @Mapping(target = "currentStock", ignore = true)
     JobOrderMaterialDto toDto(JobOrderMaterial material);
+
+    default List<JobOrderMaterialDto> mapAndSortMaterials(Set<JobOrderMaterial> materials) {
+        if (materials == null) {
+            return null;
+        }
+        return materials.stream()
+                .map(this::toDto)
+                .sorted(Comparator
+                        .<JobOrderMaterialDto, Integer>comparing(m -> 
+                                (m.material() != null && "SCU".equalsIgnoreCase(m.material().quantityType())) ? 0 : 1)
+                        .thenComparing(m -> (m.material() != null && m.material().name() != null) ? m.material().name() : "", String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
 }

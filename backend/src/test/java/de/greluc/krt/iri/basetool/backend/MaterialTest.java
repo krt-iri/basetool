@@ -128,9 +128,11 @@ class MaterialTest {
         Material material = new Material();
         material.setName("Old Material");
         material.setType(MaterialType.NO_REFINE);
+        material.setIsManualRawMaterial(false);
         material = materialRepository.save(material);
 
         material.setName("Updated Material");
+        material.setIsManualRawMaterial(true);
 
         mockMvc.perform(put("/api/v1/materials/" + material.getId())
                 .with(jwt().jwt(builder -> builder.subject(adminUser.getId().toString()))
@@ -141,6 +143,7 @@ class MaterialTest {
         
         Material loaded = materialRepository.findById(material.getId()).orElseThrow();
         assertEquals("Updated Material", loaded.getName());
+        assertEquals(true, loaded.getIsManualRawMaterial());
     }
 
     @Test

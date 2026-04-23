@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 
 import java.util.UUID;
 
@@ -27,6 +28,7 @@ public class JobOrderHandoverService {
     private final JobOrderHandoverRepository jobOrderHandoverRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final JobOrderHandoverMapper jobOrderHandoverMapper;
+    private final JobOrderService jobOrderService;
 
     @Transactional
     public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
@@ -74,10 +76,21 @@ public class JobOrderHandoverService {
                     .ifPresent(mat -> {
                         double newAmount = mat.getAmount() - itemDto.amount();
                         mat.setAmount(Math.max(0.0, newAmount));
+                        if (mat.getAmount() <= 0.0001) {
+                            inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, mat.getMaterial().getId());
+                        }
                     });
         }
 
         JobOrderHandover savedHandover = jobOrderHandoverRepository.save(handover);
+
+        boolean allFulfilled = jobOrder.getMaterials().stream()
+                .allMatch(mat -> mat.getAmount() <= 0.0001);
+
+        if (allFulfilled) {
+            jobOrderService.updateJobOrderStatus(jobOrderId, JobOrderStatus.COMPLETED);
+        }
+
         return jobOrderHandoverMapper.toDto(savedHandover);
     }
 }

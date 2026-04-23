@@ -77,9 +77,14 @@ public class OperationFinanceService {
                 }
             }
 
+            // Raffinerieauftraege fliessen mit ihrem Gewinn/Verlust (oreSales - expenses) ein,
+            // nicht nur mit ihren Kosten. Altdaten mit oreSales=null werden als 0 behandelt.
             for (RefineryOrder order : orders) {
-                if (order.getExpenses() != null && order.getExpenses() > 0) {
-                    missionTotalSum = missionTotalSum.subtract(BigDecimal.valueOf(order.getExpenses()));
+                double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
+                double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
+                double profit = sales - costs;
+                if (profit != 0d) {
+                    missionTotalSum = missionTotalSum.add(BigDecimal.valueOf(profit));
                 }
             }
 

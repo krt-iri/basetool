@@ -77,11 +77,54 @@ class InventoryPageControllerTest {
         PageResponse<InventoryItemDto> page = new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
         when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
         
-        String view = controller.viewMyInventory(model);
+        String view = controller.viewMyInventory(null, null, null, null, false, model);
         
         assertEquals("inventory-my", view);
         assertTrue(model.containsAttribute("items"));
         assertTrue(model.containsAttribute("inventoryForm"));
+    }
+
+    @Test
+    void viewMyInventory_shouldForwardMaterialAndMinQualityFiltersToBackend() {
+        // Given
+        Model model = new ConcurrentModel();
+        PageResponse<InventoryItemDto> page = new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+        when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+        UUID materialId = UUID.randomUUID();
+        UUID jobOrderId = UUID.randomUUID();
+
+        // When
+        String view = controller.viewMyInventory(List.of(materialId), 500, List.of(jobOrderId), null, false, model);
+
+        // Then
+        assertEquals("inventory-my", view);
+        assertEquals(List.of(materialId), model.getAttribute("selectedMaterialIds"));
+        assertEquals(500, model.getAttribute("selectedMinQuality"));
+        assertEquals(List.of(jobOrderId), model.getAttribute("selectedJobOrderIds"));
+        org.mockito.ArgumentCaptor<String> urlCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+                .get(urlCaptor.capture(), any(ParameterizedTypeReference.class));
+        String groupedUrl = urlCaptor.getAllValues().stream()
+                .filter(u -> u.contains("/api/v1/inventory/my-inventory/grouped"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Personal grouped endpoint was not called"));
+        assertTrue(groupedUrl.contains("materialIds=" + materialId), "materialIds must be forwarded");
+        assertTrue(groupedUrl.contains("minQuality=500"), "minQuality must be forwarded");
+        assertTrue(groupedUrl.contains("jobOrderIds=" + jobOrderId), "jobOrderIds must be forwarded alongside new filters");
+    }
+
+    @Test
+    void viewMyInventory_shouldReturnFragmentWhenRequested() {
+        // Given
+        Model model = new ConcurrentModel();
+        PageResponse<InventoryItemDto> page = new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+        when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+
+        // When
+        String view = controller.viewMyInventory(null, null, null, null, true, model);
+
+        // Then
+        assertEquals("inventory-my :: inventoryTableFragment", view);
     }
 
     @Test
@@ -90,7 +133,7 @@ class InventoryPageControllerTest {
         PageResponse<InventoryItemDto> page = new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
         when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
         
-        String view = controller.viewAllInventory(List.of(UUID.randomUUID()), 100, false, model);
+        String view = controller.viewAllInventory(List.of(UUID.randomUUID()), 100, null, null, false, model);
         
         assertEquals("inventory-admin", view);
         assertTrue(model.containsAttribute("items"));
@@ -115,7 +158,7 @@ class InventoryPageControllerTest {
         when(bindingResult.hasErrors()).thenReturn(false);
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-        InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, 10, 100.0, false, null, null, null, null, 1L);
+        InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, 10, 100.0, false, null, null, null, null, null, 1L);
         when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(expectedDto);
         
         String view = controller.addInventoryItem(form, bindingResult, redirectAttributes);
@@ -187,6 +230,50 @@ class InventoryPageControllerTest {
     }
 
     @Test
+    void bookOutInventoryItem_shouldPreserveFiltersFromRefererOnSuccess() {
+        UUID id = UUID.randomUUID();
+        de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm form = new de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm();
+        form.setAmount(5.0);
+        form.setVersion(1L);
+        BindingResult bindingResult = mock(BindingResult.class);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+
+        when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+
+        String referer = "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, referer);
+
+        assertEquals("redirect:/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222", view);
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
+    }
+
+    @Test
+    void bookOutInventoryItem_shouldPreserveFiltersForAdminView() {
+        UUID id = UUID.randomUUID();
+        de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm form = new de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm();
+        form.setAmount(5.0);
+        form.setVersion(1L);
+        BindingResult bindingResult = mock(BindingResult.class);
+        when(bindingResult.hasErrors()).thenReturn(true);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+
+        String referer = "https://example.org/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2";
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, referer);
+
+        assertEquals("redirect:/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2", view);
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
+    }
+
+    @Test
+    void buildInventoryRedirectFromReferer_shouldHandleNullAndEmptyReferer() {
+        assertEquals("/inventory/my", de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.buildInventoryRedirectFromReferer("/inventory/my", null));
+        assertEquals("/inventory/my", de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.buildInventoryRedirectFromReferer("/inventory/my", ""));
+        assertEquals("/inventory/my", de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.buildInventoryRedirectFromReferer("/inventory/my", "https://example.org/inventory/my"));
+        assertEquals("/inventory/all", de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.buildInventoryRedirectFromReferer("/inventory/all", "https://example.org/inventory/all?fragment=true"));
+    }
+
+    @Test
     void updateAssociations_shouldReturnOkOnSuccess() {
         UUID id = UUID.randomUUID();
         InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
@@ -223,6 +310,68 @@ class InventoryPageControllerTest {
         when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenThrow(new RuntimeException("Generic error"));
 
         org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+
+        assertEquals(500, response.getStatusCode().value());
+    }
+
+    @Test
+    void updateInventoryItemNote_shouldReturnOkWithUpdatedDtoOnSuccess() {
+        // Given
+        UUID id = UUID.randomUUID();
+        InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
+        InventoryItemDto updated = new InventoryItemDto(
+                id, null, null, null, 100, 10.0, false, null, null, null, null, "hello", 2L);
+        when(backendApiClient.put(eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
+                .thenReturn(updated);
+
+        // When
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateInventoryItemNote(id, request);
+
+        // Then
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(updated, response.getBody());
+    }
+
+    @Test
+    void updateInventoryItemNote_shouldPropagate409FromBackendServiceException() {
+        // Given: backend returned 409 CONFLICT (wrapped in BackendServiceException by BackendApiClient)
+        UUID id = UUID.randomUUID();
+        InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
+        de.greluc.krt.iri.basetool.frontend.service.BackendServiceException ex =
+                new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                        "Backend service returned error: 409 CONFLICT", null, 409);
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+
+        // When
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateInventoryItemNote(id, request);
+
+        // Then: must be 409, NOT 500, so the JS modal can react (toast + reload) instead of
+        // treating the response as a generic server error.
+        assertEquals(409, response.getStatusCode().value());
+    }
+
+    @Test
+    void updateInventoryItemNote_shouldPropagate403FromBackendServiceException() {
+        UUID id = UUID.randomUUID();
+        InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
+        de.greluc.krt.iri.basetool.frontend.service.BackendServiceException ex =
+                new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                        "Backend service returned error: 403 FORBIDDEN", null, 403);
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateInventoryItemNote(id, request);
+
+        assertEquals(403, response.getStatusCode().value());
+    }
+
+    @Test
+    void updateInventoryItemNote_shouldReturn500OnGenericException() {
+        UUID id = UUID.randomUUID();
+        InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateInventoryItemNote(id, request);
 
         assertEquals(500, response.getStatusCode().value());
     }

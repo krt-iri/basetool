@@ -50,4 +50,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "mission_id", nullable = true)
     private Mission mission;
+
+    @Column(name = "note", length = 1000)
+    private String note;
 }

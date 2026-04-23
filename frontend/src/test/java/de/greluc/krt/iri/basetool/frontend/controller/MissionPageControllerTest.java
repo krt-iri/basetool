@@ -36,7 +36,7 @@ class MissionPageControllerTest {
         Model model = new ConcurrentModel();
 
         // Act
-        String viewName = controller.createMissionForm(model);
+        String viewName = controller.createMissionForm(model, null);
 
         // Assert
         assertEquals("mission-detail", viewName);
@@ -70,6 +70,29 @@ class MissionPageControllerTest {
         // Assert
         assertEquals("redirect:/missions/" + id, view);
         verify(backendApiClient).post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class), eq(true)); // Should use public client for anon
+    }
+
+    @Test
+    void addParticipant_AmbiguousName_ShouldExposeLocalizedToast() {
+        // Backend returns 409 when the free-text participant name matches more than one
+        // registered member. The frontend must expose a dedicated localized toast key so
+        // users are guided to pick an entry from the autocomplete.
+        UUID id = UUID.randomUUID();
+        BackendApiClient backendApiClient = mock(BackendApiClient.class);
+        MissionPageController controller = new MissionPageController(backendApiClient);
+        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+
+        when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                        "ambiguous", null, 409));
+
+        String view = controller.addParticipant(id,
+                new ParticipantForm(null, "Shared Alias", null, null, "Comment", null, null, null, null, null),
+                mock(BindingResult.class), redirectAttributes, null);
+
+        assertEquals("redirect:/missions/" + id, view);
+        verify(redirectAttributes).addFlashAttribute("errorToast", "error.mission.participant.ambiguous");
+        verify(redirectAttributes, never()).addFlashAttribute("errorToast", "error.mission.participant.add");
     }
 
     @Test
@@ -228,7 +251,7 @@ class MissionPageControllerTest {
         de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission = new de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto(
                 id, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 0, 0
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true))).thenReturn(mission);
@@ -256,7 +279,7 @@ class MissionPageControllerTest {
         de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission = new de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto(
                 id, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 0, 0
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true))).thenReturn(mission);

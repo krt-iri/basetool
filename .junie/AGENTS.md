@@ -138,6 +138,7 @@ The application adheres strictly to the "DAS KARTELL" Corporate Design Manual:
   - Filter database queries in the service layer by the `sub` (User ID) from the JWT.
   - For unauthenticated users (guests), only the minimum required data may be returned. Sensible fields (e.g., email, real name, internal orders/items) MUST be explicitly cleared or filtered in the controller (e.g., using a `cleanupForGuest` method) to prevent information disclosure.
 - **CRITICAL JUNIE RULE - CONCURRENCY AND OPTIMISTIC LOCKING:** To prevent "Lost Updates" in a multi-user environment, all DTOs used for updating existing entities MUST include the `version` field from the database entity. Frontend requests must transmit this `version` to trigger Spring Data JPA's Optimistic Locking (`ObjectOptimisticLockingFailureException` -> `409 Conflict`) upon concurrent modifications.
+- **CRITICAL JUNIE RULE - FRONTEND DOM VERSION SYNC:** When updating entities via asynchronous AJAX requests in the frontend (e.g., changing a dropdown, reordering rows), Junie must actively ensure that the returned or incremented `version` is synchronized across ALL relevant UI elements in the same DOM context (e.g., edit buttons, action buttons, modals within the same `tr` or container). Failure to update all related `data-version` attributes will cause 409 Conflict errors on subsequent user actions. If targeted DOM updates are too complex, trigger a full page reload (`window.location.reload()`) upon success.
 - **Pessimistic Locking for Bulk Updates:** Race conditions in critical bulk update operations (like shifting priorities or reordering elements) must be avoided by using explicit table or row locks (e.g., `@Lock(LockModeType.PESSIMISTIC_WRITE)` in JPA) or safe atomic database operations.
 
 ### Security (Keycloak / Spring Security)
@@ -146,6 +147,7 @@ The application adheres strictly to the "DAS KARTELL" Corporate Design Manual:
 ## 5. Documentation Guidelines
 
 - **CRITICAL JUNIE RULE - MAINTAIN CHANGELOG:** Junie must actively ensure that all changes (features, bug fixes, adjustments) are documented in the `CHANGELOG.md` without exception.
+- **CRITICAL JUNIE RULE - CHANGELOG UMLAUTS:** In `CHANGELOG.md` (and other Markdown documentation files), German umlauts (ä, ö, ü, Ä, Ö, Ü, ß) MUST be written directly as UTF-8 characters. NEVER use Unicode escape sequences like `\u00e4` in Markdown files. The `\uXXXX` rule applies exclusively to Java `.properties` translation files.
 - **Project Documentation:** The `README.md` and `CHANGELOG.md` must be kept up-to-date with new architecture decisions, features, and environment variable requirements.
 - **API Documentation:** 
   - All REST endpoints must be documented using SpringDoc OpenAPI annotations (e.g., `@Operation`, `@ApiResponses`).

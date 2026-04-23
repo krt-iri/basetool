@@ -8,5 +8,6 @@ public record RefineryOrderStoreItemDto(
     Integer quality,
     Double amount,
     UUID userId,
-    UUID jobOrderId
+    UUID jobOrderId,
+    String note
 ) {}

@@ -56,10 +56,15 @@ public class MissionFinanceEntryService {
             }
         }
         
+        // Raffinerieauftraege fliessen nun mit ihrem Gewinn/Verlust (oreSales - expenses) ein,
+        // nicht mehr nur mit ihren Kosten. Null-Werte werden als 0 behandelt (Altdaten-Schutz).
         List<RefineryOrder> refineryOrders = refineryOrderRepository.findByMissionId(missionId);
         for (RefineryOrder order : refineryOrders) {
-            if (order.getExpenses() != null && order.getExpenses() > 0) {
-                total = total.subtract(BigDecimal.valueOf(order.getExpenses()));
+            double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
+            double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
+            double profit = sales - costs;
+            if (profit != 0d) {
+                total = total.add(BigDecimal.valueOf(profit));
             }
         }
         

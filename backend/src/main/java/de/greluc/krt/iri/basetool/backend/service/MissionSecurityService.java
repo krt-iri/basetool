@@ -10,11 +10,13 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -31,10 +33,25 @@ public class MissionSecurityService {
     private final MissionParticipantRepository missionParticipantRepository;
     private final MissionFinanceEntryRepository missionFinanceEntryRepository;
 
+    /**
+     * Authorizes access to a single participant of a mission.
+     *
+     * <p>Access is granted when the caller has elevated privileges (MISSION_MANAGER /
+     * OFFICER / ADMIN / mission owner or manager) OR when the participant belongs to the
+     * currently authenticated user (Self-Edit: {@code participant.user.id == jwt.sub}).
+     * Guest (unlinked) participants are editable by anyone, matching the add-participant
+     * behaviour.
+     *
+     * <p>If the participant does not exist (e.g. the frontend holds a stale row whose
+     * entry was concurrently deleted in another tab), this method translates the
+     * missing row into a {@code 404 Not Found} via {@link ResponseStatusException}
+     * instead of letting a plain {@link RuntimeException} bubble up as a generic
+     * {@code 500 Internal Server Error} (see RFC7807 Problem Details).
+     */
     @Transactional(readOnly = true)
     public boolean canAccessParticipant(UUID missionId, UUID participantId, Authentication authentication) {
         MissionParticipant p = missionParticipantRepository.findById(participantId)
-                .orElseThrow(() -> new RuntimeException("Participant not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Participant not found"));
 
         if (!p.getMission().getId().equals(missionId)) {
             log.warn("Mission ID mismatch: {} != {}", p.getMission().getId(), missionId);

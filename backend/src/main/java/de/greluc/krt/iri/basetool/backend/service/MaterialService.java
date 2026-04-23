@@ -84,6 +84,7 @@ public class MaterialService {
         material.setType(materialDetails.getType());
         material.setDescription(materialDetails.getDescription());
         material.setQuantityType(materialDetails.getQuantityType());
+        material.setIsManualRawMaterial(materialDetails.getIsManualRawMaterial());
         
         if (materialDetails.getRefinedMaterial() != null && materialDetails.getRefinedMaterial().getId() != null) {
             Material refined = materialRepository.findById(materialDetails.getRefinedMaterial().getId()).orElse(null);

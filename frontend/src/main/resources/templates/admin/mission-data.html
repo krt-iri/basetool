@@ -376,7 +376,8 @@
         const jtLeadershipGroup = document.getElementById('jt-leadership-group');
 
         function updateLeadershipVisibility() {
-            if (jtArchetypeSelect.value === 'MISSION') {
+            // Leadership flag is now supported for both archetypes MISSION and CREW.
+            if (jtArchetypeSelect.value === 'MISSION' || jtArchetypeSelect.value === 'CREW') {
                 jtLeadershipGroup.style.display = 'block';
             } else {
                 jtLeadershipGroup.style.display = 'none';
@@ -551,10 +552,11 @@
             }).then(response => {
                 if (!response.ok) {
                     console.error('Failed to reorder');
-                    window.location.reload();
                 }
+                window.location.reload();
             }).catch(err => {
                 console.error('Error during reorder', err);
+                window.location.reload();
             });
 
             draggedRow = null;

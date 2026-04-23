@@ -133,6 +133,10 @@ public class JobOrderService {
             normalizePriorities();
         }
 
+        if (isTerminal && !wasTerminal) {
+            inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+        }
+
         return mapToDtoWithStock(jobOrder);
     }
 

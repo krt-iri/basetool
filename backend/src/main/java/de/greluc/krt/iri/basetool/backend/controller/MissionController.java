@@ -173,7 +173,9 @@ public class MissionController {
                 null, // managers
                 false, // canEdit
                 false, // canManageManagers
-                dto.version()
+                dto.version(),
+                dto.checkedInParticipants(),
+                dto.registeredParticipants()
         );
     }
 
@@ -347,11 +349,21 @@ public class MissionController {
 
 
     @PostMapping("/{id}/participants/add")
-    @Operation(summary = "Add a participant (public)")
+    @Operation(summary = "Add a participant (public)",
+            description = "Adds a participant by explicit userId (from autocomplete) or by free-text guestName. "
+                    + "Free-text names are resolved case-insensitively against existing users: a unique match links the participant as a registered member; "
+                    + "no match falls back to the guest path; multiple matches return 409 (ambiguous name).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Participant added"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation error or guest name reserved for a registered user (anonymous only)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Anonymous users cannot add registered users"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Participant name is ambiguous and matches more than one registered user")
+    })
     public MissionDto addParticipantPublic(@PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request, @AuthenticationPrincipal Jwt jwt) {
         UUID finalUserId = request.userId();
+        String finalGuestName = request.guestName();
 
-        if (jwt != null && finalUserId == null && (request.guestName() == null || request.guestName().isBlank())) {
+        if (jwt != null && finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
             finalUserId = userService.getUserIdFromJwt(jwt);
         }
 
@@ -359,11 +371,32 @@ public class MissionController {
             throw new AccessDeniedException("Anonymous users cannot add registered users.");
         }
 
-        if (finalUserId == null && request.guestName() != null && !request.guestName().isBlank() && userService.isUsernameOrDisplayNameTaken(request.guestName())) {
-             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Guest name is already taken.");
+        // Resolve free-text participant name to an existing registered user (case-insensitive,
+        // exact match on username or displayName). This fixes the bug where an authenticated
+        // squadron member typing their own name without using the autocomplete dropdown was
+        // rejected with "Guest name is already taken." – now the name is transparently linked
+        // to the matching user. Anonymous users may still not spoof a registered member's name.
+        if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
+            List<User> matches = userService.findMatchesByExactName(finalGuestName);
+            if (matches.size() > 1) {
+                log.info("[DEBUG_LOG] Participant name '{}' is ambiguous ({} matches) for mission {}",
+                        finalGuestName, matches.size(), id);
+                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Participant name is ambiguous.");
+            }
+            if (matches.size() == 1) {
+                if (jwt != null) {
+                    finalUserId = matches.get(0).getId();
+                    finalGuestName = null;
+                    log.debug("[DEBUG_LOG] Resolved free-text participant name '{}' to userId {} for mission {}",
+                            request.guestName(), finalUserId, id);
+                } else {
+                    // Anonymous user tried to add a name that belongs to a registered member -> keep spoofing protection.
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Guest name is already taken.");
+                }
+            }
         }
 
-        return missionMapper.toDto(missionService.addParticipant(id, finalUserId, request.guestName(), request.desiredJobTypeId(), request.comment(), request.squadronId()));
+        return missionMapper.toDto(missionService.addParticipant(id, finalUserId, finalGuestName, request.desiredJobTypeId(), request.comment(), request.squadronId()));
     }
 
     @PostMapping("/{id}/frequencies")

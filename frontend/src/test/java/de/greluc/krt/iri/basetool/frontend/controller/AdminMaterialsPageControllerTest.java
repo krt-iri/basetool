@@ -31,14 +31,14 @@ class AdminMaterialsPageControllerTest {
         AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
         
         UUID matId = UUID.randomUUID();
-        MaterialDto currentMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, 1L);
-        MaterialDto updatedMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, 2L);
+        MaterialDto currentMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, 1L);
+        MaterialDto updatedMaterial = new MaterialDto(matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false, 2L);
         
         when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
             .thenReturn(currentMaterial)
             .thenReturn(updatedMaterial);
             
-        MaterialUpdateAjaxRequest request = new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", 1L);
+        MaterialUpdateAjaxRequest request = new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", null, 1L);
         
         // Act
         ResponseEntity<MaterialDto> response = controller.updateMaterialAjax(matId, request);
@@ -57,11 +57,11 @@ class AdminMaterialsPageControllerTest {
 
         // Data for Materials
         List<MaterialDto> materials = new ArrayList<>();
-        materials.add(new MaterialDto(UUID.randomUUID(), 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, 0L));
-        materials.add(new MaterialDto(UUID.randomUUID(), 4, "Delta", "REFINED", "SCU", "Desc", null, null, false, false, false, 0L));
-        materials.add(new MaterialDto(UUID.randomUUID(), 3, "Charlie", "RAW", "SCU", "Desc", null, null, false, false, false, 0L));
-        materials.add(new MaterialDto(UUID.randomUUID(), 5, "Echo", "NO_REFINE", "SCU", "Desc", null, null, false, false, false, 0L));
-        materials.add(new MaterialDto(UUID.randomUUID(), 2, "Bravo", "RAW", "SCU", "Desc", null, null, false, false, false, 0L));
+        materials.add(new MaterialDto(UUID.randomUUID(), 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, 0L));
+        materials.add(new MaterialDto(UUID.randomUUID(), 4, "Delta", "REFINED", "SCU", "Desc", null, null, false, false, false, false, 0L));
+        materials.add(new MaterialDto(UUID.randomUUID(), 3, "Charlie", "RAW", "SCU", "Desc", null, null, false, false, false, false, 0L));
+        materials.add(new MaterialDto(UUID.randomUUID(), 5, "Echo", "NO_REFINE", "SCU", "Desc", null, null, false, false, false, false, 0L));
+        materials.add(new MaterialDto(UUID.randomUUID(), 2, "Bravo", "RAW", "SCU", "Desc", null, null, false, false, false, false, 0L));
 
         PageResponse<MaterialDto> materialsPage = new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
@@ -83,7 +83,11 @@ class AdminMaterialsPageControllerTest {
         assertEquals("Echo", sortedMaterials.get(4).name());
         
         List<MaterialDto> refinedMats = (List<MaterialDto>) model.getAttribute("refinedMaterials");
-        assertEquals(1, refinedMats.size());
-        assertEquals("Delta", refinedMats.get(0).name());
+        assertEquals(5, refinedMats.size());
+        assertEquals("Alpha", refinedMats.get(0).name());
+        assertEquals("Bravo", refinedMats.get(1).name());
+        assertEquals("Charlie", refinedMats.get(2).name());
+        assertEquals("Delta", refinedMats.get(3).name());
+        assertEquals("Echo", refinedMats.get(4).name());
     }
 }

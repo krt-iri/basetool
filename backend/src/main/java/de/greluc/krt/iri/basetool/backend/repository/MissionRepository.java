@@ -16,7 +16,7 @@ import java.util.UUID;
 @Repository
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
     
-    @Query("SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name, m.status) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE') ORDER BY m.plannedStartTime ASC")
+    @Query("SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name, m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE') ORDER BY m.plannedStartTime ASC")
     List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference();
     
     @EntityGraph(attributePaths = {"participants", "assignedUnits"})

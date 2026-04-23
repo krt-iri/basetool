@@ -19,6 +19,8 @@ public abstract class MissionMapper {
     @Mapping(target = "description", expression = "java(resolveDescription(mission))")
     @Mapping(target = "canEdit", expression = "java(resolveCanEdit(mission))")
     @Mapping(target = "canManageManagers", expression = "java(resolveCanManageManagers(mission))")
+    @Mapping(target = "checkedInParticipants", expression = "java(resolveCheckedInParticipants(mission))")
+    @Mapping(target = "registeredParticipants", expression = "java(resolveRegisteredParticipants(mission))")
     public abstract MissionDto toDto(Mission mission);
 
     public abstract MissionReferenceDto toReferenceDto(Mission mission);
@@ -57,13 +59,63 @@ public abstract class MissionMapper {
         return missionSecurityService.canManageManagers(mission.getId(), auth);
     }
 
+    /**
+     * Counts participants that have been checked in. A participant is considered
+     * checked in as soon as {@code startTime} is set (see {@link de.greluc.krt.iri.basetool.backend.service.MissionService#checkIn}).
+     */
+    public int resolveCheckedInParticipants(Mission mission) {
+        if (mission == null || mission.getParticipants() == null) return 0;
+        return (int) mission.getParticipants().stream()
+                .filter(p -> p != null && p.getStartTime() != null)
+                .count();
+    }
+
+    /**
+     * Counts all registered/enrolled participants of the mission, regardless of check-in state.
+     */
+    public int resolveRegisteredParticipants(Mission mission) {
+        if (mission == null || mission.getParticipants() == null) return 0;
+        return mission.getParticipants().size();
+    }
+
     public abstract MissionParticipantDto toDto(MissionParticipant participant);
 
+    @Mapping(target = "crew", expression = "java(resolveCrew(unit))")
     public abstract MissionUnitDto toDto(MissionUnit unit);
 
     @Mapping(target = "participantId", source = "participant.id")
     @Mapping(target = "participantName", expression = "java(resolveParticipantName(crew))")
     public abstract MissionCrewDto toDto(MissionCrew crew);
+
+    /**
+     * Sorts crew members of a mission unit so that leadership roles appear first.
+     * A crew member is considered a leader if at least one of its assigned JobTypes
+     * is flagged as leadership role (independent of archetype so CREW and MISSION
+     * leadership JobTypes both qualify; MISSION semantics remain unchanged).
+     * Secondary sort is stable by participant display name to keep the previous
+     * alphabetical ordering for non-leaders.
+     */
+    public java.util.List<MissionCrewDto> resolveCrew(MissionUnit unit) {
+        if (unit == null || unit.getCrew() == null) return java.util.List.of();
+        java.util.Comparator<MissionCrew> leaderFirst = java.util.Comparator
+                .comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
+                .thenComparing(c -> {
+                    String n = resolveParticipantName(c);
+                    return n == null ? "" : n.toLowerCase(java.util.Locale.ROOT);
+                });
+        return unit.getCrew().stream()
+                .sorted(leaderFirst)
+                .map(this::toDto)
+                .toList();
+    }
+
+    private boolean isLeaderCrew(MissionCrew crew) {
+        if (crew == null || crew.getJobTypes() == null) return false;
+        for (JobType jt : crew.getJobTypes()) {
+            if (jt != null && jt.isLeadershipRole()) return true;
+        }
+        return false;
+    }
 
     @Mapping(target = "missionId", source = "mission.id")
     public abstract MissionFinanceEntryDto toDto(MissionFinanceEntry entry);

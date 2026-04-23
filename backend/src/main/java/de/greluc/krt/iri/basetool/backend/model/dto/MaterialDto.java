@@ -14,5 +14,6 @@ public record MaterialDto(
     @JsonProperty("isIllegal") Boolean isIllegal,
     @JsonProperty("isVolatileQt") Boolean isVolatileQt,
     @JsonProperty("isVolatileTime") Boolean isVolatileTime,
+    @JsonProperty("isManualRawMaterial") Boolean isManualRawMaterial,
     Long version
 ) {}

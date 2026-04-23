@@ -39,11 +39,33 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
     @Query("SELECT i FROM InventoryItem i WHERE i.personal = false " +
            "AND (:hasMaterials = false OR i.material.id IN :materialIds) " +
-           "AND (:minQuality IS NULL OR i.quality >= :minQuality)")
+           "AND (:minQuality IS NULL OR i.quality >= :minQuality) " +
+           "AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds)) " +
+           "AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN :missionIds))")
     Page<InventoryItem> findGlobalByFilters(@Param("hasMaterials") boolean hasMaterials,
                                             @Param("materialIds") List<UUID> materialIds,
                                             @Param("minQuality") Integer minQuality,
+                                            @Param("hasJobOrders") boolean hasJobOrders,
+                                            @Param("jobOrderIds") List<UUID> jobOrderIds,
+                                            @Param("hasMissions") boolean hasMissions,
+                                            @Param("missionIds") List<UUID> missionIds,
                                             Pageable pageable);
+
+    @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
+    @Query("SELECT i FROM InventoryItem i WHERE i.user = :user " +
+           "AND (:hasMaterials = false OR i.material.id IN :materialIds) " +
+           "AND (:minQuality IS NULL OR i.quality >= :minQuality) " +
+           "AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds)) " +
+           "AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN :missionIds))")
+    Page<InventoryItem> findUserByFilters(@Param("user") User user,
+                                          @Param("hasMaterials") boolean hasMaterials,
+                                          @Param("materialIds") List<UUID> materialIds,
+                                          @Param("minQuality") Integer minQuality,
+                                          @Param("hasJobOrders") boolean hasJobOrders,
+                                          @Param("jobOrderIds") List<UUID> jobOrderIds,
+                                          @Param("hasMissions") boolean hasMissions,
+                                          @Param("missionIds") List<UUID> missionIds,
+                                          Pageable pageable);
 
     @Query("SELECT i.material as material, " +
            "CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, " +
@@ -80,7 +102,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
            "((i.mission IS NULL AND :mission IS NULL) OR (i.mission = :mission)) AND " +
            "((i.jobOrder IS NULL AND :jobOrder IS NULL) OR (i.jobOrder = :jobOrder)) AND " +
            "((i.personal IS NULL AND :personal IS NULL) OR (i.personal = :personal))")
-    java.util.Optional<InventoryItem> findMatchingInventoryItem(
+    java.util.List<InventoryItem> findMatchingInventoryItem(
             @Param("user") User user,
             @Param("material") Material material,
             @Param("location") Location location,

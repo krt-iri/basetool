@@ -74,9 +74,28 @@ public class InventoryItemService {
 
     @Transactional(readOnly = true)
     public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getMyAggregatedInventory(UUID userId) {
+        return getMyAggregatedInventory(userId, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
+        return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getMyAggregatedInventory(UUID userId, List<UUID> materialIds, Integer minQuality, List<UUID> jobOrderIds, List<UUID> missionIds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        List<InventoryItemDto> items = inventoryItemRepository.findByUser(user, Pageable.unpaged())
+        boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+        boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+        boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+        List<InventoryItemDto> items = inventoryItemRepository.findUserByFilters(
+                user,
+                hasMaterials, hasMaterials ? materialIds : null,
+                minQuality,
+                hasJobOrders, hasJobOrders ? jobOrderIds : null,
+                hasMissions, hasMissions ? missionIds : null,
+                Pageable.unpaged())
                 .getContent().stream().map(inventoryItemMapper::toDto).toList();
 
         return aggregateInventoryItems(items);
@@ -84,8 +103,20 @@ public class InventoryItemService {
 
     @Transactional(readOnly = true)
     public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
+        return getAllAggregatedInventory(materialIds, minQuality, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality, List<UUID> jobOrderIds, List<UUID> missionIds) {
         boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-        List<InventoryItemDto> items = inventoryItemRepository.findGlobalByFilters(hasMaterials, hasMaterials ? materialIds : null, minQuality, Pageable.unpaged())
+        boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+        boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+        List<InventoryItemDto> items = inventoryItemRepository.findGlobalByFilters(
+                hasMaterials, hasMaterials ? materialIds : null,
+                minQuality,
+                hasJobOrders, hasJobOrders ? jobOrderIds : null,
+                hasMissions, hasMissions ? missionIds : null,
+                Pageable.unpaged())
                 .getContent().stream().map(inventoryItemMapper::toDto).toList();
 
         return aggregateInventoryItems(items);
@@ -128,8 +159,20 @@ public class InventoryItemService {
     
     @Transactional(readOnly = true)
     public Page<InventoryItemDto> getAllInventory(List<UUID> materialIds, Integer minQuality, Pageable pageable) {
+        return getAllInventory(materialIds, minQuality, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<InventoryItemDto> getAllInventory(List<UUID> materialIds, Integer minQuality, List<UUID> jobOrderIds, List<UUID> missionIds, Pageable pageable) {
         boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-        return inventoryItemRepository.findGlobalByFilters(hasMaterials, hasMaterials ? materialIds : null, minQuality, pageable)
+        boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+        boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+        return inventoryItemRepository.findGlobalByFilters(
+                hasMaterials, hasMaterials ? materialIds : null,
+                minQuality,
+                hasJobOrders, hasJobOrders ? jobOrderIds : null,
+                hasMissions, hasMissions ? missionIds : null,
+                pageable)
                 .map(inventoryItemMapper::toDto);
     }
 
@@ -165,7 +208,7 @@ public class InventoryItemService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Personal items cannot be assigned to a mission or job order");
         }
 
-        java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+        java.util.List<InventoryItem> existingItems = inventoryItemRepository.findMatchingInventoryItem(
             user,
             material,
             location,
@@ -175,9 +218,11 @@ public class InventoryItemService {
             isPersonal
         );
 
+        java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
+
         if (existingItemOpt.isPresent()) {
             InventoryItem existingItem = existingItemOpt.get();
-            existingItem.setAmount(existingItem.getAmount() + dto.amount());
+            existingItem.setAmount(roundAmount(existingItem.getAmount() + dto.amount()));
             return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
         }
 
@@ -186,7 +231,7 @@ public class InventoryItemService {
         item.setMaterial(material);
         item.setLocation(location);
         item.setQuality(dto.quality());
-        item.setAmount(dto.amount());
+        item.setAmount(roundAmount(dto.amount()));
         item.setPersonal(isPersonal);
         item.setMission(mission);
         item.setJobOrder(jobOrder);
@@ -225,7 +270,7 @@ public class InventoryItemService {
         item.setLocation(location);
 
         item.setQuality(dto.quality());
-        item.setAmount(dto.amount());
+        item.setAmount(roundAmount(dto.amount()));
 
         if (dto.jobOrderId() != null) {
             JobOrder jobOrder = jobOrderRepository.findById(dto.jobOrderId())
@@ -243,7 +288,7 @@ public class InventoryItemService {
             item.setMission(null);
         }
 
-        java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+        java.util.List<InventoryItem> existingItems = inventoryItemRepository.findMatchingInventoryItem(
                 item.getUser(),
                 item.getMaterial(),
                 item.getLocation(),
@@ -253,12 +298,55 @@ public class InventoryItemService {
                 item.getPersonal()
         );
 
-        if (existingItemOpt.isPresent() && !existingItemOpt.get().getId().equals(item.getId())) {
+        java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream()
+                .filter(i -> !i.getId().equals(item.getId()))
+                .findFirst();
+
+        if (existingItemOpt.isPresent()) {
             InventoryItem existingItem = existingItemOpt.get();
-            existingItem.setAmount(existingItem.getAmount() + item.getAmount());
+            existingItem.setAmount(roundAmount(existingItem.getAmount() + item.getAmount()));
             inventoryItemRepository.delete(item);
             return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
         }
+
+        return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    }
+
+    /**
+     * Sets, updates or removes the free-text note of an inventory item.
+     *
+     * <p>Access rules:
+     * <ul>
+     *   <li>The owner of the item may always modify its note.</li>
+     *   <li>A non-owner may only modify the note when {@code isLogistician} is {@code true}
+     *       (i.e. they hold {@code ROLE_LOGISTICIAN} or a role that inherits it such as
+     *       {@code ROLE_OFFICER}/{@code ROLE_ADMIN}).</li>
+     * </ul>
+     * A blank or empty note is normalized to {@code null} and thus effectively removes the note.
+     * Optimistic locking is enforced via the supplied {@code version}.</p>
+     */
+    @Transactional
+    public InventoryItemDto updateNote(UUID id, InventoryItemNoteUpdateRequest request, UUID currentUserId, boolean isLogistician) {
+        InventoryItem item = inventoryItemRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+
+        boolean isOwner = item.getUser().getId().equals(currentUserId);
+        if (!isOwner && !isLogistician) {
+            throw new AccessDeniedException("You are not allowed to modify the note of this inventory item");
+        }
+
+        if (request.version() != null && item.getVersion() != null && !item.getVersion().equals(request.version())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(InventoryItem.class, id);
+        }
+
+        String normalizedNote = request.note();
+        if (normalizedNote != null) {
+            normalizedNote = normalizedNote.trim();
+            if (normalizedNote.isEmpty()) {
+                normalizedNote = null;
+            }
+        }
+        item.setNote(normalizedNote);
 
         return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
     }
@@ -294,7 +382,7 @@ public class InventoryItemService {
             }
         }
 
-        double remainingAmount = item.getAmount() - dto.amount();
+        double remainingAmount = roundAmount(item.getAmount() - dto.amount());
 
         if (checkoutType == CheckoutType.TRANSFER && (dto.targetUserId() != null || dto.targetLocationId() != null)) {
             User targetUser = item.getUser();
@@ -318,7 +406,7 @@ public class InventoryItemService {
             newItem.setMaterial(item.getMaterial());
             newItem.setLocation(targetLocation);
             newItem.setQuality(item.getQuality());
-            newItem.setAmount(dto.amount());
+            newItem.setAmount(roundAmount(dto.amount()));
             newItem.setPersonal(item.getPersonal());
             newItem.setJobOrder(item.getJobOrder());
             newItem.setMission(item.getMission());
@@ -342,5 +430,12 @@ public class InventoryItemService {
             item.setAmount(remainingAmount);
             inventoryItemRepository.save(item);
         }
+    }
+
+    private Double roundAmount(Double amount) {
+        if (amount == null) return null;
+        return java.math.BigDecimal.valueOf(amount)
+                .setScale(3, java.math.RoundingMode.HALF_UP)
+                .doubleValue();
     }
 }

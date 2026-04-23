@@ -112,6 +112,7 @@ public class MissionService {
 
         mission.setName(missionDetails.getName());
         mission.setDescription(missionDetails.getDescription());
+        mission.setCalendarLink(missionDetails.getCalendarLink());
         mission.setStatus(missionDetails.getStatus());
         mission.setMeetingTime(missionDetails.getMeetingTime());
         mission.setPlannedStartTime(missionDetails.getPlannedStartTime());
@@ -302,12 +303,14 @@ public class MissionService {
                                                Instant startTime, Instant endTime,
                                                UUID squadronId, PayoutPreference payoutPreference, String guestName, Long version) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new RuntimeException("Mission not found"));
+            .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Mission not found"));
 
         MissionParticipant participant = mission.getParticipants().stream()
             .filter(p -> p.getId().equals(participantId))
             .findFirst()
-            .orElseThrow(() -> new RuntimeException("Participant not found in this mission"));
+            .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Participant not found in this mission"));
 
         if (version != null && !version.equals(participant.getVersion())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(MissionParticipant.class, participant.getId());

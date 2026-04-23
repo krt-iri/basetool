@@ -63,7 +63,7 @@ class MissionSecurityRenderingTest {
         MissionDto mission = new MissionDto(
                 missionId, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L, 0, 1
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
@@ -92,7 +92,7 @@ class MissionSecurityRenderingTest {
         MissionDto mission = new MissionDto(
                 missionId, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 0, 1
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
@@ -118,7 +118,7 @@ class MissionSecurityRenderingTest {
         MissionDto mission = new MissionDto(
                 missionId, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L, 0, 1
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))
@@ -145,7 +145,7 @@ class MissionSecurityRenderingTest {
         MissionDto mission = new MissionDto(
                 missionId, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), false, false, 1L, 0, 1
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), org.mockito.ArgumentMatchers.<org.springframework.core.ParameterizedTypeReference<Object>>any(), eq(true)))

@@ -19,7 +19,7 @@ server:
     mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
   servlet:
     session:
-      timeout: 12h
+      timeout: 240h
       cookie:
         secure: true
         http-only: true

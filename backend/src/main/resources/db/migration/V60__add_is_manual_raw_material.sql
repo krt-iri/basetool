@@ -1,0 +1,1 @@
+ALTER TABLE material ADD COLUMN is_manual_raw_material BOOLEAN DEFAULT FALSE NOT NULL;

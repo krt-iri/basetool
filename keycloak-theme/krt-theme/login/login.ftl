@@ -16,6 +16,12 @@
                     <input tabindex="2" id="password" class="krt-input" name="password" type="password" autocomplete="off" />
                 </div>
 
+                <#if realm.resetPasswordAllowed>
+                    <div class="krt-form-footer">
+                        <a tabindex="5" href="${url.loginResetCredentialsUrl!''}" class="krt-link">${msg("doForgotPassword")}</a>
+                    </div>
+                </#if>
+
                 <div class="form-group login-action">
                     <input tabindex="4" class="krt-button" name="login" id="kc-login" type="submit" value="${msg("doLogIn")}"/>
                 </div>

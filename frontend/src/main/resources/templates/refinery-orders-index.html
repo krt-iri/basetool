@@ -75,10 +75,11 @@
                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}"></td>
                 <td th:text="${order.status != null ? #messages.msg('refineryorder.status.' + order.status) : '-'}"></td>
                 <td style="white-space: nowrap;">
-                    <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${#temporals.format(order.startedAt, 'dd.MM.yy HH:mm')}"></span>
+                    <!-- Server-Rendering explizit in UTC, Anzeige wird im Browser per JS in Browser-Lokalzeit (DST-korrekt) konvertiert. -->
+                    <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${order.startedAt != null ? #temporals.format(order.startedAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td style="white-space: nowrap;">
-                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yy HH:mm') : '-'}"></span>
+                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>
                 <td th:text="${order.mission != null ? order.mission.name : '-'}"></td>

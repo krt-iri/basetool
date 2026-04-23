@@ -14,12 +14,25 @@ import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 
 @Mapper(componentModel = "spring", uses = {UserMapper.class, MaterialMapper.class}, unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface RefineryOrderMapper {
+    @Mapping(target = "profit", expression = "java(computeProfit(entity))")
     RefineryOrderDto toDto(RefineryOrder entity);
 
+    @Mapping(target = "profit", expression = "java(computeProfit(entity))")
     RefineryOrderListDto toListDto(RefineryOrder entity);
     
     @Mapping(target = "owner", ignore = true)
     RefineryOrder toEntity(RefineryOrderDto dto);
+
+    /**
+     * Berechnet Gewinn/Verlust = oreSales - expenses fuer den Auftrag.
+     * Null-Werte werden als 0 behandelt, damit Altdaten keine NPE ausloesen.
+     */
+    default Double computeProfit(RefineryOrder entity) {
+        if (entity == null) return 0d;
+        double sales = entity.getOreSales() != null ? entity.getOreSales() : 0d;
+        double costs = entity.getExpenses() != null ? entity.getExpenses() : 0d;
+        return sales - costs;
+    }
     
     LocationDto locationToDto(Location location);
 

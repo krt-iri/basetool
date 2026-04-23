@@ -113,7 +113,8 @@ class MissionTimeTest {
                 null, null, Collections.emptySet(),
                 false,
                 false,
-                0L
+                0L,
+                0, 0
         );
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId())
@@ -146,7 +147,8 @@ class MissionTimeTest {
                 null, null, Collections.emptySet(),
                 false,
                 false,
-                0L
+                0L,
+                0, 0
         );
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId())
@@ -234,7 +236,8 @@ class MissionTimeTest {
                 null, null, Collections.emptySet(),
                 false,
                 false,
-                0L
+                0L,
+                0, 0
         );
         
         mockMvc.perform(put("/api/v1/missions/" + mission.getId())

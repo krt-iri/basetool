@@ -70,6 +70,79 @@ class InventoryItemServiceTest {
     private InventoryItemService inventoryItemService;
 
     @Test
+    void updateInventoryItem_withExistingMatchingItem_shouldMergeAndReturnMergedItem() {
+        // Given
+        UUID itemId = UUID.randomUUID();
+        UUID currentUserId = UUID.randomUUID();
+        UUID existingItemId = UUID.randomUUID();
+        
+        User user = new User();
+        user.setId(currentUserId);
+        
+        Material material = new Material();
+        material.setId(UUID.randomUUID());
+        
+        Location location = new Location();
+        location.setId(UUID.randomUUID());
+        
+        JobOrder jobOrder = new JobOrder();
+        jobOrder.setId(UUID.randomUUID());
+        
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setUser(user);
+        item.setMaterial(material);
+        item.setLocation(location);
+        item.setQuality(10);
+        item.setAmount(5.0);
+        item.setPersonal(false);
+        item.setVersion(1L);
+        
+        InventoryItemUpdateDto dto = new InventoryItemUpdateDto(
+                material.getId(),
+                location.getId(),
+                10,
+                2.0,
+                false, // personal
+                jobOrder.getId(), // jobOrderId
+                null, // missionId
+                1L // version
+        );
+        
+        InventoryItem existingItem = new InventoryItem();
+        existingItem.setId(existingItemId);
+        existingItem.setUser(user);
+        existingItem.setMaterial(material);
+        existingItem.setLocation(location);
+        existingItem.setQuality(10);
+        existingItem.setAmount(10.0);
+        existingItem.setPersonal(false);
+        existingItem.setJobOrder(jobOrder);
+        existingItem.setVersion(1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
+        when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+        when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
+        
+        when(inventoryItemRepository.findMatchingInventoryItem(
+                any(User.class), any(Material.class), any(Location.class), anyInt(), isNull(), any(JobOrder.class), anyBoolean()
+        )).thenReturn(List.of(item, existingItem));
+        
+        when(inventoryItemRepository.save(existingItem)).thenReturn(existingItem);
+        when(inventoryItemMapper.toDto(existingItem)).thenReturn(null);
+        
+        // When
+        InventoryItemDto result = inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
+        
+        // Then
+        assertNull(result);
+        assertEquals(12.0, existingItem.getAmount());
+        verify(inventoryItemRepository).delete(item);
+        verify(inventoryItemRepository).save(existingItem);
+    }
+
+    @Test
     void getAggregatedInventory_shouldReturnPage() {
         Object[] obj = new Object[]{new Material(), 10.0, 5L};
         Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
@@ -112,13 +185,141 @@ class InventoryItemServiceTest {
 
     @Test
     void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
-        when(inventoryItemRepository.findGlobalByFilters(eq(false), eq(null), eq(null), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(new InventoryItem())));
+        when(inventoryItemRepository.findGlobalByFilters(eq(false), eq(null), eq(null), eq(false), eq(null), eq(false), eq(null), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
         when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
         Page<InventoryItemDto> result = inventoryItemService.getAllInventory(null, null, Pageable.unpaged());
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getAllInventory_shouldPassJobOrderAndMissionFilters() {
+        // Given
+        UUID jobOrderId = UUID.randomUUID();
+        UUID missionId = UUID.randomUUID();
+        List<UUID> jobOrderIds = List.of(jobOrderId);
+        List<UUID> missionIds = List.of(missionId);
+
+        when(inventoryItemRepository.findGlobalByFilters(
+                eq(false), eq(null), eq(null),
+                eq(true), eq(jobOrderIds),
+                eq(true), eq(missionIds),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
+        when(inventoryItemMapper.toDto(any())).thenReturn(null);
+
+        // When
+        Page<InventoryItemDto> result = inventoryItemService.getAllInventory(
+                null, null, jobOrderIds, missionIds, Pageable.unpaged());
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(inventoryItemRepository).findGlobalByFilters(
+                eq(false), eq(null), eq(null),
+                eq(true), eq(jobOrderIds),
+                eq(true), eq(missionIds),
+                any(Pageable.class));
+    }
+
+    @Test
+    void getMyAggregatedInventory_shouldPassJobOrderAndMissionFilters() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        UUID jobOrderId = UUID.randomUUID();
+        UUID missionId = UUID.randomUUID();
+        List<UUID> jobOrderIds = List.of(jobOrderId);
+        List<UUID> missionIds = List.of(missionId);
+        User user = new User();
+        user.setId(userId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inventoryItemRepository.findUserByFilters(
+                eq(user),
+                eq(false), eq(null),
+                eq(null),
+                eq(true), eq(jobOrderIds),
+                eq(true), eq(missionIds),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        // When
+        List<GroupedInventoryDto> result = inventoryItemService.getMyAggregatedInventory(userId, jobOrderIds, missionIds);
+
+        // Then
+        assertNotNull(result);
+        verify(inventoryItemRepository).findUserByFilters(
+                eq(user),
+                eq(false), eq(null),
+                eq(null),
+                eq(true), eq(jobOrderIds),
+                eq(true), eq(missionIds),
+                any(Pageable.class));
+    }
+
+    @Test
+    void getMyAggregatedInventory_withoutFilters_shouldPassEmptyFlags() {
+        UUID userId = UUID.randomUUID();
+        User user = new User();
+        user.setId(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inventoryItemRepository.findUserByFilters(
+                eq(user),
+                eq(false), eq(null),
+                eq(null),
+                eq(false), eq(null),
+                eq(false), eq(null),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<GroupedInventoryDto> result = inventoryItemService.getMyAggregatedInventory(userId);
+
+        assertNotNull(result);
+        verify(inventoryItemRepository).findUserByFilters(
+                eq(user),
+                eq(false), eq(null),
+                eq(null),
+                eq(false), eq(null),
+                eq(false), eq(null),
+                any(Pageable.class));
+    }
+
+    @Test
+    void getMyAggregatedInventory_shouldPassMaterialAndMinQualityFilters() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        UUID materialId = UUID.randomUUID();
+        List<UUID> materialIds = List.of(materialId);
+        Integer minQuality = 500;
+        User user = new User();
+        user.setId(userId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inventoryItemRepository.findUserByFilters(
+                eq(user),
+                eq(true), eq(materialIds),
+                eq(minQuality),
+                eq(false), eq(null),
+                eq(false), eq(null),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        // When
+        List<GroupedInventoryDto> result = inventoryItemService.getMyAggregatedInventory(
+                userId, materialIds, minQuality, null, null);
+
+        // Then
+        assertNotNull(result);
+        verify(inventoryItemRepository).findUserByFilters(
+                eq(user),
+                eq(true), eq(materialIds),
+                eq(minQuality),
+                eq(false), eq(null),
+                eq(false), eq(null),
+                any(Pageable.class));
     }
 
     @Test
@@ -145,13 +346,48 @@ class InventoryItemServiceTest {
         InventoryItem savedItem = new InventoryItem();
         when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(savedItem);
         
-        InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, null, null, false, null, null, null, null, null);
+        InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, null, null, false, null, null, null, null, null, null);
         when(inventoryItemMapper.toDto(savedItem)).thenReturn(expectedDto);
 
         InventoryItemDto result = inventoryItemService.createInventoryItem(dto, userId, false);
 
         assertNotNull(result);
         verify(inventoryItemRepository).save(any(InventoryItem.class));
+    }
+
+    @Test
+    void createInventoryItem_shouldRoundAmountToThreeDecimals() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        UUID materialId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        double inputAmount = 0.3289;
+
+        InventoryItemCreateDto dto = new InventoryItemCreateDto(userId, materialId, locationId, 100, inputAmount, false, null, null);
+        
+        User user = new User();
+        user.setId(userId);
+        
+        Material material = new Material();
+        material.setId(materialId);
+
+        Location location = new Location();
+        location.setId(locationId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        // When
+        inventoryItemService.createInventoryItem(dto, userId, false);
+
+        // Then
+        org.mockito.ArgumentCaptor<InventoryItem> captor = org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+        verify(inventoryItemRepository).save(captor.capture());
+        assertEquals(0.329, captor.getValue().getAmount());
     }
 
     @Test
@@ -457,5 +693,117 @@ class InventoryItemServiceTest {
 
         assertThrows(ObjectOptimisticLockingFailureException.class, () -> 
             inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
+    }
+
+    @Test
+    void updateNote_asOwner_shouldPersistNoteAndReturnDto() {
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(3L);
+        User owner = new User();
+        owner.setId(ownerId);
+        item.setUser(owner);
+
+        InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("Ready for mission", 3L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        inventoryItemService.updateNote(itemId, req, ownerId, false);
+
+        assertEquals("Ready for mission", item.getNote());
+        verify(inventoryItemRepository).save(item);
+    }
+
+    @Test
+    void updateNote_asStranger_withoutLogistician_shouldThrowAccessDenied() {
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        User owner = new User();
+        owner.setId(ownerId);
+        item.setUser(owner);
+
+        InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("nope", 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+        assertThrows(AccessDeniedException.class, () ->
+            inventoryItemService.updateNote(itemId, req, strangerId, false));
+        verify(inventoryItemRepository, never()).save(any());
+    }
+
+    @Test
+    void updateNote_asStranger_withLogistician_shouldSucceed() {
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        User owner = new User();
+        owner.setId(ownerId);
+        item.setUser(owner);
+
+        InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("admin hint", 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        inventoryItemService.updateNote(itemId, req, strangerId, true);
+
+        assertEquals("admin hint", item.getNote());
+        verify(inventoryItemRepository).save(item);
+    }
+
+    @Test
+    void updateNote_withVersionMismatch_shouldThrowOptimisticLockingFailure() {
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(5L);
+        User owner = new User();
+        owner.setId(ownerId);
+        item.setUser(owner);
+
+        InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("x", 2L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () ->
+            inventoryItemService.updateNote(itemId, req, ownerId, false));
+        verify(inventoryItemRepository, never()).save(any());
+    }
+
+    @Test
+    void updateNote_withBlankNote_shouldClearNoteToNull() {
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        item.setNote("existing");
+        User owner = new User();
+        owner.setId(ownerId);
+        item.setUser(owner);
+
+        InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("   ", 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        inventoryItemService.updateNote(itemId, req, ownerId, false);
+
+        assertNull(item.getNote());
+        verify(inventoryItemRepository).save(item);
     }
 }

@@ -9,5 +9,6 @@ public record MaterialUpdateAjaxRequest(
     UUID categoryId,
     UUID refinedMaterialId,
     String quantityType,
+    Boolean isManualRawMaterial,
     @NotNull Long version
 ) {}

@@ -108,4 +108,43 @@ class OperationFinanceServiceTest {
                 .findFirst().orElseThrow();
         assertEquals(BigDecimal.valueOf(-200), sum2.totalSum());
     }
+
+    @Test
+    void shouldUseProfitFromOreSalesMinusExpensesForRefineryOrders() {
+        // Given: ein Raffinerieauftrag mit oreSales > expenses -> positiver Gewinn fliesst in die Einsatzbilanz ein.
+        UUID operationId = UUID.randomUUID();
+        Operation operation = new Operation();
+        operation.setId(operationId);
+
+        Mission msn = new Mission();
+        msn.setId(UUID.randomUUID());
+        msn.setName("Profit Mission");
+        operation.setMissions(Set.of(msn));
+
+        RefineryOrder profitOrder = new RefineryOrder();
+        profitOrder.setMission(msn);
+        profitOrder.setExpenses(100.0);
+        profitOrder.setOreSales(450.0); // profit = 350
+
+        RefineryOrder lossOrder = new RefineryOrder();
+        lossOrder.setMission(msn);
+        lossOrder.setExpenses(200.0);
+        lossOrder.setOreSales(50.0); // profit = -150
+
+        RefineryOrder legacyOrder = new RefineryOrder();
+        legacyOrder.setMission(msn);
+        legacyOrder.setExpenses(25.0);
+        legacyOrder.setOreSales(null); // Altdaten: oreSales=null -> 0, profit = -25
+
+        when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+        when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of());
+        when(refineryOrderRepository.findByMissionIdIn(any()))
+                .thenReturn(List.of(profitOrder, lossOrder, legacyOrder));
+
+        // When
+        OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
+
+        // Then: 350 + (-150) + (-25) = 175
+        assertEquals(0, BigDecimal.valueOf(175.0).compareTo(result.totalSum()));
+    }
 }

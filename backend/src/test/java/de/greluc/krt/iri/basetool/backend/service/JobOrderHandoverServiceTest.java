@@ -10,6 +10,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverItemCreateDt
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,8 @@ class JobOrderHandoverServiceTest {
     private InventoryItemRepository inventoryItemRepository;
     @Mock
     private JobOrderHandoverMapper jobOrderHandoverMapper;
+    @Mock
+    private JobOrderService jobOrderService;
 
     @InjectMocks
     private JobOrderHandoverService service;
@@ -93,6 +96,8 @@ class JobOrderHandoverServiceTest {
         assertEquals(6.0, jobOrderMaterial.getAmount());
         verify(inventoryItemRepository).save(inventoryItem);
         verify(inventoryItemRepository, never()).delete(any());
+        verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+        verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
         verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     }
 
@@ -114,6 +119,8 @@ class JobOrderHandoverServiceTest {
         assertEquals(0.0, jobOrderMaterial.getAmount());
         verify(inventoryItemRepository).delete(inventoryItem);
         verify(inventoryItemRepository, never()).save(any());
+        verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+        verify(jobOrderService).updateJobOrderStatus(orderId, JobOrderStatus.COMPLETED);
         verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     }
 

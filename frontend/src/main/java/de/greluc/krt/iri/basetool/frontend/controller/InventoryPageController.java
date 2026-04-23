@@ -85,17 +85,41 @@ public class InventoryPageController {
     ) {}
 
     @GetMapping("/my")
-    public String viewMyInventory(Model model) {
+    public String viewMyInventory(@RequestParam(required = false) List<UUID> materialIds,
+                                  @RequestParam(required = false) Integer minQuality,
+                                  @RequestParam(required = false) List<UUID> jobOrderIds,
+                                  @RequestParam(required = false) List<UUID> missionIds,
+                                  @RequestParam(required = false, defaultValue = "false") boolean fragment,
+                                  Model model) {
         if (!model.containsAttribute("inventoryForm")) {
             model.addAttribute("inventoryForm", new InventoryForm());
         }
         if (!model.containsAttribute("inventoryBookOutForm")) {
             model.addAttribute("inventoryBookOutForm", new de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm());
         }
-        
+
         List<GroupedInventoryDto> groupedItems = new ArrayList<>();
         try {
-            String url = org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/my-inventory/grouped").build().toUriString();
+            org.springframework.web.util.UriComponentsBuilder uriBuilder = org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/my-inventory/grouped");
+            if (materialIds != null && !materialIds.isEmpty()) {
+                for (UUID id : materialIds) {
+                    uriBuilder.queryParam("materialIds", id.toString());
+                }
+            }
+            if (minQuality != null) {
+                uriBuilder.queryParam("minQuality", minQuality);
+            }
+            if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
+                for (UUID id : jobOrderIds) {
+                    uriBuilder.queryParam("jobOrderIds", id.toString());
+                }
+            }
+            if (missionIds != null && !missionIds.isEmpty()) {
+                for (UUID id : missionIds) {
+                    uriBuilder.queryParam("missionIds", id.toString());
+                }
+            }
+            String url = uriBuilder.build().toUriString();
             List<GroupedInventoryDto> res = backendApiClient.get(url, new ParameterizedTypeReference<>() {});
             if (res != null) {
                 groupedItems = res;
@@ -113,12 +137,24 @@ public class InventoryPageController {
         model.addAttribute("jobOrders", fetchActiveJobOrders());
         model.addAttribute("missions", fetchMissions());
         model.addAttribute("users", fetchUsers());
+        model.addAttribute("selectedMaterialIds", materialIds);
+        model.addAttribute("selectedMinQuality", minQuality);
+        model.addAttribute("selectedJobOrderIds", jobOrderIds);
+        model.addAttribute("selectedMissionIds", missionIds);
+        model.addAttribute("authUserId", currentAuthName());
+        model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+
+        if (fragment) {
+            return "inventory-my :: inventoryTableFragment";
+        }
         return "inventory-my";
     }
 
     @GetMapping("/all")
     public String viewAllInventory(@RequestParam(required = false) List<UUID> materialIds, 
                                    @RequestParam(required = false) Integer minQuality, 
+                                   @RequestParam(required = false) List<UUID> jobOrderIds,
+                                   @RequestParam(required = false) List<UUID> missionIds,
                                    @RequestParam(required = false, defaultValue = "false") boolean fragment,
                                    Model model) {
         if (!model.containsAttribute("inventoryForm")) {
@@ -139,6 +175,16 @@ public class InventoryPageController {
             if (minQuality != null) {
                 uriBuilder.queryParam("minQuality", minQuality);
             }
+            if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
+                for (UUID id : jobOrderIds) {
+                    uriBuilder.queryParam("jobOrderIds", id.toString());
+                }
+            }
+            if (missionIds != null && !missionIds.isEmpty()) {
+                for (UUID id : missionIds) {
+                    uriBuilder.queryParam("missionIds", id.toString());
+                }
+            }
             String url = uriBuilder.build().toUriString();
             List<GroupedInventoryDto> res = backendApiClient.get(url, new ParameterizedTypeReference<>() {});
             if (res != null) {
@@ -154,11 +200,15 @@ public class InventoryPageController {
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("selectedMaterialIds", materialIds);
         model.addAttribute("selectedMinQuality", minQuality);
+        model.addAttribute("selectedJobOrderIds", jobOrderIds);
+        model.addAttribute("selectedMissionIds", missionIds);
         model.addAttribute("locations", fetchLocations());
         model.addAttribute("jobOrders", fetchActiveJobOrders());
         model.addAttribute("missions", fetchMissions());
         model.addAttribute("users", fetchUsers());
-        
+        model.addAttribute("authUserId", currentAuthName());
+        model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+
         if (fragment) {
             return "inventory-admin :: inventoryTableFragment";
         }
@@ -237,7 +287,8 @@ public class InventoryPageController {
 
     @PostMapping("/{id}/book-out")
     public String bookOutInventoryItem(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("inventoryBookOutForm") de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes, @RequestHeader(value = "Referer", required = false) String referer) {
-        String redirectPath = (referer != null && referer.contains("/inventory/all")) ? "/inventory/all" : "/inventory/my";
+        String basePath = (referer != null && referer.contains("/inventory/all")) ? "/inventory/all" : "/inventory/my";
+        String redirectPath = buildInventoryRedirectFromReferer(basePath, referer);
 
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute("errorToast", "error.validation.failed");
@@ -266,6 +317,48 @@ public class InventoryPageController {
         return "redirect:" + redirectPath;
     }
 
+    /**
+     * Builds a redirect target for inventory list views that preserves the filter query parameters
+     * (e.g. {@code materialIds}, {@code minQuality}, {@code jobOrderIds}, {@code missionIds},
+     * {@code page}, {@code size}, {@code sort}) taken from the given Referer URL. This is the
+     * single source of truth for filter state (URL-based) and guarantees that users keep their
+     * active filters after write actions such as book-out / transfer / sell.
+     * <p>
+     * If the referer is empty, not parseable, or contains no query string, the plain base path is
+     * returned. The {@code fragment} parameter is intentionally stripped since the redirect always
+     * targets the full page view.
+     */
+    @org.jetbrains.annotations.NotNull
+    static String buildInventoryRedirectFromReferer(@org.jetbrains.annotations.NotNull String basePath,
+                                                    @org.jetbrains.annotations.Nullable String referer) {
+        if (referer == null || referer.isBlank()) {
+            return basePath;
+        }
+        String query;
+        try {
+            java.net.URI uri = java.net.URI.create(referer);
+            query = uri.getRawQuery();
+        } catch (IllegalArgumentException ex) {
+            return basePath;
+        }
+        if (query == null || query.isBlank()) {
+            return basePath;
+        }
+        StringBuilder rebuilt = new StringBuilder();
+        for (String raw : query.split("&")) {
+            if (raw.isEmpty()) continue;
+            int eq = raw.indexOf('=');
+            String name = eq < 0 ? raw : raw.substring(0, eq);
+            if (name.isEmpty() || "fragment".equals(name)) continue;
+            if (!rebuilt.isEmpty()) rebuilt.append('&');
+            rebuilt.append(raw);
+        }
+        if (rebuilt.isEmpty()) {
+            return basePath;
+        }
+        return basePath + "?" + rebuilt;
+    }
+
     @PutMapping("/{id}/update-associations")
     @ResponseBody
     public org.springframework.http.ResponseEntity<Void> updateAssociations(
@@ -274,11 +367,44 @@ public class InventoryPageController {
         try {
             backendApiClient.put("/api/v1/inventory/" + id, dto, Void.class);
             return org.springframework.http.ResponseEntity.ok().build();
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("Failed to update inventory item associations: status={}, {}", e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
         } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
             log.error("Failed to update inventory item associations: {}", e.getMessage());
             return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
         } catch (Exception e) {
             log.error("Failed to update inventory item associations", e);
+            return org.springframework.http.ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * AJAX endpoint that proxies a note update (add/edit/remove) for an inventory item to the backend.
+     * Authorisation is enforced by the backend (owner or {@code LOGISTICIAN}/{@code OFFICER}/
+     * {@code ADMIN} via role hierarchy). A blank or empty {@code note} removes the note.
+     * On success, returns the updated {@link InventoryItemDto} (including the incremented version)
+     * so the frontend can synchronize {@code data-version} DOM attributes.
+     */
+    @PutMapping("/{id}/note")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<InventoryItemDto> updateInventoryItemNote(
+            @PathVariable @NotNull UUID id,
+            @RequestBody @Valid InventoryItemNoteUpdateRequest request) {
+        try {
+            InventoryItemDto updated = backendApiClient.put("/api/v1/inventory/" + id + "/note", request, InventoryItemDto.class);
+            return org.springframework.http.ResponseEntity.ok(updated);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            // Propagate backend status (e.g. 409 Conflict from Optimistic Locking, 400 Validation,
+            // 403 Forbidden) to the browser instead of masking it as 500, so the JS note modal
+            // can react appropriately (toast + reload on 409).
+            log.error("Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            log.error("Failed to update inventory item note: {}", e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("Failed to update inventory item note", e);
             return org.springframework.http.ResponseEntity.status(500).build();
         }
     }
@@ -344,6 +470,23 @@ public class InventoryPageController {
             log.error("Failed to fetch missions", e);
         }
         return new ArrayList<>();
+    }
+
+    private static String currentAuthName() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : null;
+    }
+
+    private static boolean hasLogisticianOrAbove() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (org.springframework.security.core.GrantedAuthority a : auth.getAuthorities()) {
+            String r = a.getAuthority();
+            if ("ROLE_LOGISTICIAN".equals(r) || "ROLE_OFFICER".equals(r) || "ROLE_ADMIN".equals(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String parseString(Object o) {

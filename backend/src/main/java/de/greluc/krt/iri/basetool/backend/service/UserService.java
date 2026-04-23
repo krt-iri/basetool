@@ -38,7 +38,25 @@ public class UserService {
     private final MissionParticipantRepository missionParticipantRepository;
 
     public boolean isUsernameOrDisplayNameTaken(@NotNull String name) {
-        return userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(name, name).isPresent();
+        return !findMatchesByExactName(name).isEmpty();
+    }
+
+    /**
+     * Resolves a free-text participant name to existing users by case-insensitive exact match
+     * on {@code username} or {@code displayName}. The input is trimmed. An empty or blank name
+     * yields an empty result without hitting the database.
+     *
+     * <p>Used by participant-add flows to translate free-text input (when the user did not pick
+     * an entry from the autocomplete dropdown) into a concrete user reference, so that a member
+     * is correctly linked instead of being (wrongly) rejected as a duplicate guest name.
+     */
+    @NotNull
+    public List<User> findMatchesByExactName(@NotNull String name) {
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return List.of();
+        }
+        return userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(trimmed, trimmed);
     }
 
     @NotNull

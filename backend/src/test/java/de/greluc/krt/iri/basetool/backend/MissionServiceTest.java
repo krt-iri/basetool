@@ -153,6 +153,25 @@ class MissionServiceTest {
     }
 
     @Test
+    void updateMission_ShouldUpdateCalendarLink() {
+        UUID id = UUID.randomUUID();
+        Mission existing = new Mission();
+        existing.setId(id);
+        existing.setCalendarLink("old-link");
+
+        Mission details = new Mission();
+        details.setStatus("PLANNED");
+        details.setCalendarLink("new-link");
+
+        when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Mission updated = missionService.updateMission(id, details);
+
+        assertEquals("new-link", updated.getCalendarLink());
+    }
+
+    @Test
     void createMission_ShouldThrowException_WhenMeetingTimeAfterPlannedStart() {
         Mission mission = new Mission();
         mission.setPlannedStartTime(Instant.now());

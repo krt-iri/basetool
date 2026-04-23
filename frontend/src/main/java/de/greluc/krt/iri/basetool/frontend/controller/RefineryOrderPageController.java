@@ -50,6 +50,36 @@ public class RefineryOrderPageController {
     private final BackendApiClient backendApiClient;
     private final RoleHierarchy roleHierarchy;
 
+    /**
+     * Parsed den vom Formular uebermittelten Start-Zeitpunkt als UTC-{@link java.time.Instant}.
+     *
+     * Warum: Alle Zeitpunkte werden im System ausschliesslich in UTC persistiert und ueber
+     * die API transportiert (AGENTS.md "Consistent Date/Time/Zone Handling"). Das Frontend
+     * (datetime-splitter.js) liefert daher grundsaetzlich einen ISO-Instant-String mit 'Z'
+     * oder mit Offset. Es werden ausserdem Rueckwaerts-Kompatibilitaetsformen geparst
+     * (reines Datum, lokales DateTime ohne Zone – letzteres wird defensiv als UTC interpretiert,
+     * um eine implizite und DST-anfaellige Verwendung von {@code ZoneId.systemDefault()} zu vermeiden).
+     */
+    static java.time.Instant parseStartedAt(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return java.time.Instant.now();
+        }
+        String input = raw.trim();
+        try {
+            return java.time.Instant.parse(input);
+        } catch (Exception ignored) { /* not an instant */ }
+        try {
+            return java.time.OffsetDateTime.parse(input).toInstant();
+        } catch (Exception ignored) { /* not offset date time */ }
+        if (input.length() == 10) {
+            // Nur Datum -> Tagesbeginn in UTC
+            return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        }
+        // LocalDateTime ohne Zone -> defensiv als UTC interpretieren, um doppelte
+        // DST-Umrechnung zu vermeiden. Korrekte Eingaben tragen immer 'Z' oder Offset.
+        return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
+    }
+
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public String viewOrders(@RequestParam(required = false) List<String> status, @RequestParam(required = false) Boolean onlyMine, Model model, @AuthenticationPrincipal OidcUser principal) {
@@ -123,8 +153,8 @@ public class RefineryOrderPageController {
             List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto = new ArrayList<>();
             for (RefineryGoodForm g : form.getGoods()) {
                 if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null);
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null) : null;
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null);
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null) : null;
                     goodsDto.add(new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto(null, inMat, g.getInputQuantity(), outMat, g.getOutputQuantity(), g.getQuality(), null));
                 }
             }
@@ -135,35 +165,18 @@ public class RefineryOrderPageController {
                 return "redirect:/refinery-orders/create" + (form.getSource() != null ? "?source=" + form.getSource() : "");
             }
             
-            java.time.Instant startedAtTime;
-            if (form.getStartedAt() != null && !form.getStartedAt().trim().isEmpty()) {
-                String input = form.getStartedAt().trim();
-                if (input.length() == 10) {
-                    // Falls nur ein Datum (YYYY-MM-DD) gesendet wird
-                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-                } else if (input.length() == 16) {
-                    // Falls Datum + Zeit (YYYY-MM-DDTHH:mm) ohne Sekunden gesendet wird
-                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toInstant();
-                } else {
-                    // Fallback parse
-                    try {
-                        startedAtTime = java.time.OffsetDateTime.parse(input).toInstant();
-                    } catch (Exception e) {
-                        startedAtTime = java.time.Instant.parse(input);
-                    }
-                }
-            } else {
-                startedAtTime = java.time.Instant.now();
-            }
+            java.time.Instant startedAtTime = parseStartedAt(form.getStartedAt());
 
             RefineryOrderDto orderDto = new RefineryOrderDto(
                     null,
                     form.getOwnerId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(form.getOwnerId(), null, null, null, null) : null,
                     form.getLocationId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(form.getLocationId(), null, null, false, null) : null,
-                    form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null) : null,
+                    form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null, null) : null,
                     startedAtTime,
                     (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
                     form.getExpenses(),
+                    form.getOreSales() != null ? form.getOreSales() : 0d,
+                    null,
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
                     form.getStatus() != null ? form.getStatus() : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
@@ -216,6 +229,7 @@ public class RefineryOrderPageController {
                         form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
                     }
                     form.setExpenses(orderDto.expenses());
+                    form.setOreSales(orderDto.oreSales() != null ? orderDto.oreSales() : 0d);
                     if (orderDto.location() != null) {
                         form.setLocationId(orderDto.location().id());
                     }
@@ -327,8 +341,8 @@ public class RefineryOrderPageController {
             List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto = new ArrayList<>();
             for (RefineryGoodForm g : form.getGoods()) {
                 if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null);
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null) : null;
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null);
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null) : null;
                     goodsDto.add(new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto(null, inMat, g.getInputQuantity(), outMat, g.getOutputQuantity(), g.getQuality(), null));
                 }
             }
@@ -339,32 +353,18 @@ public class RefineryOrderPageController {
                 return "redirect:/refinery-orders/" + id;
             }
 
-            java.time.Instant startedAtTime;
-            if (form.getStartedAt() != null && !form.getStartedAt().trim().isEmpty()) {
-                String input = form.getStartedAt().trim();
-                if (input.length() == 10) {
-                    startedAtTime = java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-                } else if (input.length() == 16) {
-                    startedAtTime = java.time.LocalDateTime.parse(input).atZone(java.time.ZoneId.systemDefault()).toInstant();
-                } else {
-                    try {
-                        startedAtTime = java.time.OffsetDateTime.parse(input).toInstant();
-                    } catch (Exception e) {
-                        startedAtTime = java.time.Instant.parse(input);
-                    }
-                }
-            } else {
-                startedAtTime = java.time.Instant.now();
-            }
+            java.time.Instant startedAtTime = parseStartedAt(form.getStartedAt());
 
             RefineryOrderDto orderDto = new RefineryOrderDto(
                     id,
                     form.getOwnerId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(form.getOwnerId(), null, null, null, null) : null,
                     form.getLocationId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(form.getLocationId(), null, null, false, null) : null,
-                    form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null) : null,
+                    form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null, null) : null,
                     startedAtTime,
                     (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
                     form.getExpenses(),
+                    form.getOreSales() != null ? form.getOreSales() : 0d,
+                    null,
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
                     form.getStatus() != null ? form.getStatus() : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
@@ -413,7 +413,8 @@ public class RefineryOrderPageController {
                     f.getQuality(),
                     f.getAmount(),
                     f.getUserId(),
-                    f.getJobOrderId()
+                    f.getJobOrderId(),
+                    f.getNote()
                 ));
             }
             RefineryOrderStoreDto dto = new RefineryOrderStoreDto(dtoList);

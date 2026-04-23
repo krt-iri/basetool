@@ -82,7 +82,7 @@ class RefineryOrderDurationTest {
     void testViewOrder_DurationBackConversion() throws Exception {
         UUID orderId = UUID.randomUUID();
         RefineryOrderDto order = new RefineryOrderDto(
-                orderId, null, null, null, java.time.Instant.now(), 145L, 100.0, null, Collections.emptyList(), null, 1L
+                orderId, null, null, null, java.time.Instant.now(), 145L, 100.0, 0d, 0d, null, Collections.emptyList(), null, 1L
         );
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
 
@@ -124,7 +124,7 @@ class RefineryOrderDurationTest {
     void testEndsAtCalculation() {
         java.time.Instant startedAt = java.time.Instant.parse("2024-04-06T12:00:00Z");
         RefineryOrderDto order = new RefineryOrderDto(
-                UUID.randomUUID(), null, null, null, startedAt, 125L, 100.0, null, Collections.emptyList(), null, 1L
+                UUID.randomUUID(), null, null, null, startedAt, 125L, 100.0, 0d, 0d, null, Collections.emptyList(), null, 1L
         );
         
         java.time.Instant expectedEnd = startedAt.plus(125, java.time.temporal.ChronoUnit.MINUTES);
@@ -151,5 +151,81 @@ class RefineryOrderDurationTest {
                 .andExpect(model().attribute("onlyMine", false));
 
         verify(backendApiClient).get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"), any(org.springframework.core.ParameterizedTypeReference.class));
+    }
+
+    @Test
+    void testViewCreateForm_DurationDefaultsZero() throws Exception {
+        mockMvc.perform(get("/refinery-orders/create")
+                .with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("refineryOrderForm"))
+                .andExpect(model().attribute("refineryOrderForm",
+                        org.hamcrest.Matchers.hasProperty("durationHours", org.hamcrest.Matchers.is(0))))
+                .andExpect(model().attribute("refineryOrderForm",
+                        org.hamcrest.Matchers.hasProperty("durationMinutes", org.hamcrest.Matchers.is(0))));
+    }
+
+    @Test
+    void testCreateOrder_RejectsNegativeHours() throws Exception {
+        mockMvc.perform(post("/refinery-orders/create")
+                .param("durationHours", "-1")
+                .param("durationMinutes", "15")
+                .param("expenses", "100")
+                .param("ownerId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("refiningMethodId", UUID.randomUUID().toString())
+                .param("startedAt", "2024-04-06T12:00")
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .with(csrf())
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/refinery-orders/create")));
+
+        org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.never())
+                .post(eq("/api/v1/refinery-orders"), any(), eq(RefineryOrderDto.class));
+    }
+
+    @Test
+    void testCreateOrder_RejectsMinutesOutOfRange() throws Exception {
+        mockMvc.perform(post("/refinery-orders/create")
+                .param("durationHours", "1")
+                .param("durationMinutes", "60")
+                .param("expenses", "100")
+                .param("ownerId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("refiningMethodId", UUID.randomUUID().toString())
+                .param("startedAt", "2024-04-06T12:00")
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .with(csrf())
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/refinery-orders/create")));
+
+        org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.never())
+                .post(eq("/api/v1/refinery-orders"), any(), eq(RefineryOrderDto.class));
+    }
+
+    @Test
+    void testCreateOrder_AcceptsZeroDuration() throws Exception {
+        mockMvc.perform(post("/refinery-orders/create")
+                .param("durationHours", "0")
+                .param("durationMinutes", "0")
+                .param("expenses", "100")
+                .param("ownerId", UUID.randomUUID().toString())
+                .param("locationId", UUID.randomUUID().toString())
+                .param("refiningMethodId", UUID.randomUUID().toString())
+                .param("startedAt", "2024-04-06T12:00")
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .with(csrf())
+                .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/create"))));
+
+        ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+        verify(backendApiClient).post(eq("/api/v1/refinery-orders"), captor.capture(), eq(RefineryOrderDto.class));
+        assertEquals(0L, captor.getValue().durationMinutes());
     }
 }

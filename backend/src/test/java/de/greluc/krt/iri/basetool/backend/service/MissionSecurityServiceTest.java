@@ -19,7 +19,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -119,5 +125,133 @@ class MissionSecurityServiceTest {
         when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
         assertFalse(missionSecurityService.canManageManagers(missionId, authentication));
+    }
+
+    // ---------------------------------------------------------------------
+    // canAccessParticipant: Self-Edit support for logged-in mission participants.
+    // A participant may be edited by its owner (participant.user.id == jwt.sub)
+    // or by any user with elevated MISSION_MANAGER / OFFICER / ADMIN authority.
+    // ---------------------------------------------------------------------
+
+    @Test
+    void canAccessParticipant_Owner_ShouldReturnTrue() {
+        // Given: participant belongs to current user, no elevated role
+        UUID participantId = UUID.randomUUID();
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(mission);
+        participant.setUser(user);
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
+        when(authentication.getAuthorities()).thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+        // When / Then: self-edit allowed
+        assertTrue(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+    }
+
+    @Test
+    void canAccessParticipant_ForeignUserWithoutPrivilege_ShouldReturnFalse() {
+        // Given: participant belongs to a DIFFERENT user
+        UUID participantId = UUID.randomUUID();
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(mission);
+        participant.setUser(otherUser);
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
+        when(authentication.getAuthorities()).thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+        // When / Then: foreign edit forbidden
+        assertFalse(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+    }
+
+    @Test
+    void canAccessParticipant_MissionManager_ShouldReturnTrueForAnyParticipant() {
+        // Given: participant belongs to a DIFFERENT user, but caller is MISSION_MANAGER
+        UUID participantId = UUID.randomUUID();
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(mission);
+        participant.setUser(otherUser);
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
+        when(authentication.getAuthorities()).thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+
+        // When / Then: privileged access granted without owner match
+        assertTrue(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+    }
+
+    @Test
+    void canAccessParticipant_AnonymousCaller_ShouldReturnFalse() {
+        // Given: registered participant, anonymous caller
+        UUID participantId = UUID.randomUUID();
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(mission);
+        participant.setUser(user);
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("anonymousUser");
+
+        // When / Then
+        assertFalse(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+    }
+
+    @Test
+    void canAccessParticipant_GuestParticipant_ShouldReturnTrueForAnyone() {
+        // Given: guest (unlinked) participant
+        UUID participantId = UUID.randomUUID();
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(mission);
+        participant.setUser(null);
+        participant.setGuestName("Somebody");
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+
+        // When / Then: guest entries are editable by anyone, matching add-participant behaviour
+        assertTrue(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+    }
+
+    @Test
+    void canAccessParticipant_MissingParticipant_ShouldThrow404() {
+        // Regression: a stale frontend row (participant concurrently deleted) must
+        // surface as 404 Not Found, not as a generic 500 Internal Server Error.
+        UUID participantId = UUID.randomUUID();
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void canAccessParticipant_MissionMismatch_ShouldReturnFalse() {
+        // Given: participant belongs to a different mission than the one addressed
+        UUID participantId = UUID.randomUUID();
+        Mission otherMission = new Mission();
+        otherMission.setId(UUID.randomUUID());
+        MissionParticipant participant = new MissionParticipant();
+        participant.setId(participantId);
+        participant.setMission(otherMission);
+        participant.setUser(user);
+
+        when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+
+        assertFalse(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
     }
 }

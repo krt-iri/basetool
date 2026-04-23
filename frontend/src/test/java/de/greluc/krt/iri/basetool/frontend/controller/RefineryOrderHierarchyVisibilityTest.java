@@ -58,7 +58,7 @@ class RefineryOrderHierarchyVisibilityTest {
         RefineryOrderDto order = new RefineryOrderDto(
                 orderId,
                 new UserReferenceDto(ownerId, "Owner", null, null, null),
-                null, null, java.time.Instant.now(), 60L, 100.0, null, List.of(), RefineryOrderStatus.OPEN, 1L
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.OPEN, 1L
         );
         
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
@@ -77,5 +77,69 @@ class RefineryOrderHierarchyVisibilityTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Einlagern")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Auftrag Abbrechen")));
+    }
+
+    @Test
+    void refineryOrderDetail_Completed_AsOwner_ShouldShowSaveButton_ButHideStoreAndCancel() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+
+        RefineryOrderDto order = new RefineryOrderDto(
+                orderId,
+                new UserReferenceDto(ownerId, "Owner", null, null, null),
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.COMPLETED, 1L
+        );
+
+        when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
+        when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class))).thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put(org.springframework.security.oauth2.core.oidc.IdTokenClaimNames.SUB, ownerId.toString());
+        claims.put("preferred_username", "owner");
+        org.springframework.security.oauth2.core.oidc.OidcIdToken idToken = new org.springframework.security.oauth2.core.oidc.OidcIdToken("token-value", java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600), claims);
+        org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser = new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MEMBER")), idToken);
+        org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken authToken = new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
+
+        String html = mockMvc.perform(get("/refinery-orders/" + orderId)
+                        .locale(java.util.Locale.GERMAN)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authToken)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(html.contains("Speichern"), "Save button should be visible in COMPLETED state for owner");
+        org.junit.jupiter.api.Assertions.assertFalse(html.contains("onclick=\"openStoreModal()\""), "Store button should be hidden in COMPLETED state");
+        org.junit.jupiter.api.Assertions.assertFalse(html.contains("Auftrag Abbrechen"), "Cancel button should be hidden in COMPLETED state");
+    }
+
+    @Test
+    void refineryOrderDetail_Canceled_AsOwner_ShouldShowSaveButton_ButHideStoreAndCancel() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+
+        RefineryOrderDto order = new RefineryOrderDto(
+                orderId,
+                new UserReferenceDto(ownerId, "Owner", null, null, null),
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.CANCELED, 1L
+        );
+
+        when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
+        when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class))).thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put(org.springframework.security.oauth2.core.oidc.IdTokenClaimNames.SUB, ownerId.toString());
+        claims.put("preferred_username", "owner");
+        org.springframework.security.oauth2.core.oidc.OidcIdToken idToken = new org.springframework.security.oauth2.core.oidc.OidcIdToken("token-value", java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600), claims);
+        org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser = new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MEMBER")), idToken);
+        org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken authToken = new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
+
+        String html = mockMvc.perform(get("/refinery-orders/" + orderId)
+                        .locale(java.util.Locale.GERMAN)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authToken)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(html.contains("Speichern"), "Save button should be visible in CANCELED state for owner");
+        org.junit.jupiter.api.Assertions.assertFalse(html.contains("onclick=\"openStoreModal()\""), "Store button should be hidden in CANCELED state");
+        org.junit.jupiter.api.Assertions.assertFalse(html.contains("Auftrag Abbrechen"), "Cancel button should be hidden in CANCELED state");
     }
 }

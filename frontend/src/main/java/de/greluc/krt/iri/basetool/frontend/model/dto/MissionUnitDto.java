@@ -1,8 +1,8 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public record MissionUnitDto(
@@ -12,7 +12,7 @@ public record MissionUnitDto(
         ShipDto ship,
         Double frequency,
         Boolean highValueUnit,
-        Set<MissionCrewDto> crew
+        List<MissionCrewDto> crew
 ) {
     public Map<String, Integer> getJobSummary() {
         if (crew == null) return Map.of();

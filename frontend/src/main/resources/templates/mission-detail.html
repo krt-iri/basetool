@@ -7,7 +7,7 @@
     <style>
         .form-group { margin-bottom: 1.5rem; }
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
-        input[type="text"], input[type="url"], select, textarea, input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
+        input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
         .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
         .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
@@ -213,10 +213,13 @@
             </div>
 
             <div class="form-row">
-            <div class="form-group">
+            <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
                 <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
-                <input type="datetime-local" name="meetingTime" th:value="*{meetingTime}"
-                       th:disabled="${!isNew and !mission.canEdit}">
+                <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                </div>
                 <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
             </div>
@@ -229,28 +232,36 @@
             </div>
             
             <div class="form-row">
-            <div class="form-group">
+            <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
                 <label th:text="#{mission.planned_start}">Planned Start</label>
-                <input type="datetime-local" name="plannedStartTime" th:value="*{plannedStartTime}"
-                       th:disabled="${!isNew and !mission.canEdit}" required>
+                <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" required th:disabled="${!isNew and !mission.canEdit}">
+                </div>
                 <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
             
-            <div class="form-group">
+            <div class="form-group datetime-split-group" th:attr="data-validate-after='plannedStartTime', data-error-after=#{validation.datetime.after}">
                 <label th:text="#{mission.planned_end}">Planned End</label>
-                <input type="datetime-local" name="plannedEndTime" th:value="*{plannedEndTime}"
-                       th:disabled="${!isNew and !mission.canEdit}">
+                <input type="hidden" name="plannedEndTime" id="plannedEndTime" th:value="*{plannedEndTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                </div>
                 <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
             </div>
             
-            <div class="form-row" th:if="${!isNew}">
-            <div class="form-group">
+            <div th:if="${!isNew}" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="form-group datetime-split-group">
                 <label th:text="#{mission.actual_start}">Actual Start</label>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <input type="datetime-local" id="actualStartTime" name="actualStartTime" th:value="*{actualStartTime}"
-                           style="flex-grow: 1;"
-                           th:disabled="${!isNew and !mission.canEdit}">
+                <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
+                <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
+                    <div class="datetime-split-inputs" style="flex-grow: 1;">
+                        <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                    </div>
                     <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
                             onclick="setNowToInput('actualStartTime')"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
@@ -258,12 +269,14 @@
                 <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
                 <label th:text="#{mission.actual_end}">Actual End</label>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <input type="datetime-local" id="actualEndTime" name="actualEndTime" th:value="*{actualEndTime}"
-                           style="flex-grow: 1;"
-                           th:disabled="${!isNew and !mission.canEdit}">
+                <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
+                <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
+                    <div class="datetime-split-inputs" style="flex-grow: 1;">
+                        <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                    </div>
                     <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
                             onclick="setNowToInput('actualEndTime')"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
@@ -371,9 +384,16 @@
 
         <!-- Column 2: Participants -->
         <div class="mission-column" id="col-participants" th:if="${!isNew}">
-            <div class="vertical-title" onclick="toggleColumn('col-participants')" th:text="#{mission.participants}">Teilnehmer</div>
+            <div class="vertical-title" onclick="toggleColumn('col-participants')"
+                 th:text="|${#messages.msg('mission.participants')} ${mission.checkedInParticipants}/${mission.registeredParticipants}|">Teilnehmer 0/0</div>
             <div class="col-header" onclick="toggleColumn('col-participants')">
-                <h2 th:text="#{mission.participants}">Teilnehmer</h2>
+                <h2>
+                    <span th:text="#{mission.participants}">Teilnehmer</span>
+                    <span class="participants-count"
+                          style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-left: 0.5rem;"
+                          th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|"
+                          th:title="#{mission.participants.count.tooltip}">0/0</span>
+                </h2>
                 <span class="toggle-icon">-</span>
             </div>
             <div class="col-content">
@@ -404,9 +424,9 @@
                     <td th:text="${p?.id != null ? assignedUnitByParticipantId[p.id] : ''}">
                     </td>
                     <td>
-                        <div style="display:flex; gap:0.5rem;" th:if="${mission.canEdit or (#authorization.expression('isAuthenticated()') and p?.user != null and p.user.id.toString() == #authentication.name) or (p?.user == null)}">
+                        <div style="display:flex; gap:0.5rem;" th:if="${mission.canEdit or (authUserId != null and p?.user != null and p.user.id.toString() == authUserId) or (p?.user == null)}">
                             <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}">
-                                <button type="submit" class="btn" th:text="#{mission.participant.checkin}" th:title="#{mission.participant.checkin.tooltip}">Check-In</button>
+                                <button type="submit" class="btn btn-success" th:text="#{mission.participant.checkin}" th:title="#{mission.participant.checkin.tooltip}">Check-In</button>
                             </form>
                             <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}">
                                 <button type="submit" class="btn" th:text="#{mission.participant.checkout}">Check-Out</button>
@@ -417,6 +437,7 @@
                                     th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
                                     th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
                                     th:data-squadron="${p?.squadron != null ? p.squadron.id : ''}"
+                                    th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('MEMBER') or p.user.roles.contains('ROLE_MEMBER') or p.user.roles.contains('SQUADRON_MEMBER') or p.user.roles.contains('ROLE_SQUADRON_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                                     th:data-payout-preference="${p?.payoutPreference?.name()}"
                                     th:data-comment="${p?.comment}"
                                     th:data-version="${p?.version}"
@@ -845,14 +866,22 @@
                 <input type="hidden" name="startTime" id="edit-participant-start-time-hidden">
                 <input type="hidden" name="endTime" id="edit-participant-end-time-hidden">
                 
-                <div class="form-group" th:if="${mission.canEdit}">
+                <div class="form-group datetime-split-group" th:if="${mission.canEdit}">
                     <label th:text="#{mission.participant.start_time}">Startzeit</label>
-                    <input type="datetime-local" id="edit-participant-start-time-ui">
+                    <input type="hidden" id="edit-participant-start-time-ui">
+                    <div class="datetime-split-inputs">
+                        <input type="date" class="date-part">
+                        <input type="time" class="time-part">
+                    </div>
                 </div>
 
-                <div class="form-group" th:if="${mission.canEdit}">
+                <div class="form-group datetime-split-group" th:attr="data-validate-after='edit-participant-start-time-ui', data-error-after=#{validation.datetime.after}" th:if="${mission.canEdit}">
                     <label th:text="#{mission.participant.end_time}">Endzeit</label>
-                    <input type="datetime-local" id="edit-participant-end-time-ui">
+                    <input type="hidden" id="edit-participant-end-time-ui">
+                    <div class="datetime-split-inputs">
+                        <input type="date" class="date-part">
+                        <input type="time" class="time-part">
+                    </div>
                 </div>
                 
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
@@ -1110,6 +1139,8 @@
     const MSG_ERROR_OWNER_CHANGE = /*[[#{error.mission.owner.change}]]*/ 'Error changing owner';
     const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.owner.confirm}]]*/ 'Are you sure you want to change the owner?';
     const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
+    window.MSG_MISSION_ACTUAL_TIME_ERROR = /*[[#{mission.actual_time.error}]]*/ 'Fehler beim Speichern der tats\u00e4chlichen Zeit.';
+    window.MSG_MISSION_ACTUAL_TIME_CONFLICT = /*[[#{mission.actual_time.conflict}]]*/ 'Konflikt: Die Daten wurden zwischenzeitlich ge\u00e4ndert. Seite wird neu geladen.';
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     console.log('Mission ID initialized:', missionId);
@@ -1152,7 +1183,16 @@
                     eForm.action = this.getAttribute('data-action');
                     eJob.value = this.getAttribute('data-job');
                     if(ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
-                    if(eSquadron) eSquadron.value = this.getAttribute('data-squadron');
+                    if(eSquadron) {
+                        eSquadron.value = this.getAttribute('data-squadron');
+                        if (!eSquadron.value && this.getAttribute('data-is-member') === 'true') {
+                            const iridiumOption = Array.from(eSquadron.options).find(opt => opt.text.trim().toUpperCase() === 'IRIDIUM');
+                            if (iridiumOption) {
+                                eSquadron.value = iridiumOption.value;
+                                eSquadron.dispatchEvent(new Event('change'));
+                            }
+                        }
+                    }
                     eComment.value = this.getAttribute('data-comment');
                     
                     const ePayout = document.getElementById('edit-payout-preference');
@@ -1417,6 +1457,14 @@
                                 div.addEventListener("click", function(e) {
                                     searchInput.value = displayName;
                                     userIdInput.value = user.id;
+                                    const pSquadron = document.getElementById('participant-squadron');
+                                    if (pSquadron && user.roles && (user.roles.includes('MEMBER') || user.roles.includes('ROLE_MEMBER') || user.roles.includes('SQUADRON_MEMBER') || user.roles.includes('ROLE_SQUADRON_MEMBER') || user.roles.includes('ADMIN') || user.roles.includes('ROLE_ADMIN') || user.roles.includes('OFFICER') || user.roles.includes('ROLE_OFFICER'))) {
+                                        const iridiumOption = Array.from(pSquadron.options).find(opt => opt.text.trim().toUpperCase() === 'IRIDIUM');
+                                        if (iridiumOption) {
+                                            pSquadron.value = iridiumOption.value;
+                                            pSquadron.dispatchEvent(new Event('change'));
+                                        }
+                                    }
                                     closeAllLists();
                                 });
                                 resultsDiv.appendChild(div);
@@ -1444,15 +1492,92 @@
 
     function setNowToInput(inputId) {
         const input = document.getElementById(inputId);
-        if (input) {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            
+        if (!input) return;
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+
+        const group = input.closest('.datetime-split-group');
+        if (group) {
+            const dateInput = group.querySelector('.date-part');
+            const timeInput = group.querySelector('.time-part');
+            if (dateInput && timeInput) {
+                dateInput.value = `${year}-${month}-${day}`;
+                timeInput.value = `${hours}:${minutes}`;
+                dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        } else {
             input.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Nur für actualStartTime/actualEndTime wird sofort gespeichert + Reload
+        // (siehe AGENTS.md: Optimistic Locking via Version aus dem DOM)
+        if (inputId === 'actualStartTime' || inputId === 'actualEndTime') {
+            saveActualTimeAndReload(inputId, now);
+        }
+    }
+
+    async function saveActualTimeAndReload(field, nowDate) {
+        const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+        if (!currentMissionId) {
+            console.error('[mission-detail] Mission ID nicht gefunden');
+            return;
+        }
+        const versionInput = document.getElementById('mission-version');
+        const version = versionInput ? versionInput.value : null;
+        if (version === null || version === '') {
+            console.error('[mission-detail] Version nicht gefunden (mission-version input)');
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
+            }
+            return;
+        }
+
+        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+        const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        };
+        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+            headers[csrfHeader] = csrfToken;
+        }
+
+        try {
+            const resp = await fetch(`/missions/${encodeURIComponent(currentMissionId)}/actual-time`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    field: field,
+                    value: nowDate.toISOString(), // UTC ISO-8601 (Instant)
+                    version: Number(version)
+                })
+            });
+            if (resp.ok) {
+                window.location.reload();
+                return;
+            }
+            if (resp.status === 409) {
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_CONFLICT || 'Konflikt: Bitte Seite neu laden.');
+                }
+                // Seite neu laden, damit frische Version geholt wird
+                setTimeout(() => window.location.reload(), 1200);
+                return;
+            }
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
+            }
+        } catch (err) {
+            console.error('[mission-detail] saveActualTimeAndReload error', err);
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
+            }
         }
     }
 
@@ -1625,12 +1750,22 @@
                     showFrontendErrorToast(MSG_ERROR_PAYOUT_UPDATE);
                 }
                 selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
-            } else {
-                selectElement.setAttribute('data-original-value', value);
-                const participantId = selectElement.getAttribute('data-participant-id');
-                if (participantId) {
+                return null;
+            }
+            return response.json();
+        })
+        .then(missionDto => {
+            if (!missionDto) return;
+            selectElement.setAttribute('data-original-value', value);
+            const participantId = selectElement.getAttribute('data-participant-id');
+            if (participantId && missionDto.participants) {
+                const updatedParticipant = missionDto.participants.find(p => p.id === participantId);
+                if (updatedParticipant) {
                     document.querySelectorAll('.edit-participant-btn[data-participant-id="' + participantId + '"]').forEach(btn => {
                         btn.setAttribute('data-payout-preference', value);
+                        if (updatedParticipant.version !== undefined) {
+                            btn.setAttribute('data-version', updatedParticipant.version);
+                        }
                     });
                 }
             }

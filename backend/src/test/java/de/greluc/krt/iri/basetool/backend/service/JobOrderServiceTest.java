@@ -68,7 +68,7 @@ class JobOrderServiceTest {
         material.setId(materialId);
         material.setName("Gold");
 
-        materialDto = new MaterialDto(materialId, "Gold", "RAW", "SCU", "Some desc", null, null, false, false, false, 0L);
+        materialDto = new MaterialDto(materialId, "Gold", "RAW", "SCU", "Some desc", null, null, false, false, false, false, 0L);
 
         jobOrder = new JobOrder();
         jobOrder.setId(orderId);
@@ -174,6 +174,29 @@ class JobOrderServiceTest {
         assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
         assertNotNull(result);
         verify(jobOrderRepository).lockAllJobOrders();
+        verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    }
+
+    @Test
+    void updateJobOrderStatus_ToRejected_ShouldRemovePriorityAndNormalizeAndUnlink() {
+        // Given
+        jobOrder.setPriority(3);
+        jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+        when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+        when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+        when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(UUID.class), any(UUID.class), any())).thenReturn(10.0);
+
+        // When
+        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, JobOrderStatus.REJECTED);
+
+        // Then
+        assertNull(jobOrder.getPriority());
+        assertEquals(JobOrderStatus.REJECTED, jobOrder.getStatus());
+        assertNotNull(result);
+        verify(jobOrderRepository).lockAllJobOrders();
+        verify(inventoryItemRepository).unlinkJobOrder(orderId);
     }
 
     @Test
@@ -280,7 +303,7 @@ class JobOrderServiceTest {
 
         de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto itemDto = 
             new de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto(
-                item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, 1L);
+                item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, null, 1L);
 
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
         when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));

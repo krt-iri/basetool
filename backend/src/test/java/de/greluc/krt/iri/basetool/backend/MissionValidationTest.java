@@ -190,4 +190,76 @@ class MissionValidationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
     }
+
+    /**
+     * Reproduces the bug where an authenticated squadron member types a registered user's
+     * exact name (e.g. "lord_adley") without picking it from the autocomplete dropdown.
+     * The backend must resolve the name to the matching user instead of rejecting the
+     * request with "Guest name is already taken.".
+     */
+    @Test
+    void testAddParticipantPublic_AuthenticatedFreetextName_IsResolvedToMember() throws Exception {
+        User lordAdley = new User();
+        lordAdley.setId(UUID.randomUUID());
+        lordAdley.setUsername("lord_adley");
+        userRepository.save(lordAdley);
+
+        User caller = new User();
+        caller.setId(UUID.randomUUID());
+        caller.setUsername("caller");
+        userRepository.save(caller);
+
+        // Intentionally mixed case + whitespace to verify case-insensitive, trimmed match.
+        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
+            null, "  Lord_Adley  ", null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .with(jwt().jwt(builder -> builder.subject(caller.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        Mission refreshed = missionRepository.findById(mission.getId()).orElseThrow();
+        boolean linked = refreshed.getParticipants().stream()
+            .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(lordAdley.getId()));
+        org.junit.jupiter.api.Assertions.assertTrue(linked,
+            "Freetext participant name must be resolved to the matching registered user.");
+    }
+
+    /**
+     * Two registered users share the same displayName. A free-text participant entry matching
+     * that name is ambiguous and must be rejected with 409 Conflict – never silently assigned.
+     */
+    @Test
+    void testAddParticipantPublic_AmbiguousFreetextName_ShouldReturn409() throws Exception {
+        User u1 = new User();
+        u1.setId(UUID.randomUUID());
+        u1.setUsername("ambig_a");
+        u1.setDisplayName("Shared Alias");
+        userRepository.save(u1);
+
+        User u2 = new User();
+        u2.setId(UUID.randomUUID());
+        u2.setUsername("ambig_b");
+        u2.setDisplayName("Shared Alias");
+        userRepository.save(u2);
+
+        User caller = new User();
+        caller.setId(UUID.randomUUID());
+        caller.setUsername("caller2");
+        userRepository.save(caller);
+
+        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
+            null, "Shared Alias", null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .with(jwt().jwt(builder -> builder.subject(caller.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+    }
 }

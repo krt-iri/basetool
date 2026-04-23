@@ -41,9 +41,9 @@ public class AdminMaterialsPageController {
                 materials = new ArrayList<>(materialsPage.content());
             }
 
-            // Provide a list of only REFINED materials for assignment to RAW materials
+            // Provide a list of all materials for assignment to RAW materials
+            // (bypass UEX data errors where refined materials are not marked correctly)
             List<MaterialDto> refinedMaterials = materials.stream()
-                .filter(m -> "REFINED".equals(m.type()))
                 .sorted(Comparator.comparing(m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
             model.addAttribute("refinedMaterials", refinedMaterials);
@@ -101,6 +101,7 @@ public class AdminMaterialsPageController {
             MaterialCategoryDto category = currentMaterial.category();
             MaterialDto refinedMaterial = currentMaterial.refinedMaterial();
             String quantityType = currentMaterial.quantityType();
+            Boolean isManualRawMaterial = currentMaterial.isManualRawMaterial();
             
             if ("CATEGORY".equals(request.updateType())) {
                 if (request.categoryId() != null) {
@@ -116,6 +117,8 @@ public class AdminMaterialsPageController {
                 }
             } else if ("QUANTITY_TYPE".equals(request.updateType())) {
                 quantityType = request.quantityType();
+            } else if ("MANUAL_RAW".equals(request.updateType())) {
+                isManualRawMaterial = request.isManualRawMaterial();
             } else {
                 return ResponseEntity.badRequest().build();
             }
@@ -132,6 +135,7 @@ public class AdminMaterialsPageController {
                 currentMaterial.isIllegal(), 
                 currentMaterial.isVolatileQt(), 
                 currentMaterial.isVolatileTime(), 
+                isManualRawMaterial,
                 request.version()
             );
             

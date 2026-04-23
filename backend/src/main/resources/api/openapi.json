@@ -5031,6 +5031,103 @@
         }
       }
     },
+    "/api/v1/inventory/{id}/note" : {
+      "put" : {
+        "tags" : [ "inventory-item-controller" ],
+        "operationId" : "updateInventoryItemNote",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InventoryItemNoteUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InventoryItemDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/hangar/users/{userId}/ships/{shipId}" : {
       "put" : {
         "tags" : [ "hangar-controller" ],
@@ -9040,6 +9137,7 @@
       "post" : {
         "tags" : [ "Missions" ],
         "summary" : "Add a participant (public)",
+        "description" : "Adds a participant by explicit userId (from autocomplete) or by free-text guestName. Free-text names are resolved case-insensitively against existing users: a unique match links the participant as a registered member; no match falls back to the guest path; multiple matches return 409 (ambiguous name).",
         "operationId" : "addParticipantPublic",
         "parameters" : [ {
           "name" : "id",
@@ -9062,7 +9160,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Participant added",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -9081,16 +9179,6 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "403" : {
             "description" : "Forbidden",
             "content" : {
@@ -9101,8 +9189,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9111,8 +9199,18 @@
               }
             }
           },
-          "409" : {
-            "description" : "Conflict",
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15621,6 +15719,48 @@
       "get" : {
         "tags" : [ "inventory-item-controller" ],
         "operationId" : "getMyGroupedInventory",
+        "parameters" : [ {
+          "name" : "materialIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
+          "name" : "minQuality",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "jobOrderIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
+          "name" : "missionIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        } ],
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -15867,6 +16007,28 @@
             "format" : "int32"
           }
         }, {
+          "name" : "jobOrderIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
+          "name" : "missionIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -16004,6 +16166,28 @@
           "schema" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }, {
+          "name" : "jobOrderIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
+          "name" : "missionIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           }
         } ],
         "responses" : {
@@ -17148,6 +17332,9 @@
           "isVolatileTime" : {
             "type" : "boolean"
           },
+          "isManualRawMaterial" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -17166,6 +17353,10 @@
           },
           "status" : {
             "type" : "string"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -17224,6 +17415,14 @@
             "format" : "int64"
           },
           "expenses" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "profit" : {
             "type" : "number",
             "format" : "double"
           },
@@ -17353,6 +17552,9 @@
             "format" : "uuid"
           },
           "missionName" : {
+            "type" : "string"
+          },
+          "note" : {
             "type" : "string"
           },
           "version" : {
@@ -17773,6 +17975,14 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "checkedInParticipants" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "registeredParticipants" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         },
         "required" : [ "name" ]
@@ -17866,8 +18076,7 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/MissionCrewDto"
-            },
-            "uniqueItems" : true
+            }
           }
         }
       },
@@ -18028,6 +18237,21 @@
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
+      },
+      "InventoryItemNoteUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "note" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "ShipRequestDto" : {
         "type" : "object",
@@ -18210,6 +18434,11 @@
           "jobOrderId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
@@ -18705,6 +18934,14 @@
             "format" : "int64"
           },
           "expenses" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "profit" : {
             "type" : "number",
             "format" : "double"
           },

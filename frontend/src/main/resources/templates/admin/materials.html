@@ -119,7 +119,17 @@
                         <td>
                             <span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
                         </td>
-                        <td th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</td>
+                        <td>
+                            <div style="white-space: nowrap;">
+                                <span th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
+                            </div>
+                            <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
+                                <label style="margin-bottom: 0; cursor: pointer;">
+                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" onchange="updateMaterial(this)" style="margin-right: 0.25rem;" />
+                                    <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
+                                </label>
+                            </div>
+                        </td>
                         <td>
                             <select name="quantityType" data-update-type="QUANTITY_TYPE" onchange="updateMaterial(this)" style="width: 100%;">
                                 <option value="SCU" th:text="#{admin.materials.quantityType.scu}" th:selected="${mat.quantityType == 'SCU' || mat.quantityType == null}">SCU</option>
@@ -133,14 +143,14 @@
                             </select>
                         </td>
                         <td>
-                            <th:block th:if="${mat?.type == 'RAW'}">
+                            <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
                                 <select sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" name="refinedMaterialId" data-update-type="REFINED" onchange="updateMaterial(this)" style="width: 100%;">
                                     <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
                                     <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                 </select>
                                 <span sec:authorize="!hasAnyRole('ADMIN', 'OFFICER')" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
                             </th:block>
-                            <th:block th:if="${mat?.type != 'RAW'}">
+                            <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
                                 <span>-</span>
                             </th:block>
                         </td>
@@ -196,6 +206,8 @@
             requestBody.categoryId = selectElement.value || null;
         } else if (updateType === 'REFINED') {
             requestBody.refinedMaterialId = selectElement.value || null;
+        } else if (updateType === 'MANUAL_RAW') {
+            requestBody.isManualRawMaterial = selectElement.checked;
         }
 
         const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;

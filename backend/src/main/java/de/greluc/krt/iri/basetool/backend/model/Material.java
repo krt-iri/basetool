@@ -109,6 +109,9 @@ public class Material extends AbstractEntity<UUID> {
     @Column(name = "is_fuel")
     private Integer isFuel;
 
+    @Column(name = "is_manual_raw_material", nullable = false)
+    private Boolean isManualRawMaterial = false;
+
     @ManyToOne
     @JoinColumn(name = "refined_material_id")
     private Material refinedMaterial;

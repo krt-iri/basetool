@@ -28,6 +28,8 @@ public record MissionDto(
         Set<UserReferenceDto> managers,
         Boolean canEdit,
         Boolean canManageManagers,
-        Long version
+        Long version,
+        Integer checkedInParticipants,
+        Integer registeredParticipants
 ) {
 }

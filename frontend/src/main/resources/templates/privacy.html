@@ -22,7 +22,84 @@
 <main>
     <div class="hud-box" style="margin-top: 2rem;">
         <h1 th:text="#{privacy.title}">Datenschutzerklärung</h1>
-        <p th:text="#{privacy.example_text}">Dies ist die Datenschutzerklärung der Plattform.</p>
+
+        <h2 th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</h2>
+        
+        <h3 th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</h3>
+        <p th:text="#{privacy.p_1_1}">Die folgenden Hinweise geben einen einfachen Überblick darüber...</p>
+        
+        <h3 th:text="#{privacy.h2_1_2}">Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>
+        <p th:text="#{privacy.p_1_2}">Die Datenverarbeitung auf dieser Website erfolgt durch...</p>
+        
+        <h3 th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</h3>
+        <p th:text="#{privacy.p_1_3}">Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung...</p>
+        
+        <h3 th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>
+        <p th:text="#{privacy.p_1_4}">Sie haben jederzeit das Recht, Auskunft über Herkunft...</p>
+
+        <h2 th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</h2>
+        
+        <h3 th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</h3>
+        <p>
+            <span th:text="#{privacy.p_2_1}">Die verantwortliche Stelle für die Datenverarbeitung...</span><br><br>
+            <strong th:text="#{privacy.address.name}">Lucas Greuloch</strong><br>
+            <span th:text="#{privacy.address.street}">Stauffenbergallee 20a</span><br>
+            <span th:text="#{privacy.address.city}">56410 Montabaur</span><br><br>
+            <span th:text="#{privacy.contact.phone}">Telefon: 0170-9677429</span><br>
+            <span th:text="#{privacy.contact.email_label}">E-Mail:</span> <a th:href="'mailto:' + #{privacy.contact.email_value}" th:text="#{privacy.contact.email_value}">lucas.greuloch@pm.me</a>
+        </p>
+
+        <h3 th:text="#{privacy.h2_2_2}">Speicherdauer</h3>
+        <p th:text="#{privacy.p_2_2}">Im Falle einer Löschanfrage Ihres Nutzerkontos werden...</p>
+
+        <h3 th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</h3>
+        <p th:text="#{privacy.p_2_3}">Sie haben im Rahmen der geltenden gesetzlichen Bestimmungen (insb. DSGVO) folgende Rechte:</p>
+        <ul style="list-style-type: disc; margin-left: 2rem;">
+            <li th:text="#{privacy.list_2_3_1}">Recht auf Auskunft...</li>
+            <li th:text="#{privacy.list_2_3_2}">Recht auf Berichtigung...</li>
+            <li th:text="#{privacy.list_2_3_3}">Recht auf Löschung...</li>
+            <li th:text="#{privacy.list_2_3_4}">Recht auf Einschränkung...</li>
+            <li th:text="#{privacy.list_2_3_5}">Recht auf Datenübertragbarkeit...</li>
+            <li th:text="#{privacy.list_2_3_6}">Widerspruchsrecht...</li>
+            <li th:text="#{privacy.list_2_3_7}">Recht auf Beschwerde...</li>
+        </ul>
+
+        <h3 th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung zur Datenverarbeitung</h3>
+        <p th:text="#{privacy.p_2_4}">Viele Datenverarbeitungsvorgänge sind nur mit Ihrer ausdrücklichen...</p>
+
+        <h3 th:text="#{privacy.h2_2_5}">Beschwerderecht bei der zuständigen Aufsichtsbehörde</h3>
+        <p th:text="#{privacy.p_2_5_1}">Im Falle datenschutzrechtlicher Verstöße steht Ihnen ein Beschwerderecht...</p>
+        <p>
+            <span th:text="#{privacy.p_2_5_2}">Der Landesbeauftragte...</span><br>
+            <span th:text="#{privacy.p_2_5_3}">Hintere Bleiche 34</span><br>
+            <span th:text="#{privacy.p_2_5_4}">55116 Mainz</span><br><br>
+            <span th:text="#{privacy.p_2_5_5}">Telefon: +49 (0) 6131 8920-0</span><br>
+            <span th:text="#{privacy.p_2_5_6}">Telefax: +49 (0) 6131 8920-299</span><br>
+            <span th:text="#{privacy.p_2_5_7}">Webseite: https://www.datenschutz.rlp.de/</span><br>
+            <span th:text="#{privacy.p_2_5_8}">E-Mail: poststelle(at)datenschutz.rlp.de</span>
+        </p>
+
+        <h2 th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</h2>
+        
+        <h3 th:text="#{privacy.h2_3_1}">Externes Hosting</h3>
+        <p th:text="#{privacy.p_3_1_1}">Diese Website wird bei einem externen Dienstleister gehostet...</p>
+        <p th:text="#{privacy.p_3_1_2}">Der Einsatz des Hosters erfolgt zum Zwecke der Vertragserfüllung...</p>
+        <p th:utext="#{privacy.p_3_1_3}">Wir setzen folgenden Hoster ein...</p>
+        <p th:text="#{privacy.p_3_1_4}">Wir haben mit unserem Hoster einen Auftragsverarbeitungsvertrag (AVV)...</p>
+
+        <h3 th:text="#{privacy.h2_3_2}">Cookies</h3>
+        <p th:text="#{privacy.p_3_2_1}">Unsere Internetseiten verwenden ausschließlich technisch notwendige...</p>
+        <p th:utext="#{privacy.p_3_2_2}">Sitzungs-Cookie...</p>
+        <p th:utext="#{privacy.p_3_2_3}">XSRF-TOKEN...</p>
+
+        <h3 th:text="#{privacy.h2_3_3}">Server-Log-Dateien</h3>
+        <p th:text="#{privacy.p_3_3_1}">Der Provider der Seiten erhebt und speichert automatisch...</p>
+
+        <h3 th:text="#{privacy.h2_3_4}">Kontaktformular und Forum</h3>
+        <p th:text="#{privacy.p_3_4_1}">Die Verarbeitung der Daten, die Sie im Kontaktformular...</p>
+
+        <br>
+        <p><em th:text="#{privacy.last_updated}">Stand dieser Datenschutzerklärung: 11.04.2026</em></p>
     </div>
 </main>
 </body>

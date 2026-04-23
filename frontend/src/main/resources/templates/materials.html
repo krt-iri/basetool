@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{nav.materials} + ' - ' + #{app.title}">Materialien - IRIDIUM Basetool</title>
+    <title th:text="#{nav.materials.list} + ' - ' + #{app.title}">Materialien - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .material-card {
@@ -85,7 +85,7 @@
 
 <main>
     <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 th:text="#{nav.materials}">Materialien</h1>
+        <h1 th:text="#{nav.materials.list}">Materialien</h1>
     </div>
 
     <div class="hud-box" style="margin-top: 2rem;">

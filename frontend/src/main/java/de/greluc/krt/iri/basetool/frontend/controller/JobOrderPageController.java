@@ -39,6 +39,8 @@ public class JobOrderPageController {
     private final BackendApiClient backendApiClient;
     private final RoleHierarchy roleHierarchy;
 
+    private static final List<String> VALID_STATUSES = List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
+
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public String viewOrders(
@@ -48,12 +50,18 @@ public class JobOrderPageController {
             Model model) {
         if (status == null || status.isEmpty()) {
             if (cookieStatus != null && !cookieStatus.isBlank()) {
-                status = Arrays.asList(cookieStatus.split("_"));
+                List<String> parsed = Arrays.asList(cookieStatus.split("-"));
+                boolean allValid = parsed.stream().allMatch(VALID_STATUSES::contains);
+                if (allValid) {
+                    status = parsed;
+                } else {
+                    status = List.of("OPEN", "IN_PROGRESS");
+                }
             } else {
                 status = List.of("OPEN", "IN_PROGRESS");
             }
         } else {
-            Cookie cookie = new Cookie("orders_filter_status", String.join("_", status));
+            Cookie cookie = new Cookie("orders_filter_status", String.join("-", status));
             cookie.setPath("/orders");
             cookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
             response.addCookie(cookie);

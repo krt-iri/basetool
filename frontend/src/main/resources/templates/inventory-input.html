@@ -106,7 +106,8 @@
                     <label for="missionId" th:text="#{inventory.mission}">Einsatz zuordnen (optional)</label>
                     <select id="missionId" th:field="*{missionId}">
                         <option value="" th:text="#{inventory.mission.select}">-- Kein Einsatz --</option>
-                        <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.name}"></option>
+                        <option th:each="mission : ${missions}" th:value="${mission.id}"
+                                th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
                     </select>
                 </div>
                 

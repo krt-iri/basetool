@@ -265,9 +265,13 @@
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
         <form th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
-            <div class="form-group" style="margin-bottom: 1rem;">
+            <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}" style="margin-bottom: 1rem;">
                 <label for="handoverTime" th:text="#{orders.handover.time}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Zeitpunkt der Übergabe</label>
-                <input type="datetime-local" id="handoverTime" th:field="*{handoverTime}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                </div>
             </div>
 
             <div class="form-group" style="margin-bottom: 1rem;">

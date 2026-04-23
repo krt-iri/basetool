@@ -401,6 +401,7 @@ class RefineryOrderTest {
                 100,
                 32.543, // Decimal amount
                 user1.getId(),
+                null,
                 null
         );
         RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
@@ -418,5 +419,86 @@ class RefineryOrderTest {
         java.util.List<InventoryItem> items = inventoryItemRepository.findByUser(user1, org.springframework.data.domain.Pageable.unpaged()).getContent();
         boolean found = items.stream().anyMatch(i -> i.getAmount().equals(32.543));
         assertTrue(found, "Decimal amount should be stored correctly in inventory");
+    }
+
+    @Test
+    void testStoreRefineryOrder_WithNoteAndAmountOverride() throws Exception {
+        // Given: ein Raffinerieauftrag mit einem Output-Material
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setOwner(user1);
+        order.setRefiningMethod(dinyx);
+        Set<RefineryGood> goods = new HashSet<>();
+        RefineryGood good = new RefineryGood();
+        good.setInputMaterial(quantanium);
+        good.setInputQuantity(100);
+        good.setOutputMaterial(quantanium);
+        good.setOutputQuantity(100);
+        good.setQuality(100);
+        goods.add(good);
+        order.setGoods(goods);
+        good.setRefineryOrder(order);
+        order = refineryOrderRepository.save(order);
+        UUID orderId = order.getId();
+
+        // When: Nutzer ueberschreibt die Menge im Einlager-Dialog und ergaenzt eine Notiz
+        RefineryOrderStoreItemDto itemDto = new RefineryOrderStoreItemDto(
+                quantanium.getId(),
+                station.getId(),
+                100,
+                42.125,
+                user1.getId(),
+                null,
+                "Charge A - Tagesproduktion"
+        );
+        RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
+
+        mockMvc.perform(post("/api/v1/refinery-orders/" + orderId + "/store")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(storeDto)))
+                .andExpect(status().isOk());
+
+        // Then: Notiz am InventoryItem persistiert, Raffinerieauftrag-Output ist auf neue Menge angepasst
+        java.util.List<InventoryItem> items = inventoryItemRepository.findByUser(user1, org.springframework.data.domain.Pageable.unpaged()).getContent();
+        InventoryItem persisted = items.stream()
+                .filter(i -> i.getAmount() != null && i.getAmount().equals(42.125))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("InventoryItem mit Override-Menge nicht gefunden"));
+        assertEquals("Charge A - Tagesproduktion", persisted.getNote(),
+                "Notiz aus Einlager-Dialog muss am InventoryItem persistiert werden");
+
+        RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
+        RefineryGood updated = stored.getGoods().iterator().next();
+        assertEquals(42, updated.getOutputQuantity().intValue(),
+                "Manuell eingegebene Menge muss zurueck in RefineryGood.outputQuantity geschrieben werden (Units, gerundet)");
+    }
+
+    @Test
+    void testStoreRefineryOrder_RejectsNegativeAmount() throws Exception {
+        RefineryOrder order = new RefineryOrder();
+        order.setLocation(station);
+        order.setOwner(user1);
+        order.setRefiningMethod(dinyx);
+        order = refineryOrderRepository.save(order);
+
+        RefineryOrderStoreItemDto itemDto = new RefineryOrderStoreItemDto(
+                quantanium.getId(),
+                station.getId(),
+                100,
+                -1.0,
+                user1.getId(),
+                null,
+                null
+        );
+        RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
+
+        mockMvc.perform(post("/api/v1/refinery-orders/" + order.getId() + "/store")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"), new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(storeDto)))
+                .andExpect(status().isBadRequest());
     }
 }

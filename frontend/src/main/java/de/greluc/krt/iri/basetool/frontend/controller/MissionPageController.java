@@ -52,9 +52,37 @@ public class MissionPageController {
         }
     }
 
-    public void addFormsToModel(Model model) {
+    public void addFormsToModel(Model model, OidcUser principal) {
         if (!model.containsAttribute("participantForm")) {
-            model.addAttribute("participantForm", new ParticipantForm(null, "", null, null, "", null, null, null, null, null));
+            ParticipantForm form = new ParticipantForm(null, "", null, null, "", null, null, null, null, null);
+            if (principal != null) {
+                try {
+                    UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+                    if (me != null) {
+                        String name = (me.displayName() != null && !me.displayName().isBlank()) ? me.displayName() : me.username();
+                        UUID squadronId = null;
+                        if (me.roles() != null && (me.roles().contains("MEMBER") || me.roles().contains("ROLE_MEMBER") || me.roles().contains("SQUADRON_MEMBER") || me.roles().contains("ROLE_SQUADRON_MEMBER") || me.roles().contains("ADMIN") || me.roles().contains("ROLE_ADMIN") || me.roles().contains("OFFICER") || me.roles().contains("ROLE_OFFICER"))) {
+                            PageResponse<Map<String, Object>> squadronsPage = backendApiClient.getCached(
+                                    "/api/v1/squadrons?size=1000",
+                                    new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
+                                    true
+                            );
+                            if (squadronsPage != null && squadronsPage.content() != null) {
+                                for (Map<String, Object> sq : squadronsPage.content()) {
+                                    if ("Iridium".equalsIgnoreCase(String.valueOf(sq.get("name")))) {
+                                        squadronId = UUID.fromString(String.valueOf(sq.get("id")));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        form = new ParticipantForm(me.id(), name, squadronId, null, "", null, null, null, null, null);
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not prefill participant form", e);
+                }
+            }
+            model.addAttribute("participantForm", form);
         }
         if (!model.containsAttribute("unitForm")) {
             model.addAttribute("unitForm", new UnitForm("", null, null, false, null));
@@ -263,7 +291,7 @@ public class MissionPageController {
                 ));
             }
             model.addAttribute("isNew", false);
-            addFormsToModel(model);
+            addFormsToModel(model, principal);
             addOperationsToModel(model, principal == null);
 
             model.addAttribute("roundingMode", fetchRoundingMode(principal == null));
@@ -373,6 +401,12 @@ public class MissionPageController {
              model.addAttribute("error", "error.mission.details.load");
              return "redirect:/missions?error=error.mission.details.load";
         }
+        // Expose the authenticated user's JWT sub (Keycloak UUID) so Thymeleaf can
+        // robustly decide whether a participant row belongs to the current user
+        // and enable self-edit on the member's own entry.
+        org.springframework.security.core.Authentication currentAuth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        model.addAttribute("authUserId", currentAuth != null ? currentAuth.getName() : null);
         return "mission-detail";
     }
     
@@ -399,6 +433,14 @@ public class MissionPageController {
             boolean isPublic = (principal == null);
             backendApiClient.post("/api/v1/missions/" + id + "/participants/add", body, Void.class, isPublic);
             redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
+            // 409 Conflict = backend found more than one registered member matching the free-text name
+            // -> show a dedicated, localized hint that the user should pick an entry from the autocomplete.
+            String toastKey = (e.getStatusCode() == 409)
+                    ? "error.mission.participant.ambiguous"
+                    : "error.mission.participant.add";
+            redirectAttributes.addFlashAttribute("errorToast", toastKey);
         } catch (Exception e) {
             log.error("Add participant failed", e);
             redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.add");
@@ -434,11 +476,11 @@ public class MissionPageController {
 
     @PostMapping("/{id}/participants/{participantId}/payout-preference")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<Void> updatePayoutPreference(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, @RequestBody UpdatePayoutPreferenceRequest request, @AuthenticationPrincipal OidcUser principal) {
+    public org.springframework.http.ResponseEntity<MissionDto> updatePayoutPreference(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId, @RequestBody UpdatePayoutPreferenceRequest request, @AuthenticationPrincipal OidcUser principal) {
         try {
             boolean isPublic = (principal == null);
-            backendApiClient.put("/api/v1/missions/" + id + "/participants/" + participantId + "/payout-preference", request, Void.class, isPublic);
-            return org.springframework.http.ResponseEntity.ok().build();
+            MissionDto updatedMission = backendApiClient.put("/api/v1/missions/" + id + "/participants/" + participantId + "/payout-preference", request, MissionDto.class, isPublic);
+            return org.springframework.http.ResponseEntity.ok(updatedMission);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("Update payout preference failed with status {}: {}", e.getStatusCode(), e.getMessage());
             if (e.getStatusCode() == 403 || e.getStatusCode() == 401) {
@@ -447,6 +489,76 @@ public class MissionPageController {
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         } catch (Exception e) {
             log.error("Update payout preference failed", e);
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Setzt die tatsächliche Start- oder Endzeit eines Einsatzes auf den übergebenen UTC-Zeitpunkt
+     * und speichert sofort. Der Client sendet die aktuelle {@code version} aus dem DOM; dadurch
+     * greift das Optimistic Locking im Backend und liefert bei parallelen Änderungen HTTP 409.
+     *
+     * <p>Warum dieser dedizierte Endpoint? Der normale Mission-Update läuft über ein Form-Submit
+     * mit Full-Page-Reload, was beim Klick auf "Jetzt" unerwünscht ist. Der Endpoint lädt daher
+     * die Mission vom Backend, überschreibt gezielt das angeforderte Zeitfeld und leitet die
+     * Version des Clients weiter, damit Lost-Updates verhindert werden (siehe AGENTS.md:
+     * CRITICAL JUNIE RULE - CONCURRENCY AND OPTIMISTIC LOCKING).</p>
+     */
+    @PostMapping("/{id}/actual-time")
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<MissionDto> updateActualTime(
+            @PathVariable @NotNull UUID id,
+            @Valid @RequestBody de.greluc.krt.iri.basetool.frontend.model.dto.MissionActualTimeUpdateRequest request,
+            @AuthenticationPrincipal OidcUser principal) {
+        if (request == null || request.version() == null
+                || (!"actualStartTime".equals(request.field()) && !"actualEndTime".equals(request.field()))) {
+            return org.springframework.http.ResponseEntity.badRequest().build();
+        }
+        try {
+            MissionDto current = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+            if (current == null) {
+                return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).build();
+            }
+
+            Instant newStart = "actualStartTime".equals(request.field()) ? request.value() : current.actualStartTime();
+            Instant newEnd = "actualEndTime".equals(request.field()) ? request.value() : current.actualEndTime();
+
+            MissionDto updated = new MissionDto(
+                    current.id(),
+                    current.name(),
+                    current.description(),
+                    current.calendarLink(),
+                    current.status(),
+                    current.meetingTime(),
+                    current.plannedStartTime(),
+                    newStart,
+                    current.plannedEndTime(),
+                    newEnd,
+                    current.isInternal(),
+                    null, null, null, null, null, null,
+                    current.operation(),
+                    null, null, null, null,
+                    request.version(), // Optimistic-Lock-Version aus dem DOM
+                    current.checkedInParticipants(),
+                    current.registeredParticipants()
+            );
+
+            backendApiClient.put("/api/v1/missions/" + id, updated, Void.class);
+            MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+            return org.springframework.http.ResponseEntity.ok(refreshed);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
+            org.springframework.http.HttpStatus status;
+            switch (e.getStatusCode()) {
+                case 409 -> status = org.springframework.http.HttpStatus.CONFLICT;
+                case 403, 401 -> status = org.springframework.http.HttpStatus.FORBIDDEN;
+                case 404 -> status = org.springframework.http.HttpStatus.NOT_FOUND;
+                default -> status = org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+            }
+            return org.springframework.http.ResponseEntity.status(status).build();
+        } catch (Exception e) {
+            log.error("Update actual time failed", e);
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -647,13 +759,13 @@ public class MissionPageController {
 
     @GetMapping("/new")
     @PreAuthorize("isAuthenticated()")
-    public String createMissionForm(Model model) {
+    public String createMissionForm(Model model, @AuthenticationPrincipal OidcUser principal) {
         if (!model.containsAttribute("missionForm")) {
             model.addAttribute("missionForm", new MissionForm("", "", "", "PLANNED", "", "", "", "", "", false, null, null));
         }
         model.addAttribute("isNew", true);
-        model.addAttribute("mission", new MissionDto(null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, true, true, null));
-        addFormsToModel(model);
+        model.addAttribute("mission", new MissionDto(null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, true, true, null, 0, 0));
+        addFormsToModel(model, principal);
         addOperationsToModel(model, false);
         return "mission-detail";
     }
@@ -699,7 +811,9 @@ public class MissionPageController {
                      null, // managers
                      null, // canEdit
                      null, // canManageManagers
-                     null  // version
+                     null, // version
+                     0, // checkedInParticipants
+                     0  // registeredParticipants
              );
 
              backendApiClient.post("/api/v1/missions", missionDto, Void.class);
@@ -757,7 +871,9 @@ public class MissionPageController {
                      null, // managers
                      null, // canEdit
                      null, // canManageManagers
-                     form.version() // version
+                     form.version(), // version
+                     0, // checkedInParticipants
+                     0  // registeredParticipants
              );
 
              backendApiClient.put("/api/v1/missions/" + id, missionDto, Void.class);

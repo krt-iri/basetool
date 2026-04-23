@@ -63,7 +63,7 @@ class OfficerRefineryButtonsTest {
         
         // record RefineryOrderDto(UUID id, UserReferenceDto owner, LocationDto location, MissionReferenceDto mission, OffsetDateTime startedAt, Integer durationMinutes, Integer expenses, RefiningMethodDto refiningMethod, List<RefineryGoodDto> goods, RefineryOrderStatus status, Long version)
         RefineryOrderDto order = new RefineryOrderDto(
-                orderId, null, null, null, java.time.Instant.now(), 60L, 100.0, null, java.util.Collections.emptyList(), de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN, 1L
+                orderId, null, null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, java.util.Collections.emptyList(), de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN, 1L
         );
         
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);

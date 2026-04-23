@@ -14,5 +14,6 @@ public record InventoryItemDto(
     Integer jobOrderDisplayId,
     UUID missionId,
     String missionName,
+    String note,
     Long version
 ) {}

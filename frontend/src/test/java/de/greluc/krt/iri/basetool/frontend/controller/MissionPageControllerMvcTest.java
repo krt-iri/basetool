@@ -134,7 +134,7 @@ class MissionPageControllerMvcTest {
         MissionDto mission = new MissionDto(
                 missionId, "Test Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, java.util.Set.of(manager), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, java.util.Set.of(manager), true, true, 1L, 0, 0
         );
 
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -163,7 +163,7 @@ class MissionPageControllerMvcTest {
         MissionDto mission = new MissionDto(
                 missionId, "Auth Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 java.util.Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 1, 1
         );
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
             .thenReturn(mission);
@@ -173,6 +173,43 @@ class MissionPageControllerMvcTest {
         mockMvc.perform(get("/missions/" + missionId))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Teilnahme (%)")));
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void missionDetail_ShouldRenderParticipantsCounter_AsXSlashY() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID p1Id = UUID.randomUUID();
+        UUID p2Id = UUID.randomUUID();
+        UUID p3Id = UUID.randomUUID();
+
+        de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto p1 =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+                p1Id, null, "P1", null, null, null, null, null, null,
+                de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT, 1L);
+        de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto p2 =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+                p2Id, null, "P2", null, null, null, null, null, null,
+                de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT, 1L);
+        de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto p3 =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+                p3Id, null, "P3", null, null, null, null, null, null,
+                de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT, 1L);
+
+        // 2 checked-in out of 3 registered
+        MissionDto mission = new MissionDto(
+                missionId, "Counter Mission", null, null, "PLANNED", null, null, null, null, null, false,
+                java.util.Set.of(p1, p2, p3), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 2, 3
+        );
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+            .thenReturn(mission);
+        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+            .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/missions/" + missionId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("2/3")));
     }
 
     @Test
@@ -189,7 +226,7 @@ class MissionPageControllerMvcTest {
         MissionDto mission = new MissionDto(
                 missionId, "Guest Mission", null, null, "PLANNED", null, null, null, null, null, false,
                 java.util.Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 0, 1
         );
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
             .thenReturn(mission);
@@ -228,6 +265,68 @@ class MissionPageControllerMvcTest {
     void addManager_WithInvalidIds_ShouldReturn400() throws Exception {
         mockMvc.perform(post("/missions/not-a-uuid/managers/not-a-uuid")
                         .with(csrf()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateActualTime_Success_ShouldReturn200WithRefreshedMission() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        MissionDto current = new MissionDto(
+                missionId, "M", null, null, "PLANNED", null, null, null, null, null, false,
+                Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 0, 0
+        );
+        MissionDto refreshed = new MissionDto(
+                missionId, "M", null, null, "PLANNED", null, null, java.time.Instant.parse("2026-04-20T12:00:00Z"),
+                null, null, false,
+                Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 2L, 0, 0
+        );
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
+                .thenReturn(current).thenReturn(refreshed);
+        when(backendApiClient.put(eq("/api/v1/missions/" + missionId), any(MissionDto.class), eq(Void.class)))
+                .thenReturn(null);
+
+        String body = "{\"field\":\"actualStartTime\",\"value\":\"2026-04-20T12:00:00Z\",\"version\":1}";
+        mockMvc.perform(post("/missions/" + missionId + "/actual-time")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateActualTime_OptimisticLockConflict_ShouldReturn409() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        MissionDto current = new MissionDto(
+                missionId, "M", null, null, "PLANNED", null, null, null, null, null, false,
+                Collections.emptySet(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(),
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 5L, 0, 0
+        );
+        when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
+                .thenReturn(current);
+        when(backendApiClient.put(eq("/api/v1/missions/" + missionId), any(MissionDto.class), eq(Void.class)))
+                .thenThrow(new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException("Conflict", null, 409));
+
+        String body = "{\"field\":\"actualEndTime\",\"value\":\"2026-04-20T13:00:00Z\",\"version\":1}";
+        mockMvc.perform(post("/missions/" + missionId + "/actual-time")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "OFFICER")
+    void updateActualTime_InvalidField_ShouldReturn400() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        String body = "{\"field\":\"unknownField\",\"value\":\"2026-04-20T13:00:00Z\",\"version\":1}";
+        mockMvc.perform(post("/missions/" + missionId + "/actual-time")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
                 .andExpect(status().isBadRequest());
     }
 

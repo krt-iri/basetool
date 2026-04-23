@@ -37,7 +37,7 @@ class ParticipationCalculationTest {
         MissionDto mission = new MissionDto(missionId, "Test Mission", null, null, "FINISHED", 
                 null, null, missionStart, null, missionEnd, false, 
                 Set.of(participant), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(), 
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L);
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 1, 1);
         
         BackendApiClient backendApiClient = mock(BackendApiClient.class);
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), anyBoolean()))
@@ -84,7 +84,7 @@ class ParticipationCalculationTest {
         MissionDto mission = new MissionDto(missionId, "Test Mission", null, null, "FINISHED", 
                 null, null, missionStart, null, missionEnd, false, 
                 Set.of(p1, p2), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(), 
-                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L);
+                Collections.emptyList(), Collections.emptyList(), null, null, Collections.emptySet(), true, true, 1L, 1, 2);
         
         BackendApiClient backendApiClient = mock(BackendApiClient.class);
         when(backendApiClient.get(eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), anyBoolean()))

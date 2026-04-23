@@ -102,7 +102,7 @@ public class RefineryOrderService {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
                         .orElseThrow(() -> new RuntimeException("Input Material not found"));
                     
-                    if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW) {
+                    if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
                     }
                     good.setInputMaterial(inMat);
@@ -132,6 +132,11 @@ public class RefineryOrderService {
 
         if (order.getStartedAt() == null) {
             order.setStartedAt(java.time.Instant.now());
+        }
+
+        // Default oreSales = 0, um Rechenfehler bei fehlenden Werten zu vermeiden
+        if (order.getOreSales() == null) {
+            order.setOreSales(0d);
         }
 
         return refineryOrderRepository.save(order);
@@ -172,6 +177,7 @@ public class RefineryOrderService {
         order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : java.time.Instant.now());
         order.setDurationMinutes(details.getDurationMinutes());
         order.setExpenses(details.getExpenses());
+        order.setOreSales(details.getOreSales() != null ? details.getOreSales() : 0d);
         if (details.getStatus() != null) {
             order.setStatus(details.getStatus());
         }
@@ -184,7 +190,7 @@ public class RefineryOrderService {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
                         .orElseThrow(() -> new RuntimeException("Input Material not found"));
                     
-                    if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW) {
+                    if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
                     }
                     good.setInputMaterial(inMat);
@@ -261,7 +267,7 @@ public class RefineryOrderService {
                     .orElseThrow(() -> new RuntimeException("JobOrder not found: " + itemDto.jobOrderId()));
             }
 
-            java.util.Optional<InventoryItem> existingItemOpt = inventoryItemRepository.findMatchingInventoryItem(
+            java.util.List<InventoryItem> existingItems = inventoryItemRepository.findMatchingInventoryItem(
                 assignee,
                 mat,
                 loc,
@@ -271,9 +277,32 @@ public class RefineryOrderService {
                 false
             );
 
+            java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
+
+            // Warum: Die vom Nutzer im Einlagern-Dialog eingegebene Menge ist die
+            // autoritative Menge (sie ueberschreibt die urspruenglich berechnete
+            // Ausgangsmenge des Raffinerieauftrags). Die Notiz wird optional an das
+            // resultierende InventoryItem durchgereicht, damit der Nutzer Anmerkungen
+            // zur Einlagerung direkt an das Lagergut binden kann.
+            String incomingNote = normalizeNote(itemDto.note());
+
             if (existingItemOpt.isPresent()) {
                 InventoryItem existingItem = existingItemOpt.get();
                 existingItem.setAmount(existingItem.getAmount() + itemDto.amount());
+                if (incomingNote != null) {
+                    String existingNote = existingItem.getNote();
+                    if (existingNote == null || existingNote.isBlank()) {
+                        existingItem.setNote(incomingNote);
+                    } else if (!existingNote.contains(incomingNote)) {
+                        // Bestehende Notiz beibehalten und neue anhaengen, damit keine
+                        // Information verloren geht.
+                        String combined = existingNote + "\n" + incomingNote;
+                        if (combined.length() > 1000) {
+                            combined = combined.substring(0, 1000);
+                        }
+                        existingItem.setNote(combined);
+                    }
+                }
                 inventoryItemRepository.save(existingItem);
             } else {
                 InventoryItem item = new InventoryItem();
@@ -284,13 +313,59 @@ public class RefineryOrderService {
                 item.setQuality(itemDto.quality());
                 item.setAmount(itemDto.amount());
                 item.setMission(order.getMission());
-                
+                item.setNote(incomingNote);
+
                 inventoryItemRepository.save(item);
             }
+
+            // Angepasste Menge zurueck in den Raffinerieauftrag schreiben, damit die
+            // tatsaechlich eingelagerte Ausgangsmenge auch dort dokumentiert ist.
+            // Match ueber das Output-Material; bei mehreren gleichen Goods wird der
+            // erste noch nicht aktualisierte Eintrag genommen.
+            updateGoodOutputQuantity(order, itemDto);
         }
 
         order.setStatus(de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus.COMPLETED);
         refineryOrderRepository.save(order);
+    }
+
+    private static String normalizeNote(String note) {
+        if (note == null) return null;
+        String trimmed = note.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * Schreibt die vom Nutzer final eingegebene Einlager-Menge zurueck in den
+     * zugehoerigen {@link de.greluc.krt.iri.basetool.backend.model.RefineryGood}.
+     * So wird die manuelle Korrektur der Ausgangsmenge im Raffinerieauftrag selbst
+     * persistiert (z. B. wenn der tatsaechliche Raffinerie-Output von der Prognose
+     * abweicht). Bei SCU-Materialien wird die SCU-Eingabe in Units (x100) zurueck-
+     * konvertiert, damit das Feld {@code outputQuantity} einheitlich in Units gefuehrt bleibt.
+     */
+    private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
+        if (order.getGoods() == null || itemDto == null || itemDto.materialId() == null || itemDto.amount() == null) {
+            return;
+        }
+        for (de.greluc.krt.iri.basetool.backend.model.RefineryGood good : order.getGoods()) {
+            if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) continue;
+            if (!good.getOutputMaterial().getId().equals(itemDto.materialId())) continue;
+
+            double amount = itemDto.amount();
+            String qType = good.getOutputMaterial().getQuantityType() != null
+                ? good.getOutputMaterial().getQuantityType().name()
+                : null;
+            long rawNew;
+            if ("SCU".equals(qType)) {
+                rawNew = Math.round(amount * 100.0d);
+            } else {
+                rawNew = Math.round(amount);
+            }
+            // @Min(1) auf outputQuantity respektieren: 0 waere ein invalider Wert.
+            int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
+            good.setOutputQuantity(clamped);
+            return;
+        }
     }
 
     private void validateLocationHasRefinery(de.greluc.krt.iri.basetool.backend.model.Location location) {

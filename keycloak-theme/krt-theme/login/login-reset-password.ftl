@@ -8,10 +8,10 @@
             <div class="krt-info-text-center">
                 ${msg("emailInstruction")}
             </div>
-            <form id="kc-reset-password-form" class="${properties.kcFormClass!}" action="${url.loginAction}" method="post">
+            <form id="kc-reset-password-form" action="${url.loginAction}" method="post">
                 <div class="form-group">
                     <label for="username" class="krt-label"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
-                    <input type="text" id="username" name="username" class="krt-input" autofocus value="${(auth.attemptedUsername!'')}" aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"/>
+                    <input tabindex="1" type="text" id="username" name="username" class="krt-input" autofocus value="${(auth.attemptedUsername!'')}" aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"/>
                     <#if messagesPerField.existsError('username')>
                         <span id="input-error-username" class="kc-error-message krt-error-message" aria-live="polite">
                             ${kcSanitize(messagesPerField.get('username'))?no_esc}
@@ -20,9 +20,9 @@
                 </div>
 
                 <div class="form-group login-action">
-                    <input class="krt-button" type="submit" value="${msg("doSubmit")}"/>
+                    <input tabindex="2" class="krt-button" type="submit" value="${msg("doSubmit")}"/>
                     <div class="krt-form-footer">
-                        <a href="${url.loginUrl}" class="krt-link">${kcSanitize(msg("backToLogin"))?no_esc}</a>
+                        <a tabindex="3" href="${url.loginUrl}" class="krt-link">${kcSanitize(msg("backToLogin"))?no_esc}</a>
                     </div>
                 </div>
             </form>

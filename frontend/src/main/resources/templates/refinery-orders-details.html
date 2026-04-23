@@ -85,16 +85,31 @@
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Kosten (aUEC)</label>
-                        <input type="number" id="expenses" th:field="*{expenses}" min="1" th:readonly="${!canEdit}">
+                        <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                    </div>
+
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
+                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" required th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                    </div>
+
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
+                        <input type="text" id="profitPreview" readonly tabindex="-1"
+                               th:title="#{refineryorder.form.profit.help}"
+                               style="background-color: var(--color-gray-5); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
                     </div>
                 </div>
 
                 <div class="material-row" style="margin-top: 1.5rem;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}" style="flex: 1; margin-bottom: 0;">
                         <label for="startedAtLocal" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
-                            <input type="datetime-local" id="startedAtLocal" style="flex: 1;" th:readonly="${!canEdit}">
+                            <div class="datetime-split-inputs" style="flex: 1;">
+                                <input type="date" class="date-part" th:readonly="${!canEdit}">
+                                <input type="time" class="time-part" th:readonly="${!canEdit}">
+                            </div>
                             <button th:if="${canEdit}" type="button" class="btn btn-secondary" onclick="setStartedAtNow()" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>
                     </div>
@@ -102,9 +117,9 @@
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label th:text="#{refineryorder.form.duration}">Dauer</label>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" th:placeholder="#{refineryorder.form.duration.hours}" style="flex: 1;" th:readonly="${!canEdit}">
+                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" style="flex: 1;" th:readonly="${!canEdit}">
                             <span style="color: var(--color-gray-2);">h</span>
-                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" th:placeholder="#{refineryorder.form.duration.minutes}" style="flex: 1;" th:readonly="${!canEdit}">
+                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" style="flex: 1;" th:readonly="${!canEdit}">
                             <span style="color: var(--color-gray-2);">m</span>
                         </div>
                     </div>
@@ -130,7 +145,8 @@
                         <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
                         <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="mis : ${missions}" th:value="${mis.id}" th:text="${mis.name}"></option>
+                            <option th:each="mis : ${missions}" th:value="${mis.id}"
+                                    th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
                         </select>
                     </div>
 
@@ -184,7 +200,7 @@
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
                                 <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required onchange="updateOutputMaterial(this)" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW'}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
                             </div>
 
@@ -223,8 +239,10 @@
             </form>
 
             <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
-                <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
+                <th:block th:if="${canEdit}">
                     <button type="submit" form="refineryOrderMainForm" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                </th:block>
+                <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn" onclick="openStoreModal()" th:text="#{refineryorder.action.store}">Einlagern</button>
                     <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" style="margin: 0;">
                         <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
@@ -262,7 +280,7 @@
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
                                 </label>
-                                <input type="number" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" th:readonly="*{items[__${stat.index}__].amountFixed}" th:classappend="*{items[__${stat.index}__].amountFixed} ? 'readonly-input' : ''" required>
+                                <input type="number" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
@@ -290,6 +308,10 @@
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="jo : ${jobOrders}" th:if="${jo.materials != null and !jo.materials.isEmpty() and #lists.contains(jo.materials.![material.id], item.materialId)}" th:value="${jo.id}" th:text="${jo.displayId} + ' - ' + ${jo.squadron}"></option>
                             </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                            <label th:for="'storeNote_' + ${stat.index}" th:text="#{refineryorder.store.note}">Notiz (Optional)</label>
+                            <textarea th:id="'storeNote_' + ${stat.index}" th:field="*{items[__${stat.index}__].note}" maxlength="1000" rows="2" th:placeholder="#{refineryorder.store.note.placeholder}"></textarea>
                         </div>
                     </div>
                 </div>
@@ -343,7 +365,7 @@
         
         const nameRegex = /items\[\d+\]/g;
         
-        newBlock.querySelectorAll('input, select').forEach(el => {
+        newBlock.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.name) {
                 el.name = el.name.replace(nameRegex, `items[${newIndex}]`);
             }
@@ -351,6 +373,9 @@
                 el.id = el.id.replace(/_\d+$/, `_${newIndex}`);
             }
             if (el.id && el.id.startsWith('storeAmount_')) {
+                el.value = '';
+            }
+            if (el.id && el.id.startsWith('storeNote_')) {
                 el.value = '';
             }
         });
@@ -380,7 +405,7 @@
         const allBlocks = container.querySelectorAll('.store-item-block');
         allBlocks.forEach((block, index) => {
             const nameRegex = /items\[\d+\]/g;
-            block.querySelectorAll('input, select').forEach(el => {
+            block.querySelectorAll('input, select, textarea').forEach(el => {
                 if (el.name) {
                     el.name = el.name.replace(nameRegex, `items[${index}]`);
                 }
@@ -434,7 +459,15 @@
         const day = String(now.getDate()).padStart(2, '0');
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('startedAtLocal').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        
+        const dateInput = document.querySelector('.datetime-split-group .date-part');
+        const timeInput = document.querySelector('.datetime-split-group .time-part');
+        
+        if (dateInput && timeInput) {
+            dateInput.value = `${year}-${month}-${day}`;
+            timeInput.value = `${hours}:${minutes}`;
+            dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         updateEndsAt();
     }
 
@@ -549,7 +582,7 @@
     }
 
     function updateEndsAt() {
-        const startedAtInput = document.getElementById('startedAtLocal');
+        const startedAtInput = document.getElementById('startedAt');
         const durationHoursInput = document.getElementById('durationHours');
         const durationMinutesInput = document.getElementById('durationMinutes');
         const endsAtDisplay = document.querySelector('#endsAtDisplay span');
@@ -583,38 +616,39 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         const hiddenStartedAt = document.getElementById('startedAt');
-        const startedAtLocal = document.getElementById('startedAtLocal');
         const dHours = document.getElementById('durationHours');
         const dMinutes = document.getElementById('durationMinutes');
         
-        if (hiddenStartedAt && startedAtLocal && hiddenStartedAt.value) {
-            const date = new Date(hiddenStartedAt.value);
-            if (!isNaN(date)) {
-                const pad = num => String(num).padStart(2, '0');
-                startedAtLocal.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-            }
+        if (hiddenStartedAt) {
+            hiddenStartedAt.addEventListener('change', updateEndsAt);
+            hiddenStartedAt.addEventListener('input', updateEndsAt);
         }
-        
-        if (startedAtLocal) startedAtLocal.addEventListener('input', updateEndsAt);
         if (dHours) dHours.addEventListener('input', updateEndsAt);
         if (dMinutes) dMinutes.addEventListener('input', updateEndsAt);
         
         updateEndsAt();
     });
 
-    document.querySelector('form').addEventListener('submit', function() {
-        const local = document.getElementById('startedAtLocal');
-        const hidden = document.getElementById('startedAt');
-        if (local && hidden && local.value) {
-            hidden.value = new Date(local.value).toISOString();
-        } else if (hidden) {
-            hidden.value = '';
-        }
-    });
-
     document.addEventListener('DOMContentLoaded', function() {
         updateMethodRatings();
     });
+
+    /**
+     * Aktualisiert das read-only "Gewinn/Verlust"-Feld live aus oreSales - expenses.
+     * Server bleibt Source of Truth; dies ist lediglich eine UI-Vorschau.
+     */
+    function updateProfitPreview() {
+        const expensesEl = document.getElementById('expenses');
+        const oreSalesEl = document.getElementById('oreSales');
+        const preview = document.getElementById('profitPreview');
+        if (!preview) return;
+        const expenses = parseFloat(expensesEl && expensesEl.value) || 0;
+        const oreSales = parseFloat(oreSalesEl && oreSalesEl.value) || 0;
+        const profit = Math.round(oreSales - expenses);
+        preview.value = profit.toLocaleString();
+        preview.style.color = profit < 0 ? '#e74c3c' : 'var(--color-gray-1)';
+    }
+    document.addEventListener('DOMContentLoaded', updateProfitPreview);
 </script>
 </body>
 </html>

@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 
 import java.time.Instant;
@@ -36,15 +37,34 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
     private Instant startedAt;
 
-    @Positive
+    @PositiveOrZero
     private Long durationMinutes;
 
     @ManyToOne
     @JoinColumn(name = "refining_method_id")
     private RefiningMethod refiningMethod;
 
-    @Positive
-    private Double expenses;
+    @PositiveOrZero
+    private Double expenses = 0d;
+
+    /**
+     * Einnahmen durch den Verkauf roher Erze ("Ore Sales"). Muss >= 0 sein.
+     * Default 0, um Rechenfehler bei bestehenden Auftraegen zu vermeiden.
+     */
+    @PositiveOrZero
+    @Column(nullable = false)
+    private Double oreSales = 0d;
+
+    /**
+     * Berechneter Gewinn/Verlust: oreSales - expenses. Kann negativ sein.
+     * Wird nicht persistiert, sondern serverseitig aus den Rohdaten abgeleitet.
+     */
+    @Transient
+    public Double getProfit() {
+        double sales = oreSales != null ? oreSales : 0d;
+        double costs = expenses != null ? expenses : 0d;
+        return sales - costs;
+    }
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

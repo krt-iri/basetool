@@ -99,7 +99,7 @@ class MaterialsPageControllerTest {
         Model model = new ConcurrentModel();
         UUID id = UUID.randomUUID();
 
-        MaterialDto materialDto = new MaterialDto(id, 1, "Gold", "Metal", "SCU", "Test description", null, null, false, false, false, 0L);
+        MaterialDto materialDto = new MaterialDto(id, 1, "Gold", "Metal", "SCU", "Test description", null, null, false, false, false, false, 0L);
         when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class))).thenReturn(materialDto);
 
         MaterialPriceDto priceDto = new MaterialPriceDto(

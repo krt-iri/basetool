@@ -13,6 +13,8 @@ public record RefineryOrderDto(
         Instant startedAt,
         @Positive Long durationMinutes,
         @Positive Double expenses,
+        Double oreSales,
+        Double profit,
         RefiningMethodDto refiningMethod,
         List<RefineryGoodDto> goods,
         RefineryOrderStatus status,
