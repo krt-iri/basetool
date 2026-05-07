@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Mein Lager - IRIDIUM Basetool</title>
@@ -9,6 +9,44 @@
             gap: 1rem;
             margin-bottom: 1rem;
             flex-wrap: wrap;
+        }
+
+        .bulk-checkout-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .bulk-checkout-bar .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .item-checkbox {
+            width: 20px;
+            height: 20px;
+            min-height: 20px;
+            accent-color: var(--color-primary);
+            cursor: pointer;
+        }
+
+        .item-checkbox-cell {
+            text-align: center;
+            vertical-align: middle;
+            width: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .bulk-checkout-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .bulk-checkout-bar .btn {
+                width: 100%;
+                min-height: 44px;
+            }
         }
         
         .modal {
@@ -47,71 +85,6 @@
             text-decoration: none;
         }
 
-        .multi-select-container {
-            position: relative;
-            min-width: 200px;
-        }
-        .multi-select-header {
-            padding: 0.5rem;
-            background-color: var(--color-gray-4);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-family: var(--font-body);
-            min-height: 44px;
-        }
-        .multi-select-header::after {
-            content: '\25BC';
-            font-size: 0.7em;
-            margin-left: 0.5rem;
-        }
-        .multi-select-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background-color: var(--color-gray-4);
-            border: 1px solid var(--color-primary);
-            border-top: none;
-            max-height: 300px;
-            overflow-y: auto;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        }
-        .multi-select-options.open {
-            display: block;
-        }
-        .multi-select-option {
-            padding: 0.5rem 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            color: var(--color-gray-1);
-            margin-bottom: 0;
-            font-family: var(--font-body);
-            white-space: nowrap;
-            min-height: 44px;
-        }
-        .multi-select-option:hover {
-            background-color: var(--color-gray-3);
-        }
-        .multi-select-option input[type="checkbox"] {
-            margin: 0;
-            flex-shrink: 0;
-        }
-        .selected-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
-        }
         @media (max-width: 768px) {
             .my-inventory-filter {
                 flex-direction: column;
@@ -179,13 +152,13 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1>Mein Lager</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
         
 
@@ -195,7 +168,7 @@
 
             <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="flex-gap-sm">
                         <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.material}">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
                             <div class="multi-select-header" onclick="toggleMultiSelect('materialOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
@@ -213,14 +186,14 @@
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="flex-gap-sm">
                         <label for="minQuality" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.minQuality}">Qualit\u00e4t \u2265:</label>
-                        <select id="minQuality" name="minQuality" style="padding: 0.5rem; min-height: 44px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" onchange="filterMyInventory();">
+                        <select id="minQuality" name="minQuality" style="padding: 0.375rem 2.5rem 0.375rem 0.75rem; min-height: 44px; min-width: 90px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" onchange="filterMyInventory();">
                             <option value="" th:text="#{filter.all}">-- Alle --</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
                         </select>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="flex-gap-sm">
                         <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
                         <div class="multi-select-container" id="jobOrderFilterContainer">
                             <div class="multi-select-header" onclick="toggleMultiSelect('jobOrderOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="jobOrderHeader">
@@ -238,7 +211,7 @@
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="flex-gap-sm">
                         <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.mission}">Einsatz:</label>
                         <div class="multi-select-container" id="missionFilterContainer">
                             <div class="multi-select-header" onclick="toggleMultiSelect('missionOptions')" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="missionHeader">
@@ -261,16 +234,24 @@
             </div>
         </div>
 
+        <div class="bulk-checkout-bar" id="bulkCheckoutBar">
+            <button type="button" id="bulkCheckoutBtn" class="btn" disabled
+                    style="min-height: 44px;"
+                    th:text="#{inventory.bulk.checkout.btn}"
+                    onclick="openBulkCheckoutModal()">Markierte ausbuchen</button>
+            <span id="bulkCheckoutCount" style="color: var(--color-gray-2); font-size: 0.9rem;"></span>
+        </div>
+
         <div style="overflow-x: auto;" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
                     <tr>
                         <th style="width: 40px;"></th>
-                        <th>Material</th>
-                        <th>Ø Qualität</th>
-                        <th>Max. Qualität</th>
-                        <th>Gesamtmenge</th>
+                        <th th:text="#{inventory.material}">Material</th>
+                        <th th:text="#{inventory.avgQuality}">Ø Qualität</th>
+                        <th th:text="#{inventory.maxQuality}">Max. Qualität</th>
+                        <th th:text="#{inventory.totalAmount}">Gesamtmenge</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -288,27 +269,40 @@
                     </tr>
                     <tr class="group-items" style="display: none;">
                         <td colspan="6" style="padding: 0;">
+                            <div class="inventory-items-table-wrapper">
                             <table class="krt-table" style="margin: 0; background: transparent; border-top: none;">
                                 <thead>
                                     <tr>
-                                        <th style="padding-left: 2rem; width: 20%;">Ort</th>
-                                        <th style="width: 10%;">Qualität</th>
-                                        <th style="width: 15%;">Menge</th>
-                                        <th style="width: 20%;">Auftrag</th>
-                                        <th style="width: 20%;">Einsatz</th>
-                                        <th style="width: 15%;">Aktionen</th>
+                                        <th class="item-checkbox-cell" style="padding-left: 2rem; width: 5%;">
+                                            <input type="checkbox" class="item-checkbox group-select-all"
+                                                   th:data-material-id="${group.material.id}"
+                                                   title="#{inventory.bulk.checkout.select.all}"
+                                                   onchange="toggleGroupCheckboxes(this)">
+                                        </th>
+                                        <th style="padding-left: 0.5rem; width: 18%;" th:text="#{inventory.location}">Ort</th>
+                                        <th style="width: 10%;" th:text="#{inventory.quality}">Qualität</th>
+                                        <th style="width: 15%;" th:text="#{inventory.amount}">Menge</th>
+                                        <th style="width: 18%;" th:text="#{inventory.order}">Auftrag</th>
+                                        <th style="width: 18%;" th:text="#{inventory.mission}">Einsatz</th>
+                                        <th style="width: 16%;" th:text="#{inventory.actions}">Aktionen</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr th:each="item : ${group.items}">
-                                        <td style="padding-left: 2rem;" th:text="${item.location.name}">Ort</td>
+                                    <tr th:each="item : ${group.items}" th:data-item-id="${item.id}">
+                                        <td class="item-checkbox-cell">
+                                            <input type="checkbox" class="item-checkbox inventory-item-checkbox"
+                                                   th:data-id="${item.id}"
+                                                   th:data-material-id="${item.material.id}"
+                                                   onchange="updateBulkCheckoutState()">
+                                        </td>
+                                        <td style="padding-left: 0.5rem;" th:text="${item.location.name}">Ort</td>
                                         <td th:text="${item.quality}">100</td>
                                         <td th:switch="${item.material.quantityType}">
                                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
                                             <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                                         </td>
                                         <td>
-                                            <select class="association-select" style="width: 100%; padding: 0.5rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-primary); color: var(--color-gray-1); min-height: 44px;"
+                                            <select class="association-select"
                                                     th:data-id="${item.id}"
                                                     th:data-material-id="${item.material.id}"
                                                     th:data-location-id="${item.location.id}"
@@ -328,7 +322,7 @@
                                             </select>
                                         </td>
                                         <td>
-                                            <select class="association-select" style="width: 100%; padding: 0.5rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-primary); color: var(--color-gray-1); min-height: 44px;"
+                                            <select class="association-select"
                                                     th:data-id="${item.id}"
                                                     th:data-material-id="${item.material.id}"
                                                     th:data-location-id="${item.location.id}"
@@ -343,6 +337,11 @@
                                                         th:value="${mission.id}"
                                                         th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
                                                         th:selected="${mission.id == item.missionId}">
+                                                </option>
+                                                <option th:if="${item.missionId != null and not #lists.contains(missions.![id], item.missionId)}"
+                                                        th:value="${item.missionId}"
+                                                        th:text="${item.missionName}"
+                                                        selected="selected">
                                                 </option>
                                             </select>
                                         </td>
@@ -379,12 +378,13 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
                 <tbody th:if="${#lists.isEmpty(groupedItems)}">
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--color-gray-2);">Du hast noch nichts eingelagert.</td>
+                        <td colspan="7" style="text-align: center; color: var(--color-gray-2);" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</td>
                     </tr>
                 </tbody>
             </table>
@@ -398,28 +398,28 @@
         <span class="close" onclick="closeBookOutModal()">&times;</span>
         <h2 style="margin-top:0;" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
-            <div th:if="${#fields.hasErrors('*')}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem; padding: 1rem;">
-                <ul style="color: #e74c3c; margin: 0; padding-left: 1.5rem; font-family: var(--font-body);">
+            <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
+                <ul class="text-danger">
                     <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
                 </ul>
             </div>
             <input type="hidden" id="version" th:field="*{version}">
             <input type="hidden" id="maxAmount" th:field="*{maxAmount}">
             
-            <div class="form-group" style="margin-bottom: 1rem;">
+            <div class="form-group mb-1">
                 <label for="targetAmount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetAmount}">Zielbestand</label>
                 <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" oninput="updateAmountFromTarget()">
             </div>
             
-            <div class="form-group" style="margin-bottom: 1rem;">
+            <div class="form-group mb-1">
                 <label for="amount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.amount}">Menge ausbuchen</label>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="flex-gap-sm">
                     <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" oninput="updateTargetFromAmount()">
                     <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
             
-            <div class="form-group" style="margin-bottom: 1rem;">
+            <div class="form-group mb-1">
                 <label style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
                     <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
@@ -436,7 +436,7 @@
             </div>
             
             <div id="transferFields" style="display:none; margin-bottom: 1rem;" class="form-group">
-                <div style="display: flex; gap: 1rem;">
+                <div class="flex-gap-md">
                     <div style="flex: 1;">
                         <label for="targetUserId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
                         <select id="targetUserId" th:field="*{targetUserId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
@@ -453,19 +453,19 @@
             </div>
             
             <div id="sellFields" style="display:none; margin-bottom: 1rem;">
-                <div class="form-group" style="margin-bottom: 1rem;">
+                <div class="form-group mb-1">
                     <label for="terminal" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.terminal}">Terminal</label>
                     <select id="terminal" th:field="*{terminal}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
                         <option value="" disabled selected>...wählen...</option>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 1rem;">
+                <div class="form-group mb-1">
                     <label for="sellAmount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
                     <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
                 </div>
             </div>
             
-            <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <div class="mt-2-flex-gap">
                 <button type="submit" id="bookOutSubmitBtn" class="btn" 
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-transfer="#{inventory.bookout.btn.transfer}"
@@ -481,7 +481,7 @@
     <div class="modal-content hud-box">
         <span class="close" onclick="closeNoteModal()">&times;</span>
         <h2 style="margin-top:0;" th:text="#{inventory.note.label}">Notiz</h2>
-        <div class="form-group" style="margin-bottom: 1rem;">
+        <div class="form-group mb-1">
             <label for="noteModalTextarea" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.note.label}">Notiz</label>
             <textarea id="noteModalTextarea" maxlength="1000" rows="6"
                       th:placeholder="#{inventory.note.placeholder}"
@@ -497,8 +497,130 @@
     </div>
 </div>
 
+<div id="bulkCheckoutModal" class="modal" style="display:none;">
+    <div class="modal-content hud-box">
+        <span class="close" onclick="closeBulkCheckoutModal()">&times;</span>
+        <h2 style="margin-top:0;" th:text="#{inventory.bulk.checkout.modal.title}">Massenausbuchung bestätigen</h2>
+        <p id="bulkCheckoutModalMessage" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; margin-bottom: 1.5rem;"></p>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button type="button" class="btn" style="min-height: 44px;" onclick="executeBulkCheckout()"
+                    th:text="#{inventory.bulk.checkout.modal.confirm}">Ausbuchen</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 44px;" onclick="closeBulkCheckoutModal()"
+                    th:text="#{inventory.bulk.checkout.modal.cancel}">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript">
+    var bulkI18n = {
+        success: /*[[#{inventory.bulk.checkout.success}]]*/ 'Massenausbuchung erfolgreich: {0} Eintr\u00e4ge ausgebucht.',
+        errorEmpty: /*[[#{inventory.bulk.checkout.error.empty}]]*/ 'Bitte mindestens einen Eintrag ausw\u00e4hlen.',
+        errorFailed: /*[[#{inventory.bulk.checkout.error.failed}]]*/ 'Fehler bei der Massenausbuchung.',
+        errorForbidden: /*[[#{inventory.bulk.checkout.error.forbidden}]]*/ 'Keine Berechtigung f\u00fcr einen oder mehrere Eintr\u00e4ge.',
+        errorNotFound: /*[[#{inventory.bulk.checkout.error.notfound}]]*/ 'Ein oder mehrere Eintr\u00e4ge wurden nicht gefunden.',
+        errorConflict: /*[[#{inventory.bulk.checkout.error.conflict}]]*/ 'Konflikt bei der Massenausbuchung. Bitte lade die Seite neu.',
+        modalMessage: /*[[#{inventory.bulk.checkout.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig ausgebucht werden?'
+    };
+
+    function getCheckedItemIds() {
+        var boxes = document.querySelectorAll('.inventory-item-checkbox:checked');
+        var ids = [];
+        boxes.forEach(function(cb) { ids.push(cb.getAttribute('data-id')); });
+        return ids;
+    }
+
+    function updateBulkCheckoutState() {
+        var ids = getCheckedItemIds();
+        var btn = document.getElementById('bulkCheckoutBtn');
+        var countSpan = document.getElementById('bulkCheckoutCount');
+        if (btn) btn.disabled = ids.length === 0;
+        if (countSpan) countSpan.textContent = ids.length > 0 ? '(' + ids.length + ')' : '';
+        // Update group-select-all checkboxes
+        document.querySelectorAll('.group-select-all').forEach(function(groupCb) {
+            var materialId = groupCb.getAttribute('data-material-id');
+            var groupBoxes = document.querySelectorAll('.inventory-item-checkbox[data-material-id="' + materialId + '"]');
+            var allChecked = groupBoxes.length > 0;
+            groupBoxes.forEach(function(cb) { if (!cb.checked) allChecked = false; });
+            groupCb.checked = allChecked;
+            groupCb.indeterminate = !allChecked && Array.from(groupBoxes).some(function(cb) { return cb.checked; });
+        });
+    }
+
+    function toggleGroupCheckboxes(groupCb) {
+        var materialId = groupCb.getAttribute('data-material-id');
+        var groupBoxes = document.querySelectorAll('.inventory-item-checkbox[data-material-id="' + materialId + '"]');
+        groupBoxes.forEach(function(cb) { cb.checked = groupCb.checked; });
+        updateBulkCheckoutState();
+    }
+
+    function openBulkCheckoutModal() {
+        var ids = getCheckedItemIds();
+        if (ids.length === 0) {
+            showInventoryToast('error', bulkI18n.errorEmpty);
+            return;
+        }
+        var msg = bulkI18n.modalMessage.replace('{0}', ids.length);
+        var msgEl = document.getElementById('bulkCheckoutModalMessage');
+        if (msgEl) msgEl.textContent = msg;
+        document.getElementById('bulkCheckoutModal').style.display = 'block';
+    }
+
+    function closeBulkCheckoutModal() {
+        document.getElementById('bulkCheckoutModal').style.display = 'none';
+    }
+
+    async function executeBulkCheckout() {
+        var ids = getCheckedItemIds();
+        if (ids.length === 0) {
+            closeBulkCheckoutModal();
+            showInventoryToast('error', bulkI18n.errorEmpty);
+            return;
+        }
+        closeBulkCheckoutModal();
+
+        var csrfToken = (document.querySelector('meta[name="_csrf"]') || {}).content;
+        var csrfHeader = (document.querySelector('meta[name="_csrf_header"]') || {}).content;
+        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
+            headers[csrfHeader] = csrfToken;
+        }
+
+        try {
+            var response = await fetch('/api/v1/inventory/bulk-checkout', {
+                method: 'POST',
+                headers: headers,
+                credentials: 'same-origin',
+                body: JSON.stringify({ itemIds: ids })
+            });
+
+            if (response.status === 204) {
+                var successMsg = bulkI18n.success.replace('{0}', ids.length);
+                showInventoryToast('success', successMsg);
+                setTimeout(function() { window.location.reload(); }, 1200);
+            } else if (response.status === 403) {
+                showInventoryToast('error', bulkI18n.errorForbidden);
+            } else if (response.status === 404) {
+                showInventoryToast('error', bulkI18n.errorNotFound);
+                setTimeout(function() { window.location.reload(); }, 1500);
+            } else if (response.status === 409) {
+                showInventoryToast('error', bulkI18n.errorConflict);
+                setTimeout(function() { window.location.reload(); }, 1500);
+            } else {
+                showInventoryToast('error', bulkI18n.errorFailed);
+            }
+        } catch (e) {
+            console.error('Bulk checkout error:', e);
+            showInventoryToast('error', bulkI18n.errorFailed);
+        }
+    }
+
+    // Close bulk modal on outside click
+    window.addEventListener('click', function(event) {
+        var bulkModal = document.getElementById('bulkCheckoutModal');
+        if (event.target === bulkModal) closeBulkCheckoutModal();
+    });
+
     var noteI18n = {
         saved: /*[[#{inventory.note.success.saved}]]*/ 'Notiz gespeichert',
         removed: /*[[#{inventory.note.success.removed}]]*/ 'Notiz entfernt',

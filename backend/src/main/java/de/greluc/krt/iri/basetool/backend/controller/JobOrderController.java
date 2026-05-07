@@ -3,11 +3,14 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +19,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
@@ -41,6 +47,7 @@ import java.util.UUID;
 public class JobOrderController {
     private final JobOrderService jobOrderService;
     private final JobOrderHandoverService jobOrderHandoverService;
+    private final JobOrderHandoverReportService jobOrderHandoverReportService;
     private final UserService userService;
     private final RoleHierarchy roleHierarchy;
 
@@ -50,6 +57,59 @@ public class JobOrderController {
     @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
     public JobOrderHandoverDto createHandover(@PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
         return jobOrderHandoverService.createHandover(id, dto);
+    }
+
+    @GetMapping("/{jobOrderId}/handovers/{handoverId}/report")
+    @Operation(
+        summary = "Download handover report PDF",
+        description = "Generates and downloads a PDF handover report for a persisted handover."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Job order or handover not found")
+    })
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public ResponseEntity<byte[]> downloadHandoverReport(
+            @PathVariable UUID jobOrderId,
+            @PathVariable UUID handoverId,
+            @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+        java.time.ZoneId userZone = null;
+        if (userTimeZone != null && !userTimeZone.isBlank()) {
+            try {
+                userZone = java.time.ZoneId.of(userTimeZone);
+            } catch (java.time.DateTimeException ex) {
+                // Invalid IANA zone in header \u2192 fall back to UTC inside the service.
+            }
+        }
+        byte[] pdf = jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, userZone);
+        String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", filename);
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @PostMapping("/{jobOrderId}/handovers/report/preview")
+    @Operation(
+        summary = "Preview handover report PDF",
+        description = "Generates a PDF handover report preview from unsaved handover data."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request data"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public ResponseEntity<byte[]> previewHandoverReport(
+            @PathVariable UUID jobOrderId,
+            @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
+        byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
+        String filename = "uebergabeprotokoll-vorschau.pdf";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", filename);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 
     @PostMapping
@@ -98,10 +158,19 @@ public class JobOrderController {
     }
 
     @PutMapping("/{id}/status")
-    @Operation(summary = "Update job order status", description = "Updates the status of a job order.")
+    @Operation(
+        summary = "Update job order status",
+        description = "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all linked inventory items are unlinked atomically. Requires the current version for optimistic locking."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Status updated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Job order not found"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Conflict – optimistic locking failure (version mismatch)")
+    })
     @PreAuthorize("hasRole('LOGISTICIAN')")
-    public JobOrderDto updateJobOrderStatus(@PathVariable UUID id, @RequestParam JobOrderStatus status) {
-        return jobOrderService.updateJobOrderStatus(id, status);
+    public JobOrderDto updateJobOrderStatus(@PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
+        return jobOrderService.updateJobOrderStatus(id, dto);
     }
 
     @PutMapping("/{id}/priority")
@@ -124,6 +193,38 @@ public class JobOrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteJobOrder(@PathVariable UUID id) {
         jobOrderService.deleteJobOrder(id);
+    }
+
+    @DeleteMapping("/{jobOrderId}/materials/{materialId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+        summary = "Unlink a material from a job order",
+        description = "Removes the link between a material and a job order, and unlinks all associated inventory items."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Material successfully unlinked"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Job order or material not found")
+    })
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
+        jobOrderService.unlinkMaterial(jobOrderId, materialId);
+    }
+
+    @DeleteMapping("/{jobOrderId}/inventory/{inventoryItemId}/unlink")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+        summary = "Unlink a single inventory item from a job order",
+        description = "Removes the link between a single inventory item and a job order by setting jobOrderId to null. Uses Hibernate dirty-checking (no bulk update)."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Inventory item successfully unlinked"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
+    })
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public void unlinkInventoryItem(@PathVariable UUID jobOrderId, @PathVariable UUID inventoryItemId) {
+        jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);
     }
 
     @PostMapping("/{id}/assignees/{userId}")

@@ -34,6 +34,7 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import de.greluc.krt.iri.basetool.frontend.logging.WebClientLoggingFilter;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,7 @@ public class WebClientConfig {
 
     private final AppBackendProperties backendProperties;
     private final AppHttpProperties httpProperties;
+    private final WebClientLoggingFilter webClientLoggingFilter;
 
     private ReactorClientHttpConnector connector() {
         try {
@@ -146,6 +148,8 @@ public class WebClientConfig {
                 .exchangeStrategies(strategies)
                 .clientConnector(connector())
                 .apply(oauth2Client.oauth2Configuration())
+                .filter(webClientLoggingFilter.correlationIdPropagation())
+                .filter(webClientLoggingFilter.callLogging())
                 .filter(resilienceFilter("backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
                 .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
                 .baseUrl(backendProperties.getBackendUrl())
@@ -164,6 +168,8 @@ public class WebClientConfig {
         return WebClient.builder()
                 .exchangeStrategies(strategies)
                 .clientConnector(connector())
+                .filter(webClientLoggingFilter.correlationIdPropagation())
+                .filter(webClientLoggingFilter.callLogging())
                 .filter(resilienceFilter("backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
                 .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
                 .baseUrl(backendProperties.getBackendUrl())

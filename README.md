@@ -2,6 +2,25 @@
 
 This project is a squadron management tool for **IRIDIUM**. It provides a central platform for mission planning, hangar management, and user administration.
 
+## Personal Inventory
+
+The application provides a personal-inventory feature that lets every authenticated member
+keep track of their own items (with name, optional note, quantity and a UEX City or Space
+Station as location).
+
+- User area: `/personal-inventory` — list, create, edit and delete only own entries.
+  Confirmation dialogues use KRT-styled modals (no native `confirm()`/`alert()`).
+- Admin area: `/admin/personal-inventory` (role `ADMIN`) — pick a member from the dropdown
+  and manage that member's inventory (clearly marked as `ADMIN MODE`).
+- Backend endpoints: `/api/v1/personal-inventory` (user), `/api/v1/admin/personal-inventory`
+  (admin) and `/api/v1/uex/locations/search` (typeahead). All endpoints are paginated,
+  validated (`jakarta.validation`) and protected by optimistic locking via the `version`
+  field on the update DTO.
+- Location data is sourced from the locally synchronized UEX `City` and `SpaceStation`
+  tables (`UexUniverseSyncService`); no live UEX call is performed on the hot path.
+- Translations live in `personalInventory.*` and `admin.personalInventory.*` and are
+  available in German and English.
+
 ## Project Structure
 
 The project is divided into two main modules:
@@ -33,6 +52,27 @@ Both modules use environment variables for key configurations.
 | `KEYCLOAK_ISSUER_URI` | The URL of the Keycloak realm. | `https://keycloak.iri-base.org/realms/iri` |
 | `KEYCLOAK_CLIENT_SECRET`| (Frontend only) The secret for the Keycloak client. | `YOUR_CLIENT_SECRET` |
 | `BACKEND_URL` | (Frontend only) The URL of the backend API. | `http://localhost:11261` |
+| `APP_LOGGING_CORRELATION_ID_HEADER` | HTTP header used for inbound/outbound request correlation (MDC-backed). | `X-Correlation-Id` |
+| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` | Threshold (ms) above which a request is logged at `WARN` instead of `INFO`. | `2000` |
+| `APP_LOGGING_STRUCTURED_ENABLED` | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile. | `false` (dev/test), `true` (prod) |
+| `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`. | `1500` |
+
+### Session Persistence (Redis)
+
+Spring Sessions werden persistent in Redis gespeichert (`spring-session-data-redis`). Nach einem Neustart des Frontend-Containers bleiben alle aktiven Nutzersessions erhalten — kein sichtbarer Re-Login-Flow, keine 302-Redirects. Redis läuft als eigener Docker-Service (`redis` / `redis-dev`) im Netzwerk `net-redis-frontend` und ist für den Frontend-Container unter dem Hostnamen `redis` erreichbar. Das Passwort wird über die Umgebungsvariable `REDIS_PASSWORD` konfiguriert (siehe `.env`).
+
+Der `SsoReAuthenticationEntryPoint` bleibt als Fallback für wirklich abgelaufene Sessions (Session-Timeout) aktiv. Er erkennt bekannte Bot-/Scanner-Pfade (z. B. `/wp-admin/`, `/robots.txt`, `/feed/`) und beantwortet diese direkt mit HTTP 404, ohne einen OAuth2-Flow auszulösen. Für legitime App-Pfade mit abgelaufener Session wird ein stiller Keycloak-SSO-Redirect (`prompt=none`) ausgeführt.
+
+### Request Correlation & Structured Logging
+
+Both the backend and the frontend module emit one access-log line per request (HTTP method, path, status, duration) and enrich **every** log line with two MDC fields:
+
+- `correlationId` — taken from the inbound `X-Correlation-Id` request header (configurable via `APP_LOGGING_CORRELATION_ID_HEADER`) or generated as UUID if absent. The effective id is echoed back in the response header of the same name so clients, proxies and load balancers can trace requests end-to-end. The frontend's `WebClientLoggingFilter` also propagates the same id to every outbound backend call, so backend and frontend log lines of the same user interaction share one id.
+- `userId` — the JWT / OIDC `sub` claim of the authenticated user, or `anonymous` for unauthenticated traffic. Names, emails and tokens are never logged.
+
+In addition to access logs, the frontend module logs Resilience4j events (circuit-breaker state transitions, retry attempts, bulkhead rejections, time-limiter timeouts) via a dedicated `ResilienceEventLogger` so that degraded-backend symptoms such as `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always carry a matching log entry explaining why.
+
+In the `prod` profile both applications additionally write a structured JSON log (`logs/backend.json` / `logs/frontend.json`) via `LogstashEncoder`, making the logs ready for ELK / Loki / CloudWatch ingestion. Error events are rolled into dedicated `*-error.log` files for fast incident triage.
 
 ## Getting Started
 
@@ -47,6 +87,7 @@ KC_POSTGRES_USER=krt_keycloak_user
 KC_POSTGRES_PASSWORD=krt_keycloak_password
 KC_BOOTSTRAP_ADMIN_USERNAME=admin
 KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+REDIS_PASSWORD=your_redis_password
 ```
 
 ### Running with Docker Compose (Production)

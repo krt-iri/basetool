@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:d68cbca8-a3fb-471d-8faf-144cdb5ef428" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:be97e6bf-cdee-47a1-9b1f-173e497488ab" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-04-21T09:39:37Z</timestamp>
+    <timestamp>2026-05-04T17:23:07Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -498,6 +498,36 @@ of Jackson components maintained by FasterXML.com</description>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar">
+      <group>com.github.librepdf</group>
+      <name>openpdf</name>
+      <version>2.0.3</version>
+      <hashes>
+        <hash alg="MD5">0c87ddb05e934db1ddcf824266172ae2</hash>
+        <hash alg="SHA-1">2dc1fc7eddda56b16621c912e8be60b85a8d305d</hash>
+        <hash alg="SHA-256">8dcc234a767557687b4eaa66f067de09d6e9bf8c8bc7003d606f230423fe7b5a</hash>
+        <hash alg="SHA-512">14c3a4553653a7b792b55104728bec806a5036fab94375aab86a3f9b6d1e4b967f6b70a43bfb0601e5bdf08cb6187a388861163e9c97a986a2903191953321e5</hash>
+        <hash alg="SHA-384">301d75e8c5e030496996eb3e96a3e6e804371e5c1c22dce515856824caeae4d9b53cfb0e17967cfe2d878c72d24faf6c</hash>
+        <hash alg="SHA3-384">786cf6e194306c53e1997a5a3039cf9b276c2b5d596190d4cc81283e85f67286132d77f8c8aeae66ba01237b8cb9e8f2</hash>
+        <hash alg="SHA3-256">e7fca1f9f59e0f6b2924527366e11bf45b7e8bad9554dc9c5bebd815b2c9eb6c</hash>
+        <hash alg="SHA3-512">1579b9a5d7d0b4aae3ce8171ed4779751ef46bda37713e05077c541c6b3bff0b763b20836876d17739f371e0aed80cbd5a505ff676a594edff0c68e24ae6c85f</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <name>GNU Lesser General Public License (LGPL), Version 2.1</name>
+          <url>https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html</url>
+        </license>
+        <license>
+          <name>Mozilla Public License Version 2.0</name>
+          <url>https://www.mozilla.org/en-US/MPL/2.0/</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
     <component type="library" bom-ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.43.0?type=jar">
@@ -2019,6 +2049,41 @@ file comparators, endian transformation classes, and much more.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar">
+      <group>net.logstash.logback</group>
+      <name>logstash-logback-encoder</name>
+      <version>8.0</version>
+      <description>Provides logback encoders, layouts, and appenders to log in JSON and other formats supported by Jackson</description>
+      <hashes>
+        <hash alg="MD5">c774c8e1c337b7eefcb0e591dec7b49f</hash>
+        <hash alg="SHA-1">73a2ae828d20f710be8439af3c1a53d21a62dc0f</hash>
+        <hash alg="SHA-256">81fcbde1b5a7d673d6c0d0d4f1e0f79b676f948e6b92b912e9e0b75097458bd3</hash>
+        <hash alg="SHA-512">0c7d56dad2204521f0f07fbae1193b9cdf4aa21f29dfbd34f65579ed4876a64ff9b2eba795aee49431580dc84ba60505ae4abe62367a735af257f62026a07925</hash>
+        <hash alg="SHA-384">e4c7688ee2ba99bca504226a56eb6f7cfb52fdcd7c725a141707f8fdadb6dec5d1b9ff7143c80b074a7c1ff824ec4108</hash>
+        <hash alg="SHA3-384">d4c0c8cd928b78f2b2a63a0156f4e5b28107b6887e3fc2886fa52a864d2fb3f8597dccdbc12cdc41f1fb89671c2bb427</hash>
+        <hash alg="SHA3-256">208a5707fb9bc90f4e0454aff3cc1f13d5d39c740436876f2ece785caa90ce3c</hash>
+        <hash alg="SHA3-512">f3b1d4a17ed17640b9f07085abe2311281ce000f4a6c1ea69d8649efb2a3b99595b2d1bf50d544b65e0927ee065b7eadc7a61e10553fcdee781788dcab991d3b</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+        <license>
+          <id>MIT</id>
+          <url>https://opensource.org/license/mit/</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/logfellow/logstash-logback-encoder</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/net.minidev/accessors-smart@2.6.0?type=jar">
       <publisher>Chemouni Uriel</publisher>
       <group>net.minidev</group>
@@ -2890,114 +2955,6 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar">
-      <group>org.jacoco</group>
-      <name>org.jacoco.agent</name>
-      <version>0.8.14</version>
-      <description>JaCoCo Agent</description>
-      <hashes>
-        <hash alg="MD5">80ca49511ad2aaadecb86b631b400f10</hash>
-        <hash alg="SHA-1">bca1f6d49506da3eb9d0d3b9acbcfdd1fb22c14e</hash>
-        <hash alg="SHA-256">20be9853385bdfc65a5929643412d09243d14514304b89ba23a265158cc8792b</hash>
-        <hash alg="SHA-512">01b6bedbc736f2e7350c2046b96861556d39552322758eaa874bbcca479d66c19621755ed98d80df3e80d77a48eb1713ec0dc771c4b481893b9307748cbbe756</hash>
-        <hash alg="SHA-384">3922fdf1f5b4b8ee23da68fc5e91aea0d628d9b4d5f25d457412b8cde472e0ddf02771a23c032bb9792d1e7a4a0bdaf8</hash>
-        <hash alg="SHA3-384">de955ba95663b36d1527dfb458c549122899be99665416b42d8624d0d7dc788fed1d49a864f4422334e32f49c476f50c</hash>
-        <hash alg="SHA3-256">a1f35cf33933c5694674fb79cddbb2502838f86d8c475b888b603a311cedd71a</hash>
-        <hash alg="SHA3-512">f76c8e39568f4d0c81a07856c4f32ba7cd16bec92c4e43d17d2c347fd1020796e8fa7b63b8d0182f8992f966d3d52b2967e4cc2b09f77f3baea0ad78973f44e6</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-          <url>https://www.eclipse.org/legal/epl-2.0</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar</purl>
-      <modified>false</modified>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar">
-      <group>org.jacoco</group>
-      <name>org.jacoco.ant</name>
-      <version>0.8.14</version>
-      <description>JaCoCo Ant Tasks</description>
-      <hashes>
-        <hash alg="MD5">341aaffda886f24b74fcd67f8ec27b27</hash>
-        <hash alg="SHA-1">f52b386d3440618462eb656584b6f655a655c2b1</hash>
-        <hash alg="SHA-256">9fff68954d5de3aad2bf838eaf886ed67d2c22a2d6c6f095548bade8c45caeae</hash>
-        <hash alg="SHA-512">d51e08c8735a1310de5689844214ee592bb1ca93064675d1c27e47e01c3a397aed9083e54ee26c3e9b430e40681043095ee10022d59af0239900af7b6e2bea93</hash>
-        <hash alg="SHA-384">74cb9ca8ecf147b874c58fe63ab8ee1fa59b8e400455649c560003e131a1a18afdf267b1433b8f4cd05fcfba78d1eba5</hash>
-        <hash alg="SHA3-384">a3cebdaf7f6c0f09791a58b78e8a9d22bd2d421c992dd7dae361433b02bf8570c2c631716cb0250ac19a804d8a21117c</hash>
-        <hash alg="SHA3-256">19b57ba4469ba11d25ce0d7f4dc83b2a659b164ed300665e225f15abb640763f</hash>
-        <hash alg="SHA3-512">52039c46db985ff61d5ba258670890e5d99de928a2bce4a6b1e3f45dc51021483a279ce71f5b053c83c2f047b2ac83dd8812d8814e90bae124276457b11578b5</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-          <url>https://www.eclipse.org/legal/epl-2.0</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar</purl>
-      <modified>false</modified>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar">
-      <group>org.jacoco</group>
-      <name>org.jacoco.core</name>
-      <version>0.8.14</version>
-      <description>JaCoCo Core</description>
-      <hashes>
-        <hash alg="MD5">07f7ab938a007b6146aede8407c2b117</hash>
-        <hash alg="SHA-1">5d317827447ab203bb90ecc7597850baae9c8565</hash>
-        <hash alg="SHA-256">28abbf0eea5a08e4f24097f2fbac663ca17c341c25c3a04d90d6cd325943c995</hash>
-        <hash alg="SHA-512">3af7632e45398541202f3c1073978fdb54bad3dbb07c1a7c2bc412c060d148c1877bfb5d697674c22acd57dee9811e64f5a3113b79f275bc71b87876ff882faf</hash>
-        <hash alg="SHA-384">ee13a5eac4c0ff720e17bbdf66edc79453f66a2364e143dba49f8446305f463a251d3f4bc1b97a9a231cfd36cb2b142d</hash>
-        <hash alg="SHA3-384">06dbe89f54d4ba4da2c4ffc550802d2c732a0c374d61253a76b0d127ae420e4429e9345bc06cfd8e2dd6031b78bdd6c7</hash>
-        <hash alg="SHA3-256">600c45651d6e2be92fb1a88c41ecf565343c86b36e05da3405b08e761bae3f40</hash>
-        <hash alg="SHA3-512">6682a21604e11d144235a88348afa030689e8fc1dbfdd6f1c65c08662dc34ef95e32c00b4815e6a2a4114085db8187e2cc045a814f183ce10aedc1e8425a7f53</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-          <url>https://www.eclipse.org/legal/epl-2.0</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar</purl>
-      <modified>false</modified>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar">
-      <group>org.jacoco</group>
-      <name>org.jacoco.report</name>
-      <version>0.8.14</version>
-      <description>JaCoCo Report</description>
-      <hashes>
-        <hash alg="MD5">00cef8f0702d2c26201078f566552014</hash>
-        <hash alg="SHA-1">d25b1c200c0c6e82baac3c0ddb8b9e38f13a5f6c</hash>
-        <hash alg="SHA-256">a3e2026060ab8b8d5c650706406234bb4c033dfd5376afeb8b1666e8ed27c453</hash>
-        <hash alg="SHA-512">ea4c40c7240bea5148dc415078a71d5a5ae767a8ad945fca068aac2f765ab3f6191ed29575930fbf44e4919be4f4a8dce914f3bb62af6cbe0d5761c5237090ed</hash>
-        <hash alg="SHA-384">723d1e0cc46581e2b041d912153acfaf256a215aa4e865fde890443e0a5b30aa192aab6b4bc0c1215c9d663cc32f19a8</hash>
-        <hash alg="SHA3-384">b2ba55c38524d8f1cadbc4eb6f32b5e00edd0e7703b884db173cadbc68f5e5aa5c21e05c227a4654c1738502c3142b6e</hash>
-        <hash alg="SHA3-256">d8f2e63fa5221fb485d8adc695f6fa8793e164d727028200c831687c37063396</hash>
-        <hash alg="SHA3-512">952683b971397290986e39b015cace74dfac8793e4bb7de86312c0a6d7b72b9cc525e461f8fff3c0097fec348a0f23462f460efb01d3d10349836c5b1fd954a8</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-          <url>https://www.eclipse.org/legal/epl-2.0</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar</purl>
-      <modified>false</modified>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
     <component type="library" bom-ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar">
       <group>org.jboss.logging</group>
       <name>jboss-logging</name>
@@ -3760,90 +3717,6 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar">
-      <publisher>OW2</publisher>
-      <group>org.ow2.asm</group>
-      <name>asm-commons</name>
-      <version>9.9</version>
-      <description>Usefull class adapters based on ASM, a very small and fast Java bytecode manipulation framework</description>
-      <hashes>
-        <hash alg="MD5">8103b3de8f48fb4c7f97efdaa46ce809</hash>
-        <hash alg="SHA-1">db9165a3bf908ded6b08612d583a15d1d0c7bda0</hash>
-        <hash alg="SHA-256">db2f6f26150bbe7c126606b4a1151836bcc22a1e05a423b3585698bece995ff8</hash>
-        <hash alg="SHA-512">4949cde2b51e5d171d0ff02ebd1f9f7f111bf538c8bfd62f139364181ee4bebd6598949d895f1c78daaba6dd1da4e564fab10e602cfe297915cd0287f8c2f1d5</hash>
-        <hash alg="SHA-384">e061073a17a2310f77dd5eb1717138d9671eb8dbe7cda22e04cf5ff77d115b0885c9c62318128e6512c98cdc6aff747e</hash>
-        <hash alg="SHA3-384">5ee23c408a8be72585e34bbe68890fd89ea4657bc90bec2a4393f49b92a6eb0677df876687bcad8fe7d11a1f9202de46</hash>
-        <hash alg="SHA3-256">818366607c56ef4d772f9becbd51f4972aa8e01a7226d81ca5dcce93aa8ff214</hash>
-        <hash alg="SHA3-512">4cdaa61289c73a98ed25f9ab49837d2cc1bfff6d2d60bcc888a02fea6472865362231644c4d36954d8f20dc937aa5197c558f98705855d4ca5a84a2d4e5747b0</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>BSD-3-Clause</id>
-          <url>https://opensource.org/licenses/BSD-3-Clause</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="website">
-          <url>http://www.ow2.org/</url>
-        </reference>
-        <reference type="issue-tracker">
-          <url>https://gitlab.ow2.org/asm/asm/issues</url>
-        </reference>
-        <reference type="mailing-list">
-          <url>https://mail.ow2.org/wws/arc/asm/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://gitlab.ow2.org/asm/asm/</url>
-        </reference>
-      </externalReferences>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar">
-      <publisher>OW2</publisher>
-      <group>org.ow2.asm</group>
-      <name>asm-tree</name>
-      <version>9.9</version>
-      <description>Tree API of ASM, a very small and fast Java bytecode manipulation framework</description>
-      <hashes>
-        <hash alg="MD5">912eeaba1a63d574ffc66c651c7c6725</hash>
-        <hash alg="SHA-1">f8de6eead6d24dd0f45bd065bbe112b2cda6ea21</hash>
-        <hash alg="SHA-256">42178f3775c9c63f9e5e1446747d29b4eca4d91bd6e75e5c43cfa372a47d38c6</hash>
-        <hash alg="SHA-512">8b555d9166a17dcd0d1b297bd61fb3da59279b00a97fd7d0a3b139cb68ca8012ac14fb9bab0a6fa7ebe5612337f8e39b240d97b05a2c25ebc9ece15b7a1bc131</hash>
-        <hash alg="SHA-384">10cf329fc9d277e9b325938ca38845bd902d280482eb446d25c30bda58ae9b436ca2caa0d04a301e62cc3f1fc11d9cce</hash>
-        <hash alg="SHA3-384">f4099fee5d591554a7971f61ecc8250a24670e09b0a975afaceb0898db5c0c8db2aad160a36392e929d975f16f901fbc</hash>
-        <hash alg="SHA3-256">d2fc071369185292b730d6e84715344f9b2eefa42e759c8286fe277a4fd6534e</hash>
-        <hash alg="SHA3-512">3908bebe105c16acb716b3c5b39b9d19bb42939eecbfd47bc3905fce3e7b69c251adc2a7f687dfded747d5e63caa9921f20c174fd9d41631cc2ae2336fe1e107</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>BSD-3-Clause</id>
-          <url>https://opensource.org/licenses/BSD-3-Clause</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="website">
-          <url>http://www.ow2.org/</url>
-        </reference>
-        <reference type="issue-tracker">
-          <url>https://gitlab.ow2.org/asm/asm/issues</url>
-        </reference>
-        <reference type="mailing-list">
-          <url>https://mail.ow2.org/wws/arc/asm/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://gitlab.ow2.org/asm/asm/</url>
-        </reference>
-      </externalReferences>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
     <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm@9.7.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
@@ -3884,48 +3757,6 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
       </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">true</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar">
-      <publisher>OW2</publisher>
-      <group>org.ow2.asm</group>
-      <name>asm</name>
-      <version>9.9</version>
-      <description>ASM, a very small and fast Java bytecode manipulation framework</description>
-      <hashes>
-        <hash alg="MD5">6d1dd0482c03a6dc1807d9d004456021</hash>
-        <hash alg="SHA-1">c29635c8a7afa03d74b33c1884df8abb2b3f3dcc</hash>
-        <hash alg="SHA-256">03d99a74ad1ee5c71334ef67437f4ef4fe3488caa7c96d8645abc73c8e2017d4</hash>
-        <hash alg="SHA-512">197a4fb3ecb34d05ac555c6a510e69affcb1e476f24c5e935ad513ecdabf74b45aa1b0e0b25dbe91224fc6db7959b2677ea5876ee49e7487265e2a29c560c21c</hash>
-        <hash alg="SHA-384">98165bfe6aa74973d10eac0ef1296edc07e9d216105f2fc0e482d9ac069e7c711030a72bbe3866c18074aecf91078c16</hash>
-        <hash alg="SHA3-384">3577d41feefb5cbc5722a2d16875b9ebd1adefb03e7760388922178b6e665975a2cb68aff8fa109897a6e800e76ee935</hash>
-        <hash alg="SHA3-256">33695fb4935e016d154b5b7ec76bae39378b27ad52394ae7a61f43a8861a862a</hash>
-        <hash alg="SHA3-512">64dee71b6796970e7be94468a41ef24b9f5b09b0725f4e9fe307e063fb590ff9740011a0032e207b77641da10686ec655a91b9d73fad26f7b1dc1e2ab9f32b46</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>BSD-3-Clause</id>
-          <url>https://opensource.org/licenses/BSD-3-Clause</url>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.ow2.asm/asm@9.9?type=jar</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="website">
-          <url>http://www.ow2.org/</url>
-        </reference>
-        <reference type="issue-tracker">
-          <url>https://gitlab.ow2.org/asm/asm/issues</url>
-        </reference>
-        <reference type="mailing-list">
-          <url>https://mail.ow2.org/wws/arc/asm/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://gitlab.ow2.org/asm/asm/</url>
-        </reference>
-      </externalReferences>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
     <component type="library" bom-ref="pkg:maven/org.postgresql/postgresql@42.7.10?type=jar">
@@ -7526,6 +7357,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.github.docker-java/docker-java-transport@3.7.1?type=jar"/>
+    <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar"/>
     <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.43.0?type=jar"/>
     <dependency ref="pkg:maven/com.h2database/h2@2.4.240?type=jar"/>
     <dependency ref="pkg:maven/com.jayway.jsonpath/json-path@2.10.0?type=jar">
@@ -7545,12 +7377,12 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.17.0?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar"/>
+      <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar"/>
       <dependency ref="pkg:maven/com.h2database/h2@2.4.240?type=jar"/>
+      <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar"/>
       <dependency ref="pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar"/>
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.junit.platform/junit-platform-launcher@6.0.3?type=jar"/>
       <dependency ref="pkg:maven/org.mapstruct/mapstruct-processor@1.6.3?type=jar"/>
@@ -7774,6 +7606,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy-agent@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.java.dev.jna/jna@5.18.1?type=jar"/>
+    <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar">
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/net.minidev/accessors-smart@2.6.0?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.7.1?type=jar"/>
     </dependency>
@@ -7865,20 +7700,6 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
-    <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar">
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar"/>
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar"/>
-    </dependency>
-    <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar">
-      <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
-    </dependency>
-    <dependency ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar">
-      <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar"/>
-    </dependency>
     <dependency ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"/>
     <dependency ref="pkg:maven/org.jetbrains/annotations@17.0.0?type=jar"/>
     <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
@@ -7943,15 +7764,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.osgi/org.osgi.annotation.versioning@1.1.2?type=jar"/>
     <dependency ref="pkg:maven/org.osgi/org.osgi.resource@1.0.0?type=jar"/>
     <dependency ref="pkg:maven/org.osgi/org.osgi.service.serviceloader@1.0.0?type=jar"/>
-    <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar">
-      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
-    </dependency>
-    <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar">
-      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
-    </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm@9.7.1?type=jar"/>
-    <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
     <dependency ref="pkg:maven/org.postgresql/postgresql@42.7.10?type=jar">
       <dependency ref="pkg:maven/org.checkerframework/checker-qual@3.52.0?type=jar"/>
     </dependency>

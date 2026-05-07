@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{missions.title} + ' - ' + #{app.title}">Missions - IRIDIUM Basetool</title>
@@ -25,15 +25,15 @@
         <p th:text="#{missions.description}">Manage and view missions.</p>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
 
-        <form method="get" th:action="@{/missions}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
+        <form id="missions-filter-form" method="get" th:action="@{/missions}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
             <div style="display:flex; flex-direction:column; gap:0.2rem; flex:1; min-width: 150px;">
                 <label for="mission-search" th:text="#{mission.search}">Search</label>
                 <input type="text" id="mission-search" name="search" th:value="${search}" th:placeholder="#{mission.search.placeholder}">
             </div>
-            
-            <div style="display:flex; flex-direction:column; gap:0.2rem;" class="datetime-split-group">
+
+            <div class="datetime-split-group">
                 <label for="mission-start" th:text="#{mission.filter.start}">From</label>
                 <input type="hidden" name="start" id="mission-start" th:value="${start}">
                 <div class="datetime-split-inputs">
@@ -41,8 +41,8 @@
                     <input type="time" class="time-part">
                 </div>
             </div>
-            
-            <div style="display:flex; flex-direction:column; gap:0.2rem;" class="datetime-split-group" th:attr="data-validate-after='mission-start', data-error-after=#{validation.datetime.after}">
+
+            <div class="datetime-split-group" th:attr="data-validate-after='mission-start', data-error-after=#{validation.datetime.after}">
                 <label for="mission-end" th:text="#{mission.filter.end}">To</label>
                 <input type="hidden" name="end" id="mission-end" th:value="${end}">
                 <div class="datetime-split-inputs">
@@ -52,53 +52,55 @@
             </div>
 
             <div style="display:flex; flex-direction:column; gap:0.2rem;" sec:authorize="isAuthenticated()">
-                 <div style="height: 1.2rem;"></div>
-                 <label style="display:flex; align-items:center; cursor:pointer; gap:0.5rem; padding: 0.5rem 0.75rem; border: 1px solid transparent;">
-                     <input type="checkbox" name="showPast" th:checked="${showPast}">
-                     <span th:text="#{mission.filter.show_past}">Show Past</span>
-                 </label>
+                <div style="height: 1.2rem;"></div>
+                <label style="display:flex; align-items:center; cursor:pointer; gap:0.5rem; padding: 0.5rem 0.75rem; border: 1px solid transparent;">
+                    <input type="checkbox" name="showPast" th:checked="${showPast}">
+                    <span th:text="#{mission.filter.show_past}">Show Past</span>
+                </label>
             </div>
-            
-            <div style="align-self: flex-end;">
-                 <button type="submit" class="btn" th:text="#{general.filter}">Filter</button>
-            </div>
-            
-            <div sec:authorize="isAuthenticated()" style="align-self: flex-end; margin-left: auto;">
-                 <a th:href="@{/missions/new}" class="btn" th:text="#{mission.create}">Create New</a>
+
+            <div style="align-self: flex-end; display: flex; gap: 0.5rem;">
+                <button type="button" id="missions-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zurücksetzen</button>
+                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" th:text="#{mission.create}">Create New</a>
             </div>
         </form>
 
-        <div class="table-responsive">
-        <table th:if="${missions}">
-            <thead>
-                <tr>
-                    <th th:text="#{mission.name}">Name</th>
-                    <th th:text="#{mission.status}">Status</th>
-                    <th th:text="#{mission.planned_start}">Planned Start</th>
-                    <th th:text="#{general.action}">Aktion</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="m : ${missions}">
-                    <td th:text="${m.name}">Name</td>
-                    <td th:text="${m.status}">Status</td>
-                    <td class="utc-time" th:text="${m.plannedStartTime}">Start</td>
-                    <td>
-                        <a th:href="@{/missions/{id}(id=${m.id})}" class="btn" th:text="#{general.open}">Open</a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div id="missions-loading-indicator" style="display:none; text-align:center; padding: 1rem;">
+            <span class="krt-loading-indicator"></span>
         </div>
-        
-        <div th:replace="~{fragments/pagination :: pagination(pageResponse=${missionsPage}, baseUrl='/missions')}"></div>
-        
-        <p th:if="${missions == null or missions.isEmpty()}" th:text="#{mission.empty}">No missions.</p>
+
+        <div id="missions-results">
+            <th:block th:fragment="missionsResults">
+            <div class="table-responsive">
+            <table th:if="${missions}">
+                <thead>
+                    <tr>
+                        <th th:text="#{mission.name}">Name</th>
+                        <th th:text="#{mission.status}">Status</th>
+                        <th th:text="#{mission.planned_start}">Planned Start</th>
+                        <th th:text="#{general.action}">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="m : ${missions}">
+                        <td th:text="${m.name}">Name</td>
+                        <td th:text="${m.status}">Status</td>
+                        <td class="utc-time" th:text="${m.plannedStartTime}">Start</td>
+                        <td>
+                            <a th:href="@{/missions/{id}(id=${m.id})}" class="btn" th:text="#{general.open}">Open</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+
+            <div th:replace="~{fragments/pagination :: pagination(pageResponse=${missionsPage}, baseUrl='/missions')}"></div>
+
+            <p th:if="${missions == null or missions.isEmpty()}" th:text="#{mission.empty}">No missions.</p>
+            </th:block>
+        </div>
     </div>
 </main>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-    });
-</script>
+<script th:src="@{/js/missions.js}" defer></script>
 </body>
 </html>

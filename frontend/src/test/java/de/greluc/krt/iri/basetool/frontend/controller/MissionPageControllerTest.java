@@ -199,7 +199,7 @@ class MissionPageControllerTest {
         when(backendApiClient.get(uriCaptor.capture(), any(ParameterizedTypeReference.class), eq(false))).thenReturn(new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
         // Act
-        controller.listMissions(null, null, null, null, true, null, null, model, user);
+        controller.listMissions(null, null, null, null, true, null, null, null, model, user);
 
         // Assert
         String uri = uriCaptor.getValue();
@@ -224,7 +224,7 @@ class MissionPageControllerTest {
         when(backendApiClient.get(uriCaptor.capture(), any(ParameterizedTypeReference.class), eq(true))).thenReturn(new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
         // Act
-        controller.listMissions(null, null, null, null, true, null, null, model, null);
+        controller.listMissions(null, null, null, null, true, null, null, null, model, null);
 
         // Assert
         String uri = uriCaptor.getValue();

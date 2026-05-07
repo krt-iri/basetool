@@ -40,7 +40,7 @@ public class OperationFinanceService {
     @Transactional(readOnly = true)
     public OperationFinanceDto getOperationFinances(UUID operationId) {
         Operation operation = operationRepository.findById(operationId)
-                .orElseThrow(() -> new RuntimeException("Operation not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
         List<UUID> missionIds = operation.getMissions().stream()
                 .map(Mission::getId)
@@ -77,12 +77,13 @@ public class OperationFinanceService {
                 }
             }
 
-            // Raffinerieauftraege fliessen mit ihrem Gewinn/Verlust (oreSales - expenses) ein,
-            // nicht nur mit ihren Kosten. Altdaten mit oreSales=null werden als 0 behandelt.
+            // Raffinerieauftraege fliessen mit ihrem Gewinn/Verlust (oreSales - expenses - otherExpenses) ein,
+            // nicht nur mit ihren Kosten. Altdaten mit null-Werten werden als 0 behandelt.
             for (RefineryOrder order : orders) {
                 double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
                 double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
-                double profit = sales - costs;
+                double otherCosts = order.getOtherExpenses() != null ? order.getOtherExpenses() : 0d;
+                double profit = sales - costs - otherCosts;
                 if (profit != 0d) {
                     missionTotalSum = missionTotalSum.add(BigDecimal.valueOf(profit));
                 }

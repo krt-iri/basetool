@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="unsavedModal">
@@ -6,7 +6,7 @@
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
             <h2 th:text="#{unsaved.modal.title}" style="margin-top:0;">Ungespeicherte Änderungen</h2>
             <p th:text="#{unsaved.modal.message}" style="margin-bottom: 2rem;">Du hast ungespeicherte Änderungen. Möchtest du die Seite wirklich verlassen und die Änderungen verwerfen?</p>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
+            <div class="flex-center-gap">
                 <button type="button" id="unsaved-leave-btn" class="btn btn-secondary" th:text="#{unsaved.modal.btn.leave}">Ohne Speichern verlassen</button>
                 <button type="button" id="unsaved-stay-btn" class="btn" th:text="#{unsaved.modal.btn.stay}">Zurück</button>
             </div>

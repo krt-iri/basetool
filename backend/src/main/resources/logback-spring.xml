@@ -3,36 +3,105 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml" />
 
     <property name="LOG_FILE" value="logs/backend.log"/>
+    <property name="LOG_ERROR_FILE" value="logs/backend-error.log"/>
+
+    <!--
+      MDC-enriched pattern.
+      - %X{correlationId:-} renders the per-request correlation id set by CorrelationIdFilter.
+      - %X{userId:-anonymous} renders the JWT `sub` of the authenticated user (or "anonymous").
+      These two fields are the single most important addition for production debugging / support.
+    -->
+    <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <layout class="de.greluc.krt.iri.basetool.backend.logging.PiiMaskingPatternLayout">
-                <pattern>%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}</pattern>
+                <pattern>${LOG_PATTERN_CONSOLE}</pattern>
             </layout>
         </encoder>
     </appender>
 
+    <!--
+      Size-and-time based rolling replaces the previous FixedWindowRollingPolicy, which raised
+      the "Large window sizes are not allowed" warning observed in production log.txt.
+    -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_FILE}</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>logs/backend.%i.log.zip</fileNamePattern>
-            <minIndex>1</minIndex>
-            <maxIndex>100</maxIndex>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/backend.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
         </rollingPolicy>
-        <triggeringPolicy class="de.greluc.krt.iri.basetool.backend.logging.StartupSizeTriggeringPolicy">
-            <maxFileSize>10MB</maxFileSize>
-        </triggeringPolicy>
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <layout class="de.greluc.krt.iri.basetool.backend.logging.PiiMaskingPatternLayout">
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}</pattern>
+                <pattern>${LOG_PATTERN_FILE}</pattern>
             </layout>
         </encoder>
     </appender>
 
-    <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
-    </root>
+    <!--
+      Dedicated ERROR-only appender. Lets support quickly scan incidents without wading through
+      the full INFO stream.
+    -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_ERROR_FILE}</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/backend-error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="de.greluc.krt.iri.basetool.backend.logging.PiiMaskingPatternLayout">
+                <pattern>${LOG_PATTERN_FILE}</pattern>
+            </layout>
+        </encoder>
+    </appender>
+
+    <!--
+      Optional structured JSON appender, enabled for the `prod` Spring profile via
+      <springProfile>. LogstashEncoder preserves all MDC entries (correlationId, userId) as
+      first-class JSON fields so ELK/Loki/CloudWatch can index them natively. The feature flag
+      `app.logging.structured-enabled` documents the same switch at application level for the
+      banner / health endpoint.
+    -->
+    <springProfile name="prod">
+        <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/backend.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>logs/backend.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+                <maxFileSize>50MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+                <totalSizeCap>2GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <customFields>{"app":"basetool-backend"}</customFields>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="JSON_FILE" />
+        </root>
+    </springProfile>
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+            <appender-ref ref="ERROR_FILE" />
+        </root>
+    </springProfile>
 
     <logger name="de.greluc.krt.iri.basetool" level="TRACE" />
     <logger name="org.springframework.web" level="INFO" />

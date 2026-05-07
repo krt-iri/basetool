@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{operation.details} + ' - ' + #{app.title}">Operation Details - IRIDIUM Basetool</title>
@@ -162,7 +162,7 @@
 <div class="page-wrapper">
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
-            <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="greeting hud-box flex-between">
                 <h1 style="margin: 0;" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
                 <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
             </div>
@@ -182,7 +182,7 @@
                     <div class="hud-box">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
                             <h2 style="margin:0; font-family: var(--font-headline); color: var(--color-primary);" th:text="${operation.name}">Name</h2>
-                            <div style="display: flex; gap: 0.5rem;">
+                            <div class="flex-gap-xs">
                                 <div sec:authorize="hasRole('MISSION_MANAGER')">
                                     <button type="button" class="btn" style="padding:0.4rem 0.8rem; font-size:0.8rem;" th:text="#{general.edit}"
                                             th:data-id="${operation.id}"
@@ -205,7 +205,7 @@
                                 <span style="display:block; padding:0.5rem; background:var(--color-gray-4); border:1px solid var(--color-gray-3);" th:text="${operation.status}"></span>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top: 1rem;">
+                        <div class="form-group mt-1">
                             <label th:text="#{operation.description}">Description</label>
                             <p style="padding: 1rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); margin:0; white-space: pre-wrap;" th:text="${operation.description}"></p>
                         </div>
@@ -376,7 +376,7 @@
                     <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                 </select>
             </div>
-            <div style="margin-top: 2rem; display:flex; gap:1rem;">
+            <div class="mt-2-flex-gap">
                 <button type="submit" class="btn" th:text="#{general.save}">Save</button>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
             </div>
@@ -390,7 +390,7 @@
         <h2 th:text="#{general.confirm}" class="text-danger">Confirm Delete</h2>
         <p th:text="#{operation.delete.confirm}" style="margin: 1.5rem 0;">Confirm that you want to delete this operation.</p>
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
-            <div style="margin-top: 2rem; display:flex; gap:1rem;">
+            <div class="mt-2-flex-gap">
                 <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('delete-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
             </div>

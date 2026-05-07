@@ -50,7 +50,7 @@ public class MaterialService {
     @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE)
     public Material getMaterial(@NotNull UUID id) {
         return materialRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Material not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Material not found"));
     }
 
     public Page<MaterialPriceDto> getMaterialPrices(@NotNull UUID id, @NotNull Pageable pageable) {
@@ -63,6 +63,10 @@ public class MaterialService {
 
     public Page<MaterialMatrixItemDto> getAllMatrixItems(@NotNull Pageable pageable) {
         return materialPriceRepository.findAllMatrixItems(pageable);
+    }
+
+    public List<Material> getAllJobOrderMaterials() {
+        return materialRepository.findAllByIsJobOrderTrueOrderByNameAsc();
     }
 
     @Transactional
@@ -85,6 +89,7 @@ public class MaterialService {
         material.setDescription(materialDetails.getDescription());
         material.setQuantityType(materialDetails.getQuantityType());
         material.setIsManualRawMaterial(materialDetails.getIsManualRawMaterial());
+        material.setIsJobOrder(materialDetails.getIsJobOrder());
         
         if (materialDetails.getRefinedMaterial() != null && materialDetails.getRefinedMaterial().getId() != null) {
             Material refined = materialRepository.findById(materialDetails.getRefinedMaterial().getId()).orElse(null);

@@ -5,7 +5,6 @@ plugins {
   java
   id("application")
   id("idea")
-  id("jacoco")
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
@@ -45,6 +44,8 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation(libs.bucket4j.core)
   implementation(libs.semver4j.core)
+  // Structured JSON logging (LogstashEncoder) for production profile in logback-spring.xml.
+  implementation(libs.logstash.logback.encoder)
 
   // MapStruct for compile-time mappers
   implementation(libs.mapstruct.core)
@@ -58,6 +59,8 @@ dependencies {
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   compileOnly("org.jetbrains:annotations:26.1.0")
+  // PDF generation
+  implementation("com.github.librepdf:openpdf:_")
   // Ensure MapStruct understands Lombok-generated accessors
   annotationProcessor("org.projectlombok:lombok-mapstruct-binding:_")
 
@@ -107,7 +110,6 @@ tasks.withType<Test> {
   if (mockitoCore != null) {
     jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
   }
-  finalizedBy(tasks.jacocoTestReport)
 }
 
 tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
@@ -146,13 +148,6 @@ tasks {
   asciidoctor {
     inputs.dir(project.extra["snippetsDir"]!!)
     dependsOn(test)
-  }
-
-  jacocoTestReport {
-    reports {
-      xml.required.set(true)
-      csv.required.set(true)
-    }
   }
 }
 

@@ -28,7 +28,7 @@ public class ProfitCalculationPageController {
         log.debug("Showing profit calculation page");
         try {
             // Fetch ship types for the dropdown
-            PageResponse<ShipTypeDto> shipTypesPage = backendApiClient.get(
+            PageResponse<ShipTypeDto> shipTypesPage = backendApiClient.getCached(
                     "/api/v1/ship-types?size=1000&sort=name,asc",
                     new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {}
             );
@@ -48,7 +48,7 @@ public class ProfitCalculationPageController {
                     .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
 
             // Fetch terminals to get unique star systems
-            PageResponse<Map<String, Object>> terminalsPage = backendApiClient.get(
+            PageResponse<Map<String, Object>> terminalsPage = backendApiClient.getCached(
                     "/api/v1/terminals?size=10000",
                     new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {}
             );

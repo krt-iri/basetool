@@ -40,7 +40,7 @@ public class SquadronService {
 
     public Squadron getSquadronById(@NotNull UUID id) {
         return squadronRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Squadron not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Squadron not found"));
     }
 
     @Transactional
@@ -74,7 +74,7 @@ public class SquadronService {
     @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
     public void deleteSquadron(@NotNull UUID id) {
         if (!squadronRepository.existsById(id)) {
-            throw new RuntimeException("Squadron not found");
+            throw new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Squadron not found");
         }
         Squadron squadron = getSquadronById(id);
         squadron.setActive(false);

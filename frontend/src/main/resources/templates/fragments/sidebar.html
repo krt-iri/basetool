@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 <th:block th:fragment="sidebar">
@@ -22,6 +22,7 @@
                     </div>
                 </details>
                 <a th:href="@{/hangar}" th:text="#{nav.hangar}">Hangar</a>
+                <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory}">Persönliches Inventar</a>
                 <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
                 <details class="sidebar-group" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
                     <summary th:text="#{nav.administration}">Administration</summary>
@@ -34,6 +35,7 @@
                         <a th:href="@{/ship-data}" th:text="#{nav.hangar_data}">Schiffsdaten</a>
                         <a th:href="@{/admin/materials}" th:text="#{nav.admin.materials}">Materialien</a>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
+                        <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}" sec:authorize="hasRole('ADMIN')">Pers. Inventar (Admin)</a>
                     </div>
                 </details>
                 <a th:href="@{/logout}" th:text="#{nav.logout}">Logout</a>
@@ -53,11 +55,11 @@
             </div>
             <div class="dropdown">
                 <button class="dropbtn">
-                <span th:if="${#locale.language == 'de'}" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span th:if="${#locale.language == 'de'}" class="flex-gap-sm">
                      <img th:src="@{/images/flags/de.svg}" class="flag-icon" alt="DE">
                      <span th:text="#{lang.de}">DE</span>
                 </span>
-                    <span th:unless="${#locale.language == 'de'}" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span th:unless="${#locale.language == 'de'}" class="flex-gap-sm">
                      <img th:src="@{/images/flags/gb.svg}" class="flag-icon" alt="EN">
                      <span th:text="#{lang.en}">EN</span>
                 </span>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.profit_calculation} + ' - ' + #{app.title}">Profitberechnung - IRIDIUM Basetool</title>
@@ -39,76 +39,6 @@
                 border-color: var(--color-primary);
             }
             
-            /* Multi-select styling from materials-overview.html */
-            .multi-select-container {
-                position: relative;
-                width: 100%;
-                font-family: var(--font-body);
-            }
-            .multi-select-header {
-                background-color: var(--color-gray-4);
-                color: var(--color-gray-1);
-                border: 1px solid var(--color-gray-3);
-                padding: 0.25rem 0.5rem;
-                cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                user-select: none;
-                transition: border-color 0.2s;
-                height: 32px;
-                box-sizing: border-box;
-                font-size: 0.9rem;
-            }
-            .multi-select-header:hover {
-                border-color: var(--color-primary);
-            }
-            .multi-select-header::after {
-                content: '▼';
-                font-size: 0.7em;
-                margin-left: 0.5rem;
-            }
-            .multi-select-options {
-                position: absolute;
-                top: 100%;
-                left: 0;
-                right: 0;
-                background-color: var(--color-gray-4);
-                border: 1px solid var(--color-primary);
-                border-top: none;
-                max-height: 300px;
-                overflow-y: auto;
-                z-index: 100;
-                display: none;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-            }
-            .multi-select-options.open {
-                display: block;
-            }
-            .multi-select-option {
-                padding: 0.5rem 0.75rem;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 0.5rem;
-                cursor: pointer;
-                transition: background-color 0.2s;
-                color: var(--color-gray-1);
-                margin-bottom: 0;
-                font-family: var(--font-body);
-            }
-            .multi-select-option:hover {
-                background-color: var(--color-gray-3);
-            }
-            .multi-select-option input[type="checkbox"] {
-                margin: 0;
-                flex-shrink: 0;
-            }
-            .selected-text {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
 
             /* Table styling matching materials-overview.html */
             .table-wrapper {
@@ -249,7 +179,7 @@
         <h1 th:text="#{nav.materials.profit_calculation}">Profitberechnung</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <div class="filter-container">
             <div class="filter-group">
                 <label for="shipSelect" th:text="#{profit.filter.ship}">Schiff wählen</label>
@@ -300,37 +230,37 @@
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(1)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.min_buy}">Einkauf (min)</span>
                                 <span class="sort-icon" id="sort-icon-1">↕</span>
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(2)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.max_sell}">Verkauf (max)</span>
                                 <span class="sort-icon" id="sort-icon-2">↕</span>
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(3)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.profit_scu}">Gewinn / SCU</span>
                                 <span class="sort-icon" id="sort-icon-3">↕</span>
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(4)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.margin}">Marge (%)</span>
                                 <span class="sort-icon" id="sort-icon-4">↕</span>
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(5)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.load_cost}">Ladungskosten</span>
                                 <span class="sort-icon" id="sort-icon-5">↕</span>
                             </div>
                         </th>
                         <th class="sortable-header" onclick="sortTable(6)" title="Klicken zum Sortieren">
-                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <div class="flex-end">
                                 <span th:text="#{profit.col.total_profit}">Max Profit</span>
                                 <span class="sort-icon" id="sort-icon-6">↕</span>
                             </div>
@@ -558,7 +488,7 @@
             }
         } catch (error) {
             console.error('Error fetching profit calculation:', error);
-            body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #e74c3c;">[[#{profit.error.fetch}]]</td></tr>`;
+            body.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center; padding: 2rem;">[[#{profit.error.fetch}]]</td></tr>`;
         }
     }
 

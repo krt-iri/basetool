@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MaterialServiceTest {
@@ -86,5 +88,30 @@ class MaterialServiceTest {
         assertEquals(1, result.getTotalElements());
         assertEquals("Area18", result.getContent().get(0).terminalName());
         assertEquals(new BigDecimal("5.0"), result.getContent().get(0).priceBuy());
+    }
+
+    @Test
+    void getAllJobOrderMaterials_ShouldReturnOnlyJobOrderMaterials() {
+        // Given
+        Material mat1 = new Material();
+        mat1.setId(UUID.randomUUID());
+        mat1.setName("Agricium");
+        mat1.setIsJobOrder(true);
+
+        Material mat2 = new Material();
+        mat2.setId(UUID.randomUUID());
+        mat2.setName("Bexalite");
+        mat2.setIsJobOrder(true);
+
+        when(materialRepository.findAllByIsJobOrderTrueOrderByNameAsc()).thenReturn(List.of(mat1, mat2));
+
+        // When
+        List<Material> result = materialService.getAllJobOrderMaterials();
+
+        // Then
+        assertEquals(2, result.size());
+        assertEquals("Agricium", result.get(0).getName());
+        assertEquals("Bexalite", result.get(1).getName());
+        verify(materialRepository).findAllByIsJobOrderTrueOrderByNameAsc();
     }
 }

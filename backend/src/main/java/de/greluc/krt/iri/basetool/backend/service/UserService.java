@@ -225,9 +225,9 @@ public class UserService {
 
     @Transactional
     @NotNull
-    public User updateUserAttributes(@NotNull UUID id, @Nullable Integer rank, @Nullable String description, @Nullable String displayName, @Nullable Long version) {
+    public User updateUserAttributes(@NotNull UUID id, @Nullable Integer rank, @Nullable String description, @Nullable String displayName, @Nullable Long version, @Nullable java.time.LocalDate joinDate) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
 
         if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
             throw new ObjectOptimisticLockingFailureException(User.class, id);
@@ -252,13 +252,15 @@ public class UserService {
         }
         if (description != null) user.setDescription(description);
         if (displayName != null) user.setDisplayName(displayName.isBlank() ? null : displayName);
+        // joinDate kann explizit auf null gesetzt werden (Datum löschen)
+        user.setJoinDate(joinDate);
         return userRepository.save(user);
     }
 
     @Transactional
     public User updateUserDescription(@NotNull UUID id, @Nullable String description, @Nullable String displayName, @Nullable Long version) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
         if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
             throw new ObjectOptimisticLockingFailureException(User.class, id);
         }
@@ -270,7 +272,7 @@ public class UserService {
     @Transactional
     public User updateReadAnnouncement(@NotNull UUID id, @NotNull UUID announcementId) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
         user.setLastReadAnnouncementId(announcementId);
         return userRepository.save(user);
     }
@@ -296,7 +298,7 @@ public class UserService {
     }
 
     public User findById(@NotNull UUID id) {
-        return userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
     }
 
     public Optional<User> getCurrentUser() {

@@ -29,6 +29,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -153,6 +156,25 @@ public class HangarService {
 
         entityManager.flush();
         shipRepository.delete(ship);
+    }
+
+    @Transactional
+    public void deleteAllShipsForUser(@NotNull UUID userId) {
+        List<Ship> ships = shipRepository.findByOwnerId(userId);
+        if (ships.isEmpty()) {
+            log.debug("deleteAllShipsForUser: no ships found for user {}", userId);
+            return;
+        }
+        log.info("deleteAllShipsForUser: unlinking {} ships for user {}", ships.size(), userId);
+        for (Ship ship : ships) {
+            missionUnitRepository.findByShipId(ship.getId()).forEach(unit -> {
+                unit.setShip(null);
+                missionUnitRepository.save(unit);
+            });
+        }
+        entityManager.flush();
+        shipRepository.deleteAll(ships);
+        log.info("deleteAllShipsForUser: deleted {} ships for user {}", ships.size(), userId);
     }
 
     @Transactional

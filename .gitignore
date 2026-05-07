@@ -42,7 +42,4 @@ realm-export.json
 *.log
 Mining_Hub_V0.3.0.py
 *.log.zip
-/ToDo.md
-/log.txt
-/fleetview.json
 /datenschutz.md

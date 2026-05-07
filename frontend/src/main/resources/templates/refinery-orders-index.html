@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{nav.refinery}">Raffinerie</title>
@@ -21,12 +21,12 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.refinery}">Raffinerieaufträge</h1>
         <a th:href="@{/refinery-orders/create(source='index')}" class="btn" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
             <label style="display: flex; align-items: center; gap: 0.25rem;">
@@ -116,7 +116,7 @@
             if (utcMsStr && utcMsStr !== 'null') {
                 const endsAtMs = parseInt(utcMsStr, 10);
                 if (!isNaN(endsAtMs) && nowMs > endsAtMs) {
-                    el.style.color = '#2ecc71';
+                    el.classList.add('text-success');
                     el.style.fontWeight = 'bold';
                 }
             }

@@ -82,7 +82,7 @@ class RefineryOrderDurationTest {
     void testViewOrder_DurationBackConversion() throws Exception {
         UUID orderId = UUID.randomUUID();
         RefineryOrderDto order = new RefineryOrderDto(
-                orderId, null, null, null, java.time.Instant.now(), 145L, 100.0, 0d, 0d, null, Collections.emptyList(), null, 1L
+                orderId, null, null, null, java.time.Instant.now(), 145L, 100.0, 0d, 0d, 0d, null, Collections.emptyList(), null, 1L
         );
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
 
@@ -124,7 +124,7 @@ class RefineryOrderDurationTest {
     void testEndsAtCalculation() {
         java.time.Instant startedAt = java.time.Instant.parse("2024-04-06T12:00:00Z");
         RefineryOrderDto order = new RefineryOrderDto(
-                UUID.randomUUID(), null, null, null, startedAt, 125L, 100.0, 0d, 0d, null, Collections.emptyList(), null, 1L
+                UUID.randomUUID(), null, null, null, startedAt, 125L, 100.0, 0d, 0d, 0d, null, Collections.emptyList(), null, 1L
         );
         
         java.time.Instant expectedEnd = startedAt.plus(125, java.time.temporal.ChronoUnit.MINUTES);

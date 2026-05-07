@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{app.title}">IRIDIUM Basetool</title>
@@ -28,13 +28,13 @@
         <h1 th:if="${username}" th:text="#{home.welcome_user(${currentUser != null ? currentUser.effectiveName : username})}">Welcome, <span th:text="${username}">User</span>!</h1>
         <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Welcome to IRIDIUM Basetool!</h1>
         <p th:text="#{home.description}">This is the central platform for mission planning and fleet management.</p>
-        <div style="margin-top: 1.5rem;">
+        <div class="mt-1-5">
             
         </div>
     </div>
 
 
-    <div class="grid-auto-cards" style="margin-top: 2rem;">
+    <div class="grid-auto-cards mt-2">
     <!-- Info Section -->
     <div sec:authorize="isAuthenticated()" class="hud-box" th:if="${announcement}">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; cursor: pointer;" id="info-header" onclick="toggleInfo()">
@@ -68,6 +68,9 @@
              <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${nextMission.plannedStartTime}">Time</span>
         </div>
         <p th:if="${nextMission == null && error == null}" th:text="#{mission.empty_next}">Keine anstehenden Missionen.</p>
+        <div th:if="${nextMission}" sec:authorize="isAuthenticated()" class="mt-1" style="margin-top: 1rem;">
+            <a th:href="@{/missions/{id}(id=${nextMission.get('id')})}" class="btn btn-primary" th:text="#{mission.open_mission}">Einsatz öffnen</a>
+        </div>
     </div>
     </div>
 

@@ -45,7 +45,7 @@ public class LocationService {
     @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
     public Location getLocation(@NotNull UUID id) {
         return locationRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Location not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found"));
     }
 
     @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'refineries'")

@@ -58,7 +58,7 @@ class RefineryOrderHierarchyVisibilityTest {
         RefineryOrderDto order = new RefineryOrderDto(
                 orderId,
                 new UserReferenceDto(ownerId, "Owner", null, null, null),
-                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.OPEN, 1L
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, 0d, null, List.of(), RefineryOrderStatus.OPEN, 1L
         );
         
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
@@ -87,7 +87,7 @@ class RefineryOrderHierarchyVisibilityTest {
         RefineryOrderDto order = new RefineryOrderDto(
                 orderId,
                 new UserReferenceDto(ownerId, "Owner", null, null, null),
-                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.COMPLETED, 1L
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, 0d, null, List.of(), RefineryOrderStatus.COMPLETED, 1L
         );
 
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);
@@ -119,7 +119,7 @@ class RefineryOrderHierarchyVisibilityTest {
         RefineryOrderDto order = new RefineryOrderDto(
                 orderId,
                 new UserReferenceDto(ownerId, "Owner", null, null, null),
-                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, null, List.of(), RefineryOrderStatus.CANCELED, 1L
+                null, null, java.time.Instant.now(), 60L, 100.0, 0d, 0d, 0d, null, List.of(), RefineryOrderStatus.CANCELED, 1L
         );
 
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(order);

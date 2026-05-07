@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -88,7 +89,7 @@ public class UserController {
     @PutMapping("/{id}/attributes")
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
     public UserDto updateUserAttributes(@PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
-        return userMapper.toDto(userService.updateUserAttributes(id, request.getRank(), request.getDescription(), request.getDisplayName(), request.getVersion()));
+        return userMapper.toDto(userService.updateUserAttributes(id, request.getRank(), request.getDescription(), request.getDisplayName(), request.getVersion(), request.getJoinDate()));
     }
 
     @PatchMapping("/{id}/logistician")
@@ -117,6 +118,8 @@ public class UserController {
         private String displayName;
         @jakarta.validation.constraints.NotNull
         private Long version;
+        @org.jetbrains.annotations.Nullable
+        private LocalDate joinDate;
     }
 
     @lombok.Data

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Material Details - IRIDIUM Basetool</title>
@@ -38,11 +38,11 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1>Detailansicht Material</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <div class="actions-bar">
             <a th:href="@{/inventory}" class="btn btn-secondary">&laquo; Zurück zur Übersicht</a>
             

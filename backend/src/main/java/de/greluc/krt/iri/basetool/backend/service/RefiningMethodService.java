@@ -30,7 +30,7 @@ public class RefiningMethodService {
     @Cacheable(cacheNames = CacheConfig.REFINING_METHODS_CACHE)
     public RefiningMethod getRefiningMethod(@NotNull UUID id) {
         return refiningMethodRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("RefiningMethod not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefiningMethod not found"));
     }
 
     @Transactional

@@ -26,6 +26,15 @@ class RoleHierarchyTest {
     private BackendRoleSyncFilter backendRoleSyncFilter;
 
     @MockitoBean
+    private BotProtectionFilter botProtectionFilter;
+
+    @MockitoBean
+    private SessionDebugFilter sessionDebugFilter;
+
+    @MockitoBean
+    private SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
+
+    @MockitoBean
     private ClientRegistrationRepository clientRegistrationRepository;
 
     @Autowired

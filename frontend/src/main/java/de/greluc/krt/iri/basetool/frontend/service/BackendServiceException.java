@@ -1,19 +1,75 @@
 package de.greluc.krt.iri.basetool.frontend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Exception raised when a backend call performed by the frontend module fails.
+ *
+ * <p>Parses an RFC7807 Problem+JSON response body (as produced by the backend's
+ * {@code GlobalExceptionHandler}) and exposes the stable {@code code},
+ * {@code correlationId} and {@code fieldErrors[]} so that the frontend controller
+ * advice can map them onto localized message keys without leaking technical
+ * details or server stack traces to the user.
+ *
+ * <p>All reason codes originate from either the backend Problem+JSON response
+ * ({@code properties.code}) or from resilience layer mappings (see
+ * {@link BackendApiClient#handleWebClientException} / {@code handleException}).
+ */
 @Getter
 public class BackendServiceException extends RuntimeException {
-    private final int statusCode;
 
-    public BackendServiceException(String message, Throwable cause, int statusCode) {
-        super(message, cause);
-        this.statusCode = statusCode;
+    /** Unknown / unmapped backend problem (fallback). */
+    public static final String CODE_UNKNOWN = "UNKNOWN";
+
+    /** Circuit breaker is open / backend unreachable / bulkhead saturated. */
+    public static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+
+    /** The backend did not respond within the configured timeout. */
+    public static final String CODE_BACKEND_TIMEOUT = "BACKEND_TIMEOUT";
+
+    private final int statusCode;
+    private final @NotNull String problemCode;
+    private final @Nullable String correlationId;
+    private final @NotNull List<FieldError> fieldErrors;
+    private final @Nullable String problemDetail;
+
+    public BackendServiceException(@NotNull String message, @Nullable Throwable cause, int statusCode) {
+        this(message, cause, statusCode, CODE_UNKNOWN, null, Collections.emptyList(), null);
     }
 
-    public String getReadableErrorMessage() {
+    public BackendServiceException(@NotNull String message,
+                                   @Nullable Throwable cause,
+                                   int statusCode,
+                                   @NotNull String problemCode,
+                                   @Nullable String correlationId,
+                                   @NotNull List<FieldError> fieldErrors,
+                                   @Nullable String problemDetail) {
+        super(message, cause);
+        this.statusCode = statusCode;
+        this.problemCode = problemCode;
+        this.correlationId = correlationId;
+        this.fieldErrors = List.copyOf(fieldErrors);
+        this.problemDetail = problemDetail;
+    }
+
+    /**
+     * Attempts to extract a human-readable message from the underlying Problem+JSON body.
+     * Falls back to the exception message if no Problem payload is available.
+     */
+    public @NotNull String getReadableErrorMessage() {
+        if (problemDetail != null && !problemDetail.isBlank()) {
+            return problemDetail;
+        }
         if (getCause() instanceof WebClientResponseException wcre) {
             try {
                 ProblemDetail pd = wcre.getResponseBodyAs(ProblemDetail.class);
@@ -25,10 +81,15 @@ public class BackendServiceException extends RuntimeException {
             } catch (Exception ignored) {
             }
         }
-        return getMessage();
+        return String.valueOf(getMessage());
     }
 
-    public String getProblemType() {
+    /**
+     * Returns the trailing segment of the Problem {@code type} URI — kept for
+     * backwards compatibility with existing call sites that previously used the
+     * {@code type} suffix as a discriminator. Prefer {@link #getProblemCode()}.
+     */
+    public @Nullable String getProblemType() {
         if (getCause() instanceof WebClientResponseException wcre) {
             try {
                 ProblemDetail pd = wcre.getResponseBodyAs(ProblemDetail.class);
@@ -43,5 +104,66 @@ public class BackendServiceException extends RuntimeException {
             }
         }
         return null;
+    }
+
+    /**
+     * Parses an RFC7807 Problem+JSON body produced by the backend and constructs a
+     * {@link BackendServiceException}. When the body cannot be parsed, the exception
+     * still carries the HTTP status and {@link #CODE_UNKNOWN} so the advice layer
+     * can fall back to a generic localized message.
+     */
+    public static @NotNull BackendServiceException fromProblem(@NotNull WebClientResponseException cause,
+                                                               @NotNull ObjectMapper mapper) {
+        int status = cause.getStatusCode().value();
+        String body = cause.getResponseBodyAsString();
+        String code = deriveCodeFromStatus(status);
+        String correlationId = null;
+        String detail = null;
+        List<FieldError> fieldErrors = new ArrayList<>();
+
+        if (body != null && !body.isBlank()) {
+            try {
+                JsonNode root = mapper.readTree(body);
+                if (root.hasNonNull("code")) {
+                    code = root.get("code").asText(code);
+                }
+                if (root.hasNonNull("correlationId")) {
+                    correlationId = root.get("correlationId").asText();
+                }
+                if (root.hasNonNull("detail")) {
+                    detail = root.get("detail").asText();
+                }
+                JsonNode fieldErrorsNode = root.get("fieldErrors");
+                if (fieldErrorsNode != null && fieldErrorsNode.isArray()) {
+                    for (JsonNode fe : fieldErrorsNode) {
+                        String field = fe.hasNonNull("field") ? fe.get("field").asText() : "";
+                        String msg = fe.hasNonNull("message") ? fe.get("message").asText() : "";
+                        fieldErrors.add(new FieldError(field, msg));
+                    }
+                }
+            } catch (Exception ignored) {
+                // Leave defaults; the handler will fall back to a generic message.
+            }
+        }
+
+        String message = "Backend returned " + status + (code != null ? " [" + code + "]" : "");
+        return new BackendServiceException(message, cause, status, code, correlationId, fieldErrors, detail);
+    }
+
+    private static @NotNull String deriveCodeFromStatus(int status) {
+        return switch (status) {
+            case 400 -> "VALIDATION_FAILED";
+            case 401 -> "UNAUTHENTICATED";
+            case 403 -> "ACCESS_DENIED";
+            case 404 -> "NOT_FOUND";
+            case 409 -> "CONFLICT";
+            case 423 -> "LOCKED";
+            case 503 -> CODE_SERVICE_UNAVAILABLE;
+            default -> CODE_UNKNOWN;
+        };
+    }
+
+    /** Structured field-level validation error (matches backend {@code fieldErrors[]}). */
+    public record FieldError(@NotNull String field, @NotNull String message) {
     }
 }

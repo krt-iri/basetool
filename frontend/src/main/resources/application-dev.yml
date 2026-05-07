@@ -5,6 +5,15 @@ spring:
         provider:
           keycloak:
             issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.iri-base.org/realms/iri}
+  session:
+    store-type: redis
+    redis:
+      namespace: basetool:session
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 spring.thymeleaf.cache: false
 

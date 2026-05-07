@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.RequestParam;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 @Controller
@@ -66,6 +68,13 @@ public class ProfileController {
                 }
                 if (user.containsKey("version")) {
                     model.addAttribute("version", parseLong(user.get("version")));
+                }
+                if (user.containsKey("joinDate") && user.get("joinDate") != null) {
+                    try {
+                        LocalDate joinDate = LocalDate.parse(String.valueOf(user.get("joinDate")));
+                        model.addAttribute("joinDate", joinDate);
+                        model.addAttribute("monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
+                    } catch (Exception ignored) {}
                 }
             }
         } catch (Exception e) {

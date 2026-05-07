@@ -21,7 +21,7 @@ public class JobOrderForm {
     @Data
     public static class JobOrderMaterialForm {
         private UUID materialId;
-        private Integer minQuality = 100;
+        private Integer minQuality = 750;
         private Double amount;
     }
 }

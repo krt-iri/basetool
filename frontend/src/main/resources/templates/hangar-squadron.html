@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{hangar.squadron.title} + ' - ' + #{app.title}">Staffelübersicht - IRIDIUM Basetool</title>
@@ -21,14 +21,14 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{hangar.squadron.title}">Staffelübersicht</h1>
         <a th:href="@{/hangar}" class="btn btn-secondary" th:text="#{hangar.back}">Zurück zum Hangar</a>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
         <style>
@@ -109,7 +109,7 @@
                             <td th:text="${detail.locationName != null ? detail.locationName : '-'}">Location</td>
                             <td>
                                 <span th:text="${detail.fitted} ? #{hangar.ship.yes} : #{hangar.ship.no}"
-                                      th:style="${detail.fitted} ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c;'">Ja/Nein</span>
+                                      th:class="${detail.fitted} ? 'text-success' : 'text-danger'">Ja/Nein</span>
                             </td>
                         </tr>
                         </tbody>

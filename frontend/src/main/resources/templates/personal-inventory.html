@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{personalInventory.title}">Persoenliches Inventar</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span><span></span><span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box krt-personal-inventory-header">
+        <h1 th:text="#{personalInventory.title}">Persoenliches Inventar</h1>
+        <p class="krt-subtitle" th:text="#{personalInventory.subtitle}">Eigene Bestaende</p>
+    </div>
+
+    <div class="hud-box krt-personal-inventory mt-2">
+
+        <div class="krt-pi-actionbar">
+            <button type="button" class="btn krt-pi-create"
+                    th:attr="data-action=@{/personal-inventory/add}"
+                    onclick="krtPersonalInventory.openCreate(this)"
+                    th:text="#{personalInventory.action.create}">Eintrag anlegen</button>
+
+            <form th:action="@{/personal-inventory}" method="get" class="krt-pi-filter no-track">
+                <label for="krt-pi-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
+                <input id="krt-pi-q" type="search" name="q" th:value="${filterQuery}"
+                       th:placeholder="#{personalInventory.filter.search}"
+                       class="krt-pi-search-input">
+                <button type="submit" class="btn btn-secondary" th:text="#{personalInventory.filter.apply}">Filtern</button>
+            </form>
+        </div>
+
+        <div class="table-responsive krt-pi-table-wrapper">
+            <table class="krt-table krt-pi-table">
+                <thead>
+                <tr>
+                    <th th:text="#{personalInventory.field.name}">Name</th>
+                    <th th:text="#{personalInventory.field.location}">Ort</th>
+                    <th th:text="#{personalInventory.field.quantity}">Menge</th>
+                    <th th:text="#{personalInventory.field.note}">Notiz</th>
+                    <th th:text="#{personalInventory.field.actions}">Aktionen</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(items)}">
+                    <td colspan="5" class="krt-pi-empty" th:text="#{personalInventory.empty}">Keine Eintraege.</td>
+                </tr>
+                <tr th:each="item : ${items}" th:attr="data-item-id=${item.id}">
+                    <td th:text="${item.name}">Name</td>
+                    <td>
+                        <span class="krt-pi-location-marker"
+                              th:classappend="${item.locationType?.name() == 'CITY'} ? ' krt-pi-loc-city' : ' krt-pi-loc-station'"></span>
+                        <span th:text="${item.locationName}">Ort</span>
+                    </td>
+                    <td th:text="${item.quantity}">1</td>
+                    <td class="krt-pi-note" th:text="${item.note}">Notiz</td>
+                    <td>
+                        <div class="krt-pi-actions">
+                            <button type="button" class="btn"
+                                    th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/update'},
+                                             data-id=${item.id},
+                                             data-version=${item.version},
+                                             data-name=${item.name},
+                                             data-note=${item.note},
+                                             data-quantity=${item.quantity},
+                                             data-location-uex-id=${item.locationUexId},
+                                             data-location-type=${item.locationType?.name()},
+                                             data-location-name=${item.locationName}"
+                                    onclick="krtPersonalInventory.openEdit(this)"
+                                    th:text="#{personalInventory.action.edit}">Bearbeiten</button>
+                            <button type="button" class="btn btn-secondary"
+                                    th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/delete'},
+                                             data-name=${item.name}"
+                                    onclick="krtPersonalInventory.openDelete(this)"
+                                    th:text="#{personalInventory.action.delete}">Loeschen</button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- Create / Edit modal (KRT-styled, no native confirm/alert) -->
+<div id="krt-pi-modal" class="modal" th:style="${showItemModal != null ? 'display:block' : 'display:none'}">
+    <div class="modal-content hud-box">
+        <span class="close" onclick="krtPersonalInventory.closeModal()">&times;</span>
+        <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
+
+        <form id="krt-pi-form"
+              th:action="${modalAction != null ? modalAction : '/personal-inventory/add'}"
+              method="post"
+              th:object="${personalInventoryForm}">
+
+            <div th:if="${#fields.hasErrors('*')}" class="krt-pi-error-box">
+                <ul>
+                    <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
+                </ul>
+            </div>
+
+            <input type="hidden" th:field="*{id}">
+            <input type="hidden" th:field="*{version}">
+            <input type="hidden" id="krt-pi-location-uex-id" th:field="*{locationUexId}">
+            <input type="hidden" id="krt-pi-location-type" th:field="*{locationType}">
+
+            <div class="form-group">
+                <label for="krt-pi-name" th:text="#{personalInventory.field.name}">Name</label>
+                <input id="krt-pi-name" type="text" maxlength="120" required th:field="*{name}">
+            </div>
+
+            <div class="form-group">
+                <label for="krt-pi-quantity" th:text="#{personalInventory.field.quantity}">Menge</label>
+                <input id="krt-pi-quantity" type="number" min="1" step="1" inputmode="numeric"
+                       pattern="[0-9]*" required th:field="*{quantity}"
+                       oninput="krtPersonalInventory.sanitizeQuantity(this)">
+            </div>
+
+            <div class="form-group krt-pi-typeahead">
+                <label for="krt-pi-location-search" th:text="#{personalInventory.field.location}">Ort</label>
+                <input id="krt-pi-location-search" type="text" autocomplete="off"
+                       th:value="${personalInventoryForm.locationName}"
+                       th:placeholder="#{personalInventory.field.location.placeholder}">
+                <div id="krt-pi-location-results" class="krt-pi-typeahead-results" hidden></div>
+            </div>
+
+            <div class="form-group">
+                <label for="krt-pi-note" th:text="#{personalInventory.field.note}">Notiz</label>
+                <textarea id="krt-pi-note" maxlength="2000" rows="4" th:field="*{note}"></textarea>
+            </div>
+
+            <div class="krt-pi-modal-actions">
+                <button type="submit" class="btn" th:text="#{personalInventory.action.save}">Speichern</button>
+                <button type="button" class="btn btn-secondary" onclick="krtPersonalInventory.closeModal()" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete confirmation modal (KRT-styled, replaces native confirm()) -->
+<div id="krt-pi-delete-modal" class="modal" style="display:none;">
+    <div class="modal-content hud-box">
+        <span class="close" onclick="krtPersonalInventory.closeDelete()">&times;</span>
+        <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
+        <p id="krt-pi-delete-message" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
+        <form id="krt-pi-delete-form" method="post">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <div class="krt-pi-modal-actions">
+                <button type="submit" class="btn krt-danger" th:text="#{personalInventory.action.delete.confirm.ok}">Loeschen</button>
+                <button type="button" class="btn btn-secondary" onclick="krtPersonalInventory.closeDelete()" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    window.krtPersonalInventoryI18n = {
+        createTitle: /*[[#{personalInventory.modal.create.title}]]*/ 'Eintrag anlegen',
+        editTitle:   /*[[#{personalInventory.modal.edit.title}]]*/   'Eintrag bearbeiten',
+        confirmBody: /*[[#{personalInventory.action.delete.confirm.body}]]*/ 'Wirklich loeschen?',
+        searching:   /*[[#{personalInventory.field.location.searching}]]*/   'Suche...',
+        noResults:   /*[[#{personalInventory.field.location.empty}]]*/       'Keine Treffer'
+    };
+    window.krtPersonalInventoryEndpoints = {
+        uexSearch: /*[[@{/personal-inventory/uex-search}]]*/ '/personal-inventory/uex-search'
+    };
+    /*]]>*/
+</script>
+<script th:src="@{/js/personal-inventory.js}"></script>
+</body>
+</html>

@@ -57,7 +57,8 @@ class MissionControllerSlimEndpointsTest {
 
     @MockitoBean
     private de.greluc.krt.iri.basetool.backend.service.MissionSecurityService missionSecurityService;
-
+    @MockitoBean
+    private de.greluc.krt.iri.basetool.backend.service.UserService userService;
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
@@ -210,5 +211,164 @@ class MissionControllerSlimEndpointsTest {
 
     private static boolean anyBoolean() {
         return org.mockito.ArgumentMatchers.anyBoolean();
+    }
+
+    // --- Participants slim (self-enroll fix) -------------------------------
+
+    private Mission missionWithParticipant(UUID participantId, UUID userId) {
+        Mission mission = new Mission();
+        MissionParticipant p = new MissionParticipant();
+        p.setId(participantId);
+        User u = new User();
+        u.setId(userId);
+        u.setUsername("self.user");
+        u.setFirstName("Self");
+        u.setLastName("User");
+        p.setUser(u);
+        Set<MissionParticipant> set = new LinkedHashSet<>();
+        set.add(p);
+        mission.setParticipants(set);
+        return mission;
+    }
+
+    @Test
+    void addParticipantSlim_memberSelfEnroll_isAllowed() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        when(userService.getUserIdFromJwt(any())).thenReturn(userId);
+        // non-manager
+        when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
+        when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+                .thenReturn(missionWithParticipant(participantId, userId));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(jwt().jwt(j -> j.subject(userId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].id").value(participantId.toString()));
+    }
+
+    @Test
+    void addParticipantSlim_memberAddingOtherUser_isForbidden() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID callerId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+
+        when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+        when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + otherId + "\"}")
+                        .with(jwt().jwt(j -> j.subject(callerId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    /**
+     * Reproducer for the "anonymous guest cannot sign up to a mission" bug
+     * (see live-log/log.txt: 401 UNAUTHENTICATED on
+     * POST /api/v1/missions/{id}/participants/slim for `[anonymous]`).
+     *
+     * Backend SecurityConfig must permit anonymous POSTs to the slim signup
+     * endpoint, mirroring the legacy `/participants/add` permit rule, so the
+     * controller's own anonymous-guest branch (jwt == null + guestName) can run.
+     */
+    @Test
+    void addParticipantSlim_anonymousGuest_withGuestName_isAllowed() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        Mission mission = new Mission();
+        MissionParticipant p = new MissionParticipant();
+        p.setId(participantId);
+        p.setGuestName("Anon-Guest");
+        Set<MissionParticipant> set = new LinkedHashSet<>();
+        set.add(p);
+        mission.setParticipants(set);
+
+        when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+                .thenReturn(mission);
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"Anon-Guest\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].id").value(participantId.toString()));
+    }
+
+    /**
+     * Reproducer for the follow-up bug "anonymous guest cannot edit/delete their own
+     * participant entry" (see live-log/log.txt: 403 on PUT/DELETE
+     * /missions/{id}/participants/{pid}/ajax for `[anonymous]`).
+     *
+     * Backend SecurityConfig must permit anonymous PUT and DELETE on the slim
+     * participant sub-resource so that {@code MissionSecurityService#canAccessParticipant}
+     * (which already returns true for guest entries with {@code user == null}) can
+     * apply.
+     */
+    @Test
+    void updateParticipantSlim_anonymousGuest_isAllowed() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        Mission mission = new Mission();
+        MissionParticipant p = new MissionParticipant();
+        p.setId(participantId);
+        p.setGuestName("Anon-Guest");
+        Set<MissionParticipant> set = new LinkedHashSet<>();
+        set.add(p);
+        mission.setParticipants(set);
+
+        when(missionSecurityService.canAccessParticipant(any(UUID.class), any(UUID.class), any()))
+                .thenReturn(true);
+        when(missionService.updateParticipantAttributes(
+                any(UUID.class), any(UUID.class),
+                any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(mission);
+
+        mockMvc.perform(put("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(participantId.toString()));
+    }
+
+    @Test
+    void deleteParticipantSlim_anonymousGuest_isAllowed() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        when(missionSecurityService.canAccessParticipant(any(UUID.class), any(UUID.class), any()))
+                .thenReturn(true);
+
+        mockMvc.perform(delete("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void addParticipantSlim_officerAddingOtherUser_isAllowed() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID callerId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+        when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+        when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+                .thenReturn(missionWithParticipant(participantId, otherId));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + otherId + "\"}")
+                        .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(participantId.toString()));
     }
 }

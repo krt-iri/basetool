@@ -18,6 +18,8 @@ public record RefineryOrderDto(
         Long durationMinutes,
         Double expenses,
         @PositiveOrZero
+        Double otherExpenses,
+        @PositiveOrZero
         Double oreSales,
         Double profit,
         RefiningMethodDto refiningMethod,

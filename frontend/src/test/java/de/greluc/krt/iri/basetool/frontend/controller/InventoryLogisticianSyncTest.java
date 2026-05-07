@@ -65,7 +65,7 @@ class InventoryLogisticianSyncTest {
     void memberWithLogisticianFlag_ShouldSeeActions() throws Exception {
         // Given
         UUID userId = UUID.randomUUID();
-        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, true, false, true, 1L);
+        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, true, false, true, 1L, null);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
         when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
         when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
@@ -87,7 +87,7 @@ class InventoryLogisticianSyncTest {
     void memberWithoutLogisticianFlag_ShouldNotSeeActions() throws Exception {
         // Given
         UUID userId = UUID.randomUUID();
-        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, false, false, true, 1L);
+        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, false, false, true, 1L, null);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
         when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
         when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
@@ -109,7 +109,7 @@ class InventoryLogisticianSyncTest {
     void officerWithoutLogisticianFlag_ShouldSeeActionsByHierarchy() throws Exception {
         // Given
         UUID userId = UUID.randomUUID();
-        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L);
+        UserDto userDto = new UserDto(userId, "testuser", "Test User", "Test User", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L, null);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
         when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());
         when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class))).thenReturn(Collections.emptyList());

@@ -20,6 +20,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
     boolean existsByShipTypeId(UUID shipTypeId);
     boolean existsByLocationId(UUID locationId);
+    boolean existsByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
+    long countByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
     @EntityGraph(attributePaths = {"shipType", "location", "owner"})
     List<Ship> findByOwnerId(UUID ownerId);
     

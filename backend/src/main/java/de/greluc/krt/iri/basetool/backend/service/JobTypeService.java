@@ -55,7 +55,7 @@ public class JobTypeService {
         }
         if (jobType.getParent() != null && jobType.getParent().getId() != null) {
              JobType parent = jobTypeRepository.findById(jobType.getParent().getId())
-                 .orElseThrow(() -> new RuntimeException("Parent JobType not found"));
+                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Parent JobType not found"));
              jobType.setParent(parent);
         } else {
             jobType.setParent(null);
@@ -70,7 +70,7 @@ public class JobTypeService {
             throw new DuplicateEntityException("A Job Type with the name '" + jobTypeDto.name() + "' already exists.");
         }
         JobType jobType = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("JobType not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
 
         if (jobType.getVersion() != null && !jobType.getVersion().equals(jobTypeDto.version())) {
             throw new ObjectOptimisticLockingFailureException(JobType.class, id);
@@ -83,7 +83,7 @@ public class JobTypeService {
         
         if (jobTypeDto.parentId() != null) {
             JobType parent = jobTypeRepository.findById(jobTypeDto.parentId())
-                    .orElseThrow(() -> new RuntimeException("Parent JobType not found"));
+                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Parent JobType not found"));
             jobType.setParent(parent);
         } else {
             jobType.setParent(null);
@@ -96,7 +96,7 @@ public class JobTypeService {
     @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
     public void deleteJobType(@NotNull UUID id) {
         JobType jobTypeToDeactivate = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("JobType not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
 
         jobTypeToDeactivate.setActive(false);
         jobTypeRepository.save(jobTypeToDeactivate);
@@ -106,7 +106,7 @@ public class JobTypeService {
     @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
     public void activateJobType(@NotNull UUID id) {
         JobType jobTypeToActivate = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("JobType not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
 
         jobTypeToActivate.setActive(true);
         jobTypeRepository.save(jobTypeToActivate);

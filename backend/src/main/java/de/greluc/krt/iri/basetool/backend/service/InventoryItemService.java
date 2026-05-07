@@ -22,6 +22,7 @@ import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -30,9 +31,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InventoryItemService {
@@ -352,7 +355,7 @@ public class InventoryItemService {
     }
 
     @Transactional
-    public void bookOutInventoryItem(UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
+    public InventoryItemDto bookOutInventoryItem(UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
         InventoryItem item = inventoryItemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
 
@@ -410,7 +413,14 @@ public class InventoryItemService {
             newItem.setPersonal(item.getPersonal());
             newItem.setJobOrder(item.getJobOrder());
             newItem.setMission(item.getMission());
-            inventoryItemRepository.save(newItem);
+            InventoryItem savedNew = inventoryItemRepository.save(newItem);
+            if (remainingAmount <= 0.0001) {
+                inventoryItemRepository.delete(item);
+            } else {
+                item.setAmount(remainingAmount);
+                inventoryItemRepository.save(item);
+            }
+            return inventoryItemMapper.toDto(savedNew);
         } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
             MissionParticipant participant = missionParticipantRepository.findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "You must be a participant of the mission to sell its items"));
@@ -426,10 +436,110 @@ public class InventoryItemService {
 
         if (remainingAmount <= 0.0001) { // Floating point precision safety
             inventoryItemRepository.delete(item);
+            return null;
         } else {
             item.setAmount(remainingAmount);
-            inventoryItemRepository.save(item);
+            return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
         }
+    }
+
+    /**
+     * Bulk-checkout: removes all inventory items with the given IDs that belong to the
+     * authenticated user. Associations to JobOrders and Missions are cleared on the managed
+     * entities inside the loop (no @Modifying bulk-update inside the loop). The actual
+     * deleteAllById call happens after the loop, in one batch.
+     *
+     * @param request       the bulk checkout request containing item IDs
+     * @param currentUserId the UUID of the authenticated user (JWT sub)
+     */
+    @Transactional
+    public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
+        log.info("Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
+
+        List<UUID> toDelete = new ArrayList<>();
+
+        for (UUID itemId : request.itemIds()) {
+            InventoryItem item = inventoryItemRepository.findByIdForUpdate(itemId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Inventory item not found: " + itemId));
+
+            if (!item.getUser().getId().equals(currentUserId)) {
+                log.warn("User {} attempted to bulk-checkout item {} owned by {}",
+                        currentUserId, itemId, item.getUser().getId());
+                throw new AccessDeniedException(
+                        "You are not allowed to check out inventory item: " + itemId);
+            }
+
+            // Clear associations on the managed entity – no @Modifying query inside the loop
+            item.setJobOrder(null);
+            item.setMission(null);
+
+            toDelete.add(itemId);
+        }
+
+        // Flush association changes, then delete all in one batch
+        inventoryItemRepository.flush();
+        inventoryItemRepository.deleteAllById(toDelete);
+        log.info("Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
+    }
+
+    /**
+     * Returns all inventory items linked to the given job order, sorted server-side by
+     * owner name, location, material name, quality (desc), quantity (desc).
+     *
+     * @param jobOrderId the UUID of the job order
+     * @return sorted list of {@link MaterialCollectionEntryDto}
+     */
+    @Transactional(readOnly = true)
+    public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
+        jobOrderRepository.findById(jobOrderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job order not found"));
+        return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
+                .map(item -> {
+                    String ownerName = item.getUser().getDisplayName() != null
+                            ? item.getUser().getDisplayName()
+                            : item.getUser().getUsername();
+                    return new MaterialCollectionEntryDto(
+                            item.getId(),
+                            item.getVersion() != null ? item.getVersion() : 0L,
+                            ownerName,
+                            item.getUser().getId(),
+                            item.getLocation().getName(),
+                            item.getLocation().getId(),
+                            item.getMaterial().getName(),
+                            item.getQuality() != null ? item.getQuality().doubleValue() : null,
+                            item.getAmount(),
+                            Boolean.TRUE.equals(item.getDelivered())
+                    );
+                })
+                .toList();
+    }
+
+    /**
+     * Updates the delivered status of an inventory item.
+     * Applies optimistic locking via the version field.
+     *
+     * @param id            the UUID of the inventory item
+     * @param request       the update request containing delivered flag and version
+     * @param currentUserId the UUID of the authenticated user
+     * @param isLogistician whether the user has logistician or higher role
+     * @return updated {@link InventoryItemDto}
+     */
+    @Transactional
+    public InventoryItemDto updateDelivered(UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
+        InventoryItem item = inventoryItemRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+
+        if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
+            throw new AccessDeniedException("You are not allowed to update this inventory item");
+        }
+
+        if (item.getVersion() != null && !item.getVersion().equals(request.version())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(InventoryItem.class, id);
+        }
+
+        item.setDelivered(request.delivered());
+        return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
     }
 
     private Double roundAmount(Double amount) {

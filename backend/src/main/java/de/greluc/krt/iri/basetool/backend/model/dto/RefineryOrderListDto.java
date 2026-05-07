@@ -12,6 +12,7 @@ public record RefineryOrderListDto(
         Instant startedAt,
         Long durationMinutes,
         Double expenses,
+        Double otherExpenses,
         Double oreSales,
         Double profit,
         RefiningMethodDto refiningMethod,

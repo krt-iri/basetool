@@ -76,11 +76,11 @@ public class MemberManagementController {
             );
             model.addAttribute("user", user);
             if (!model.containsAttribute("memberEditForm")) {
-                model.addAttribute("memberEditForm", new MemberEditForm(user.rank(), user.description(), user.displayName(), user.version(), source));
+                model.addAttribute("memberEditForm", new MemberEditForm(user.rank(), user.description(), user.displayName(), user.version(), source, user.joinDate()));
             } else {
                 MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
                 if (form != null && form.source() == null) {
-                    model.addAttribute("memberEditForm", new MemberEditForm(form.rank(), form.description(), form.displayName(), form.version(), source));
+                    model.addAttribute("memberEditForm", new MemberEditForm(form.rank(), form.description(), form.displayName(), form.version(), source, form.joinDate()));
                 }
             }
             return "member-edit";
@@ -102,7 +102,7 @@ public class MemberManagementController {
             return "redirect:/members/" + id + "/edit" + (form.source() != null ? "?source=" + form.source() : "");
         }
         try {
-            UserAttributesUpdateDto body = new UserAttributesUpdateDto(form.rank(), form.description(), form.displayName(), form.version());
+            UserAttributesUpdateDto body = new UserAttributesUpdateDto(form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
             backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
             redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
             if ("profile".equals(form.source())) {

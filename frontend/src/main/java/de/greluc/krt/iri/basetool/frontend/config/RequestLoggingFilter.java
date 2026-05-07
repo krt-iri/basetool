@@ -4,48 +4,67 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+/**
+ * Emits a single structured access-log line per request on INFO (or WARN for slow requests) in
+ * the frontend module. Correlation id and user id are rendered via the MDC pattern in
+ * {@code logback-spring.xml} and therefore not duplicated in the message body.
+ *
+ * <p>Static resources, the actuator and swagger assets are skipped to keep the access log focused
+ * on real user traffic.</p>
+ */
 @Slf4j
-public class RequestLoggingFilter extends OncePerRequestFilter {
+@Component
+@RequiredArgsConstructor
+public class RequestLoggingFilter extends OncePerRequestFilter implements Ordered {
+
+    private final LoggingProperties loggingProperties;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NotNull HttpServletRequest request,
+                                    @NotNull HttpServletResponse response,
+                                    @NotNull FilterChain filterChain)
             throws ServletException, IOException {
-        
-        String uri = request.getRequestURI();
-        String method = request.getMethod();
-        String remoteAddr = request.getRemoteAddr();
-        
-        // Skip logging for common static resources to keep logs clean
-        boolean isStatic = uri.endsWith(".css") || uri.endsWith(".js") || uri.contains("/images/") || uri.contains("/logos/") || uri.contains("/fonts/");
-        
-        if (!isStatic) {
-            String csrfHeader = request.getHeader("X-CSRF-TOKEN");
-            log.info("[DEBUG_LOG] RequestLoggingFilter START: {} {} from {} (CSRF header: {})", 
-                method, uri, remoteAddr, (csrfHeader != null));
-        }
-        
+        long start = System.nanoTime();
         try {
             filterChain.doFilter(request, response);
-            if (!isStatic) {
-                log.info("[DEBUG_LOG] RequestLoggingFilter END: {} {} -> Status {}", 
-                    method, uri, response.getStatus());
+        } finally {
+            long durationMs = (System.nanoTime() - start) / 1_000_000L;
+            int status = response.getStatus();
+            String method = request.getMethod();
+            String path = request.getRequestURI();
+            if (durationMs >= loggingProperties.getSlowRequestThresholdMs()) {
+                log.warn("Slow request {} {} -> {} in {} ms", method, path, status, durationMs);
+            } else if (log.isInfoEnabled()) {
+                log.info("{} {} -> {} in {} ms", method, path, status, durationMs);
             }
-        } catch (Exception e) {
-            if (!isStatic) {
-                log.error("[DEBUG_LOG] RequestLoggingFilter ERROR: {} {} -> Exception: {}", 
-                    method, uri, e.getMessage());
-            }
-            throw e;
         }
+    }
+
+    @Override
+    protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri.endsWith(".css")
+                || uri.endsWith(".js")
+                || uri.endsWith(".ico")
+                || uri.endsWith(".woff")
+                || uri.endsWith(".woff2")
+                || uri.contains("/images/")
+                || uri.contains("/logos/")
+                || uri.contains("/fonts/")
+                || uri.startsWith("/actuator/")
+                || uri.startsWith("/webjars/");
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE - 50;
     }
 }

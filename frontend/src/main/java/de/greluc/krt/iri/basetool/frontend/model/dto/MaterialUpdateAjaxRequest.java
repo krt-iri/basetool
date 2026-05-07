@@ -10,5 +10,6 @@ public record MaterialUpdateAjaxRequest(
     UUID refinedMaterialId,
     String quantityType,
     Boolean isManualRawMaterial,
+    Boolean isJobOrder,
     @NotNull Long version
 ) {}

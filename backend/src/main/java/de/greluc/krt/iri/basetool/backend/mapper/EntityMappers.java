@@ -23,7 +23,7 @@ public final class EntityMappers {
                 .collect(Collectors.toSet());
         return new UserDto(
                 u.getId(), u.getUsername(), u.getDisplayName(), u.getEffectiveName(), u.getFirstName(), u.getLastName(), u.getEmail(),
-                u.getRank(), u.getDescription(), roleNames, permissions, u.getLastReadAnnouncementId(), u.isLogistician(), u.isMissionManager(), u.isInKeycloak(), u.getVersion()
+                u.getRank(), u.getDescription(), roleNames, permissions, u.getLastReadAnnouncementId(), u.isLogistician(), u.isMissionManager(), u.isInKeycloak(), u.getVersion(), u.getJoinDate()
         );
     }
 

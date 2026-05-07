@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{material.collection.title} + ' - ' + #{app.title}">Materialsammelübersicht - IRIDIUM Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box flex-between" style="flex-wrap: wrap; gap: 1rem;">
+        <h1 th:text="#{material.collection.title}" style="font-family: 'Ethnocentric', sans-serif; text-transform: uppercase; letter-spacing: 0.08em;">Materialsammelübersicht</h1>
+        <a th:href="@{/orders/{id}(id=${jobOrderId})}" class="btn btn-secondary" style="min-height: 44px; display: inline-flex; align-items: center;" th:text="#{material.collection.back}">Zurück zum Auftrag</a>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div th:if="${entries == null or entries.isEmpty()}" style="color: var(--color-gray-2); font-family: 'Lato', sans-serif; padding: 2rem 0; text-align: center;" th:text="#{material.collection.empty}">
+            Keine Lagereinträge für diesen Auftrag vorhanden.
+        </div>
+
+        <div th:unless="${entries == null or entries.isEmpty()}" class="table-responsive">
+            <table class="data-table" id="material-collection-table">
+                <thead>
+                <tr>
+                    <th th:text="#{material.collection.col.owner}">Besitzer</th>
+                    <th th:text="#{material.collection.col.location}">Standort</th>
+                    <th th:text="#{material.collection.col.material}">Material</th>
+                    <th th:text="#{material.collection.col.quality}">Qualität</th>
+                    <th th:text="#{material.collection.col.quantity}">Menge</th>
+                    <th th:text="#{material.collection.col.delivered}">Geliefert</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="entry : ${entries}"
+                    th:data-inventory-id="${entry.inventoryEntryId}"
+                    th:data-version="${entry.version}"
+                    th:data-amount="${entry.quantity}">
+                    <td>
+                        <select class="owner-select krt-select"
+                                th:data-inventory-id="${entry.inventoryEntryId}"
+                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
+                            <option th:each="u : ${users}"
+                                    th:value="${u.id}"
+                                    th:text="${u.effectiveName}"
+                                    th:selected="${u.id == entry.ownerId}"></option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="location-select krt-select"
+                                th:data-inventory-id="${entry.inventoryEntryId}"
+                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
+                            <option th:each="loc : ${locations}"
+                                    th:value="${loc.id}"
+                                    th:text="${loc.name}"
+                                    th:selected="${loc.id == entry.locationId}"></option>
+                        </select>
+                    </td>
+                    <td th:text="${entry.materialName}" style="font-family: 'Lato', sans-serif;"></td>
+                    <td th:text="${entry.quality}" style="font-family: 'Lato', sans-serif;"></td>
+                    <td th:text="${entry.quantity}" style="font-family: 'Lato', sans-serif;"></td>
+                    <td style="text-align: center;">
+                        <input type="checkbox"
+                               class="delivered-checkbox"
+                               th:data-inventory-id="${entry.inventoryEntryId}"
+                               th:checked="${entry.delivered}"
+                               style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--color-primary);">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- KRT Toast Container -->
+<div id="krt-toast-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem; pointer-events: none;"></div>
+
+<style>
+    .krt-select:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+    .krt-toast {
+        background: var(--color-gray-4, #1e1e1e);
+        border-left: 4px solid var(--color-primary, #E77E23);
+        color: var(--color-text, #fff);
+        font-family: 'Lato', sans-serif;
+        font-size: 0.95rem;
+        padding: 0.85rem 1.25rem;
+        border-radius: 4px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        pointer-events: auto;
+        min-width: 240px;
+        max-width: 380px;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .krt-toast.krt-toast--error {
+        border-left-color: #e74c3c;
+    }
+    .krt-toast.krt-toast--visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    @media (max-width: 768px) {
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #krt-toast-container { bottom: 1rem; right: 1rem; left: 1rem; }
+        .krt-toast { min-width: unset; max-width: 100%; }
+    }
+</style>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const MSG_OWNER_UPDATED   = /*[[#{material.collection.toast.ownerUpdated}]]*/ 'Besitzer aktualisiert.';
+    const MSG_LOCATION_UPDATED = /*[[#{material.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';
+    const MSG_DELIVERED_UPDATED = /*[[#{material.collection.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.';
+    const MSG_ERROR_CONFLICT  = /*[[#{material.collection.toast.conflict}]]*/ 'Konflikt: Seite wird neu geladen.';
+    const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
+
+    function showToast(message, isError) {
+        const container = document.getElementById('krt-toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'krt-toast' + (isError ? ' krt-toast--error' : '');
+        toast.textContent = message;
+        container.appendChild(toast);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => toast.classList.add('krt-toast--visible'));
+        });
+        setTimeout(() => {
+            toast.classList.remove('krt-toast--visible');
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
+    }
+
+    function getVersion(inventoryId) {
+        const row = document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+        return row ? parseInt(row.getAttribute('data-version'), 10) : 0;
+    }
+
+    function syncVersion(inventoryId, newVersion) {
+        const row = document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+        if (row) row.setAttribute('data-version', newVersion);
+    }
+
+    function handleConflict() {
+        showToast(MSG_ERROR_CONFLICT, true);
+        setTimeout(() => window.location.reload(), 1500);
+    }
+
+    // Owner dropdown change
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.owner-select').forEach(function (select) {
+            select.addEventListener('change', function () {
+                const sel = this;
+                const inventoryId = sel.getAttribute('data-inventory-id');
+                const targetUserId = sel.value;
+                const version = getVersion(inventoryId);
+
+                const row = document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+                const amount = row ? parseFloat(row.getAttribute('data-amount')) : 0;
+
+                // Disable all selects in this row to prevent concurrent changes
+                if (row) row.querySelectorAll('select').forEach(function (s) { s.disabled = true; });
+
+                fetch('/inventory/' + inventoryId + '/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: amount, targetUserId: targetUserId, targetLocationId: null, type: 'TRANSFER', terminal: null, sellAmount: null, version: version })
+                }).then(function (res) {
+                    if (res.status === 409) { handleConflict(); return null; }
+                    if (!res.ok) {
+                        if (row) row.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
+                        showToast(MSG_ERROR_GENERIC, true);
+                        return null;
+                    }
+                    showToast(MSG_OWNER_UPDATED, false);
+                    setTimeout(() => window.location.reload(), 800);
+                }).catch(function () {
+                    if (row) row.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
+                    showToast(MSG_ERROR_GENERIC, true);
+                });
+            });
+        });
+
+        // Location dropdown change
+        document.querySelectorAll('.location-select').forEach(function (select) {
+            select.addEventListener('change', function () {
+                const sel = this;
+                const inventoryId = sel.getAttribute('data-inventory-id');
+                const targetLocationId = sel.value;
+                const version = getVersion(inventoryId);
+
+                const row2 = document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+                const amount2 = row2 ? parseFloat(row2.getAttribute('data-amount')) : 0;
+
+                // Disable all selects in this row to prevent concurrent changes
+                if (row2) row2.querySelectorAll('select').forEach(function (s) { s.disabled = true; });
+
+                fetch('/inventory/' + inventoryId + '/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: amount2, targetUserId: null, targetLocationId: targetLocationId, type: 'TRANSFER', terminal: null, sellAmount: null, version: version })
+                }).then(function (res) {
+                    if (res.status === 409) { handleConflict(); return null; }
+                    if (!res.ok) {
+                        if (row2) row2.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
+                        showToast(MSG_ERROR_GENERIC, true);
+                        return null;
+                    }
+                    showToast(MSG_LOCATION_UPDATED, false);
+                    setTimeout(() => window.location.reload(), 800);
+                }).catch(function () {
+                    if (row2) row2.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
+                    showToast(MSG_ERROR_GENERIC, true);
+                });
+            });
+        });
+
+        // Delivered checkbox change
+        document.querySelectorAll('.delivered-checkbox').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                const inventoryId = this.getAttribute('data-inventory-id');
+                const delivered = this.checked;
+                const version = getVersion(inventoryId);
+
+                fetch('/inventory/' + inventoryId + '/delivered', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ delivered: delivered, version: version })
+                }).then(function (res) {
+                    if (res.status === 409) { handleConflict(); return null; }
+                    if (!res.ok) { showToast(MSG_ERROR_GENERIC, true); return null; }
+                    return res.json();
+                }).then(function (data) {
+                    if (data && data.version !== undefined) {
+                        syncVersion(inventoryId, data.version);
+                        showToast(MSG_DELIVERED_UPDATED, false);
+                    }
+                }).catch(function () { showToast(MSG_ERROR_GENERIC, true); });
+            });
+        });
+    });
+    /*]]>*/
+</script>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+</body>
+</html>

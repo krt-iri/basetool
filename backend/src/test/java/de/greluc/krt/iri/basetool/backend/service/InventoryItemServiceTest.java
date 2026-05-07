@@ -806,4 +806,153 @@ class InventoryItemServiceTest {
         assertNull(item.getNote());
         verify(inventoryItemRepository).save(item);
     }
+
+    // ---- getMaterialCollection ----
+
+    @Test
+    void getMaterialCollection_shouldReturnMappedEntries() {
+        // Given
+        UUID jobOrderId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+
+        JobOrder jobOrder = new JobOrder();
+        jobOrder.setId(jobOrderId);
+
+        User user = new User();
+        user.setId(userId);
+        user.setUsername("testuser");
+        user.setDisplayName("Test User");
+
+        Location location = new Location();
+        location.setId(locationId);
+        location.setName("Port Olisar");
+
+        Material material = new Material();
+        material.setName("Laranite");
+
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        item.setUser(user);
+        item.setLocation(location);
+        item.setMaterial(material);
+        item.setQuality(100);
+        item.setAmount(5.0);
+        item.setDelivered(false);
+
+        when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+        when(inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId)).thenReturn(List.of(item));
+
+        // When
+        List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialCollectionEntryDto> result =
+                inventoryItemService.getMaterialCollection(jobOrderId);
+
+        // Then
+        assertEquals(1, result.size());
+        de.greluc.krt.iri.basetool.backend.model.dto.MaterialCollectionEntryDto dto = result.get(0);
+        assertEquals(itemId, dto.inventoryEntryId());
+        assertEquals(1L, dto.version());
+        assertEquals("Test User", dto.ownerName());
+        assertEquals(userId, dto.ownerId());
+        assertEquals("Port Olisar", dto.location());
+        assertEquals(locationId, dto.locationId());
+        assertEquals("Laranite", dto.materialName());
+        assertFalse(dto.delivered());
+    }
+
+    @Test
+    void getMaterialCollection_shouldThrowWhenJobOrderNotFound() {
+        // Given
+        UUID jobOrderId = UUID.randomUUID();
+        when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.empty());
+
+        // When / Then
+        assertThrows(ResponseStatusException.class,
+                () -> inventoryItemService.getMaterialCollection(jobOrderId));
+    }
+
+    // ---- updateDelivered ----
+
+    @Test
+    void updateDelivered_shouldUpdateDeliveredFlag() {
+        // Given
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+
+        User owner = new User();
+        owner.setId(ownerId);
+
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        item.setUser(owner);
+        item.setDelivered(false);
+
+        de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest request =
+                new de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+        when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+        // When
+        inventoryItemService.updateDelivered(itemId, request, ownerId, false);
+
+        // Then
+        assertTrue(item.getDelivered());
+        verify(inventoryItemRepository).save(item);
+    }
+
+    @Test
+    void updateDelivered_shouldThrowOnVersionConflict() {
+        // Given
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+
+        User owner = new User();
+        owner.setId(ownerId);
+
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(2L);
+        item.setUser(owner);
+        item.setDelivered(false);
+
+        de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest request =
+                new de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+        // When / Then
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> inventoryItemService.updateDelivered(itemId, request, ownerId, false));
+        verify(inventoryItemRepository, never()).save(any());
+    }
+
+    @Test
+    void updateDelivered_shouldThrowAccessDeniedForNonOwnerNonLogistician() {
+        // Given
+        UUID itemId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        User owner = new User();
+        owner.setId(ownerId);
+
+        InventoryItem item = new InventoryItem();
+        item.setId(itemId);
+        item.setVersion(1L);
+        item.setUser(owner);
+
+        de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest request =
+                new de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+
+        when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+        // When / Then
+        assertThrows(AccessDeniedException.class,
+                () -> inventoryItemService.updateDelivered(itemId, request, otherUserId, false));
+    }
 }

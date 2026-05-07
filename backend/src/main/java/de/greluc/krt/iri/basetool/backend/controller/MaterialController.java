@@ -11,6 +11,9 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.iri.basetool.backend.service.MaterialService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -42,6 +45,16 @@ public class MaterialController {
         Page<Material> p = Boolean.TRUE.equals(hasTerminals) ? materialService.getAllMaterialsWithPrices(pageable) : materialService.getAllMaterials(pageable);
         List<MaterialDto> content = p.getContent().stream().map(materialMapper::toDto).toList();
         return new PageResponse<>(content, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
+    }
+
+    @Operation(summary = "Get all job-order materials", description = "Returns all materials marked as isJobOrder=true, sorted by name.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "List of job-order materials returned successfully")
+    })
+    @GetMapping("/job-order")
+    public List<MaterialDto> getJobOrderMaterials() {
+        return materialService.getAllJobOrderMaterials()
+            .stream().map(materialMapper::toDto).toList();
     }
 
     @GetMapping("/lookup")

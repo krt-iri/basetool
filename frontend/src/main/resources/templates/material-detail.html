@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${material != null ? material.name : 'Material'} + ' - ' + #{app.title}">Material Detail - IRIDIUM Basetool</title>
@@ -56,15 +56,15 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:if="${material != null}" th:text="${material.name}">Material Name</h1>
         <h1 th:if="${material == null}">Material nicht gefunden</h1>
         <a th:href="@{/materials}" class="btn btn-secondary">Zurück zur Übersicht</a>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
         <div th:if="${material != null}">
@@ -73,7 +73,7 @@
             </div>
 
             <div class="data-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="flex-between-mb">
                     <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;">Preise und Terminals</h2>
                     <div class="form-group" style="margin: 0; position: relative;">
                         <input type="text" id="terminalFilter" placeholder="Terminal suchen..." onkeyup="filterTerminals()" autocomplete="off">
@@ -91,13 +91,13 @@
                                 </div>
                             </th>
                             <th class="sortable-header" onclick="sortTable(1)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
-                                <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceBuy}">Einkaufspreis</span>
                                     <span class="sort-icon" id="sort-icon-1" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
                                 </div>
                             </th>
                             <th class="sortable-header" onclick="sortTable(2)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
-                                <div style="display: flex; align-items: center; justify-content: flex-end;">
+                                <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceSell}">Verkaufspreis</span>
                                     <span class="sort-icon" id="sort-icon-2" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
                                 </div>

@@ -76,6 +76,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @EntityGraph(attributePaths = {"user", "location", "material"})
     List<InventoryItem> findByJobOrderIdAndMaterialId(UUID jobOrderId, UUID materialId);
 
+    @EntityGraph(attributePaths = {"user", "location", "material"})
+    @Query("SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC")
+    List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
+
     @Query(value = "SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item " +
            "WHERE material_id = :materialId " +
            "AND job_order_id = :jobOrderId " +
@@ -86,7 +90,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId")
     void unlinkJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND i.material.id = :materialId")
     void unlinkJobOrderMaterial(@Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
@@ -116,6 +120,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     @org.springframework.data.jpa.repository.Query("UPDATE InventoryItem i SET i.user = :newUser WHERE i.user = :oldUser")
     void updateOwner(@org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User oldUser, @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User newUser);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"material", "jobOrder", "user", "location"})
     @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
     Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 }

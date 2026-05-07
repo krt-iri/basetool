@@ -7,9 +7,13 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
@@ -68,7 +72,7 @@ class JobOrderServiceTest {
         material.setId(materialId);
         material.setName("Gold");
 
-        materialDto = new MaterialDto(materialId, "Gold", "RAW", "SCU", "Some desc", null, null, false, false, false, false, 0L);
+        materialDto = new MaterialDto(materialId, "Gold", "RAW", "SCU", "Some desc", null, null, false, false, false, false, false, 0L);
 
         jobOrder = new JobOrder();
         jobOrder.setId(orderId);
@@ -90,7 +94,7 @@ class JobOrderServiceTest {
     @Test
     void createJobOrder_ShouldCalculateStockAndReturnDto() {
         // Given
-        CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 100, 50.0);
+        CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
         CreateJobOrderDto createDto = new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
 
         when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
@@ -102,7 +106,7 @@ class JobOrderServiceTest {
             return saved;
         });
         when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-        when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(eq(materialId), any(UUID.class), eq(100))).thenReturn(25.0);
+        when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any())).thenReturn(25.0);
 
         // When
         JobOrderDto result = jobOrderService.createJobOrder(createDto);
@@ -121,9 +125,35 @@ class JobOrderServiceTest {
     }
 
     @Test
+    void createJobOrder_ShouldAlwaysSetMinQualityTo750() {
+        // Given — DTO carries 750 (the only valid value), service must persist exactly 750
+        CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 10.0);
+        CreateJobOrderDto createDto = new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+
+        when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+        when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(i -> {
+            JobOrder saved = i.getArgument(0);
+            saved.setId(orderId);
+            return saved;
+        });
+        when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+        when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any())).thenReturn(0.0);
+
+        // When
+        jobOrderService.createJobOrder(createDto);
+
+        // Then — the saved JobOrder must have minQuality == 750 on every material
+        verify(jobOrderRepository).save(argThat(jo ->
+            jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == 750)
+        ));
+    }
+
+    @Test
     void createJobOrder_MaterialNotFound_ShouldThrowException() {
         // Given
-        CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 100, 50.0);
+        CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
         CreateJobOrderDto createDto = new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
 
         when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -160,6 +190,7 @@ class JobOrderServiceTest {
         // Given
         jobOrder.setPriority(3);
         jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
+        jobOrder.setVersion(1L);
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
         when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
         when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
@@ -167,7 +198,7 @@ class JobOrderServiceTest {
         when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(UUID.class), any(UUID.class), any())).thenReturn(10.0);
 
         // When
-        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, JobOrderStatus.COMPLETED);
+        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
 
         // Then
         assertNull(jobOrder.getPriority());
@@ -182,6 +213,7 @@ class JobOrderServiceTest {
         // Given
         jobOrder.setPriority(3);
         jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
+        jobOrder.setVersion(1L);
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
         when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
         when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
@@ -189,7 +221,7 @@ class JobOrderServiceTest {
         when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(UUID.class), any(UUID.class), any())).thenReturn(10.0);
 
         // When
-        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, JobOrderStatus.REJECTED);
+        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, new UpdateJobOrderStatusDto(JobOrderStatus.REJECTED, 1L));
 
         // Then
         assertNull(jobOrder.getPriority());
@@ -200,10 +232,46 @@ class JobOrderServiceTest {
     }
 
     @Test
+    void updateJobOrderStatus_ToInProgress_ShouldNotUnlink() {
+        // Given
+        jobOrder.setPriority(2);
+        jobOrder.setStatus(JobOrderStatus.OPEN);
+        jobOrder.setVersion(1L);
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+        when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+        when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(UUID.class), any(UUID.class), any())).thenReturn(10.0);
+
+        // When
+        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, 1L));
+
+        // Then
+        assertEquals(JobOrderStatus.IN_PROGRESS, jobOrder.getStatus());
+        assertNotNull(result);
+        verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    }
+
+    @Test
+    void updateJobOrderStatus_VersionMismatch_ShouldThrow409() {
+        // Given
+        jobOrder.setVersion(5L);
+        jobOrder.setStatus(JobOrderStatus.OPEN);
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+        // When / Then
+        assertThrows(org.springframework.orm.ObjectOptimisticLockingFailureException.class, () ->
+            jobOrderService.updateJobOrderStatus(orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L))
+        );
+        verify(jobOrderRepository, never()).save(any());
+        verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    }
+
+    @Test
     void updateJobOrderStatus_ToActive_FromCompleted_ShouldAssignNewPriority() {
         // Given
         jobOrder.setPriority(null);
         jobOrder.setStatus(JobOrderStatus.COMPLETED);
+        jobOrder.setVersion(2L);
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
         when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(5));
         when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
@@ -212,7 +280,7 @@ class JobOrderServiceTest {
         when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(UUID.class), any(UUID.class), any())).thenReturn(10.0);
 
         // When
-        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, JobOrderStatus.OPEN);
+        JobOrderDto result = jobOrderService.updateJobOrderStatus(orderId, new UpdateJobOrderStatusDto(JobOrderStatus.OPEN, 2L));
 
         // Then
         assertEquals(1, jobOrder.getPriority()); 
@@ -254,7 +322,7 @@ class JobOrderServiceTest {
     void updateJobOrder_OptimisticLockingFailure_ShouldThrowException() {
         // Given
         jobOrder.setVersion(2L);
-        CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 100, 50.0);
+        CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
         CreateJobOrderDto updateDto = new CreateJobOrderDto("Alpha", "Tester", List.of(updateMat), 1L); // version mismatch
 
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -273,7 +341,7 @@ class JobOrderServiceTest {
         Material newMaterial = new Material();
         newMaterial.setId(newMaterialId);
         
-        CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 100, 50.0);
+        CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 750, 50.0);
         CreateJobOrderDto updateDto = new CreateJobOrderDto("Beta", "NewTester", List.of(updateMat), null);
 
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -295,14 +363,55 @@ class JobOrderServiceTest {
         verify(jobOrderRepository).save(jobOrder);
     }
     @Test
+    void completeJobOrderWithinTransaction_ShouldFlushBeforeLockQuery_ToAvoidOptimisticLockConflict() {
+        // Given — reproduces the root cause of the 409 bug:
+        // completeJobOrderWithinTransaction() modifies jobOrder in-memory (status, priority),
+        // then calls normalizePriorities() which issues a PESSIMISTIC_WRITE lock query via
+        // lockAllJobOrders(). Without a flush() before that query, the DB still holds the old
+        // @Version value while Hibernate has already incremented it in-memory, causing an
+        // ObjectOptimisticLockingFailureException on the final transaction flush.
+        // Fix: jobOrderRepository.flush() is called before normalizePriorities().
+        jobOrder.setStatus(JobOrderStatus.OPEN);
+        jobOrder.setPriority(1);
+        when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+
+        // When — must not throw any exception
+        assertDoesNotThrow(() -> jobOrderService.completeJobOrderWithinTransaction(jobOrder));
+
+        // Then — flush() must be called BEFORE lockAllJobOrders() to sync the @Version to DB
+        var inOrder = inOrder(jobOrderRepository);
+        inOrder.verify(jobOrderRepository).flush();
+        inOrder.verify(jobOrderRepository).lockAllJobOrders();
+
+        assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
+        assertNull(jobOrder.getPriority());
+        verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    }
+
+    @Test
+    void completeJobOrderWithinTransaction_ShouldNotNormalize_WhenAlreadyTerminal() {
+        // Given — if the order is already COMPLETED, normalizePriorities() must NOT be called
+        jobOrder.setStatus(JobOrderStatus.COMPLETED);
+        jobOrder.setPriority(null);
+
+        // When
+        assertDoesNotThrow(() -> jobOrderService.completeJobOrderWithinTransaction(jobOrder));
+
+        // Then — no flush, no lock query, no unlink since wasTerminal=true
+        verify(jobOrderRepository, never()).flush();
+        verify(jobOrderRepository, never()).lockAllJobOrders();
+        verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    }
+
+    @Test
     void getInventoryItemsForJobOrderMaterial_ShouldReturnMappedDtos() {
         // Given
         de.greluc.krt.iri.basetool.backend.model.InventoryItem item = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
         item.setId(UUID.randomUUID());
         item.setAmount(10.0);
 
-        de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto itemDto = 
-            new de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto(
+        InventoryItemDto itemDto =
+            new InventoryItemDto(
                 item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, null, 1L);
 
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -311,7 +420,7 @@ class JobOrderServiceTest {
         when(inventoryItemMapper.toDto(item)).thenReturn(itemDto);
 
         // When
-        List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> result = jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
+        List<InventoryItemDto> result = jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
 
         // Then
         assertNotNull(result);
@@ -321,5 +430,160 @@ class JobOrderServiceTest {
         verify(materialRepository).findById(materialId);
         verify(inventoryItemRepository).findByJobOrderIdAndMaterialId(orderId, materialId);
         verify(inventoryItemMapper).toDto(item);
+    }
+
+    @Test
+    void unlinkMaterial_ShouldCallUnlinkAndRemoveMaterialFromJobOrder() {
+        // Given
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+
+        // When
+        jobOrderService.unlinkMaterial(orderId, materialId);
+
+        // Then
+        verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+        verify(jobOrderRepository).save(jobOrder);
+        assertTrue(jobOrder.getMaterials().isEmpty(), "Material should have been removed from job order");
+    }
+
+    @Test
+    void unlinkMaterial_WhenJobOrderNotFound_ShouldThrowNotFound() {
+        // Given
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        // When / Then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobOrderService.unlinkMaterial(orderId, materialId));
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    }
+
+    @Test
+    void unlinkMaterial_WhenMaterialNotLinked_ShouldThrowNotFound() {
+        // Given
+        UUID otherMaterialId = UUID.randomUUID();
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+        // When / Then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    }
+
+    @Test
+    void unlinkInventoryItem_ShouldSetJobOrderToNull() {
+        // Given
+        UUID inventoryItemId = UUID.randomUUID();
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem item = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        item.setId(inventoryItemId);
+        item.setJobOrder(jobOrder);
+
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
+
+        // When
+        jobOrderService.unlinkInventoryItem(orderId, inventoryItemId);
+
+        // Then
+        assertNull(((de.greluc.krt.iri.basetool.backend.model.InventoryItem) item).getJobOrder(), "JobOrder should be null after unlinking");
+        verify(jobOrderRepository).findById(orderId);
+        verify(inventoryItemRepository).findById(inventoryItemId);
+    }
+
+    @Test
+    void unlinkInventoryItem_WhenJobOrderNotFound_ShouldThrowNotFound() {
+        // Given
+        UUID inventoryItemId = UUID.randomUUID();
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        // When / Then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(inventoryItemRepository, never()).findById(any());
+    }
+
+    @Test
+    void unlinkInventoryItem_WhenInventoryItemNotFound_ShouldThrowNotFound() {
+        // Given
+        UUID inventoryItemId = UUID.randomUUID();
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.empty());
+
+        // When / Then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void unlinkInventoryItem_WhenItemNotLinkedToOrder_ShouldThrowNotFound() {
+        // Given
+        UUID inventoryItemId = UUID.randomUUID();
+        UUID otherOrderId = UUID.randomUUID();
+        JobOrder otherOrder = new JobOrder();
+        otherOrder.setId(otherOrderId);
+
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem item = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        item.setId(inventoryItemId);
+        item.setJobOrder(otherOrder);
+
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
+
+        // When / Then
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void getInventoryItemsForJobOrderMaterial_ShouldReturnItemsSortedByOwnerAscQualityDescLocationAscAmountDesc() {
+        // Given
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem i1 = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        i1.setId(UUID.randomUUID());
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem i2 = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        i2.setId(UUID.randomUUID());
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem i3 = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        i3.setId(UUID.randomUUID());
+        de.greluc.krt.iri.basetool.backend.model.InventoryItem i4 = new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+        i4.setId(UUID.randomUUID());
+
+        UserReferenceDto userAlpha = new UserReferenceDto(UUID.randomUUID(), "alpha", "Alpha", "Alpha", 1);
+        UserReferenceDto userBeta  = new UserReferenceDto(UUID.randomUUID(), "beta",  "Beta",  "Beta",  2);
+        LocationReferenceDto locA  = new LocationReferenceDto(UUID.randomUUID(), "ArcCorp");
+        LocationReferenceDto locB  = new LocationReferenceDto(UUID.randomUUID(), "Baijini");
+
+        // Same owner "Alpha", same quality 80, different location → ArcCorp before Baijini
+        InventoryItemDto dto1 = new InventoryItemDto(i1.getId(), userAlpha, null, locB, 80, 5.0,  false, null, null, null, null, null, 1L);
+        // Same owner "Alpha", higher quality 90 → comes before quality 80
+        InventoryItemDto dto2 = new InventoryItemDto(i2.getId(), userAlpha, null, locA, 90, 3.0,  false, null, null, null, null, null, 1L);
+        // Owner "Beta" → after all "Alpha" entries
+        InventoryItemDto dto3 = new InventoryItemDto(i3.getId(), userBeta,  null, locA, 70, 20.0, false, null, null, null, null, null, 1L);
+        // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before lower amount
+        InventoryItemDto dto4 = new InventoryItemDto(i4.getId(), userAlpha, null, locA, 80, 10.0, false, null, null, null, null, null, 1L);
+
+        when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+        when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+        when(inventoryItemRepository.findByJobOrderIdAndMaterialId(orderId, materialId))
+                .thenReturn(List.of(i1, i2, i3, i4));
+        when(inventoryItemMapper.toDto(i1)).thenReturn(dto1);
+        when(inventoryItemMapper.toDto(i2)).thenReturn(dto2);
+        when(inventoryItemMapper.toDto(i3)).thenReturn(dto3);
+        when(inventoryItemMapper.toDto(i4)).thenReturn(dto4);
+
+        // When
+        List<InventoryItemDto> result = jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
+
+        // Then
+        // Expected order: dto2 (Alpha, q90, ArcCorp, 3), dto4 (Alpha, q80, ArcCorp, 10), dto1 (Alpha, q80, Baijini, 5), dto3 (Beta, q70, ArcCorp, 20)
+        assertNotNull(result);
+        assertEquals(4, result.size());
+        assertEquals(dto2.id(), result.get(0).id(), "1st: Alpha, quality 90, ArcCorp");
+        assertEquals(dto4.id(), result.get(1).id(), "2nd: Alpha, quality 80, ArcCorp, amount 10");
+        assertEquals(dto1.id(), result.get(2).id(), "3rd: Alpha, quality 80, Baijini, amount 5");
+        assertEquals(dto3.id(), result.get(3).id(), "4th: Beta, quality 70, ArcCorp");
     }
 }

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{app.title} + ' - ' + #{terms.title}">IRIDIUM Basetool - Nutzungsbedingungen</title>
@@ -20,7 +20,7 @@
     </nav>
 </header>
 <main>
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <h1 th:text="#{terms.title}">Nutzungsbedingungen</h1>
         <p th:text="#{terms.example_text}">Dies sind die Nutzungsbedingungen der Plattform.</p>
     </div>

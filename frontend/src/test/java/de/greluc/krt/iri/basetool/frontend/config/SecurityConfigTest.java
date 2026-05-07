@@ -20,7 +20,10 @@ class SecurityConfigTest {
         // Arrange
         RequestLoggingFilter loggingFilter = mock(RequestLoggingFilter.class);
         BackendRoleSyncFilter roleSyncFilter = mock(BackendRoleSyncFilter.class);
-        SecurityConfig config = new SecurityConfig(loggingFilter, roleSyncFilter);
+        BotProtectionFilter botProtectionFilter = mock(BotProtectionFilter.class);
+        SessionDebugFilter sessionDebugFilter = mock(SessionDebugFilter.class);
+        SsoReAuthenticationEntryPoint ssoEntryPoint = mock(SsoReAuthenticationEntryPoint.class);
+        SecurityConfig config = new SecurityConfig(loggingFilter, roleSyncFilter, botProtectionFilter, sessionDebugFilter, ssoEntryPoint);
         GrantedAuthoritiesMapper mapper = config.userAuthoritiesMapper();
 
         Map<String, Object> realmAccess = new HashMap<>();

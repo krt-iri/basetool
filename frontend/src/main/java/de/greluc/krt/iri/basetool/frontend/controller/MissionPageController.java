@@ -108,6 +108,7 @@ public class MissionPageController {
                                @RequestParam(required = false, defaultValue = "false") boolean showPast,
                                @RequestParam(required = false) Integer page,
                                @RequestParam(required = false) Integer size,
+                               @RequestParam(required = false) String fragment,
                                Model model,
                                @AuthenticationPrincipal OidcUser principal) {
         StringBuilder uri = new StringBuilder("/api/v1/missions/search?");
@@ -147,6 +148,10 @@ public class MissionPageController {
         } catch (Exception e) {
             log.error("Error loading missions", e);
             model.addAttribute("error", "error.missions.load");
+        }
+        // AJAX live-filter requests only need the results fragment.
+        if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+            return "missions :: missionsResults";
         }
         return "missions";
     }
@@ -291,6 +296,7 @@ public class MissionPageController {
                 ));
             }
             model.addAttribute("isNew", false);
+            model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
             addFormsToModel(model, principal);
             addOperationsToModel(model, principal == null);
 
@@ -404,9 +410,10 @@ public class MissionPageController {
         // Expose the authenticated user's JWT sub (Keycloak UUID) so Thymeleaf can
         // robustly decide whether a participant row belongs to the current user
         // and enable self-edit on the member's own entry.
-        org.springframework.security.core.Authentication currentAuth =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        model.addAttribute("authUserId", currentAuth != null ? currentAuth.getName() : null);
+        // NOTE: currentAuth.getName() returns the preferred_username (configured via user-name-attribute),
+        // NOT the Keycloak UUID. We must use principal.getSubject() to get the sub (UUID) that matches
+        // p.user.id in the participant list.
+        model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
         return "mission-detail";
     }
     
@@ -1209,16 +1216,23 @@ public class MissionPageController {
             value = "/{id}/participants/ajax",
             produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<Object> addParticipantAjax(
             @PathVariable @NotNull UUID id,
-            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal OidcUser principal) {
         try {
+            // Mirror the classical /missions/{id}/participant handler: anonymous guests
+            // hit the backend's slim endpoint via the public WebClient (no JWT) so the
+            // backend can apply its guest-signup branch (jwt == null + guestName).
+            // Previously this method was annotated with @PreAuthorize("isAuthenticated()")
+            // and always passed isPublic=false, which produced the AccessDeniedException
+            // observed in live-log/log.txt for anonymous mission signups.
+            boolean isPublic = (principal == null);
             Object result = backendApiClient.post(
                     "/api/v1/missions/" + id + "/participants/slim",
                     body,
                     Object.class,
-                    false);
+                    isPublic);
             return org.springframework.http.ResponseEntity.ok(result);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("[DEBUG_LOG] Add participant (AJAX) failed: status={}, msg={}",
@@ -1238,17 +1252,22 @@ public class MissionPageController {
             value = "/{id}/participants/{participantId}/ajax",
             produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<Object> updateParticipantAjax(
             @PathVariable @NotNull UUID id,
             @PathVariable @NotNull UUID participantId,
-            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal OidcUser principal) {
         try {
+            // Anonymous guests are allowed to edit their own guest participant entries
+            // (see backend MissionSecurityService#canAccessParticipant: guest entries
+            // with user == null are editable). Route via the public WebClient when no
+            // OIDC principal is present, mirroring addParticipantAjax.
+            boolean isPublic = (principal == null);
             Object result = backendApiClient.put(
                     "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
                     body,
                     Object.class,
-                    false);
+                    isPublic);
             return org.springframework.http.ResponseEntity.ok(result);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("[DEBUG_LOG] Update participant (AJAX) failed: status={}, msg={}",
@@ -1268,15 +1287,16 @@ public class MissionPageController {
             value = "/{id}/participants/{participantId}/ajax",
             produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<Object> deleteParticipantAjax(
             @PathVariable @NotNull UUID id,
-            @PathVariable @NotNull UUID participantId) {
+            @PathVariable @NotNull UUID participantId,
+            @AuthenticationPrincipal OidcUser principal) {
         try {
+            boolean isPublic = (principal == null);
             backendApiClient.delete(
                     "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
                     Void.class,
-                    false);
+                    isPublic);
             return org.springframework.http.ResponseEntity.noContent().build();
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("[DEBUG_LOG] Delete participant (AJAX) failed: status={}, msg={}",
@@ -1296,16 +1316,17 @@ public class MissionPageController {
             value = "/{id}/participants/{participantId}/check-in/ajax",
             produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<Object> checkInParticipantAjax(
             @PathVariable @NotNull UUID id,
-            @PathVariable @NotNull UUID participantId) {
+            @PathVariable @NotNull UUID participantId,
+            @AuthenticationPrincipal OidcUser principal) {
         try {
+            boolean isPublic = (principal == null);
             Object result = backendApiClient.post(
                     "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
                     null,
                     Object.class,
-                    false);
+                    isPublic);
             return org.springframework.http.ResponseEntity.ok(result);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("[DEBUG_LOG] Check-in participant (AJAX) failed: status={}, msg={}",
@@ -1325,16 +1346,17 @@ public class MissionPageController {
             value = "/{id}/participants/{participantId}/check-out/ajax",
             produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<Object> checkOutParticipantAjax(
             @PathVariable @NotNull UUID id,
-            @PathVariable @NotNull UUID participantId) {
+            @PathVariable @NotNull UUID participantId,
+            @AuthenticationPrincipal OidcUser principal) {
         try {
+            boolean isPublic = (principal == null);
             Object result = backendApiClient.post(
                     "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
                     null,
                     Object.class,
-                    false);
+                    isPublic);
             return org.springframework.http.ResponseEntity.ok(result);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("[DEBUG_LOG] Check-out participant (AJAX) failed: status={}, msg={}",
@@ -1432,6 +1454,33 @@ public class MissionPageController {
             return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
         } catch (Exception e) {
             log.error("[DEBUG_LOG] UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}", id, unitId, crewId, e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * AJAX endpoint: returns all participants of a mission that are not yet assigned to any unit crew.
+     * Used to populate the "Crew zuweisen" dropdown with only unassigned participants.
+     */
+    @GetMapping(
+            value = "/{id}/participants/unassigned/ajax",
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    @PreAuthorize("isAuthenticated()")
+    public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
+            @PathVariable @NotNull UUID id) {
+        try {
+            Object result = backendApiClient.get(
+                    "/api/v1/missions/" + id + "/participants/unassigned",
+                    new ParameterizedTypeReference<Object>() {},
+                    false);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("[DEBUG_LOG] Get unassigned participants (AJAX) failed: status={}, msg={}",
+                    e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("[DEBUG_LOG] UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
             return org.springframework.http.ResponseEntity.internalServerError().build();
         }
     }

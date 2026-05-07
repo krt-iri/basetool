@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{members.title} + ' - ' + #{app.title}">Mitgliederverwaltung - IRIDIUM Basetool</title>
@@ -25,7 +25,7 @@
         <p th:text="#{members.description}">Verwalte die Mitglieder deiner Squadron.</p>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
 
         <form method="get" th:action="@{/members}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
             <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
@@ -75,14 +75,14 @@
                                th:disabled="${#authentication.principal.subject == user.id.toString()}">
                     </td>
                     <td>
-                        <span th:if="${user.inKeycloak}" style="color: var(--success-color, #2ecc71); font-size: 0.8rem;" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:if="${!user.inKeycloak}" style="color: var(--danger-color, #e74c3c); font-size: 0.8rem;" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        <span th:if="${user.inKeycloak}" style="color: var(--color-success); font-size: 0.8rem;" th:text="#{members.in_keycloak}">In Keycloak</span>
+                        <span th:if="${!user.inKeycloak}" style="color: var(--color-danger); font-size: 0.8rem;" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
                     </td>
                     <td>
-                        <div style="display: flex; gap: 0.5rem;">
+                        <div class="flex-gap-xs">
                             <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn" th:text="#{members.edit}">Bearbeiten</a>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
-                                    class="btn danger"
+                                    class="btn btn-danger"
                                     th:data-user-id="${user.id}"
                                     onclick="deleteUser(this.getAttribute('data-user-id'))"
                                     th:text="#{members.delete}">Löschen</button>
@@ -130,6 +130,14 @@
         }
     });
 
+    const MSG_STATUS_UPDATED = "[[#{members.status.updated}]]";
+    const MSG_STATUS_UPDATE_FAILED = "[[#{members.status.update.failed}]]";
+    const MSG_STATUS_UPDATE_ERROR = "[[#{members.status.update.error}]]";
+    const MSG_DELETE_TITLE = "[[#{members.delete.title}]]";
+    const MSG_DELETE_CONFIRM = "[[#{members.delete_confirm}]]";
+    const MSG_DELETE_LABEL = "[[#{members.delete}]]";
+    const MSG_CANCEL_LABEL = "[[#{general.cancel}]]";
+
     async function updateLogisticianStatus(userId, isLogistician) {
         try {
             const resp = await fetch(`/members/${userId}/logistician?isLogistician=${isLogistician}`, {
@@ -141,15 +149,14 @@
             });
             if (!resp.ok) {
                 const data = await resp.json();
-                showFrontendErrorToast(data.message || 'Error updating status');
-                // Rollback UI
+                showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
                 location.reload();
             } else {
-                showFrontendSuccessToast('Status updated successfully');
+                showFrontendSuccessToast(MSG_STATUS_UPDATED);
             }
         } catch (err) {
             console.error('Failed to update status', err);
-            showFrontendErrorToast('Failed to update status');
+            showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
             location.reload();
         }
     }
@@ -165,22 +172,21 @@
             });
             if (!resp.ok) {
                 const data = await resp.json();
-                showFrontendErrorToast(data.message || 'Error updating status');
-                // Rollback UI
+                showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
                 location.reload();
             } else {
-                showFrontendSuccessToast('Status updated successfully');
+                showFrontendSuccessToast(MSG_STATUS_UPDATED);
             }
         } catch (err) {
             console.error('Failed to update status', err);
-            showFrontendErrorToast('Failed to update status');
+            showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
             location.reload();
         }
     }
 
-    function deleteUser(userId) {
-        const confirmMsg = "[[#{members.delete_confirm}]]";
-        if (!confirm(confirmMsg)) return;
+    async function deleteUser(userId) {
+        const confirmed = await window.showKrtConfirm(MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL);
+        if (!confirmed) return;
 
         const form = document.getElementById('delete-user-form');
         form.action = `/members/${userId}/delete`;

@@ -33,7 +33,7 @@ class JobOrderMapperTest {
                         material.getMaterial() != null ? material.getMaterial().getName() : null,
                         null,
                         material.getMaterial() != null && material.getMaterial().getQuantityType() != null ? material.getMaterial().getQuantityType().name() : null,
-                        null, null, null, false, false, false, false, 1L
+                        null, null, null, false, false, false, false, false, 1L
                 );
                 return new JobOrderMaterialDto(material.getId(), matDto, material.getMinQuality(), material.getAmount(), 0.0, 1L);
             }

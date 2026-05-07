@@ -39,7 +39,7 @@ public class ShipTypeService {
     @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
     public ShipType getShipType(@NotNull UUID id) {
         return shipTypeRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("ShipType not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("ShipType not found"));
     }
 
     @Transactional
@@ -53,7 +53,7 @@ public class ShipTypeService {
     private void resolveManufacturer(ShipType shipType) {
         if (shipType.getManufacturer() != null && shipType.getManufacturer().getId() != null) {
             shipType.setManufacturer(manufacturerRepository.findById(shipType.getManufacturer().getId())
-                    .orElseThrow(() -> new RuntimeException("Manufacturer not found")));
+                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Manufacturer not found")));
         } else {
             shipType.setManufacturer(null);
         }

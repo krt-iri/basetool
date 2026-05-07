@@ -17,12 +17,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
-import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.DefaultHttpSecurityExpressionHandler;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
-import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -43,6 +41,9 @@ import java.util.Set;
 public class SecurityConfig {
     private final RequestLoggingFilter requestLoggingFilter;
     private final BackendRoleSyncFilter backendRoleSyncFilter;
+    private final BotProtectionFilter botProtectionFilter;
+    private final SessionDebugFilter sessionDebugFilter;
+    private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
 
     @Bean
     public static RoleHierarchy roleHierarchy() {
@@ -56,19 +57,21 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, ClientRegistrationRepository clientRegistrationRepository, RoleHierarchy roleHierarchy) throws Exception {
-        OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler =
-                new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
-
-        // Sets the `post_logout_redirect_uri` parameter to the base URL of the application
-        oidcLogoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}");
+        SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
+                new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
 
         http
+            .addFilterBefore(botProtectionFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
+            .addFilterBefore(sessionDebugFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
             .addFilterBefore(requestLoggingFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
             .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers(
                     "/missions/**",
-                    "/operations/**"
+                    "/operations/**",
+                    "/hangar/import/fleetview",
+                    "/hangar/ships/all",
+                    "/inventory/**"
                 )
             )
             .headers(headers -> {
@@ -99,6 +102,9 @@ public class SecurityConfig {
             .logout(logout -> logout
                 .logoutRequestMatcher(request -> request.getRequestURI().equals(request.getContextPath() + "/logout"))
                 .logoutSuccessHandler(oidcLogoutSuccessHandler)
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(ssoReAuthenticationEntryPoint)
             );
         return http.build();
     }
@@ -127,6 +133,13 @@ public class SecurityConfig {
                 java.util.Locale locale = org.springframework.web.servlet.support.RequestContextUtils.getLocale(request);
                 Map<String, Object> additionalParameters = new java.util.HashMap<>(req.getAdditionalParameters());
                 additionalParameters.put("ui_locales", locale.getLanguage());
+                // Use Keycloak SSO session for silent re-authentication after service restarts.
+                // If the Keycloak SSO session is still active, the user is re-authenticated
+                // transparently without interaction. If not, Keycloak shows the login page.
+                String prompt = request.getParameter("prompt");
+                if ("none".equals(prompt)) {
+                    additionalParameters.put("prompt", "none");
+                }
                 return OAuth2AuthorizationRequest.from(req).additionalParameters(additionalParameters).build();
             }
         };

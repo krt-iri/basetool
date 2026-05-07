@@ -218,7 +218,8 @@ public class MissionController {
                 false, // isLogistician
                 false, // isMissionManager
                 dto.inKeycloak(),
-                dto.version()
+                dto.version(),
+                null  // joinDate – not exposed to guests
         );
     }
 
@@ -808,12 +809,59 @@ public class MissionController {
     }
 
     @PostMapping("/{id}/participants/slim")
-    @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-    @Operation(summary = "Add a participant (admin, slim response)",
-            description = "Adds a participant and returns the updated participant list as slim DTOs.")
+    @Operation(summary = "Add a participant (slim response)",
+            description = "Adds a participant and returns the updated participant list as slim DTOs. "
+                    + "Mirrors the public add-participant logic: explicit userId (autocomplete) or free-text guestName "
+                    + "(case-insensitive resolution against registered users). Authenticated users may always add "
+                    + "themselves; adding other registered users is restricted to managers/officers/admins. "
+                    + "Anonymous users may only add guest entries.")
     public List<MissionParticipantDto> addParticipantSlim(@PathVariable @NotNull UUID id,
-                                                          @RequestBody @jakarta.validation.Valid @NotNull AddParticipantRequest request) {
-        var mission = missionService.addParticipant(id, request.userId());
+                                                          @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
+                                                          @AuthenticationPrincipal Jwt jwt,
+                                                          Authentication authentication) {
+        UUID finalUserId = request.userId();
+        String finalGuestName = request.guestName();
+
+        // Default self-enroll when an authenticated caller submits an empty form.
+        if (jwt != null && finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
+            finalUserId = userService.getUserIdFromJwt(jwt);
+        }
+
+        // Anonymous callers must never add a registered user directly.
+        if (jwt == null && finalUserId != null) {
+            throw new AccessDeniedException("Anonymous users cannot add registered users.");
+        }
+
+        // Resolve free-text guest names against registered users (case-insensitive, exact match on
+        // username or displayName). Authenticated users get their name transparently linked;
+        // anonymous users trying to impersonate a registered member are rejected.
+        if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
+            List<User> matches = userService.findMatchesByExactName(finalGuestName);
+            if (matches.size() > 1) {
+                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Participant name is ambiguous.");
+            }
+            if (matches.size() == 1) {
+                if (jwt != null) {
+                    finalUserId = matches.get(0).getId();
+                    finalGuestName = null;
+                } else {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Guest name is already taken.");
+                }
+            }
+        }
+
+        // If an authenticated, non-privileged caller tries to add a *different* registered user,
+        // require manage-mission privileges. Self-add always stays permitted.
+        if (jwt != null && finalUserId != null) {
+            UUID callerId = userService.getUserIdFromJwt(jwt);
+            if ((callerId == null || !finalUserId.equals(callerId))
+                    && !missionSecurityService.canManageMission(id, authentication)) {
+                throw new AccessDeniedException("Only mission managers may add other users as participants.");
+            }
+        }
+
+        var mission = missionService.addParticipant(id, finalUserId, finalGuestName,
+                request.desiredJobTypeId(), request.comment(), request.squadronId());
         return mission.getParticipants().stream().map(missionMapper::toDto).toList();
     }
 
@@ -826,6 +874,16 @@ public class MissionController {
                                                       Authentication authentication) {
         missionService.removeParticipant(id, participantId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/participants/unassigned")
+    @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+    @Operation(summary = "Get unassigned participants",
+            description = "Returns all participants of a mission that are not yet assigned to any unit crew.")
+    public List<MissionParticipantDto> getUnassignedParticipants(@PathVariable @NotNull UUID id) {
+        return missionService.getUnassignedParticipants(id).stream()
+                .map(missionMapper::toDto)
+                .toList();
     }
 
     // --- Frequencies ---

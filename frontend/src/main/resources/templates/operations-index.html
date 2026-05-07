@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{operations.title} + ' - ' + #{app.title}">Operations - IRIDIUM Basetool</title>
@@ -29,9 +29,9 @@
     <div th:if="${errorMessage}" class="alert alert-danger" th:text="#{${errorMessage}}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="#{${error}}"></div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
 
-        <div sec:authorize="hasRole('MISSION_MANAGER')" style="margin-bottom: 1rem;">
+        <div sec:authorize="hasRole('MISSION_MANAGER')" class="mb-1">
              <button type="button" class="btn" th:text="#{operation.create}" onclick="document.getElementById('create-operation-modal').style.display='block'">Create New</button>
         </div>
 
@@ -90,7 +90,7 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
-                <div style="margin-top: 2rem; display:flex; gap:1rem;">
+                <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{general.save}">Save</button>
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('create-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
                 </div>
@@ -121,7 +121,7 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
-                <div style="margin-top: 2rem; display:flex; gap:1rem;">
+                <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{general.save}">Save</button>
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
                 </div>
@@ -135,7 +135,7 @@
             <h2 th:text="#{general.confirm}" class="text-danger">Confirm Delete</h2>
             <p th:text="#{operation.delete.confirm}" style="margin: 1.5rem 0;">Confirm that you want to delete this operation.</p>
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
-                <div style="margin-top: 2rem; display:flex; gap:1rem;">
+                <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('delete-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
                 </div>

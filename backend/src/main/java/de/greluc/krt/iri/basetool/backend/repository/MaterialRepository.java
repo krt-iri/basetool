@@ -19,6 +19,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
     @Query("SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name, m.quantityType) FROM Material m ORDER BY m.name")
     List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
     
+    List<Material> findAllByIsJobOrderTrueOrderByNameAsc();
+
     Optional<Material> findByIdCommodity(Integer idCommodity);
     Optional<Material> findByName(String name);
 

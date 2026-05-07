@@ -359,14 +359,39 @@ public class InventoryPageController {
         return basePath + "?" + rebuilt;
     }
 
+    /**
+     * AJAX endpoint that proxies a transfer (owner or location change) for an inventory item
+     * to the backend book-out endpoint. Used by the material collection page for inline reassignment.
+     */
+    @PostMapping("/{id}/transfer")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<InventoryItemDto> transferInventoryItem(
+            @PathVariable @NotNull UUID id,
+            @RequestBody @Valid InventoryItemBookOutDto dto) {
+        try {
+            InventoryItemDto result = backendApiClient.post("/api/v1/inventory/" + id + "/book-out", dto, InventoryItemDto.class);
+            if (result == null) {
+                // Item was fully consumed (deleted) – return 204 so the frontend can reload
+                return org.springframework.http.ResponseEntity.noContent().build();
+            }
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("Failed to transfer inventory item", e);
+            return org.springframework.http.ResponseEntity.status(500).build();
+        }
+    }
+
     @PutMapping("/{id}/update-associations")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<Void> updateAssociations(
+    public org.springframework.http.ResponseEntity<InventoryItemDto> updateAssociations(
             @PathVariable @NotNull UUID id,
             @RequestBody @Valid InventoryItemUpdateDto dto) {
         try {
-            backendApiClient.put("/api/v1/inventory/" + id, dto, Void.class);
-            return org.springframework.http.ResponseEntity.ok().build();
+            InventoryItemDto updated = backendApiClient.put("/api/v1/inventory/" + id, dto, InventoryItemDto.class);
+            return org.springframework.http.ResponseEntity.ok(updated);
         } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
             log.error("Failed to update inventory item associations: status={}, {}", e.getStatusCode(), e.getMessage());
             return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
@@ -405,6 +430,31 @@ public class InventoryPageController {
             return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
         } catch (Exception e) {
             log.error("Failed to update inventory item note", e);
+            return org.springframework.http.ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * AJAX endpoint that proxies a delivered-status update for an inventory item to the backend.
+     * On success, returns the updated {@link InventoryItemDto} (including the incremented version)
+     * so the frontend can synchronize {@code data-version} DOM attributes.
+     */
+    @PatchMapping("/{id}/delivered")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<InventoryItemDto> updateDelivered(
+            @PathVariable @NotNull UUID id,
+            @RequestBody @Valid de.greluc.krt.iri.basetool.frontend.model.dto.UpdateDeliveredRequest request) {
+        try {
+            InventoryItemDto updated = backendApiClient.patch("/api/v1/inventory/" + id + "/delivered", request, InventoryItemDto.class);
+            return org.springframework.http.ResponseEntity.ok(updated);
+        } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+            log.error("Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            log.error("Failed to update delivered status: {}", e.getMessage());
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            log.error("Failed to update delivered status", e);
             return org.springframework.http.ResponseEntity.status(500).build();
         }
     }

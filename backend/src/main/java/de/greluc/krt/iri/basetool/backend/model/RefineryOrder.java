@@ -44,26 +44,37 @@ public class RefineryOrder extends AbstractEntity<UUID> {
     @JoinColumn(name = "refining_method_id")
     private RefiningMethod refiningMethod;
 
+    /**
+     * Auftragskosten. Muss >= 0 sein. Optional: 0 wird beim Speichern wie "nicht gesetzt"
+     * behandelt und als {@code null} persistiert. Die Profit-Berechnung behandelt {@code null} als 0.
+     */
     @PositiveOrZero
-    private Double expenses = 0d;
+    private Double expenses;
+
+    /**
+     * Sonstige Kosten neben den regulaeren {@link #expenses}. Muss >= 0 sein.
+     * Optional: 0 wird beim Speichern wie "nicht gesetzt" behandelt und als {@code null} persistiert.
+     */
+    @PositiveOrZero
+    private Double otherExpenses;
 
     /**
      * Einnahmen durch den Verkauf roher Erze ("Ore Sales"). Muss >= 0 sein.
-     * Default 0, um Rechenfehler bei bestehenden Auftraegen zu vermeiden.
+     * Optional: 0 wird beim Speichern wie "nicht gesetzt" behandelt und als {@code null} persistiert.
      */
     @PositiveOrZero
-    @Column(nullable = false)
-    private Double oreSales = 0d;
+    private Double oreSales;
 
     /**
-     * Berechneter Gewinn/Verlust: oreSales - expenses. Kann negativ sein.
+     * Berechneter Gewinn/Verlust: oreSales - expenses - otherExpenses. Kann negativ sein.
      * Wird nicht persistiert, sondern serverseitig aus den Rohdaten abgeleitet.
      */
     @Transient
     public Double getProfit() {
         double sales = oreSales != null ? oreSales : 0d;
         double costs = expenses != null ? expenses : 0d;
-        return sales - costs;
+        double other = otherExpenses != null ? otherExpenses : 0d;
+        return sales - costs - other;
     }
 
     @Enumerated(EnumType.STRING)

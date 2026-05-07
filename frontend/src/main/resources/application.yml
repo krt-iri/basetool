@@ -23,7 +23,7 @@ server:
       cookie:
         secure: true
         http-only: true
-        same-site: lax
+        same-site: strict
 
 spring:
   threads:
@@ -74,6 +74,19 @@ app:
     write-timeout: 3s
   ui:
     notification-duration: 5000
+  logging:
+    correlation-id-header: X-Correlation-Id
+    correlation-id-mdc-key: correlationId
+    user-id-mdc-key: userId
+    slow-request-threshold-ms: 2000
+    slow-backend-call-threshold-ms: 1500
+    structured-enabled: false
+
+logging:
+  level:
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    io.github.resilience4j: INFO
 
 resilience4j:
   spring:

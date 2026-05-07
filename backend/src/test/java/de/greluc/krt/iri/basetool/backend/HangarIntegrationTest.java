@@ -325,4 +325,85 @@ class HangarIntegrationTest {
         MissionUnit updatedUnit = missionUnitRepository.findById(unit.getId()).orElseThrow();
         assertNull(updatedUnit.getShip());
     }
+
+    // ---- DELETE /api/v1/hangar/ships (delete all) ----
+
+    @Test
+    void testDeleteAllShips_ReturnsNoContent() throws Exception {
+        // Given: user1 has two ships
+        Ship ship1 = new Ship();
+        ship1.setShipType(fighter);
+        ship1.setOwner(user1);
+        ship1.setInsurance("LTI");
+        shipRepository.save(ship1);
+
+        Ship ship2 = new Ship();
+        ship2.setShipType(fighter);
+        ship2.setOwner(user1);
+        ship2.setInsurance("0");
+        shipRepository.save(ship2);
+
+        // When
+        mockMvc.perform(delete("/api/v1/hangar/ships")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"))))
+                .andExpect(status().isNoContent());
+
+        // Then: user1's ships are deleted
+        assertTrue(shipRepository.findByOwnerId(user1.getId()).isEmpty());
+    }
+
+    @Test
+    void testDeleteAllShips_Unauthenticated_Returns401() throws Exception {
+        mockMvc.perform(delete("/api/v1/hangar/ships"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void testDeleteAllShips_NoHangarWriteAuthority_Returns403() throws Exception {
+        mockMvc.perform(delete("/api/v1/hangar/ships")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testDeleteAllShips_WithLinkedMissionUnit_UnlinksBeforeDelete() throws Exception {
+        // Given: user1 has a ship assigned to a mission unit
+        Ship ship = new Ship();
+        ship.setShipType(fighter);
+        ship.setOwner(user1);
+        ship.setInsurance("LTI");
+        ship = shipRepository.save(ship);
+
+        Mission mission = new Mission();
+        mission.setName("Test Mission for Delete All");
+        mission.setStatus("PLANNED");
+        mission = missionRepository.save(mission);
+
+        MissionUnit unit = new MissionUnit();
+        unit.setMission(mission);
+        unit.setName("Bravo 1");
+        unit.setShip(ship);
+        missionUnitRepository.save(unit);
+
+        // When: user1 deletes all ships
+        mockMvc.perform(delete("/api/v1/hangar/ships")
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"))))
+                .andExpect(status().isNoContent());
+
+        // Then: ship deleted, mission unit still exists but ship reference is null
+        assertTrue(shipRepository.findById(ship.getId()).isEmpty());
+        MissionUnit updatedUnit = missionUnitRepository.findById(unit.getId()).orElseThrow();
+        assertNull(updatedUnit.getShip());
+
+        // And: user2's ships are unaffected (multi-user isolation)
+        Ship user2Ship = new Ship();
+        user2Ship.setShipType(fighter);
+        user2Ship.setOwner(user2);
+        user2Ship.setInsurance("LTI");
+        shipRepository.save(user2Ship);
+        assertFalse(shipRepository.findByOwnerId(user2.getId()).isEmpty());
+    }
 }

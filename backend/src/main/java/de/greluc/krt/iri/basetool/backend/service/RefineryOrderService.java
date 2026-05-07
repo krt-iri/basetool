@@ -63,19 +63,19 @@ public class RefineryOrderService {
 
     public RefineryOrder getRefineryOrder(@NotNull UUID id) {
         return refineryOrderRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("RefineryOrder not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefineryOrder not found"));
     }
 
     @Transactional
     public RefineryOrder createRefineryOrder(@NotNull UUID userId, @NotNull RefineryOrder order) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
         
         order.setOwner(user);
 
         if (order.getLocation() != null && order.getLocation().getId() != null) {
             order.setLocation(locationRepository.findById(order.getLocation().getId())
-                .orElseThrow(() -> new RuntimeException("Location not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found")));
             validateLocationHasRefinery(order.getLocation());
         } else {
             throw new RuntimeException("Location is required");
@@ -83,14 +83,14 @@ public class RefineryOrderService {
 
         if (order.getMission() != null && order.getMission().getId() != null) {
             order.setMission(missionRepository.findById(order.getMission().getId())
-                .orElseThrow(() -> new RuntimeException("Mission not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found")));
         } else {
             order.setMission(null);
         }
 
         if (order.getRefiningMethod() != null && order.getRefiningMethod().getId() != null) {
             order.setRefiningMethod(refiningMethodRepository.findById(order.getRefiningMethod().getId())
-                .orElseThrow(() -> new RuntimeException("RefiningMethod not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefiningMethod not found")));
         } else {
             order.setRefiningMethod(null);
         }
@@ -100,7 +100,7 @@ public class RefineryOrderService {
             order.getGoods().forEach(good -> {
                 if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
-                        .orElseThrow(() -> new RuntimeException("Input Material not found"));
+                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Input Material not found"));
                     
                     if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
@@ -109,7 +109,7 @@ public class RefineryOrderService {
 
                     if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
                         de.greluc.krt.iri.basetool.backend.model.Material outMat = materialRepository.findById(good.getOutputMaterial().getId())
-                            .orElseThrow(() -> new RuntimeException("Output Material not found"));
+                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Output Material not found"));
                             
                         if (inMat.getRefinedMaterial() != null && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
                             throw new IllegalArgumentException("Output material must match the refined material of the input material.");
@@ -134,12 +134,21 @@ public class RefineryOrderService {
             order.setStartedAt(java.time.Instant.now());
         }
 
-        // Default oreSales = 0, um Rechenfehler bei fehlenden Werten zu vermeiden
-        if (order.getOreSales() == null) {
-            order.setOreSales(0d);
-        }
+        // Geldfelder (expenses, otherExpenses, oreSales) sind optional. Sowohl null als auch 0
+        // werden semantisch als "nicht gesetzt" behandelt und persistiert als null. Damit muss
+        // das Frontend nicht zwischen "leer" und "0" unterscheiden, und die Spalten bleiben in
+        // der DB sauber leer, wenn der Nutzer keinen Wert eingegeben hat. Die Profit-Berechnung
+        // (siehe RefineryOrder#getProfit) behandelt null bereits als 0.
+        order.setExpenses(zeroToNull(order.getExpenses()));
+        order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
+        order.setOreSales(zeroToNull(order.getOreSales()));
 
         return refineryOrderRepository.save(order);
+    }
+
+    private static Double zeroToNull(Double value) {
+        if (value == null) return null;
+        return value == 0.0 ? null : value;
     }
 
     @Transactional
@@ -156,28 +165,30 @@ public class RefineryOrderService {
 
         if (details.getLocation() != null && details.getLocation().getId() != null) {
             order.setLocation(locationRepository.findById(details.getLocation().getId())
-                .orElseThrow(() -> new RuntimeException("Location not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found")));
             validateLocationHasRefinery(order.getLocation());
         }
 
         if (details.getMission() != null && details.getMission().getId() != null) {
             order.setMission(missionRepository.findById(details.getMission().getId())
-                .orElseThrow(() -> new RuntimeException("Mission not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found")));
         } else if (details.getMission() == null) {
              order.setMission(null);
         }
 
         if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
             order.setRefiningMethod(refiningMethodRepository.findById(details.getRefiningMethod().getId())
-                .orElseThrow(() -> new RuntimeException("RefiningMethod not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefiningMethod not found")));
         } else if (details.getRefiningMethod() == null) {
             order.setRefiningMethod(null);
         }
 
         order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : java.time.Instant.now());
         order.setDurationMinutes(details.getDurationMinutes());
-        order.setExpenses(details.getExpenses());
-        order.setOreSales(details.getOreSales() != null ? details.getOreSales() : 0d);
+        // Geldfelder: 0 wird wie "nicht gesetzt" behandelt und als null persistiert (siehe createRefineryOrder).
+        order.setExpenses(zeroToNull(details.getExpenses()));
+        order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
+        order.setOreSales(zeroToNull(details.getOreSales()));
         if (details.getStatus() != null) {
             order.setStatus(details.getStatus());
         }
@@ -188,7 +199,7 @@ public class RefineryOrderService {
             details.getGoods().forEach(good -> {
                 if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
-                        .orElseThrow(() -> new RuntimeException("Input Material not found"));
+                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Input Material not found"));
                     
                     if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
@@ -197,7 +208,7 @@ public class RefineryOrderService {
 
                     if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
                         de.greluc.krt.iri.basetool.backend.model.Material outMat = materialRepository.findById(good.getOutputMaterial().getId())
-                            .orElseThrow(() -> new RuntimeException("Output Material not found"));
+                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Output Material not found"));
                             
                         if (inMat.getRefinedMaterial() != null && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
                             throw new IllegalArgumentException("Output material must match the refined material of the input material.");
@@ -248,15 +259,15 @@ public class RefineryOrderService {
 
         for (RefineryOrderStoreItemDto itemDto : dto.items()) {
             de.greluc.krt.iri.basetool.backend.model.Material mat = materialRepository.findById(itemDto.materialId())
-                .orElseThrow(() -> new RuntimeException("Material not found: " + itemDto.materialId()));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Material not found: " + itemDto.materialId()));
             
             de.greluc.krt.iri.basetool.backend.model.Location loc = locationRepository.findById(itemDto.locationId())
-                .orElseThrow(() -> new RuntimeException("Location not found: " + itemDto.locationId()));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found: " + itemDto.locationId()));
                 
             User assignee;
             if (itemDto.userId() != null) {
                 assignee = userRepository.findById(itemDto.userId())
-                    .orElseThrow(() -> new RuntimeException("User not found: " + itemDto.userId()));
+                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found: " + itemDto.userId()));
             } else {
                 assignee = order.getOwner();
             }
@@ -264,7 +275,7 @@ public class RefineryOrderService {
             de.greluc.krt.iri.basetool.backend.model.JobOrder jobOrder = null;
             if (itemDto.jobOrderId() != null) {
                 jobOrder = jobOrderRepository.findById(itemDto.jobOrderId())
-                    .orElseThrow(() -> new RuntimeException("JobOrder not found: " + itemDto.jobOrderId()));
+                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobOrder not found: " + itemDto.jobOrderId()));
             }
 
             java.util.List<InventoryItem> existingItems = inventoryItemRepository.findMatchingInventoryItem(

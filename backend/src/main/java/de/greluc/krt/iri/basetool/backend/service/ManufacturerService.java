@@ -37,7 +37,7 @@ public class ManufacturerService {
     @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
     public Manufacturer getManufacturer(@NotNull UUID id) {
         return manufacturerRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Manufacturer not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Manufacturer not found"));
     }
 
     @Transactional

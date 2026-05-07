@@ -61,11 +61,11 @@ class OfficerRefineryAccessTest {
     void officer_ShouldBeAbleToSelectUserInCreateForm() throws Exception {
         // Given
         UUID userId = UUID.randomUUID();
-        UserDto userDto = new UserDto(userId, "officer", "Officer", "Officer", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L);
+        UserDto userDto = new UserDto(userId, "officer", "Officer", "Officer", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L, null);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
         
         // Mocking user list for dropdown
-        UserDto memberDto = new UserDto(UUID.randomUUID(), "member", "Member", "Member", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, false, false, true, 1L);
+        UserDto memberDto = new UserDto(UUID.randomUUID(), "member", "Member", "Member", null, null, null, null, null, Set.of("MEMBER"), Collections.emptySet(), null, false, false, true, 1L, null);
         PageResponse<UserDto> userPage = new PageResponse<>(List.of(userDto, memberDto), 0, 10, 2L, 1, Collections.emptyList());
         when(backendApiClient.get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class))).thenReturn(userPage);
         
@@ -95,11 +95,11 @@ class OfficerRefineryAccessTest {
         UUID otherUserId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         
-        UserDto officerDto = new UserDto(officerId, "officer", "Officer", "Officer", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L);
+        UserDto officerDto = new UserDto(officerId, "officer", "Officer", "Officer", null, null, null, null, null, Set.of("OFFICER"), Collections.emptySet(), null, false, false, true, 1L, null);
         when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(officerDto);
 
         UserReferenceDto ownerRef = new UserReferenceDto(otherUserId, "other", "Other", "Other", null);
-        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, ownerRef, null, null, java.time.Instant.now(), 60L, 1000.0, 0d, 0d, null, Collections.emptyList(), RefineryOrderStatus.OPEN, 1L);
+        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, ownerRef, null, null, java.time.Instant.now(), 60L, 1000.0, 0d, 0d, 0d, null, Collections.emptyList(), RefineryOrderStatus.OPEN, 1L);
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class))).thenReturn(orderDto);
         
         when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class))).thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));

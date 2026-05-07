@@ -34,7 +34,7 @@ public class StarSystemService {
     @Cacheable(cacheNames = CacheConfig.STAR_SYSTEMS_CACHE)
     public StarSystem getStarSystem(@NotNull UUID id) {
         return starSystemRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("StarSystem not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("StarSystem not found"));
     }
 
     @Transactional

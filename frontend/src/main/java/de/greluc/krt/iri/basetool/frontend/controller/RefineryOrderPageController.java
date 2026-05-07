@@ -153,8 +153,8 @@ public class RefineryOrderPageController {
             List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto = new ArrayList<>();
             for (RefineryGoodForm g : form.getGoods()) {
                 if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null);
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null) : null;
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null, null);
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null, null) : null;
                     goodsDto.add(new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto(null, inMat, g.getInputQuantity(), outMat, g.getOutputQuantity(), g.getQuality(), null));
                 }
             }
@@ -174,8 +174,9 @@ public class RefineryOrderPageController {
                     form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null, null) : null,
                     startedAtTime,
                     (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-                    form.getExpenses(),
-                    form.getOreSales() != null ? form.getOreSales() : 0d,
+                    zeroToNull(form.getExpenses()),
+                    zeroToNull(form.getOtherExpenses()),
+                    zeroToNull(form.getOreSales()),
                     null,
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
@@ -229,6 +230,7 @@ public class RefineryOrderPageController {
                         form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
                     }
                     form.setExpenses(orderDto.expenses());
+                    form.setOtherExpenses(orderDto.otherExpenses() != null ? orderDto.otherExpenses() : 0d);
                     form.setOreSales(orderDto.oreSales() != null ? orderDto.oreSales() : 0d);
                     if (orderDto.location() != null) {
                         form.setLocationId(orderDto.location().id());
@@ -341,8 +343,8 @@ public class RefineryOrderPageController {
             List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto = new ArrayList<>();
             for (RefineryGoodForm g : form.getGoods()) {
                 if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null);
-                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null) : null;
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat = new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getInputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null, null);
+                    de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat = g.getOutputMaterialId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(g.getOutputMaterialId(), null, null, null, null, null, null, null, null, null, null, null, null, null) : null;
                     goodsDto.add(new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto(null, inMat, g.getInputQuantity(), outMat, g.getOutputQuantity(), g.getQuality(), null));
                 }
             }
@@ -362,8 +364,9 @@ public class RefineryOrderPageController {
                     form.getMissionId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(form.getMissionId(), null, null, null) : null,
                     startedAtTime,
                     (long) ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60 + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-                    form.getExpenses(),
-                    form.getOreSales() != null ? form.getOreSales() : 0d,
+                    zeroToNull(form.getExpenses()),
+                    zeroToNull(form.getOtherExpenses()),
+                    zeroToNull(form.getOreSales()),
                     null,
                     form.getRefiningMethodId() != null ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null) : null,
                     goodsDto,
@@ -539,6 +542,17 @@ public class RefineryOrderPageController {
                 return null;
             }
         }
+    }
+
+    /**
+     * Setzt einen Double-Wert auf {@code null}, falls er {@code null} oder {@code 0.0} ist.
+     * Wird beim Speichern eines Raffinerieauftrags fuer die optionalen Geldfelder
+     * ({@code expenses}, {@code otherExpenses}, {@code oreSales}) verwendet, da diese
+     * im Frontend mit 0 vorbelegt sind, semantisch aber als "nicht gesetzt" gelten sollen.
+     */
+    private static Double zeroToNull(Double value) {
+        if (value == null) return null;
+        return value == 0.0 ? null : value;
     }
 
     private boolean isLogistician(OidcUser principal) {

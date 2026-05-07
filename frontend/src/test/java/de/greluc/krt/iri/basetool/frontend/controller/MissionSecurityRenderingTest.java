@@ -57,7 +57,7 @@ class MissionSecurityRenderingTest {
         UUID userId = UUID.randomUUID();
         UUID participantId = UUID.randomUUID();
 
-        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L);
+        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L, null);
         MissionParticipantDto participant = new MissionParticipantDto(participantId, user, null, null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
 
         MissionDto mission = new MissionDto(
@@ -86,7 +86,7 @@ class MissionSecurityRenderingTest {
         UUID userId = UUID.randomUUID();
         UUID participantId = UUID.randomUUID();
 
-        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L);
+        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L, null);
         MissionParticipantDto participant = new MissionParticipantDto(participantId, user, null, null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
 
         MissionDto mission = new MissionDto(
@@ -112,7 +112,7 @@ class MissionSecurityRenderingTest {
         UUID userId = UUID.randomUUID(); 
         UUID participantId = UUID.randomUUID();
 
-        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L);
+        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L, null);
         MissionParticipantDto participant = new MissionParticipantDto(participantId, user, null, null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
 
         MissionDto mission = new MissionDto(
@@ -139,7 +139,7 @@ class MissionSecurityRenderingTest {
         UUID userId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         UUID participantId = UUID.randomUUID();
 
-        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L);
+        UserDto user = new UserDto(userId, "TestUser", "Test User", "Test User", null, null, null, null, null, null, null, null, false, false, true, 1L, null);
         MissionParticipantDto participant = new MissionParticipantDto(participantId, user, null, null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
 
         MissionDto mission = new MissionDto(

@@ -1,6 +1,9 @@
 package de.greluc.krt.iri.basetool.frontend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.frontend.config.CacheConfig;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +12,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +24,14 @@ public class BackendApiClient {
 
     private final WebClient webClient;
     private final WebClient publicWebClient;
+
+    /**
+     * Dedicated ObjectMapper used exclusively to decode backend Problem+JSON bodies.
+     * Kept as an internal instance — not auto-wired — because some frontend test
+     * slices run without Spring Boot's JacksonAutoConfiguration and therefore
+     * without a shared ObjectMapper bean.
+     */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Retry(name = "backend")
     @CircuitBreaker(name = "backend")
@@ -195,13 +209,78 @@ public class BackendApiClient {
     }
 
     private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {
-        String responseBody = e.getResponseBodyAsString();
-        log.error("[DEBUG_LOG] Backend error on {} {}: Status={}, Body={}", method, uri, e.getStatusCode(), responseBody);
-        throw new BackendServiceException("Backend service returned error: " + e.getStatusCode() + " - " + responseBody, e, e.getStatusCode().value());
+        BackendServiceException parsed = BackendServiceException.fromProblem(e, objectMapper);
+        // Log every RFC7807 backend failure exactly once, at the boundary, so individual page
+        // controllers don't have to repeat the same boilerplate. Field errors and the
+        // user-facing detail are included to make a 400 VALIDATION_FAILED diagnosable from the
+        // log alone (see AGENTS.md / CHANGELOG); rejected user values are never logged.
+        if (parsed.getStatusCode() >= 500) {
+            log.error("Backend error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
+                    method, uri, parsed.getStatusCode(), parsed.getProblemCode(), parsed.getCorrelationId(),
+                    parsed.getProblemDetail(), parsed.getFieldErrors());
+        } else {
+            log.warn("Backend client error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
+                    method, uri, parsed.getStatusCode(), parsed.getProblemCode(), parsed.getCorrelationId(),
+                    parsed.getProblemDetail(), parsed.getFieldErrors());
+        }
+        throw parsed;
     }
 
     private <T> T handleException(Exception e, String method, String uri) {
-        log.error("Backend error on {} {}: {}", method, uri, e.getMessage());
+        Throwable root = unwrap(e);
+        if (root instanceof CallNotPermittedException) {
+            log.warn("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
+            throw new BackendServiceException(
+                    "Backend circuit breaker open",
+                    e,
+                    503,
+                    BackendServiceException.CODE_SERVICE_UNAVAILABLE,
+                    null,
+                    java.util.Collections.emptyList(),
+                    null);
+        }
+        if (root instanceof BulkheadFullException) {
+            log.warn("Bulkhead saturated for {} {}: {}", method, uri, root.getMessage());
+            throw new BackendServiceException(
+                    "Backend bulkhead full",
+                    e,
+                    503,
+                    BackendServiceException.CODE_SERVICE_UNAVAILABLE,
+                    null,
+                    java.util.Collections.emptyList(),
+                    null);
+        }
+        if (root instanceof TimeoutException || root instanceof WebClientRequestException
+                || root instanceof java.net.ConnectException) {
+            log.warn("Backend timeout / connection failure on {} {}: {}", method, uri, root.getMessage());
+            throw new BackendServiceException(
+                    "Backend timeout",
+                    e,
+                    504,
+                    BackendServiceException.CODE_BACKEND_TIMEOUT,
+                    null,
+                    java.util.Collections.emptyList(),
+                    null);
+        }
+        log.error("Unexpected backend error on {} {}: {}", method, uri, e.getMessage(), e);
         throw new BackendServiceException("Error on " + method + " data from backend", e, 500);
+    }
+
+    private static Throwable unwrap(Throwable t) {
+        Throwable current = t;
+        while (current != null) {
+            if (current instanceof CallNotPermittedException
+                    || current instanceof BulkheadFullException
+                    || current instanceof TimeoutException
+                    || current instanceof WebClientRequestException
+                    || current instanceof java.net.ConnectException) {
+                return current;
+            }
+            if (current.getCause() == current || current.getCause() == null) {
+                return t;
+            }
+            current = current.getCause();
+        }
+        return t;
     }
 }

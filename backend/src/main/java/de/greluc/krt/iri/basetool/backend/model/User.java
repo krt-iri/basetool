@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.*;
+import org.jetbrains.annotations.Nullable;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -51,6 +53,10 @@ public class User extends AbstractEntity<UUID> {
 
     @Column(name = "in_keycloak")
     private boolean inKeycloak = true;
+
+    @Nullable
+    @Column(name = "join_date")
+    private LocalDate joinDate;
 
     public String getEffectiveName() {
         return (displayName != null && !displayName.isBlank()) ? displayName : username;

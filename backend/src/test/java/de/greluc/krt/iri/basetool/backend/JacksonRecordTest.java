@@ -9,7 +9,7 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 public class JacksonRecordTest {
     @Test
     public void testSpel() throws Exception {
-        MaterialDto dto = new MaterialDto(null, "Test", "RAW", "SCU", "desc", null, null, true, true, true, false, 1L);
+        MaterialDto dto = new MaterialDto(null, "Test", "RAW", "SCU", "desc", null, null, true, true, true, false, false, 1L);
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writeValueAsString(dto);
         System.out.println("[DEBUG_LOG] JSON: " + json);

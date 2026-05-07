@@ -36,7 +36,7 @@ public class OperationService {
     @Transactional(readOnly = true)
     public Operation getOperationById(@NotNull UUID id) {
         return operationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Operation not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
     }
 
     @Transactional
@@ -47,7 +47,7 @@ public class OperationService {
     @Transactional
     public Operation updateOperation(@NotNull UUID id, @NotNull Operation operationDetails) {
         Operation operation = operationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Operation not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
         if (operationDetails.getVersion() != null && !operation.getVersion().equals(operationDetails.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Operation.class, id);
@@ -64,7 +64,7 @@ public class OperationService {
     public void deleteOperation(@NotNull UUID id) {
         log.info("Deleting operation with ID: {}", id);
         Operation operation = operationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Operation not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
         java.util.List<UUID> missionIds = operation.getMissions().stream()
                 .map(de.greluc.krt.iri.basetool.backend.model.Mission::getId)
@@ -82,7 +82,7 @@ public class OperationService {
 
         // We must re-fetch the operation because we cleared the entity manager
         Operation operationToDelete = operationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Operation not found after cleanup"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found after cleanup"));
         operationRepository.delete(operationToDelete);
         log.info("Successfully deleted operation with ID: {}", id);
     }
@@ -90,7 +90,7 @@ public class OperationService {
     @Transactional(readOnly = true)
     public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
         Operation operation = operationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Operation not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
         java.util.Map<String, String> participantNames = new java.util.HashMap<>();
         java.util.Map<String, Long> validDurations = new java.util.HashMap<>();

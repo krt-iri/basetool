@@ -1,0 +1,325 @@
+/*
+ * KRT "DAS KARTELL" Corporate Design styling for the Personal Inventory feature.
+ * Color tokens: --color-primary (#E77E23), --color-bg-dark-gray (#141414).
+ * Typography: Ethnocentric for headlines (ALL CAPS), Lato for body.
+ * Touch targets >= 44px; responsive across 4 device classes.
+ */
+
+.krt-personal-inventory-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.krt-personal-inventory-header h1 {
+    font-family: 'Ethnocentric', 'Lato', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary, #E77E23);
+    margin: 0;
+}
+.krt-personal-inventory-header .krt-subtitle {
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    color: var(--color-gray-1, #d6d6d6);
+    margin: 0;
+    max-width: 80ch;
+}
+
+.krt-personal-inventory {
+    background-color: var(--color-bg-dark-gray, #141414);
+    border: 1px solid var(--color-primary, #E77E23);
+    padding: 1.25rem;
+}
+
+.krt-admin-banner {
+    background: linear-gradient(90deg, rgba(231, 126, 35, 0.25) 0%, rgba(231, 126, 35, 0.05) 100%);
+    border: 1px solid var(--color-primary, #E77E23);
+    color: var(--color-primary, #E77E23);
+    font-family: 'Ethnocentric', 'Lato', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    padding: 0.6rem 1rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    box-shadow: 0 0 16px rgba(231, 126, 35, 0.35) inset;
+}
+.krt-admin-banner::before { content: '\25B2  '; }
+.krt-admin-banner::after  { content: '  \25B2'; }
+
+.krt-pi-actionbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+.krt-pi-actionbar .btn { min-height: 44px; }
+
+.krt-pi-userform {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.krt-pi-userform select {
+    min-height: 44px;
+    background-color: var(--color-gray-4, #1f1f1f);
+    border: 1px solid var(--color-gray-3, #2a2a2a);
+    color: var(--color-gray-1, #d6d6d6);
+    /* Reserve right space for the SVG arrow injected by styles.css */
+    padding: 0.4rem 2rem 0.4rem 0.6rem;
+    min-width: 240px;
+}
+.krt-pi-userform label {
+    color: var(--color-primary, #E77E23);
+    font-family: 'Lato', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+}
+
+.krt-pi-filter {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.krt-pi-search-input {
+    min-height: 44px;
+    background-color: var(--color-gray-4, #1f1f1f);
+    border: 1px solid var(--color-gray-3, #2a2a2a);
+    color: var(--color-gray-1, #d6d6d6);
+    padding: 0.4rem 0.6rem;
+    min-width: 220px;
+}
+
+.krt-pi-table-wrapper { overflow-x: auto; }
+.krt-pi-table { width: 100%; }
+.krt-pi-table th {
+    font-family: 'Ethnocentric', 'Lato', sans-serif;
+    text-transform: uppercase;
+    color: var(--color-primary, #E77E23);
+    letter-spacing: 0.06em;
+}
+.krt-pi-table td.krt-pi-empty {
+    text-align: center;
+    color: var(--color-gray-2, #9a9a9a);
+    padding: 1.25rem;
+}
+.krt-pi-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.krt-pi-actions .btn { min-height: 44px; }
+
+/* HUD-style location marker (triangle for SPACE_STATION, ring for CITY). */
+.krt-pi-location-marker {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+.krt-pi-loc-city {
+    border: 2px solid var(--color-primary, #E77E23);
+    border-radius: 50%;
+    background: transparent;
+}
+.krt-pi-loc-station {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 12px solid var(--color-primary, #E77E23);
+    background: transparent;
+}
+
+/* Forms inside list section AND modals (Personal Inventory). */
+.krt-personal-inventory .form-group,
+#krt-pi-modal .form-group,
+#krt-pi-delete-modal .form-group { margin-bottom: 1.25rem; }
+.krt-personal-inventory .form-group input,
+.krt-personal-inventory .form-group textarea,
+#krt-pi-modal .form-group input,
+#krt-pi-modal .form-group textarea {
+    width: 100%;
+    min-height: 44px;
+    background-color: var(--color-gray-4, #1f1f1f);
+    border: 1px solid var(--color-gray-3, #2a2a2a);
+    color: var(--color-gray-1, #d6d6d6);
+    font-family: 'Lato', sans-serif;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    margin-left: 0;
+    display: block;
+}
+
+/* Select elements need extra right padding for the SVG arrow from styles.css */
+.krt-personal-inventory .form-group select,
+#krt-pi-modal .form-group select {
+    width: 100%;
+    min-height: 44px;
+    background-color: var(--color-gray-4, #1f1f1f);
+    border: 1px solid var(--color-gray-3, #2a2a2a);
+    color: var(--color-gray-1, #d6d6d6);
+    font-family: 'Lato', sans-serif;
+    padding: 0.5rem 2rem 0.5rem 0.5rem;
+    box-sizing: border-box;
+    margin-left: 0;
+    display: block;
+}
+.krt-personal-inventory .form-group label,
+#krt-pi-modal .form-group label {
+    display: block;
+    color: var(--color-primary, #E77E23);
+    font-family: 'Lato', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.8rem;
+    margin: 0 0 0.4rem 0;
+    padding: 0;
+    text-align: left;
+}
+.krt-pi-help {
+    color: var(--color-gray-2, #9a9a9a);
+    font-size: 0.8rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+/* Modal layout: relative parent so the close-X can sit absolutely top-right. */
+#krt-pi-modal .modal-content,
+#krt-pi-delete-modal .modal-content {
+    position: relative;
+    padding-top: 3rem;
+}
+#krt-pi-modal .modal-content > .close,
+#krt-pi-delete-modal .modal-content > .close {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.9rem;
+    color: var(--color-gray-1, #d6d6d6);
+    font-size: 1.8rem;
+    line-height: 1;
+    font-weight: bold;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    z-index: 2;
+}
+#krt-pi-modal .modal-content > .close:hover,
+#krt-pi-modal .modal-content > .close:focus,
+#krt-pi-delete-modal .modal-content > .close:hover,
+#krt-pi-delete-modal .modal-content > .close:focus {
+    color: var(--color-primary, #E77E23);
+    outline: none;
+}
+#krt-pi-modal #krt-pi-form,
+#krt-pi-modal #krt-pi-form .form-group {
+    text-align: left;
+}
+
+.krt-pi-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+.krt-pi-modal-actions .btn { min-height: 44px; }
+.krt-danger {
+    background-color: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+    color: #fff !important;
+}
+
+.krt-pi-error-box {
+    background-color: rgba(163, 0, 10, 0.2);
+    border: 1px solid var(--color-danger);
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 1rem;
+}
+.krt-pi-error-box ul { margin: 0; padding-left: 1.25rem; color: var(--color-danger); }
+
+/* Typeahead dropdown. */
+.krt-pi-typeahead { position: relative; }
+.krt-pi-typeahead-results {
+    position: absolute;
+    z-index: 1100;
+    left: 0;
+    right: 0;
+    top: 100%;
+    background-color: var(--color-bg-dark-gray, #141414);
+    border: 1px solid var(--color-primary, #E77E23);
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+.krt-pi-typeahead-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--color-gray-1, #d6d6d6);
+    padding: 0.6rem 0.8rem;
+    font-family: 'Lato', sans-serif;
+    cursor: pointer;
+    min-height: 44px;
+}
+.krt-pi-typeahead-item:hover,
+.krt-pi-typeahead-item:focus {
+    background-color: var(--color-gray-4, #1f1f1f);
+    color: var(--color-primary, #E77E23);
+}
+.krt-pi-typeahead-name { font-weight: 700; }
+.krt-pi-typeahead-meta { color: var(--color-gray-2, #9a9a9a); font-size: 0.85rem; margin-left: auto; }
+.krt-pi-typeahead-loading,
+.krt-pi-typeahead-empty {
+    padding: 0.75rem 1rem;
+    color: var(--color-gray-2, #9a9a9a);
+    font-style: italic;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0);
+    white-space: nowrap; border: 0;
+}
+
+/* Responsive: 4 device classes. */
+
+/* Smartphone <= 768px */
+@media (max-width: 768px) {
+    .krt-pi-actionbar { flex-direction: column; align-items: stretch; }
+    .krt-pi-filter { margin-left: 0; flex-direction: column; align-items: stretch; }
+    .krt-pi-filter .krt-pi-search-input,
+    .krt-pi-filter .btn { width: 100%; }
+    .krt-pi-userform { flex-direction: column; align-items: stretch; }
+    .krt-pi-userform select { min-width: 0; width: 100%; }
+    .krt-pi-table-wrapper { overflow-x: auto; }
+    .krt-pi-actions { flex-direction: column; }
+    .krt-pi-actions .btn { width: 100%; }
+}
+
+/* Tablet 768-1024px */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .krt-pi-table th, .krt-pi-table td { padding: 0.45rem 0.6rem; }
+}
+
+/* Desktop 1024-1600px (default body styling) */
+
+/* Ultra Wide Desktop >= 1600px */
+@media (min-width: 1600px) {
+    .krt-personal-inventory { padding: 1.5rem 2rem; }
+    .krt-personal-inventory-header .krt-subtitle { max-width: 100ch; }
+    .krt-pi-table { table-layout: fixed; }
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.list} + ' - ' + #{app.title}">Materialien - IRIDIUM Basetool</title>
@@ -84,20 +84,20 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.materials.list}">Materialien</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
         <div class="form-group" style="position: relative;">
             <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" onkeyup="filterMaterials()" autocomplete="off">
         </div>
 
-        <div th:each="entry : ${materialsByKind}" class="kind-group" style="margin-top: 1.5rem;">
+        <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
             <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-gray-4); padding: 0.5rem 1rem;" onclick="toggleKindGroup(this)">
                 <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
                 <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
@@ -106,7 +106,7 @@
             <div class="grid-auto-cards materialsGrid" style="margin-top: 1rem; display: none;">
                 <a th:href="@{/materials/{id}(id=${mat.id})}" th:each="mat : ${entry.value}" class="hud-box material-card">
                     <h3 class="material-title">
-                        <span th:if="${mat.isIllegal == true}" style="color: #e74c3c; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
+                        <span th:if="${mat.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
                     </h3>
                     
                     <div class="price-info">

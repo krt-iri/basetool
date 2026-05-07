@@ -278,12 +278,12 @@ class InventoryPageControllerTest {
         UUID id = UUID.randomUUID();
         InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
 
-        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(null);
 
-        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateAssociations(id, dto);
 
         assertEquals(200, response.getStatusCode().value());
-        verify(backendApiClient).put(eq("/api/v1/inventory/" + id), eq(dto), eq(Void.class));
+        verify(backendApiClient).put(eq("/api/v1/inventory/" + id), eq(dto), eq(InventoryItemDto.class));
     }
 
     @Test
@@ -295,9 +295,9 @@ class InventoryPageControllerTest {
             org.springframework.web.reactive.function.client.WebClientResponseException.create(
                 409, "Conflict", org.springframework.http.HttpHeaders.EMPTY, null, null
             );
-        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenThrow(exception);
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(exception);
 
-        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateAssociations(id, dto);
 
         assertEquals(409, response.getStatusCode().value());
     }
@@ -307,9 +307,9 @@ class InventoryPageControllerTest {
         UUID id = UUID.randomUUID();
         InventoryItemUpdateDto dto = new InventoryItemUpdateDto(UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
 
-        when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenThrow(new RuntimeException("Generic error"));
+        when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(new RuntimeException("Generic error"));
 
-        org.springframework.http.ResponseEntity<Void> response = controller.updateAssociations(id, dto);
+        org.springframework.http.ResponseEntity<InventoryItemDto> response = controller.updateAssociations(id, dto);
 
         assertEquals(500, response.getStatusCode().value());
     }

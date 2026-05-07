@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.hangar_data} + ' - ' + #{app.title}">Schiffsdaten - IRIDIUM Basetool</title>
@@ -47,18 +47,18 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.hangar_data}">Schiffsdaten</h1>
         <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
             <button type="button" class="btn btn-secondary" onclick="openModal('reset-fitted-confirm-modal')" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
         </form>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
 
         <!-- ShipTypes Section -->
         <div class="data-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="flex-between-mb">
                 <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
                     <input type="text" id="filterShipTypes" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('shipTypesTable', this.value)" autocomplete="off">
@@ -94,7 +94,7 @@
 
         <!-- Manufacturers Section -->
         <div class="data-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="flex-between-mb">
                 <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
                     <input type="text" id="filterManufacturers" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('manufacturersTable', this.value)" autocomplete="off">

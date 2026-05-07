@@ -1,7 +1,12 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.LocationReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.GroupedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +22,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -134,5 +140,97 @@ class InventoryPageControllerMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"inventoryTable\"")))
                 .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")));
+    }
+
+    /**
+     * Regression: a refinery order assigned to a (now non-active) mission produces an inventory item
+     * whose mission is no longer returned by {@code /api/v1/missions/lookup}. The mission must still
+     * be visible in the inventory association select via a fallback {@code <option selected>} so the
+     * user can recognise the linked mission (consistent with the mission detail view).
+     */
+    @Test
+    @WithMockUser(roles = "MEMBER", username = "test-user-123")
+    void viewMyInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        UUID materialId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID missionId = UUID.randomUUID();
+        String missionName = "Op Sundown (archived)";
+
+        InventoryItemDto item = new InventoryItemDto(
+                itemId,
+                new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+                new LocationReferenceDto(locationId, "ARC-L1"),
+                90, 10.0, false,
+                null, null,
+                missionId, missionName,
+                null, 1L);
+        GroupedInventoryDto group = new GroupedInventoryDto(
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+                10.0, 90.0, 90, List.of(item));
+
+        when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+                .thenAnswer(inv -> {
+                    String url = inv.getArgument(0);
+                    if (url.contains("/inventory/my-inventory/grouped")) {
+                        return List.of(group);
+                    }
+                    return Collections.emptyList();
+                });
+        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/inventory/my"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
+                .andExpect(content().string(containsString(missionName)))
+                .andExpect(content().string(containsString("selected=\"selected\"")));
+    }
+
+    /**
+     * Same regression as {@link #viewMyInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption()}
+     * for the logistician/admin view ({@code inventory-admin.html}).
+     */
+    @Test
+    @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+    void viewAllInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        UUID materialId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID missionId = UUID.randomUUID();
+        String missionName = "Op Sundown (archived)";
+
+        InventoryItemDto item = new InventoryItemDto(
+                itemId,
+                new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+                new LocationReferenceDto(locationId, "ARC-L1"),
+                90, 10.0, false,
+                null, null,
+                missionId, missionName,
+                null, 1L);
+        GroupedInventoryDto group = new GroupedInventoryDto(
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+                10.0, 90.0, 90, List.of(item));
+
+        when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+                .thenAnswer(inv -> {
+                    String url = inv.getArgument(0);
+                    if (url.contains("/inventory/all/grouped")) {
+                        return List.of(group);
+                    }
+                    return Collections.emptyList();
+                });
+        when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/inventory/all"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
+                .andExpect(content().string(containsString(missionName)))
+                .andExpect(content().string(containsString("selected=\"selected\"")));
     }
 }

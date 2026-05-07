@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Lagerverwaltung - IRIDIUM Basetool</title>
@@ -38,13 +38,13 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1>Lagerverwaltung</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">

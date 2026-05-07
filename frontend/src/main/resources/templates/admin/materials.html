@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::style})}">
     <title th:text="#{admin.materials.title} + ' - ' + #{app.title}">Materialien verwalten - IRIDIUM Basetool</title>
@@ -59,10 +59,10 @@
         <h1 th:text="#{admin.materials.title}">Materialien verwalten</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <div class="data-section">
             <h2 th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>
-            <form method="post" th:action="@{/admin/materials/categories}" class="inline-form" style="margin-bottom: 1rem;">
+            <form method="post" th:action="@{/admin/materials/categories}" class="inline-form mb-1">
                 <input type="text" name="name" required th:placeholder="#{general.name}">
                 <button type="submit" class="btn" th:text="#{general.add}">Hinzufügen</button>
             </form>
@@ -92,7 +92,7 @@
         </div>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <div class="data-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
@@ -101,7 +101,7 @@
                 </div>
             </div>
 
-            <div th:if="${error}" class="alert alert-danger" style="margin-bottom: 1rem;" th:text="#{${error}}">Fehler</div>
+            <div th:if="${error}" class="alert alert-danger mb-1" th:text="#{${error}}">Fehler</div>
 
             <div class="table-responsive">
             <table id="materialsTable">
@@ -124,9 +124,15 @@
                                 <span th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
                             </div>
                             <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
-                                <label style="margin-bottom: 0; cursor: pointer;">
+                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
                                     <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" onchange="updateMaterial(this)" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
+                                </label>
+                            </div>
+                            <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
+                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
+                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" onchange="updateMaterial(this)" style="margin-right: 0.25rem;" />
+                                    <span th:text="#{admin.material.job_order}">Auftrag</span>
                                 </label>
                             </div>
                         </td>
@@ -208,6 +214,8 @@
             requestBody.refinedMaterialId = selectElement.value || null;
         } else if (updateType === 'MANUAL_RAW') {
             requestBody.isManualRawMaterial = selectElement.checked;
+        } else if (updateType === 'JOB_ORDER') {
+            requestBody.isJobOrder = selectElement.checked;
         }
 
         const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{refineryorder.detail.title} + ' - ' + #{app.title}">Raffinerieauftrag Details - IRIDIUM Basetool</title>
@@ -60,21 +60,21 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{refineryorder.detail.title}">Raffinerieauftrag Details</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${errorToast}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${errorToast}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${errorToast}" class="hud-box hud-box-error">
+            <p th:text="#{__${errorToast}__}">Fehler</p>
         </div>
 
         <div class="form-container">
             <form id="refineryOrderMainForm" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
                 <input type="hidden" th:field="*{version}" />
                 
-                <div class="material-row" style="margin-top: 1.5rem;">
-                    <div class="form-group" style="flex: 3; margin-bottom: 0;">
+                <div class="material-row mt-1-5">
+                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -84,13 +84,20 @@
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label for="expenses" th:text="#{refineryorder.form.expenses}">Kosten (aUEC)</label>
+                        <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
                         <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" oninput="updateProfitPreview()">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten (aUEC)</label>
+                        <input type="number" id="otherExpenses" th:field="*{otherExpenses}" min="0" step="1"
+                               th:title="#{refineryorder.form.otherExpenses.help}"
+                               th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                    </div>
+
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
-                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" required th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" oninput="updateProfitPreview()">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -101,10 +108,10 @@
                     </div>
                 </div>
 
-                <div class="material-row" style="margin-top: 1.5rem;">
+                <div class="material-row mt-1-5">
                     <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}" style="flex: 1; margin-bottom: 0;">
                         <label for="startedAtLocal" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
-                        <div style="display: flex; gap: 0.5rem;">
+                        <div class="flex-gap-xs">
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
                             <div class="datetime-split-inputs" style="flex: 1;">
                                 <input type="date" class="date-part" th:readonly="${!canEdit}">
@@ -116,7 +123,7 @@
                     
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label th:text="#{refineryorder.form.duration}">Dauer</label>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div class="flex-gap-sm">
                             <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" style="flex: 1;" th:readonly="${!canEdit}">
                             <span style="color: var(--color-gray-2);">h</span>
                             <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" style="flex: 1;" th:readonly="${!canEdit}">
@@ -132,7 +139,7 @@
                     </div>
                 </div>
 
-                <div class="material-row" style="margin-top: 1.5rem;">
+                <div class="material-row mt-1-5">
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
                         <select id="locationId" th:field="*{locationId}" required th:disabled="${!canEdit}">
@@ -161,7 +168,7 @@
                     </div>
                 </div>
 
-                <div class="material-row" style="margin-top: 1.5rem;">
+                <div class="material-row mt-1-5">
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
                         <select id="refiningMethodId" th:field="*{refiningMethodId}" onchange="updateMethodRatings()" th:disabled="${!canEdit}">
@@ -210,7 +217,7 @@
                             </div>
                         </div>
 
-                        <div class="material-row" style="margin-top: 1.5rem;">
+                        <div class="material-row mt-1-5">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
                                 <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
@@ -263,7 +270,7 @@
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerText='WIRD GESPEICHERT...';">
                 <div id="storeItemsContainer">
                     <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div class="flex-between-mb">
                             <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
                             <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" onclick="duplicateStoreItem(this)" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
@@ -287,7 +294,7 @@
                                 <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
                             </div>
                         </div>
-                        <div class="material-row" style="margin-top: 1rem;">
+                        <div class="material-row mt-1">
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>
                                 <select th:id="'storeLocation_' + ${stat.index}" th:field="*{items[__${stat.index}__].locationId}" required>
@@ -634,19 +641,21 @@
     });
 
     /**
-     * Aktualisiert das read-only "Gewinn/Verlust"-Feld live aus oreSales - expenses.
+     * Aktualisiert das read-only "Gewinn/Verlust"-Feld live aus oreSales - expenses - otherExpenses.
      * Server bleibt Source of Truth; dies ist lediglich eine UI-Vorschau.
      */
     function updateProfitPreview() {
         const expensesEl = document.getElementById('expenses');
+        const otherExpensesEl = document.getElementById('otherExpenses');
         const oreSalesEl = document.getElementById('oreSales');
         const preview = document.getElementById('profitPreview');
         if (!preview) return;
         const expenses = parseFloat(expensesEl && expensesEl.value) || 0;
+        const otherExpenses = parseFloat(otherExpensesEl && otherExpensesEl.value) || 0;
         const oreSales = parseFloat(oreSalesEl && oreSalesEl.value) || 0;
-        const profit = Math.round(oreSales - expenses);
+        const profit = Math.round(oreSales - expenses - otherExpenses);
         preview.value = profit.toLocaleString();
-        preview.style.color = profit < 0 ? '#e74c3c' : 'var(--color-gray-1)';
+        preview.classList.toggle('text-danger', profit < 0); preview.classList.toggle('text-muted', profit >= 0);
     }
     document.addEventListener('DOMContentLoaded', updateProfitPreview);
 </script>

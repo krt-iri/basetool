@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.mission_data.title} + ' - ' + #{app.title}">Missionsdaten - IRIDIUM Basetool</title>
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Squadrons Section -->
-    <div class="hud-box data-section" style="margin-top: 2rem;" id="squadrons-box">
+    <div class="hud-box data-section mt-2" id="squadrons-box">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'squadrons-box')">
             <h2 th:text="#{admin.mission_data.squadrons}" style="margin: 0;">Staffeln</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
@@ -88,7 +88,7 @@
                         </td>
                         <td th:text="${sq.shorthand}">Kürzel</td>
                         <td th:text="${sq.description}">Desc</td>
-                        <td style="display:flex; gap:0.5rem;">
+                        <td class="flex-gap-xs">
                             <button class="btn edit-squadron-btn" 
                                     th:data-action="@{/admin/mission-data/squadrons/{id}/update(id=${sq.id})}"
                                     th:data-id="${sq.id}" 
@@ -112,7 +112,7 @@
     </div>
 
     <!-- JobTypes Section -->
-    <div class="hud-box data-section" style="margin-top: 2rem;" id="jobtypes-box">
+    <div class="hud-box data-section mt-2" id="jobtypes-box">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'jobtypes-box')">
             <h2 th:text="#{admin.mission_data.job_types}" style="margin: 0;">Aufgabenwünsche</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
@@ -148,7 +148,7 @@
                         <td th:text="${job.archetype}">Archetype</td>
                         <td th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</td>
                         <td th:text="${job.description}">Desc</td>
-                        <td style="display:flex; gap:0.5rem;">
+                        <td class="flex-gap-xs">
                             <button class="btn edit-jobtype-btn" 
                                     th:data-action="@{/admin/mission-data/job-types/{id}/update(id=${job.id})}"
                                     th:data-id="${job.id}" 
@@ -174,7 +174,7 @@
 
 
     <!-- FrequencyTypes Section -->
-    <div class="hud-box data-section" style="margin-top: 2rem;" id="freqtypes-box">
+    <div class="hud-box data-section mt-2" id="freqtypes-box">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'freqtypes-box')">
             <h2 th:text="#{admin.mission_data.frequency_types}" style="margin: 0;">Frequenztypen</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
@@ -207,7 +207,7 @@
                             <span th:if="${!freq.active}" style="font-size: 0.7rem; background-color: var(--color-gray-4); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.job_type.inactive}">Inaktiv</span>
                         </td>
                         <td th:text="${freq.description}">Desc</td>
-                        <td style="display:flex; gap:0.5rem;">
+                        <td class="flex-gap-xs">
                             <button class="btn edit-freqtype-btn" 
                                     th:data-action="@{/admin/mission-data/frequency-types/{id}/update(id=${freq.id})}"
                                     th:data-id="${freq.id}" 
@@ -320,7 +320,7 @@
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
             <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
             <p th:text="#{info.delete.confirm.message}" style="margin-bottom: 2rem;">Wirklich löschen?</p>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
+            <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/admin/mission-data}" method="post" style="margin:0;">
                     <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>

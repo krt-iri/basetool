@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
+import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
@@ -8,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,7 +58,7 @@ public class JobOrderService {
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
-                    .minQuality(matDto.minQuality())
+                    .minQuality(750)
                     .amount(matDto.amount())
                     .build();
 
@@ -106,14 +109,43 @@ public class JobOrderService {
 
         return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
                 .map(inventoryItemMapper::toDto)
+                .sorted(java.util.Comparator
+                        .comparing((de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto item) ->
+                                item.user() != null && item.user().effectiveName() != null ? item.user().effectiveName() : "",
+                                java.util.Comparator.naturalOrder())
+                        .thenComparing(item -> item.quality() != null ? item.quality() : 0,
+                                java.util.Comparator.reverseOrder())
+                        .thenComparing(item -> item.location() != null && item.location().name() != null ? item.location().name() : "",
+                                java.util.Comparator.naturalOrder())
+                        .thenComparing(item -> item.amount() != null ? item.amount() : 0.0,
+                                java.util.Comparator.reverseOrder()))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Updates the status of a JobOrder. This method performs its own {@code findById()} +
+     * {@code save()} + {@code flush()} and therefore MUST only be called from a context where
+     * the target {@link JobOrder} entity is NOT already managed/dirty in the current persistence
+     * context (i.e. called directly from a Controller, not from within another
+     * {@code @Transactional} service method that has already modified the same entity).
+     *
+     * <p><strong>WARNING:</strong> Calling this method from within a running transaction that has
+     * already modified the same {@code JobOrder} (e.g. via cascade after
+     * {@code jobOrderHandoverRepository.save()}) will cause a double-save that collides with
+     * the already-incremented {@code @Version} field, resulting in an
+     * {@link org.springframework.orm.ObjectOptimisticLockingFailureException} (HTTP 409).
+     * Use {@link #completeJobOrderWithinTransaction(JobOrder)} instead in such cases.</p>
+     */
     @Transactional
-    public JobOrderDto updateJobOrderStatus(UUID id, JobOrderStatus status) {
+    public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
         JobOrder jobOrder = jobOrderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
 
+        if (dto.version() != null && jobOrder.getVersion() != null && !jobOrder.getVersion().equals(dto.version())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
+        }
+
+        JobOrderStatus status = dto.status();
         boolean isTerminal = (status == JobOrderStatus.COMPLETED || status == JobOrderStatus.REJECTED);
         boolean wasTerminal = (jobOrder.getStatus() == JobOrderStatus.COMPLETED || jobOrder.getStatus() == JobOrderStatus.REJECTED);
 
@@ -210,7 +242,7 @@ public class JobOrderService {
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
-                    .minQuality(matDto.minQuality())
+                    .minQuality(750)
                     .amount(matDto.amount())
                     .build();
 
@@ -247,6 +279,38 @@ public class JobOrderService {
     }
 
     @Transactional
+    public void unlinkMaterial(UUID jobOrderId, UUID materialId) {
+        JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+
+        boolean exists = jobOrder.getMaterials().stream()
+                .anyMatch(m -> m.getMaterial().getId().equals(materialId));
+        if (!exists) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not linked to job order: " + materialId);
+        }
+
+        inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
+
+        jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
+        jobOrderRepository.save(jobOrder);
+    }
+
+    @Transactional
+    public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
+        jobOrderRepository.findById(jobOrderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+
+        InventoryItem item = inventoryItemRepository.findById(inventoryItemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "InventoryItem not found: " + inventoryItemId));
+
+        if (item.getJobOrder() == null || !item.getJobOrder().getId().equals(jobOrderId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "InventoryItem not linked to job order: " + inventoryItemId);
+        }
+
+        item.setJobOrder(null);
+    }
+
+    @Transactional
     public JobOrderDto removeAssignee(UUID jobOrderId, UUID userId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
@@ -254,6 +318,40 @@ public class JobOrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
         jobOrder.getAssignees().remove(user);
         return mapToDtoWithStock(jobOrderRepository.save(jobOrder));
+    }
+
+    /**
+     * Marks a JobOrder as COMPLETED within an already-running transaction.
+     * This method MUST be called from within an active transaction (e.g. from
+     * {@code JobOrderHandoverService}) so that the passed {@code jobOrder} entity
+     * is already managed by the current persistence context.  Using the managed
+     * entity directly avoids the double-save / optimistic-lock conflict that
+     * occurs when {@link #updateJobOrderStatus} is called with its own
+     * {@code findById} inside the caller's transaction.
+     *
+     * @param jobOrder the managed {@link JobOrder} entity to complete
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void completeJobOrderWithinTransaction(JobOrder jobOrder) {
+        boolean wasTerminal = (jobOrder.getStatus() == JobOrderStatus.COMPLETED
+                || jobOrder.getStatus() == JobOrderStatus.REJECTED);
+
+        if (!wasTerminal && jobOrder.getPriority() != null) {
+            jobOrder.setPriority(null);
+        }
+
+        jobOrder.setStatus(JobOrderStatus.COMPLETED);
+
+        if (!wasTerminal) {
+            // Flush the current state (including the incremented @Version) to the database
+            // BEFORE normalizePriorities() issues a PESSIMISTIC_WRITE lock query that re-reads
+            // all JobOrder rows. Without this flush, the lock query would read the old version
+            // from the DB while Hibernate already holds a newer in-memory version, causing an
+            // ObjectOptimisticLockingFailureException on the subsequent flush at transaction end.
+            jobOrderRepository.flush();
+            normalizePriorities();
+            inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+        }
     }
 
     private void normalizePriorities() {

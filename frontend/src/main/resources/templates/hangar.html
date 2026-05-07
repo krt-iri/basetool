@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{hangar.title} + ' - ' + #{app.title}">Hangar - IRIDIUM Basetool</title>
@@ -34,6 +34,98 @@
             font-family: var(--font-body);
             font-weight: 700;
         }
+    /* ---- Fleetview Import Section ---- */
+        .import-section {
+            margin-top: 2rem;
+        }
+        .import-section .form-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .import-section .form-row .form-group {
+            flex: 1 1 260px;
+            margin-bottom: 0;
+        }
+        .import-section .form-row .btn {
+            flex-shrink: 0;
+            min-height: 44px;
+        }
+        .import-status-msg {
+            margin-top: 0.75rem;
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            color: var(--color-primary);
+        }
+        /* Import result modal */
+        #import-result-modal .stat-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--color-gray-3);
+            padding: 0.4rem 0;
+            font-family: var(--font-body);
+        }
+        #import-result-modal .stat-row span:first-child {
+            color: var(--color-gray-1);
+        }
+        #import-result-modal .stat-row span:last-child {
+            color: var(--color-primary);
+            font-weight: 700;
+        }
+        #import-result-modal .skip-list {
+            margin-top: 0.75rem;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--color-gray-3);
+            padding: 0.5rem;
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+        }
+        #import-result-modal .skip-list p {
+            margin: 0.2rem 0;
+            color: var(--color-gray-2);
+        }
+        @media (max-width: 768px) {
+            .import-section .form-row {
+                flex-direction: column;
+            }
+            .import-section .form-row .btn {
+                width: 100%;
+            }
+        }
+    /* ---- Delete All Ships Section ---- */
+        .delete-all-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--color-gray-3);
+        }
+        .delete-all-section .delete-all-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .delete-all-section .delete-all-row p {
+            margin: 0;
+            flex: 1 1 200px;
+            color: var(--color-gray-2);
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+        }
+        .delete-all-section .delete-all-row .btn-danger {
+            flex-shrink: 0;
+            min-height: 44px;
+        }
+        @media (max-width: 768px) {
+            .delete-all-section .delete-all-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .delete-all-section .delete-all-row .btn-danger {
+                width: 100%;
+            }
+        }
     </style>
     </th:block>
 </head>
@@ -55,15 +147,15 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{hangar.title}">Hangar</h1>
         <a th:href="@{/hangar/squadron}" class="btn" th:text="#{hangar.squadron.title}">Staffelübersicht</a>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
 
         <div class="data-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="flex-between-mb">
                 <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
                 <button id="add-ship-btn" class="btn" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
             </div>
@@ -99,7 +191,7 @@
                         <td th:text="${ship.location != null ? ship.location.name : ''}">Ort</td>
                         <td th:text="${ship.fitted ? #messages.msg('hangar.ship.yes') : #messages.msg('hangar.ship.no')}">Nein</td>
                         <td th:text="${ship.name}">Name</td>
-                        <td style="display:flex; gap:0.5rem;">
+                        <td class="flex-gap-xs">
                             <button class="btn edit-ship-btn" 
                                     th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
                                     th:data-id="${ship.id}" 
@@ -166,7 +258,7 @@
                     </select>
                     <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" style="color: var(--color-dept-combat);"></div>
                 </div>
-                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="form-group flex-gap-sm">
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" style="margin-bottom: 0;" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
@@ -178,12 +270,84 @@
         </div>
     </div>
 
+    <!-- Fleetview Import Section -->
+    <div class="hud-box mt-2 import-section">
+        <h2 th:text="#{hangar.import.title}">Fleetview-Import</h2>
+        <p th:text="#{hangar.import.description}">Importiere deine Schiffe aus einer CCU Game Fleetview-JSON-Exportdatei.</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="fleetview-file" th:text="#{hangar.import.label}">Fleetview-JSON-Datei</label>
+                <input type="file" id="fleetview-file" accept=".json,application/json" style="min-height:44px;">
+            </div>
+            <button id="fleetview-import-btn" class="btn" type="button"
+                    th:text="#{hangar.import.btn}"
+                    th:data-uploading="#{hangar.import.uploading}"
+                    th:data-error-nofile="#{hangar.import.error.nofile}"
+                    th:data-error-failed="#{hangar.import.error.failed}">Importieren</button>
+        </div>
+        <p id="fleetview-status" class="import-status-msg" style="display:none;"></p>
+
+        <!-- Delete All Ships Section -->
+        <div class="delete-all-section">
+            <h3 th:text="#{hangar.delete_all.section_title}">Hangar leeren</h3>
+            <div class="delete-all-row">
+                <p th:text="#{hangar.delete_all.description}">Alle eigenen Schiffe aus dem Hangar entfernen.</p>
+                <button id="delete-all-ships-btn" class="btn btn-danger" type="button"
+                        th:text="#{hangar.delete_all.btn}"
+                        th:data-error-failed="#{hangar.delete_all.error.failed}"
+                        th:data-success="#{hangar.delete_all.success}">Alle Schiffe löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fleetview Import Result Modal -->
+    <div id="import-result-modal" class="modal" style="display:none; z-index:3200;">
+        <div class="modal-content hud-box" style="max-width:560px;">
+            <h2 id="import-result-title" th:text="#{hangar.import.result.title}" style="margin-top:0;">Import-Ergebnis</h2>
+            <div class="stat-row">
+                <span th:text="#{hangar.import.result.imported}">Importiert</span>
+                <span id="import-res-imported">0</span>
+            </div>
+            <div class="stat-row">
+                <span th:text="#{hangar.import.result.skipped}">Nicht erkannt</span>
+                <span id="import-res-skipped">0</span>
+            </div>
+            <div class="stat-row">
+                <span th:text="#{hangar.import.result.duplicates}">Duplikate übersprungen</span>
+                <span id="import-res-duplicates">0</span>
+            </div>
+            <div id="import-skip-section" style="display:none;">
+                <p style="margin-top:1rem; font-weight:700; color:var(--color-primary);" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
+                <div id="import-skip-list" class="skip-list"></div>
+            </div>
+            <div id="import-dup-section" style="display:none;">
+                <p style="margin-top:1rem; font-weight:700; color:var(--color-primary);" th:text="#{hangar.import.result.duplicates_list}">Übersprungene Duplikate</p>
+                <div id="import-dup-list" class="skip-list"></div>
+            </div>
+            <div style="margin-top:1.5rem; text-align:right;">
+                <button id="import-result-close" class="btn" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete All Ships Confirmation Modal -->
+    <div id="delete-all-confirm-modal" class="modal" style="display:none; z-index: 3300;">
+        <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+            <h2 th:text="#{hangar.delete_all.modal.title}" style="margin-top:0;">Hangar leeren</h2>
+            <p th:text="#{hangar.delete_all.modal.body}" style="margin-bottom: 2rem;">Alle eigenen Schiffe wirklich löschen?</p>
+            <div class="flex-center-gap">
+                <button type="button" id="delete-all-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
             <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
             <p th:text="#{hangar.ship.delete_confirm}" style="margin-bottom: 2rem;">Schiff wirklich löschen?</p>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
+            <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/hangar}" method="post" style="margin:0;">
                     <button type="submit" class="btn btn-danger" th:text="#{hangar.ship.delete}">Löschen</button>
@@ -290,6 +454,167 @@
         if (showModal) {
             openModal();
         }
+
+        // ---- Fleetview Import ----
+        (function() {
+            const importBtn = document.getElementById('fleetview-import-btn');
+            const fileInput = document.getElementById('fleetview-file');
+            const statusEl = document.getElementById('fleetview-status');
+            const resultModal = document.getElementById('import-result-modal');
+            const closeResultBtn = document.getElementById('import-result-close');
+
+            function showStatus(msg, color) {
+                statusEl.textContent = msg;
+                statusEl.style.color = color || 'var(--color-primary)';
+                statusEl.style.display = 'block';
+            }
+
+            function hideStatus() {
+                statusEl.style.display = 'none';
+            }
+
+            function openResultModal(data) {
+                document.getElementById('import-res-imported').textContent = data.importedCount;
+                document.getElementById('import-res-skipped').textContent = data.skippedCount;
+                document.getElementById('import-res-duplicates').textContent = data.duplicateCount;
+
+                const skipSection = document.getElementById('import-skip-section');
+                const skipList = document.getElementById('import-skip-list');
+                if (data.skippedShips && data.skippedShips.length > 0) {
+                    skipList.innerHTML = data.skippedShips.map(n => '<p>' + escapeHtml(n) + '</p>').join('');
+                    skipSection.style.display = 'block';
+                } else {
+                    skipSection.style.display = 'none';
+                }
+
+                const dupSection = document.getElementById('import-dup-section');
+                const dupList = document.getElementById('import-dup-list');
+                if (data.duplicateShips && data.duplicateShips.length > 0) {
+                    dupList.innerHTML = data.duplicateShips.map(n => '<p>' + escapeHtml(n) + '</p>').join('');
+                    dupSection.style.display = 'block';
+                } else {
+                    dupSection.style.display = 'none';
+                }
+
+                resultModal.style.display = 'flex';
+            }
+
+            function escapeHtml(str) {
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            if (closeResultBtn) {
+                closeResultBtn.addEventListener('click', function() {
+                    resultModal.style.display = 'none';
+                    if (document.getElementById('import-res-imported').textContent !== '0') {
+                        window.location.reload();
+                    }
+                });
+            }
+
+            window.addEventListener('click', function(e) {
+                if (e.target === resultModal) {
+                    resultModal.style.display = 'none';
+                }
+            });
+
+            if (importBtn) {
+                importBtn.addEventListener('click', function() {
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        showStatus(importBtn.getAttribute('data-error-nofile'), 'var(--color-dept-combat)');
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    importBtn.disabled = true;
+                    showStatus(importBtn.getAttribute('data-uploading'));
+
+                    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+                    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+                    const reqHeaders = { 'Accept': 'application/json' };
+                    if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
+
+                    fetch('/hangar/import/fleetview', {
+                        method: 'POST',
+                        body: formData,
+                        headers: reqHeaders
+                    })
+                    .then(function(resp) {
+                        if (!resp.ok) {
+                            return resp.json().catch(function() { return null; }).then(function(body) {
+                                throw new Error(body && body.detail ? body.detail : resp.status);
+                            });
+                        }
+                        return resp.json();
+                    })
+                    .then(function(data) {
+                        hideStatus();
+                        fileInput.value = '';
+                        openResultModal(data);
+                    })
+                    .catch(function(err) {
+                        showStatus(importBtn.getAttribute('data-error-failed') + (err.message ? ' (' + err.message + ')' : ''), 'var(--color-dept-combat)');
+                    })
+                    .finally(function() {
+                        importBtn.disabled = false;
+                    });
+                });
+            }
+        })();
+
+        // ---- Delete All Ships ----
+        (function() {
+            const deleteAllBtn = document.getElementById('delete-all-ships-btn');
+            const deleteAllModal = document.getElementById('delete-all-confirm-modal');
+            const deleteAllConfirmBtn = document.getElementById('delete-all-confirm-btn');
+            const deleteAllCancelBtn = document.getElementById('delete-all-cancel-btn');
+
+            if (!deleteAllBtn || !deleteAllModal) return;
+
+            deleteAllBtn.addEventListener('click', function() {
+                deleteAllModal.style.display = 'flex';
+            });
+
+            deleteAllCancelBtn.addEventListener('click', function() {
+                deleteAllModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', function(e) {
+                if (e.target === deleteAllModal) {
+                    deleteAllModal.style.display = 'none';
+                }
+            });
+
+            deleteAllConfirmBtn.addEventListener('click', function() {
+                deleteAllConfirmBtn.disabled = true;
+                deleteAllCancelBtn.disabled = true;
+
+                fetch('/hangar/ships/all', { method: 'DELETE' })
+                    .then(function(resp) {
+                        if (!resp.ok) {
+                            throw new Error(resp.status);
+                        }
+                        deleteAllModal.style.display = 'none';
+                        window.location.reload();
+                    })
+                    .catch(function(err) {
+                        deleteAllModal.style.display = 'none';
+                        const errMsg = deleteAllBtn.getAttribute('data-error-failed') + (err.message ? ' (' + err.message + ')' : '');
+                        const statusEl = document.getElementById('fleetview-status');
+                        if (statusEl) {
+                            statusEl.textContent = errMsg;
+                            statusEl.style.color = 'var(--color-dept-combat)';
+                            statusEl.style.display = 'block';
+                        }
+                    })
+                    .finally(function() {
+                        deleteAllConfirmBtn.disabled = false;
+                        deleteAllCancelBtn.disabled = false;
+                    });
+            });
+        })();
 
         // Prevent double submit
         form.addEventListener('submit', function() {

@@ -17,9 +17,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -65,6 +67,75 @@ class HangarServiceTest {
         );
     }
     
+    // ---- deleteAllShipsForUser ----
+
+    @Test
+    void deleteAllShipsForUser_DeletesAllShipsAndUnlinksUnits() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        UUID shipId1 = UUID.randomUUID();
+        UUID shipId2 = UUID.randomUUID();
+
+        Ship ship1 = new Ship();
+        ship1.setId(shipId1);
+        Ship ship2 = new Ship();
+        ship2.setId(shipId2);
+
+        de.greluc.krt.iri.basetool.backend.model.MissionUnit unit = new de.greluc.krt.iri.basetool.backend.model.MissionUnit();
+        unit.setShip(ship1);
+
+        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
+        when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
+        when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
+
+        // When
+        hangarService.deleteAllShipsForUser(userId);
+
+        // Then
+        verify(missionUnitRepository, times(1)).save(unit);
+        assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
+        verify(entityManager, times(1)).flush();
+        verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
+    }
+
+    @Test
+    void deleteAllShipsForUser_NoShips_DoesNothing() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of());
+
+        // When
+        hangarService.deleteAllShipsForUser(userId);
+
+        // Then
+        verify(missionUnitRepository, never()).findByShipId(any());
+        verify(shipRepository, never()).deleteAll(anyList());
+        verify(entityManager, never()).flush();
+    }
+
+    @Test
+    void deleteAllShipsForUser_OnlyDeletesOwnShips() {
+        // Given
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID shipId = UUID.randomUUID();
+
+        Ship ship = new Ship();
+        ship.setId(shipId);
+
+        // Only ships of userId are returned by repository (user isolation guaranteed by query)
+        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
+        when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
+
+        // When
+        hangarService.deleteAllShipsForUser(userId);
+
+        // Then
+        verify(shipRepository, times(1)).findByOwnerId(userId);
+        verify(shipRepository, never()).findByOwnerId(otherUserId);
+        verify(shipRepository, times(1)).deleteAll(List.of(ship));
+    }
+
     @Test
     void testUpdateShipOptimisticLocking_SucceedsWhenVersionsMatch() {
         UUID userId = UUID.randomUUID();

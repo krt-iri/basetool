@@ -3,23 +3,30 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.iri.basetool.backend.service.HangarImportService;
 import de.greluc.krt.iri.basetool.backend.service.HangarService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -30,6 +37,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HangarController {
     private final HangarService hangarService;
+    private final HangarImportService hangarImportService;
     private final UserService userService;
     private final ShipMapper shipMapper;
 
@@ -85,6 +93,19 @@ public class HangarController {
         hangarService.deleteShip(userService.getUserIdFromJwt(jwt), id);
     }
 
+    @Operation(summary = "Alle eigenen Schiffe l\u00f6schen", description = "L\u00f6scht alle Schiffe des authentifizierten Nutzers. Verkn\u00fcpfungen mit Mission-Einheiten werden sicher aufgel\u00f6st.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Alle Schiffe erfolgreich gel\u00f6scht"),
+        @ApiResponse(responseCode = "401", description = "Nicht authentifiziert"),
+        @ApiResponse(responseCode = "403", description = "Keine Berechtigung")
+    })
+    @DeleteMapping("/ships")
+    @PreAuthorize("hasAuthority('HANGAR_WRITE')")
+    public ResponseEntity<Void> deleteAllMyShips(@AuthenticationPrincipal Jwt jwt) {
+        hangarService.deleteAllShipsForUser(userService.getUserIdFromJwt(jwt));
+        return ResponseEntity.noContent().build();
+    }
+
     // Admin endpoints
 
     @GetMapping("/users/{userId}/ships")
@@ -118,6 +139,13 @@ public class HangarController {
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteUserShip(@PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
         hangarService.deleteShip(userId, shipId);
+    }
+
+    @PostMapping("/import/fleetview")
+    @Transactional
+    public FleetviewImportResponseDto importFleetview(@AuthenticationPrincipal Jwt jwt,
+                                                     @RequestParam("file") @NotNull MultipartFile file) {
+        return hangarImportService.importFleetview(userService.getUserIdFromJwt(jwt), file);
     }
 
     @PostMapping("/ships/reset-fitted")

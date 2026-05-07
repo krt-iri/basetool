@@ -19,11 +19,12 @@ public class RefineryOrderForm {
     @Min(0)
     @Max(59)
     private Integer durationMinutes = 0;
-    @NotNull
     @Min(0)
     private Double expenses = 0d;
-    /** Einnahmen durch den Verkauf roher Erze (Ore Sales). Ganzzahl >= 0, Default 0. */
-    @NotNull
+    /** Sonstige Kosten zusaetzlich zu expenses. Zahl >= 0, Default 0. Optional - leer/0 wird als null gespeichert. */
+    @Min(0)
+    private Double otherExpenses = 0d;
+    /** Einnahmen durch den Verkauf roher Erze (Ore Sales). Ganzzahl >= 0, Default 0. Optional - leer/0 wird als null gespeichert. */
     @Min(0)
     private Double oreSales = 0d;
     private UUID ownerId;

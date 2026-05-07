@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.overview} + ' - ' + #{app.title}">Material-Übersicht - IRIDIUM Basetool</title>
@@ -86,11 +86,11 @@
         }
         
         .matrix-table td .price-sell {
-            color: #2ecc71;
+            color: var(--color-success);
         }
         
         .matrix-table td .price-buy {
-            color: #e74c3c;
+            color: var(--color-danger);
         }
 
         .filters-container {
@@ -115,75 +115,6 @@
             font-size: 0.9rem;
         }
 
-        .multi-select-container {
-            position: relative;
-            width: 100%;
-            font-family: var(--font-body);
-        }
-        .multi-select-header {
-            background-color: var(--color-gray-4);
-            color: var(--color-gray-1);
-            border: 1px solid var(--color-gray-3);
-            padding: 0.25rem 0.5rem;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-            transition: border-color 0.2s;
-            height: 32px;
-            box-sizing: border-box;
-            font-size: 0.9rem;
-        }
-        .multi-select-header:hover {
-            border-color: var(--color-primary);
-        }
-        .multi-select-header::after {
-            content: '▼';
-            font-size: 0.7em;
-            margin-left: 0.5rem;
-        }
-        .multi-select-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background-color: var(--color-gray-4);
-            border: 1px solid var(--color-primary);
-            border-top: none;
-            max-height: 300px;
-            overflow-y: auto;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        }
-        .multi-select-options.open {
-            display: block;
-        }
-        .multi-select-option {
-            padding: 0.5rem 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            color: var(--color-gray-1);
-            margin-bottom: 0;
-            font-family: var(--font-body);
-        }
-        .multi-select-option:hover {
-            background-color: var(--color-gray-3);
-        }
-        .multi-select-option input[type="checkbox"] {
-            margin: 0;
-            flex-shrink: 0;
-        }
-        .selected-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
 
         .form-group input:not([type="checkbox"]), .form-group select {
             width: 100%;
@@ -222,13 +153,13 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.materials.overview}">Material-Übersicht</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
         <div class="filters-container">
@@ -306,7 +237,7 @@
                         </tr>
                         <tr th:each="row : ${entry.value}" class="row-material" th:data-material="${row.materialName}" th:data-kind="${entry.key}">
                             <td style="padding-left: 2rem; text-align: left;">
-                                <span th:if="${row.isIllegal == true}" class="text-danger" style="color: #e74c3c; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${row.isVolatileQt == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${row.isVolatileTime == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${row.materialName}"></span>
+                                <span th:if="${row.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${row.isVolatileQt == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${row.isVolatileTime == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${row.materialName}"></span>
                             </td>
                             
                             <td th:each="term : ${terminals}" class="col-terminal"><th:block th:with="item=${row.prices.get(term.name)}"><th:block th:if="${item != null}"><div th:if="${item.priceSell != null and item.priceSell > 0}" class="price-sell" th:text="|+${#numbers.formatInteger(item.priceSell, 1, 'POINT')}|"></div><div th:if="${item.priceBuy != null and item.priceBuy > 0}" class="price-buy" th:text="|-${#numbers.formatInteger(item.priceBuy, 1, 'POINT')}|"></div><div th:if="${(item.priceSell == null or item.priceSell == 0) and (item.priceBuy == null or item.priceBuy == 0)}">-</div></th:block><th:block th:if="${item == null}">-</th:block></th:block></td>

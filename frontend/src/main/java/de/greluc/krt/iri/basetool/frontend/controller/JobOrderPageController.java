@@ -1,9 +1,11 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.*;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -117,7 +119,8 @@ public class JobOrderPageController {
             model.addAttribute("currentUserId", getCurrentUserId(principal));
             
             boolean canAssign = isLogistician(principal);
-            
+            model.addAttribute("isLogistician", canAssign);
+
             if (canAssign) {
                 model.addAttribute("users", fetchUsers());
                 model.addAttribute("materials", fetchMaterials());
@@ -166,7 +169,9 @@ public class JobOrderPageController {
 
             if (!model.containsAttribute("handoverForm")) {
                 JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
-                handoverForm.setHandoverTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+                // Vorbelegung der Uhrzeit erfolgt clientseitig im Browser des Nutzers
+                // (siehe orders-detail.html, openHandoverModal), damit die Browser-Zeitzone
+                // des Nutzers (nicht des Servers/Containers) verwendet wird.
                 handoverForm.setRecipientSquadron(order.squadron());
                 model.addAttribute("handoverForm", handoverForm);
             }
@@ -201,7 +206,7 @@ public class JobOrderPageController {
         try {
             List<CreateJobOrderMaterialDto> materials = form.getMaterials().stream()
                     .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-                    .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+                    .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 750, m.getAmount()))
                     .collect(Collectors.toList());
 
             if (materials.isEmpty()) {
@@ -247,15 +252,20 @@ public class JobOrderPageController {
 
     @PostMapping("/{id}/status")
     @PreAuthorize("isAuthenticated()")
-    public String updateStatus(@PathVariable UUID id, @RequestParam String status, RedirectAttributes redirectAttributes) {
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<JobOrderDto> updateStatus(
+            @PathVariable UUID id,
+            @RequestBody UpdateJobOrderStatusDto dto) {
         try {
-            backendApiClient.put("/api/v1/orders/" + id + "/status?status=" + status, null, JobOrderDto.class);
-            redirectAttributes.addFlashAttribute("successToast", "success.joborder.status");
+            JobOrderDto result = backendApiClient.put("/api/v1/orders/" + id + "/status", dto, JobOrderDto.class);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (BackendServiceException bse) {
+            log.error("Failed to update status for order {}: {}", id, bse.getMessage());
+            return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
         } catch (Exception e) {
-            log.error("Failed to update status", e);
-            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.status.failed");
+            log.error("Failed to update status for order {}", id, e);
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        return "redirect:/orders/" + id;
     }
 
     @PostMapping("/{id}/update")
@@ -264,7 +274,7 @@ public class JobOrderPageController {
         try {
             List<CreateJobOrderMaterialDto> materials = form.getMaterials().stream()
                     .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-                    .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+                    .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 750, m.getAmount()))
                     .collect(Collectors.toList());
 
             if (materials.isEmpty()) {
@@ -326,13 +336,24 @@ public class JobOrderPageController {
                 return "redirect:/orders/" + id;
             }
 
+            // The frontend hidden input transmits the handover time as a UTC ISO-Instant (e.g.
+            // "2026-04-25T10:04:00.000Z") that is produced client-side from the user's browser-local
+            // date/time inputs by datetime-splitter.js. Parsing as Instant preserves the absolute
+            // point in time and avoids timezone drift (previously LocalDateTime.parse threw on the
+            // trailing "Z" and silently fell back to Instant.now(), which not only ignored the user
+            // input but also produced wrong displayed times for users in DST/non-UTC zones).
             Instant handoverTime = Instant.now();
-            if (form.getHandoverTime() != null && !form.getHandoverTime().isBlank()) {
+            String rawHandoverTime = form.getHandoverTime();
+            if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
                 try {
-                    handoverTime = LocalDateTime.parse(form.getHandoverTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            .atZone(ZoneId.systemDefault()).toInstant();
-                } catch (Exception e) {
-                    log.warn("Could not parse handoverTime {}, using now()", form.getHandoverTime());
+                    handoverTime = Instant.parse(rawHandoverTime);
+                } catch (Exception eIso) {
+                    try {
+                        handoverTime = LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                .atZone(ZoneId.systemDefault()).toInstant();
+                    } catch (Exception eLocal) {
+                        log.warn("Could not parse handoverTime {}, using now()", rawHandoverTime);
+                    }
                 }
             }
 
@@ -345,9 +366,50 @@ public class JobOrderPageController {
 
             backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
             redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
-        } catch (Exception e) {
-            log.error("Failed to create handover", e);
+        } catch (BackendServiceException bse) {
+            // Backend already returned an RFC7807 Problem+JSON response. Log status, problem code,
+            // correlationId and field errors so a 400 VALIDATION_FAILED can be diagnosed from the
+            // frontend log without having to reproduce the request. No PII (rejected values) is logged.
+            de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+                    log, "POST /api/v1/orders/{id}/handovers", id, bse);
             redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+        } catch (Exception e) {
+            log.error("Failed to create handover for jobOrder={} via POST /api/v1/orders/{}/handovers", id, id, e);
+            redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+        }
+        return "redirect:/orders/" + id;
+    }
+
+    @PostMapping("/{id}/materials/unlink")
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public String unlinkMaterial(@PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
+        try {
+            backendApiClient.delete("/api/v1/orders/" + id + "/materials/" + materialId, Void.class);
+            redirectAttributes.addFlashAttribute("successToast", "orders.detail.material.unlink.success");
+        } catch (BackendServiceException bse) {
+            de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+                    log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
+            redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
+        } catch (Exception e) {
+            log.error("Failed to unlink material {} from jobOrder={}", materialId, id, e);
+            redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
+        }
+        return "redirect:/orders/" + id;
+    }
+
+    @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
+    @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+    public String unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId, RedirectAttributes redirectAttributes) {
+        try {
+            backendApiClient.delete("/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+            redirectAttributes.addFlashAttribute("successToast", "orders.detail.inventory.unlink.success");
+        } catch (BackendServiceException bse) {
+            de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+                    log, "DELETE /api/v1/orders/{id}/inventory/{inventoryItemId}/unlink", id, bse);
+            redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
+        } catch (Exception e) {
+            log.error("Failed to unlink inventory item {} from jobOrder={}", inventoryItemId, id, e);
+            redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
         }
         return "redirect:/orders/" + id;
     }
@@ -392,12 +454,12 @@ public class JobOrderPageController {
     
     private List<MaterialDto> fetchMaterials() {
         try {
-            PageResponse<MaterialDto> p = backendApiClient.getCached("/api/v1/materials?size=1000", new ParameterizedTypeReference<>() {}, true);
-            if (p != null && p.content() != null) {
-                return new ArrayList<>(p.content());
+            List<MaterialDto> list = backendApiClient.getCached("/api/v1/materials/job-order", new ParameterizedTypeReference<List<MaterialDto>>() {});
+            if (list != null) {
+                return new ArrayList<>(list);
             }
         } catch (Exception e) {
-            log.error("Failed to fetch materials", e);
+            log.error("Failed to fetch job-order materials", e);
         }
         return new ArrayList<>();
     }

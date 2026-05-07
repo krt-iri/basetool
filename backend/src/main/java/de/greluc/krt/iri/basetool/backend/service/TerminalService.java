@@ -21,7 +21,7 @@ public class TerminalService {
     }
 
     public Terminal getTerminal(UUID id) {
-        return terminalRepository.findById(id).orElseThrow(() -> new RuntimeException("Terminal not found"));
+        return terminalRepository.findById(id).orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Terminal not found"));
     }
 
     @Transactional

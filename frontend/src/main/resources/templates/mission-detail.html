@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{missions.title} + ' - ' + #{app.title}">Mission Details - IRIDIUM Basetool</title>
@@ -263,7 +263,7 @@
 <div class="page-wrapper">
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
-            <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="greeting hud-box flex-between">
                 <div>
                     <h1 style="margin: 0;" th:if="${isNew}" th:text="#{mission.create}">New Mission</h1>
                     <h1 style="margin: 0;" th:unless="${isNew}" th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
@@ -305,7 +305,7 @@
 
             <div class="form-group">
                 <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div class="flex-gap-sm">
                     <input type="url" name="calendarLink" th:value="*{calendarLink}" style="flex: 1;"
                            th:disabled="${!isNew and !mission.canEdit}">
                     <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}" 
@@ -338,6 +338,13 @@
             </div>
 
             <div class="form-row">
+                <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem; justify-content: flex-start;" th:if="${isNew or mission.canEdit}">
+                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" style="margin: 0; flex: 0 0 auto;" th:disabled="${!isNew and !mission.canEdit}">
+                    <label for="isInternal" th:text="#{mission.is_internal}" style="margin: 0; flex: 0 0 auto; display: inline-block;">Intern</label>
+                </div>
+            </div>
+
+            <div class="form-row">
             <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
                 <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
                 <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
@@ -347,13 +354,6 @@
                 </div>
                 <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem; justify-content: flex-start;" th:if="${isNew or mission.canEdit}">
-                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" style="margin: 0; flex: 0 0 auto;" th:disabled="${!isNew and !mission.canEdit}">
-                    <label for="isInternal" th:text="#{mission.is_internal}" style="margin: 0; flex: 0 0 auto; display: inline-block;">Intern</label>
-                </div>
             </div>
             
             <div class="form-row">
@@ -378,12 +378,12 @@
             </div>
             </div>
             
-            <div th:if="${!isNew}" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div th:if="${!isNew}" class="form-row">
             <div class="form-group datetime-split-group">
                 <label th:text="#{mission.actual_start}">Actual Start</label>
                 <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
-                <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
-                    <div class="datetime-split-inputs" style="flex-grow: 1;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
+                    <div class="datetime-split-inputs">
                         <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
                         <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
@@ -397,8 +397,8 @@
             <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
                 <label th:text="#{mission.actual_end}">Actual End</label>
                 <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
-                <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
-                    <div class="datetime-split-inputs" style="flex-grow: 1;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
+                    <div class="datetime-split-inputs">
                         <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
                         <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
@@ -428,7 +428,7 @@
                             <div style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.5rem; border: 1px solid var(--color-gray-3);">
                                 <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                             </div>
-                            <div th:if="${mission.canEdit}" style="display: flex; gap: 0.5rem;">
+                            <div th:if="${mission.canEdit}" class="flex-gap-xs">
                                 <select id="new-owner-id" style="flex: 1;">
                                     <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer wählen --</option>
                                     <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}" th:selected="${mission.owner != null and u.id == mission.owner.id}"></option>
@@ -450,7 +450,7 @@
                             <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" style="color: var(--color-gray-3);">Keine</span>
                         </div>
                         
-                        <div th:if="${mission.canEdit}" style="display: flex; gap: 0.5rem;">
+                        <div th:if="${mission.canEdit}" class="flex-gap-xs">
                             <select id="new-manager-id" style="flex: 1;">
                                 <option value="" th:text="#{mission.manager.select}">-- Manager wählen --</option>
                                 <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
@@ -472,13 +472,13 @@
             </button>
             <div class="col-content" id="col-organisation-content">
                 <div class="hud-box">
-                    <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Führungspositionen</h3>
+                    <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Führungspositionen</h3>
                     <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
                         <div th:each="leadType : ${missionLeadTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
                             <div>
-                                <strong th:text="${leadType.name}" style="color: var(--color-gray-1);">Role</strong>
+                                <strong th:text="${leadType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Role</strong>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <div class="flex-gap-sm">
                                 <span th:each="p : ${participantsByLeadType[#strings.toString(leadType.id)]}"
                                 th:text="${p['user'] != null ? p['user']['effectiveName'] : p['guestName']}"
                                       style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
@@ -486,13 +486,13 @@
                         </div>
                     </div>
 
-                    <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Frequenzübersicht</h3>
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Frequenzübersicht</h3>
+                    <div class="flex-col-gap">
                         <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
                             <div>
-                                <strong th:text="${freqType.name}" style="color: var(--color-gray-1);">Freq</strong>
+                                <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Freq</strong>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; align-items: center;"
+                            <div class="flex-gap-sm"
                                  th:with="f=${frequencyByTypeId[freqType.id]}"
                                  th:attr="data-freq-type-id=${freqType.id}">
                                 <span class="freq-value-display"
@@ -554,7 +554,7 @@
                     <td th:text="${p?.id != null ? assignedUnitByParticipantId[p.id] : ''}">
                     </td>
                     <td>
-                        <div style="display:flex; gap:0.5rem;" th:if="${mission.canEdit or (authUserId != null and p?.user != null and p.user.id.toString() == authUserId) or (p?.user == null)}">
+                        <div class="flex-gap-xs" th:if="${mission.canEdit or (authUserId != null and p?.user != null and p.user.id.toString() == authUserId) or (p?.user == null)}">
                             <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                                 <button type="submit" class="btn btn-success" th:text="#{mission.participant.checkin}" th:title="#{mission.participant.checkin.tooltip}">Check-In</button>
                             </form>
@@ -607,20 +607,23 @@
                         <button id="add-unit-btn" class="btn" th:text="#{mission.unit.add}">Hinzufügen</button>
                     </div>
             
-            <div th:if="${!isNew and mission.assignedUnits != null and !mission.assignedUnits.isEmpty()}" style="display: flex; flex-direction: column; gap: 1rem;">
-                <div th:each="unit : ${mission?.assignedUnits}" class="hud-box" style="border-color: var(--color-gray-3);">
+            <div th:if="${!isNew and mission.assignedUnits != null and !mission.assignedUnits.isEmpty()}" class="flex-col-gap">
+                <div th:each="unit, iterStat : ${mission?.assignedUnits}"
+                     th:classappend="'unit-color-' + ${iterStat.index % 24}"
+                     class="hud-box mission-unit-box"
+                     style="border-color: var(--color-gray-3);">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 0.5rem; gap: 2rem; white-space: nowrap;">
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div class="flex-gap-sm">
                             <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" onclick="toggleUnit(this.getAttribute('data-target'), this)" th:title="#{general.toggle}">
                                 <span class="unit-toggle-icon" style="display:inline-block; width:1em; color:var(--color-primary); font-weight:bold;">-</span>
-                                <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: var(--font-headline);">Unit Name</strong>
+                                <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif;">Unit Name</strong>
                                 <span th:if="${unit.shipType != null}" th:text="' - ' + ${unit.shipType.name}" style="color: var(--color-gray-1); margin-left: 0.25rem;"> - ShipType</span>
                                 <span th:if="${unit.ship != null and unit.ship.owner != null}" th:text="${' (' + unit.ship.owner.effectiveName + ')'}" style="color: var(--color-gray-2); font-size: 0.9rem;">(Owner)</span>
                                 <span th:if="${unit.highValueUnit}" style="color: var(--color-accent-light); margin-left: 0.5rem;">[HVU]</span>
                             </div>
                             <span th:if="${unit.frequency}" th:text="#{mission.unit.frequency} + ': ' + ${#strings.replace(unit.frequency, ',', '.')}" style="margin-left: 0.5rem; color: var(--color-gray-1);">Freq: 123.45</span>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div class="flex-gap-sm">
                             <button th:if="${mission.canEdit}" class="btn assign-crew-btn"
                                     th:data-unit-id="${unit.id}" 
                                     th:data-action="@{/missions/{id}/units/{uId}/crew(id=${mission.id}, uId=${unit.id})}"
@@ -671,8 +674,8 @@
                                     <td>
                                         <span th:each="job, iterStat : ${c.jobTypes}" th:text="${job.name} + (!${iterStat.last} ? ', ' : '')">Pilot</span>
                                     </td>
-                                    <td th:if="${mission.canEdit}">
-                                        <div style="display:flex; gap:0.5rem;">
+                                    <td th:if="${mission.canEdit}" style="text-align: right;">
+                                        <div class="flex-gap-xs" style="justify-content: flex-end;">
                                             <button type="button" class="btn edit-crew-btn"
                                                     th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/update(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
                                                     th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
@@ -762,7 +765,7 @@
                         <span th:text="#{mission.finance.total}">Gesamtsumme:</span> 
                         <span th:text="${#numbers.formatDecimal(financeSum, 1, 'NONE', 2, 'COMMA')}">0,00</span> aUEC
                     </h3>
-                    <div style="margin-bottom: 1rem;">
+                    <div class="mb-1">
                         <button class="btn btn-small" onclick="document.getElementById('finance-modal').style.display='flex';" th:text="#{mission.finance.add}">Neuer Eintrag</button>
                     </div>
                     <div class="table-responsive">
@@ -786,7 +789,7 @@
                                     <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
                                     <td th:text="${entry.note}">Notiz</td>
                                     <td sec:authorize="isAuthenticated()">
-                                        <div style="display:flex; gap:0.5rem;">
+                                        <div class="flex-gap-xs">
                                             <!-- Edit button -->
                                             <button type="button" class="btn edit-finance-btn"
                                                     th:data-id="${entry.id}"
@@ -812,7 +815,7 @@
                                         <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-mining); text-decoration: underline;">Raffinerieauftrag</a>
                                     </td>
                                     <td sec:authorize="isAuthenticated()">
-                                        <div style="display:flex; gap:0.5rem;">
+                                        <div class="flex-gap-xs">
                                         </div>
                                     </td>
                                 </tr>
@@ -1071,7 +1074,7 @@
                     <input type="number" step="0.01" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
                 </div>
-                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
                     <label for="hvu-check" style="margin:0;" th:text="#{mission.unit.hvu}">HVU</label>
                 </div>
@@ -1132,7 +1135,7 @@
                     <input type="number" step="0.01" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
                 </div>
-                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
                     <label for="edit-unit-hvu" style="margin:0;" th:text="#{mission.unit.hvu}">HVU</label>
                 </div>
@@ -1267,7 +1270,7 @@
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
             <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
             <p th:text="#{info.delete.confirm.message}" style="margin-bottom: 2rem;">Wirklich löschen?</p>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
+            <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/missions}" method="post" style="margin:0;">
                     <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>

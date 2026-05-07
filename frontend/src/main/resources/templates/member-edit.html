@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{members.edit.title} + ' - ' + #{app.title}">Mitglied bearbeiten - IRIDIUM Basetool</title>
@@ -15,7 +15,7 @@
             color: var(--color-primary);
             text-transform: uppercase;
         }
-        input[type="text"], input[type="number"], select, textarea {
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
             width: 100%;
             padding: 0.8rem;
             background-color: var(--color-gray-4);
@@ -66,7 +66,7 @@
         <p th:text="${user.effectiveName}">Username</p>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         
         <form th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
@@ -95,6 +95,13 @@
                 <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
             
+            <div class="form-group">
+                <label th:text="#{member.join_date}">Beitrittsdatum</label>
+                <input type="date" name="joinDate"
+                       th:value="*{joinDate}"
+                       style="min-height:44px;" />
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
                 <a th:href="@{/members}" class="btn btn-secondary" th:text="#{profile.back}">Zurück</a>

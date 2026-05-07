@@ -87,26 +87,56 @@
             errorDiv.style.color = 'var(--color-dept-combat)';
             errorDiv.style.fontSize = '0.8rem';
             errorDiv.style.marginTop = '0.2rem';
+            errorDiv.style.display = 'none';
             group.appendChild(errorDiv);
 
             // Lokale date-/time-Inputs aus dem Hidden-Wert initial befuellen.
             applyHiddenToParts(hidden, datePart, timePart);
 
+            // Filter-Gruppen (z.B. Einsatzuebersicht) duerfen auch mit Teil-Eingaben
+            // (nur Datum ohne Zeit, nur Zeit ohne Datum) einen gueltigen UTC-Instant
+            // an das Backend senden. Die Rolle steuert sinnvolle Defaults:
+            //   role="start" -> fehlende Zeit = 00:00 (Tagesanfang)
+            //   role="end"   -> fehlende Zeit = 23:59 (Tagesende, inklusive)
+            //   fehlendes Datum -> heute (Browser-Lokalzeit)
+            const filterRole = group.getAttribute('data-datetime-filter-role');
+
             const updateHidden = () => {
                 errorDiv.textContent = '';
-                if (datePart.value && timePart.value) {
+                errorDiv.style.display = 'none';
+                const dVal = datePart.value;
+                const tVal = timePart.value;
+
+                if (dVal && tVal) {
                     // Lokale Eingabe -> Date-Objekt -> toISOString() liefert UTC mit 'Z'.
-                    const [y, m, d] = datePart.value.split('-').map(Number);
-                    const [hh, mm] = timePart.value.split(':').map(Number);
+                    const [y, m, d] = dVal.split('-').map(Number);
+                    const [hh, mm] = tVal.split(':').map(Number);
                     const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
-                    if (!isNaN(local)) {
-                        hidden.value = local.toISOString();
+                    hidden.value = isNaN(local) ? '' : local.toISOString();
+                } else if (filterRole && (dVal || tVal)) {
+                    // Teil-Eingabe im Filter: fehlende Teile mit Defaults auffuellen.
+                    let y, m, d;
+                    if (dVal) {
+                        [y, m, d] = dVal.split('-').map(Number);
                     } else {
-                        hidden.value = '';
+                        const now = new Date();
+                        y = now.getFullYear();
+                        m = now.getMonth() + 1;
+                        d = now.getDate();
                     }
-                } else if (datePart.value) {
-                    // Nur Datum -> als reines Datum (ohne Zone) uebermitteln
-                    hidden.value = datePart.value;
+                    let hh, mm;
+                    if (tVal) {
+                        [hh, mm] = tVal.split(':').map(Number);
+                    } else if (filterRole === 'end') {
+                        hh = 23; mm = 59;
+                    } else {
+                        hh = 0; mm = 0;
+                    }
+                    const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
+                    hidden.value = isNaN(local) ? '' : local.toISOString();
+                } else if (dVal) {
+                    // Nur Datum (keine Filter-Rolle) -> als reines Datum (ohne Zone) uebermitteln
+                    hidden.value = dVal;
                 } else {
                     hidden.value = '';
                 }
@@ -118,6 +148,7 @@
                     if (group.getAttribute('data-validate-not-past') === 'true') {
                         if (selectedDate < currentDate) {
                             errorDiv.textContent = group.getAttribute('data-error-past') || 'Date cannot be in the past.';
+                            errorDiv.style.display = '';
                         }
                     }
 
@@ -128,6 +159,7 @@
                             const targetDate = new Date(targetHidden.value);
                             if (selectedDate <= targetDate) {
                                 errorDiv.textContent = group.getAttribute('data-error-after') || 'End time must be after start time.';
+                                errorDiv.style.display = '';
                             }
                         }
                     }

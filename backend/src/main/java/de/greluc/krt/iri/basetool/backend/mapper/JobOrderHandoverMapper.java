@@ -7,7 +7,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverItemDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring", uses = {InventoryItemMapper.class, MaterialMapper.class})
+@Mapper(componentModel = "spring", uses = {MaterialMapper.class})
 public interface JobOrderHandoverMapper {
 
     @Mapping(source = "jobOrder.id", target = "jobOrderId")

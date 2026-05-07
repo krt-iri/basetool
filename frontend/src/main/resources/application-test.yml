@@ -2,6 +2,8 @@ server:
   ssl:
     enabled: false
 spring:
+  session:
+    store-type: none
   security:
     oauth2:
       client:

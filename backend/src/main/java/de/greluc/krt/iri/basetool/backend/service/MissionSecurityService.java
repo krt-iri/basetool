@@ -91,7 +91,7 @@ public class MissionSecurityService {
         }
 
         MissionFinanceEntry entry = missionFinanceEntryRepository.findById(entryId)
-                .orElseThrow(() -> new RuntimeException("Finance entry not found"));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Finance entry not found"));
 
         // Check if user is ADMIN or OFFICER
         boolean isAdminOrOfficer = authentication.getAuthorities().stream()

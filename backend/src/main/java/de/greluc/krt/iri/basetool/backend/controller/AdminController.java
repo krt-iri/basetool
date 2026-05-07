@@ -56,6 +56,6 @@ public class AdminController {
 
     @PutMapping("/users/{id}/attributes")
     public UserDto updateUserAttributes(@PathVariable @NotNull UUID id, @RequestParam(required = false) Integer rank, @RequestParam(required = false) String description, @RequestParam(required = false) String displayName, @RequestParam(required = true) Long version) {
-        return userMapper.toDto(userService.updateUserAttributes(id, rank, description, displayName, version));
+        return userMapper.toDto(userService.updateUserAttributes(id, rank, description, displayName, version, null));
     }
 }

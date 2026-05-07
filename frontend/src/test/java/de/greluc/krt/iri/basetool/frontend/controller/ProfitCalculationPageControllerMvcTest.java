@@ -57,9 +57,9 @@ class ProfitCalculationPageControllerMvcTest {
         
         PageResponse<Map<String, Object>> terminals = new PageResponse<>(List.of(Map.of("starSystemName", "Stanton")), 0, 10, 1, 1, List.of());
 
-        when(backendApiClient.get(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
                 .thenReturn(shipTypes);
-        when(backendApiClient.get(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
                 .thenReturn(terminals);
 
         // When & Then
@@ -80,9 +80,9 @@ class ProfitCalculationPageControllerMvcTest {
         
         PageResponse<Map<String, Object>> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-        when(backendApiClient.get(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
                 .thenReturn(shipTypes);
-        when(backendApiClient.get(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
                 .thenReturn(terminals);
 
         // When & Then
@@ -105,9 +105,9 @@ class ProfitCalculationPageControllerMvcTest {
         
         PageResponse<Map<String, Object>> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-        when(backendApiClient.get(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
                 .thenReturn(shipTypes);
-        when(backendApiClient.get(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+        when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
                 .thenReturn(terminals);
 
         // When & Then

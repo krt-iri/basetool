@@ -5,9 +5,6 @@ server:
   max-http-request-header-size: 65536
   http2:
     enabled: true
-  error:
-    whitelabel:
-      enabled: false
   port: 11261
   ssl:
     enabled: true
@@ -37,6 +34,9 @@ spring:
         cachecontrol:
           max-age: 365d
           must-revalidate: true
+    error:
+      whitelabel:
+        enabled: false
   datasource:
     driver-class-name: org.postgresql.Driver
     hikari:
@@ -57,8 +57,14 @@ logging:
     root: INFO
     org.springframework.web: INFO
     org.springframework.security: INFO
-
+    io.github.resilience4j: INFO
 app:
+  logging:
+    correlation-id-header: X-Correlation-Id
+    correlation-id-mdc-key: correlationId
+    user-id-mdc-key: userId
+    slow-request-threshold-ms: 2000
+    structured-enabled: false
   keycloak:
     sync:
       enabled: true

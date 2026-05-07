@@ -1,0 +1,102 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalInventoryItemResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+/**
+ * Admin-only counterpart of {@link PersonalInventoryController}: lets administrators
+ * manage the personal inventory of any user. The owner identifier is taken from the URL
+ * path ({@code /{userSub}}) instead of from the JWT.
+ */
+@RestController
+@RequestMapping("/api/v1/admin/personal-inventory")
+@RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin – Personal Inventory",
+        description = "Administrator endpoints for managing any user's personal inventory.")
+@SecurityRequirement(name = "bearerAuth")
+@Slf4j
+public class AdminPersonalInventoryController {
+
+    private final PersonalInventoryItemService service;
+
+    @GetMapping("/{userSub}")
+    @Operation(summary = "List a specific user's personal inventory entries.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Paginated list."),
+            @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+    })
+    public PageResponse<PersonalInventoryItemResponse> listForUser(
+            @PathVariable String userSub,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String q) {
+        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort,
+                PersonalInventoryItemService.SORTABLE_FIELDS,
+                PersonalInventoryItemService.DEFAULT_SORT_FIELD);
+        Page<PersonalInventoryItemResponse> result = service.listForUser(userSub, q, pageable);
+        return PersonalInventoryController.toPageResponse(result);
+    }
+
+    @PostMapping("/{userSub}")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a personal inventory entry on behalf of the given user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Item created."),
+            @ApiResponse(responseCode = "400", description = "Validation failed."),
+            @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
+            @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+    })
+    public PersonalInventoryItemResponse createForUser(
+            @PathVariable String userSub,
+            @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
+        return service.createForUser(userSub, request);
+    }
+
+    @PutMapping("/items/{id}")
+    @Operation(summary = "Update any personal inventory entry by id.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Item updated."),
+            @ApiResponse(responseCode = "400", description = "Validation failed."),
+            @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
+            @ApiResponse(responseCode = "404", description = "Item not found or location unknown."),
+            @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
+    })
+    public PersonalInventoryItemResponse updateForUser(
+            @PathVariable UUID id,
+            @Valid @RequestBody PersonalInventoryItemUpdateRequest request) {
+        return service.updateForUser(id, request);
+    }
+
+    @DeleteMapping("/items/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete any personal inventory entry by id.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Item deleted."),
+            @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
+            @ApiResponse(responseCode = "404", description = "Item not found.")
+    })
+    public void deleteForUser(@PathVariable UUID id) {
+        service.deleteForUser(id);
+    }
+}

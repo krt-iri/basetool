@@ -16,6 +16,8 @@ java {
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  // Jackson databind for RFC7807 Problem+JSON parsing in BackendServiceException
+  implementation("com.fasterxml.jackson.core:jackson-databind")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
@@ -25,9 +27,13 @@ dependencies {
   // Caching
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
+  // Spring Session with Redis for persistent sessions across restarts
+  implementation("org.springframework.session:spring-session-data-redis")
+  implementation("org.springframework.boot:spring-boot-starter-data-redis")
   // Resilience4j for resilience patterns + Reactor operators
   implementation(libs.resilience4j.spring.boot3)
   implementation(libs.resilience4j.reactor)
+  implementation(libs.logstash.logback.encoder)
   
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")

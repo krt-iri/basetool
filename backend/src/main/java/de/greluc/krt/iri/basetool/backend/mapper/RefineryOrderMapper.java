@@ -24,14 +24,15 @@ public interface RefineryOrderMapper {
     RefineryOrder toEntity(RefineryOrderDto dto);
 
     /**
-     * Berechnet Gewinn/Verlust = oreSales - expenses fuer den Auftrag.
+     * Berechnet Gewinn/Verlust = oreSales - expenses - otherExpenses fuer den Auftrag.
      * Null-Werte werden als 0 behandelt, damit Altdaten keine NPE ausloesen.
      */
     default Double computeProfit(RefineryOrder entity) {
         if (entity == null) return 0d;
         double sales = entity.getOreSales() != null ? entity.getOreSales() : 0d;
         double costs = entity.getExpenses() != null ? entity.getExpenses() : 0d;
-        return sales - costs;
+        double other = entity.getOtherExpenses() != null ? entity.getOtherExpenses() : 0d;
+        return sales - costs - other;
     }
     
     LocationDto locationToDto(Location location);

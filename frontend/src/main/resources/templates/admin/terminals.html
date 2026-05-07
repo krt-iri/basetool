@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.terminals.title} + ' - ' + #{app.title}">Terminals - IRIDIUM Basetool</title>
@@ -51,10 +51,10 @@
         <h1 th:text="#{admin.terminals.title}">Terminals verwalten</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <!-- Terminals Section -->
         <div class="data-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="flex-between-mb">
                 <h2 th:text="#{admin.terminals.terminals}">Terminals</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
                     <input type="text" id="filterTerminals" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('terminalsTable', this.value)" autocomplete="off">
@@ -77,7 +77,7 @@
                         <td th:text="${term.nickname}">Nickname</td>
                         <td th:text="${term.starSystemName}">System</td>
                         <td>
-                            <div style="display:flex; gap:0.5rem;">
+                            <div class="flex-gap-xs">
                                 <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/terminals/{id}/toggle-visibility(id=${term.id})}" style="margin: 0;">
                                     <input type="hidden" name="hidden" th:value="${!term.hidden}">
                                     <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'" th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{orders.create.title} + ' - ' + #{app.title}">Neuer Auftrag - IRIDIUM Basetool</title>
@@ -77,20 +77,20 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{orders.create.title}">Neuer Auftrag</h1>
-        <div style="display: flex; gap: 0.5rem; align-items: center;" sec:authorize="isAuthenticated()">
+        <div class="flex-gap-sm" sec:authorize="isAuthenticated()">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
         </div>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
         
-        <div th:if="${success}" class="hud-box" style="background-color: rgba(46, 204, 113, 0.1); border-color: #2ecc71; margin-bottom: 1rem;">
-            <p style="color: #2ecc71;" th:text="#{__${success}__}">Erfolg</p>
+        <div th:if="${success}" class="hud-box hud-box-success">
+            <p th:text="#{__${success}__}">Erfolg</p>
         </div>
 
         <div class="form-container">
@@ -114,7 +114,7 @@
                 
                 <details class="form-group scmdb-import" style="border: 1px dashed var(--color-primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
                     <summary th:text="#{orders.create.scmdb.label}">scmdb.net Export</summary>
-                    <div style="margin-top: 1rem;">
+                    <div class="mt-1">
                         <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" style="width: 100%; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); padding: 0.75rem; box-sizing: border-box; resize: vertical;"></textarea>
                         <button type="button" class="btn btn-secondary" style="margin-top: 1rem; width: 100%;" onclick="importFromScmdb()" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
                     </div>
@@ -130,19 +130,19 @@
                             </select>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="0" max="1000" required>
-                        </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label th:text="#{orders.create.amount}">Menge</label>
                             <input type="number" th:field="*{materials[__${stat.index}__].amount}" step="0.001" min="0" required>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
+                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="750" max="750" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
                         </div>
                     </div>
                 </div>
                 
-                <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" style="margin-top: 1rem;" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+                <button type="button" class="btn btn-secondary mt-1" onclick="addMaterialRow()" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
 
-                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
                     <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
@@ -217,12 +217,10 @@
                     
                     const select = targetRow.querySelector('select');
                     const inputs = targetRow.querySelectorAll('input[type="number"]');
-                    const qualityInput = inputs[0];
-                    const amountInput = inputs[1];
+                    const amountInput = inputs[0];
                     
                     select.value = materialId;
                     amountInput.value = amount;
-                    qualityInput.value = 100;
                     
                     foundAny = true;
                 } else {
@@ -266,10 +264,10 @@
                 <select name="materials[${materialIndex}].materialId" required>${options}</select>
             </div>
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="number" name="materials[${materialIndex}].minQuality" value="100" step="1" min="0" max="1000" required>
+                <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
             </div>
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
+                <input type="number" name="materials[${materialIndex}].minQuality" value="750" step="1" min="750" max="750" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
             </div>
         `;
         

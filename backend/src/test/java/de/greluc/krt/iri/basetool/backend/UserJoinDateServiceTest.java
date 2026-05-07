@@ -1,0 +1,89 @@
+package de.greluc.krt.iri.basetool.backend;
+
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.UserService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class UserJoinDateServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    @Test
+    void shouldSetJoinDate_WhenProvided() {
+        // Given
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setUsername("testuser");
+        user.setRank(1);
+        LocalDate joinDate = LocalDate.of(2024, 3, 15);
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        User result = userService.updateUserAttributes(id, 1, null, null, null, joinDate);
+
+        // Then
+        assertThat(result.getJoinDate()).isEqualTo(joinDate);
+    }
+
+    @Test
+    void shouldClearJoinDate_WhenNullProvided() {
+        // Given
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setUsername("testuser");
+        user.setRank(1);
+        user.setJoinDate(LocalDate.of(2022, 1, 1));
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        User result = userService.updateUserAttributes(id, 1, null, null, null, null);
+
+        // Then
+        assertThat(result.getJoinDate()).isNull();
+    }
+
+    @Test
+    void shouldUpdateJoinDate_WhenChanged() {
+        // Given
+        UUID id = UUID.randomUUID();
+        User user = new User();
+        user.setId(id);
+        user.setUsername("testuser");
+        user.setRank(1);
+        user.setJoinDate(LocalDate.of(2020, 6, 1));
+        LocalDate newDate = LocalDate.of(2024, 12, 31);
+
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        User result = userService.updateUserAttributes(id, 1, null, null, null, newDate);
+
+        // Then
+        assertThat(result.getJoinDate()).isEqualTo(newDate);
+    }
+}

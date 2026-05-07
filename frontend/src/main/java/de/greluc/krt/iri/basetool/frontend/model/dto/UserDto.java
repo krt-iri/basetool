@@ -1,5 +1,8 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
+import org.jetbrains.annotations.Nullable;
+
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,5 +22,6 @@ public record UserDto(
         Boolean isLogistician,
         Boolean isMissionManager,
         Boolean inKeycloak,
-        Long version
+        Long version,
+        @Nullable LocalDate joinDate
 ) {}

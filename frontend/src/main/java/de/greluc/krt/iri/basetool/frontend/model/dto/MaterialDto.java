@@ -16,5 +16,6 @@ public record MaterialDto(
     @JsonProperty("isVolatileQt") Boolean isVolatileQt,
     @JsonProperty("isVolatileTime") Boolean isVolatileTime,
     @JsonProperty("isManualRawMaterial") Boolean isManualRawMaterial,
+    @JsonProperty("isJobOrder") Boolean isJobOrder,
     Long version
 ) {}

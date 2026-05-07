@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{inventory.input.title} + ' - IRIDIUM Basetool'">Lagereintrag einbuchen - IRIDIUM Basetool</title>
@@ -48,20 +48,20 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{inventory.input.title}">Lagereintrag einbuchen</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
 
         <div class="form-container">
             <form th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
-                <div th:if="${#fields.hasErrors('*')}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem; padding: 1rem;">
-                    <ul style="color: #e74c3c; margin: 0; padding-left: 1.5rem; font-family: var(--font-body);">
+                <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
+                    <ul class="text-danger">
                         <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
                     </ul>
                 </div>
@@ -125,7 +125,7 @@
                     <span style="font-size: 0.8rem; color: var(--color-gray-2); margin-left: 0.5rem;" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</span>
                 </div>
                 
-                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{general.save}">Speichern</button>
                     <a th:href="@{/inventory}" onclick="history.back(); return false;" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{general.cancel}">Abbrechen</a>
                 </div>

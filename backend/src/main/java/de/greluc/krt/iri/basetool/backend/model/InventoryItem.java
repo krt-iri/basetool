@@ -53,4 +53,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
     @Column(name = "note", length = 1000)
     private String note;
+
+    @Column(nullable = false)
+    private Boolean delivered = false;
 }

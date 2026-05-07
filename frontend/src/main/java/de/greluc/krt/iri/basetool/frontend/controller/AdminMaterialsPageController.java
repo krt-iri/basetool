@@ -102,6 +102,7 @@ public class AdminMaterialsPageController {
             MaterialDto refinedMaterial = currentMaterial.refinedMaterial();
             String quantityType = currentMaterial.quantityType();
             Boolean isManualRawMaterial = currentMaterial.isManualRawMaterial();
+            Boolean isJobOrder = currentMaterial.isJobOrder();
             
             if ("CATEGORY".equals(request.updateType())) {
                 if (request.categoryId() != null) {
@@ -119,6 +120,8 @@ public class AdminMaterialsPageController {
                 quantityType = request.quantityType();
             } else if ("MANUAL_RAW".equals(request.updateType())) {
                 isManualRawMaterial = request.isManualRawMaterial();
+            } else if ("JOB_ORDER".equals(request.updateType())) {
+                isJobOrder = request.isJobOrder();
             } else {
                 return ResponseEntity.badRequest().build();
             }
@@ -136,10 +139,14 @@ public class AdminMaterialsPageController {
                 currentMaterial.isVolatileQt(), 
                 currentMaterial.isVolatileTime(), 
                 isManualRawMaterial,
+                isJobOrder,
                 request.version()
             );
             
             backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
+            if ("JOB_ORDER".equals(request.updateType()) || "MANUAL_RAW".equals(request.updateType())) {
+                backendApiClient.clearStaticDataCache();
+            }
             MaterialDto updatedMaterial = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
             return ResponseEntity.ok(updatedMaterial);
         } catch (Exception e) {

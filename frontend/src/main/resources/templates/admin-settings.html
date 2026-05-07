@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.settings.title} + ' - ' + #{app.title}">Systemeinstellungen - IRIDIUM Basetool</title>
@@ -51,7 +51,7 @@
         <h1 th:text="#{admin.settings.title}">Systemeinstellungen</h1>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <div class="data-section">
             <h2 th:text="#{admin.settings.orders}">Auftragsverwaltung</h2>
             <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.orders.description}">Konfiguration der Farbcodierung für ältere Aufträge (in Tagen).</p>
@@ -71,7 +71,7 @@
                     <input type="number" id="ageRedDays" name="ageRedDays" th:value="${ageRedDays}" min="0" required>
                 </div>
 
-                <div class="data-section" style="margin-top: 2rem;">
+                <div class="data-section mt-2">
                     <h2 th:text="#{admin.settings.refinery}">Raffinerie</h2>
                     <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
                     
@@ -84,7 +84,7 @@
                     </div>
                 </div>
                 
-                <button type="submit" class="btn" style="margin-top: 1rem;" th:text="#{admin.settings.save}">Speichern</button>
+                <button type="submit" class="btn mt-1" th:text="#{admin.settings.save}">Speichern</button>
             </form>
         </div>
     </div>

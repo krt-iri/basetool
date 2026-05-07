@@ -48,9 +48,9 @@ class RefineryOrderStorageCalculationTest {
     @Test
     void testStoreFormCalculationForPiece() {
         UUID orderId = UUID.randomUUID();
-        MaterialDto pieceMaterial = new MaterialDto(UUID.randomUUID(), 1, "PieceMat", "TYPE", "PIECE", null, null, null, false, false, false, false, 0L);
+        MaterialDto pieceMaterial = new MaterialDto(UUID.randomUUID(), 1, "PieceMat", "TYPE", "PIECE", null, null, null, false, false, false, false, false, 0L);
         RefineryGoodDto good = new RefineryGoodDto(UUID.randomUUID(), pieceMaterial, 100, pieceMaterial, 15, 100, null);
-        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, null, null, null, null, 60L, 0.0, 0d, 0d, null, List.of(good), RefineryOrderStatus.OPEN, 0L);
+        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, null, null, null, null, 60L, 0.0, 0d, 0d, 0d, null, List.of(good), RefineryOrderStatus.OPEN, 0L);
 
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class))).thenReturn(orderDto);
         when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
@@ -70,9 +70,9 @@ class RefineryOrderStorageCalculationTest {
     @Test
     void testStoreFormCalculationForScu() {
         UUID orderId = UUID.randomUUID();
-        MaterialDto scuMaterial = new MaterialDto(UUID.randomUUID(), 2, "ScuMat", "TYPE", "SCU", null, null, null, false, false, false, false, 0L);
+        MaterialDto scuMaterial = new MaterialDto(UUID.randomUUID(), 2, "ScuMat", "TYPE", "SCU", null, null, null, false, false, false, false, false, 0L);
         RefineryGoodDto good = new RefineryGoodDto(UUID.randomUUID(), scuMaterial, 100, scuMaterial, 1234, 100, null);
-        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, null, null, null, null, 60L, 0.0, 0d, 0d, null, List.of(good), RefineryOrderStatus.OPEN, 0L);
+        RefineryOrderDto orderDto = new RefineryOrderDto(orderId, null, null, null, null, 60L, 0.0, 0d, 0d, 0d, null, List.of(good), RefineryOrderStatus.OPEN, 0L);
 
         when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class))).thenReturn(orderDto);
         

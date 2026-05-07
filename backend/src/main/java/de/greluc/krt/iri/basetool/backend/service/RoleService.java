@@ -31,7 +31,7 @@ public class RoleService {
     @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
     public Role updatePermissions(@NotNull String roleName, @NotNull Set<String> permissions) {
         Role role = roleRepository.findByName(roleName)
-            .orElseThrow(() -> new RuntimeException("Role not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Role not found"));
         role.setPermissions(permissions);
         return roleRepository.save(role);
     }
@@ -40,7 +40,7 @@ public class RoleService {
     @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
     public Role updateRoleDescription(@NotNull String roleName, @NotNull String description) {
         Role role = roleRepository.findByName(roleName)
-            .orElseThrow(() -> new RuntimeException("Role not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Role not found"));
         role.setDescription(description);
         return roleRepository.save(role);
     }

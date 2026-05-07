@@ -11,6 +11,7 @@ x-db-backend: &db-backend-template
     interval: 5s
     timeout: 5s
     retries: 5
+  stop_grace_period: 60s
   volumes:
     - /var/iri/db-backend:/var/lib/postgresql/data
 
@@ -27,18 +28,17 @@ x-db-keycloak: &db-keycloak-template
     interval: 5s
     timeout: 5s
     retries: 5
+  stop_grace_period: 60s
   volumes:
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
   image: quay.io/keycloak/keycloak:26.6
-  command: start --proxy-headers xforwarded
+  command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
+  stop_grace_period: 30s
   environment:
     KC_HOSTNAME: keycloak.iri-base.org
-    KC_HOSTNAME_URL: https://keycloak.iri-base.org
-    KC_HOSTNAME_ADMIN_URL: https://keycloak.iri-base.org
     KC_HOSTNAME_STRICT: "true"
-    KC_HOSTNAME_STRICT_HTTPS: "true"
     KC_HEALTH_ENABLED: "true"
     KC_HTTP_ENABLED: "true"
     KC_HTTP_PORT: 18080
@@ -57,12 +57,14 @@ x-keycloak: &keycloak-template
   volumes:
     - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
     - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+    - /var/iri/keycloak/log:/var/log/keycloak
 
 x-backend: &backend-template
   build:
     context: .
     dockerfile: backend/Dockerfile
   restart: always
+  stop_grace_period: 30s
   environment:
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11261
@@ -70,25 +72,56 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
     KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
-    - /var/iri/backend:/tmp
+    - /var/iri/backend/log:/app/logs
+
+x-redis: &redis-template
+  image: redis:8-alpine
+  command: redis-server --save 1 1 --appendonly yes --loglevel notice --requirepass ${REDIS_PASSWORD}
+  restart: always
+  stop_grace_period: 30s
+  healthcheck:
+    test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  volumes:
+    - /var/iri/redis:/data
 
 x-frontend: &frontend-template
   build:
     context: .
     dockerfile: frontend/Dockerfile
   restart: always
+  stop_grace_period: 30s
   environment:
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
     KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
     BACKEND_URL: https://backend:11261
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof
+    REDIS_PASSWORD: ${REDIS_PASSWORD}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
-    - /var/iri/frontend:/tmp
+    - /var/iri/frontend/log:/app/logs
 
 services:
+  redis:
+    <<: *redis-template
+    profiles: ["prod"]
+    networks:
+      - net-redis-frontend
+
+  redis-dev:
+    <<: *redis-template
+    profiles: ["dev"]
+    ports:
+      - "6379:6379"
+    networks:
+      net-redis-frontend:
+        aliases:
+          - redis
+
   db-backend:
     <<: *db-backend-template
     profiles: ["prod"]
@@ -134,7 +167,7 @@ services:
 
   keycloak-dev:
     <<: *keycloak-template
-    command: start-dev --import-realm --proxy-headers xforwarded
+    command: start-dev --import-realm --proxy-headers xforwarded --cache=local
     profiles: ["dev"]
     ports:
       - "18080:18080"
@@ -194,10 +227,13 @@ services:
         condition: service_started
       keycloak:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - net-backend-frontend
       - net-proxy-frontend
       - net-backend-keycloak
+      - net-redis-frontend
 
   frontend-dev:
     <<: *frontend-template
@@ -209,6 +245,8 @@ services:
         condition: service_started
       keycloak-dev:
         condition: service_healthy
+      redis-dev:
+        condition: service_healthy
     networks:
       net-backend-frontend:
         aliases:
@@ -217,6 +255,9 @@ services:
         aliases:
           - frontend
       net-backend-keycloak:
+        aliases:
+          - frontend
+      net-redis-frontend:
         aliases:
           - frontend
 
@@ -247,4 +288,6 @@ networks:
   net-proxy-keycloak:
     driver: bridge
   net-backend-keycloak:
+    driver: bridge
+  net-redis-frontend:
     driver: bridge

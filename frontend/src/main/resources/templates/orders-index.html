@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{nav.orders}">Aufträge</title>
@@ -21,12 +21,12 @@
 </header>
 
 <main>
-    <div class="greeting hud-box" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.orders}">Aufträge</h1>
         <a th:href="@{/orders/create(source='index')}" class="btn">Neuer Auftrag</a>
     </div>
 
-    <div class="hud-box" style="margin-top: 2rem;">
+    <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
             <label style="display: flex; align-items: center; gap: 0.25rem;">
@@ -48,12 +48,12 @@
             <button type="submit" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
 
-        <div th:if="${error}" class="hud-box" style="background-color: rgba(231, 76, 60, 0.1); border-color: #e74c3c; margin-bottom: 1rem;">
-            <p style="color: #e74c3c;" th:text="#{__${error}__}">Fehler</p>
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
         </div>
         
-        <div th:if="${success}" class="hud-box" style="background-color: rgba(46, 204, 113, 0.1); border-color: #2ecc71; margin-bottom: 1rem;">
-            <p style="color: #2ecc71;" th:text="#{__${success}__}">Erfolg</p>
+        <div th:if="${success}" class="hud-box hud-box-success">
+            <p th:text="#{__${success}__}">Erfolg</p>
         </div>
 
         <div class="table-responsive">
@@ -127,7 +127,7 @@
                     </div>
                 </td>
                 <td style="white-space: nowrap;">
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div class="flex-gap-xs">
                         <a th:href="@{/orders/{id}(id=${order.id})}" class="btn">Details</a>
                     </div>
                 </td>
@@ -160,10 +160,10 @@
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                     
                     if (diffDays >= redDays) {
-                        el.style.color = '#e74c3c'; // red
+                        el.classList.add('text-danger');
                         el.style.fontWeight = 'bold';
                     } else if (diffDays >= yellowDays) {
-                        el.style.color = '#f1c40f'; // yellow
+                        el.classList.add('text-warning');
                         el.style.fontWeight = 'bold';
                     }
                 }

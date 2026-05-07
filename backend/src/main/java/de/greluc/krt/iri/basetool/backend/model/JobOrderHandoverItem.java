@@ -22,10 +22,6 @@ public class JobOrderHandoverItem extends AbstractEntity<UUID> {
     @JoinColumn(name = "job_order_handover_id", nullable = false)
     private JobOrderHandover jobOrderHandover;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "inventory_item_id")
-    private InventoryItem inventoryItem;
-
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "material_id", nullable = false)
     private Material material;
@@ -35,5 +31,8 @@ public class JobOrderHandoverItem extends AbstractEntity<UUID> {
 
     @Column(nullable = false)
     private Double amount;
+
+    @Column(name = "location_name")
+    private String locationName;
 
 }
