@@ -119,7 +119,7 @@ services:
     <<: *redis-template
     profiles: ["dev"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       net-redis-frontend:
         aliases:
@@ -135,7 +135,7 @@ services:
     <<: *db-backend-template
     profiles: ["dev"]
     ports:
-      - "15432:15432"
+      - "127.0.0.1:15432:15432"
     networks:
       net-db-backend:
         aliases:
@@ -151,7 +151,7 @@ services:
     <<: *db-keycloak-template
     profiles: ["dev"]
     ports:
-      - "15433:15433"
+      - "127.0.0.1:15433:15433"
     networks:
       net-db-keycloak:
         aliases:
@@ -173,7 +173,7 @@ services:
     command: start-dev --import-realm --proxy-headers xforwarded --cache=local
     profiles: ["dev"]
     ports:
-      - "18080:18080"
+      - "127.0.0.1:18080:18080"
     depends_on:
       db-keycloak-dev:
         condition: service_healthy
@@ -205,7 +205,7 @@ services:
     <<: *backend-template
     profiles: ["dev"]
     ports:
-      - "11261:11261"
+      - "127.0.0.1:11261:11261"
     depends_on:
       db-backend-dev:
         condition: service_healthy
@@ -242,7 +242,7 @@ services:
     <<: *frontend-template
     profiles: ["dev"]
     ports:
-      - "18081:18081"
+      - "127.0.0.1:18081:18081"
     depends_on:
       backend-dev:
         condition: service_started
@@ -269,7 +269,7 @@ services:
     ports:
       - "80:80"     # Frontend / Keycloak HTTP Traffic
       - "443:443"    # Frontend / Keycloak HTTPS Traffic
-      - "10081:81"     # NGINX Proxy Manager Admin Web UI
+      - "127.0.0.1:10081:81"     # NGINX Proxy Manager Admin Web UI (loopback-only)
     environment:
       DB_SQLITE_FILE: "/data/database.sqlite"
     volumes:
