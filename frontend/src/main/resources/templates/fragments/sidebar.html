@@ -78,7 +78,7 @@
         </div>
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
-    <script>
+    <script th:attr="nonce=${cspNonce}">
         // Global click handler for hamburger menu to prevent any DOM/TextNode issues
         document.addEventListener('click', function(e) {
             let target = e.target;
@@ -160,7 +160,7 @@
     </script>
     <th:block th:replace="~{fragments/toast :: toast}" />
     <th:block th:replace="~{fragments/unsaved-modal :: unsavedModal}" />
-    <script th:src="@{/js/unsaved-changes.js}"></script>
+    <script th:src="@{/js/unsaved-changes.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

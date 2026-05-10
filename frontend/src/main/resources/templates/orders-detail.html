@@ -338,7 +338,7 @@
     </div>
 </div>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     let cachedInventoryItems = [];
     let isInventoryCached = false;
 
@@ -469,7 +469,7 @@
     });
 </script>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', () => {
         const dateSpan = document.getElementById('created-date-span');
         const daysSpan = document.getElementById('elapsed-days-span');

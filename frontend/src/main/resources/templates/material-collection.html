@@ -123,7 +123,7 @@
     }
 </style>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     const MSG_OWNER_UPDATED   = /*[[#{material.collection.toast.ownerUpdated}]]*/ 'Besitzer aktualisiert.';
     const MSG_LOCATION_UPDATED = /*[[#{material.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';

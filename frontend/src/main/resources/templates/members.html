@@ -103,8 +103,8 @@
         <input type="hidden" name="_csrf" th:value="${_csrf.token}" />
     </form>
 </main>
-<script th:src="@{/js/autocomplete.js}"></script>
-<script>
+<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('member-search');
         if (searchInput) {

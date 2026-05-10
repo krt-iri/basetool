@@ -357,7 +357,7 @@
     </div>
 </main>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
         const modal = document.getElementById("ship-modal");
         const closeBtn = document.querySelector(".close-modal");

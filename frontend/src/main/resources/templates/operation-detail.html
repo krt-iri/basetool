@@ -398,7 +398,7 @@
     </div>
 </div>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
     function toggleColumn(colId) {
         const col = document.getElementById(colId);
         if (col) {

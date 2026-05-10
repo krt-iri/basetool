@@ -65,7 +65,7 @@
         <p th:text="${!#strings.isEmpty(param.error[0])} ? #{${param.error[0]}} : #{notification.error.title}"></p>
     </div>
 
-    <script th:inline="javascript">
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         function initToasts() {
             const toasts = document.querySelectorAll('.notification-toast:not(.initialized)');
             toasts.forEach(toast => {

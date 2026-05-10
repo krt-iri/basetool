@@ -143,7 +143,7 @@
         </div>
     </div>
 </main>
-<script>
+<script th:attr="nonce=${cspNonce}">
     function openDeleteModal(id) {
         document.getElementById('delete-operation-form').action = '/operations/' + id + '/delete';
         document.getElementById('delete-operation-modal').style.display = 'flex';

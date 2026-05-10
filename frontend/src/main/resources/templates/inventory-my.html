@@ -512,7 +512,7 @@
 </div>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var bulkI18n = {
         success: /*[[#{inventory.bulk.checkout.success}]]*/ 'Massenausbuchung erfolgreich: {0} Eintr\u00e4ge ausgebucht.',
         errorEmpty: /*[[#{inventory.bulk.checkout.error.empty}]]*/ 'Bitte mindestens einen Eintrag ausw\u00e4hlen.',

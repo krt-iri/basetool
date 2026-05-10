@@ -7,7 +7,7 @@
     <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}"/>
     <link rel="icon" type="image/svg+xml" th:href="@{/logos/iridium.svg}">
     <link rel="stylesheet" th:href="@{/css/styles.css}">
-    <script th:src="@{/js/datetime-splitter.js}" defer></script>
+    <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
     
     <title th:replace="${titleContent}"></title>
     <th:block th:if="${additionalLinks != null}" th:replace="${additionalLinks}"></th:block>

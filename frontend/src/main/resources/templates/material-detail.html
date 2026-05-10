@@ -124,8 +124,8 @@
     </div>
 </main>
 
-<script th:src="@{/js/autocomplete.js}"></script>
-<script th:inline="javascript">
+<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     function sortTable(n) {
         var table = document.getElementById("priceTable");
         var rows, switching, i, x, y, shouldSwitch, dir;

@@ -145,7 +145,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', () => {
         const yellowDays = /*[[${ageYellowDays}]]*/ 30;
         const redDays = /*[[${ageRedDays}]]*/ 90;
@@ -171,7 +171,7 @@
         });
     });
 </script>
-<script sec:authorize="hasRole('LOGISTICIAN')">
+<script sec:authorize="hasRole('LOGISTICIAN')" th:attr="nonce=${cspNonce}">
 document.addEventListener('DOMContentLoaded', () => {
     const tableBody = document.querySelector('.data-table tbody');
     if (!tableBody) return;

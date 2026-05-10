@@ -178,7 +178,7 @@
 </div>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     window.krtPersonalInventoryI18n = {
         createTitle: /*[[#{personalInventory.modal.create.title}]]*/ 'Eintrag anlegen',
@@ -192,6 +192,6 @@
     };
     /*]]>*/
 </script>
-<script th:src="@{/js/personal-inventory.js}"></script>
+<script th:src="@{/js/personal-inventory.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -256,7 +256,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
 
     function calcScu(index) {

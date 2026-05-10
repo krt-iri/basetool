@@ -253,7 +253,7 @@
     </div>
 </main>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
 function toggleMultiSelect(id) {
         var el = document.getElementById(id);
         var isOpened = el.classList.contains('open');

@@ -3,8 +3,8 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{app.title}">IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" th:attr="nonce=${cspNonce}"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js" th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
@@ -75,7 +75,7 @@
     </div>
 
 </main>
-<script>
+<script th:attr="nonce=${cspNonce}">
     function toggleInfo() {
         const body = document.getElementById('info-body');
         const icon = document.getElementById('info-toggle-icon');
