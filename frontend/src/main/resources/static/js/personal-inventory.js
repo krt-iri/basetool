@@ -170,14 +170,6 @@
         });
     }
 
-    function escapeHtml(s) {
-        if (s == null) return '';
-        return String(s).replace(/[&<>"']/g, function (c) {
-            return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c];
-        });
-    }
-    function escapeAttr(s) { return escapeHtml(s); }
-
     /**
      * Sanitizes the quantity input to ensure only positive integers (>= 1).
      * Strips any non-digit characters (e.g. '-', '.', 'e') that some browsers

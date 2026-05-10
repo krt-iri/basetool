@@ -499,10 +499,6 @@
                 resultModal.style.display = 'flex';
             }
 
-            function escapeHtml(str) {
-                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            }
-
             if (closeResultBtn) {
                 closeResultBtn.addEventListener('click', function() {
                     resultModal.style.display = 'none';
