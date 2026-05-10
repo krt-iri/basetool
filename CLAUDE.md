@@ -1,0 +1,167 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+IRIDIUM Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — **edit `versions.properties`, not `build.gradle.kts`**. Run `./gradlew refreshVersions` to discover updates.
+
+## Build, run, test
+
+Always use the Gradle wrapper. **Never** use the IDE test runner or the harness `run_test` tool — Gradle is the only sanctioned test path. This is a hard project rule and applies even when iterating on a single test.
+
+```bash
+./gradlew :backend:test                                    # backend tests
+./gradlew :frontend:test                                   # frontend tests (also produces JaCoCo report)
+./gradlew test                                             # all tests
+./gradlew :backend:test --tests "FullyQualifiedClassName"  # single test class
+./gradlew :backend:test --tests "ClassName.methodName"     # single test method
+./gradlew :backend:bootRun                                 # backend on https://localhost:11261 (dev profile)
+./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
+./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
+```
+
+Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED` and a Mockito agent JVM arg.
+
+## Local stack
+
+Use Docker Compose profiles:
+
+```bash
+docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev   # deps only, run apps locally
+docker compose --profile dev up -d                                                          # full dev stack with host port exposure
+docker compose --profile prod up -d                                                         # prod-equivalent stack behind nginx-proxy-manager
+```
+
+Host ports (dev profile only): backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`. A `.env` at repo root is required (see README for keys).
+
+The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `changeit`); the frontend talks to `https://backend:11261` in prod and `http://localhost:11261` (overridable via `BACKEND_URL`) in dev. Swagger UI is at `https://localhost:11261/swagger-ui.html`.
+
+## Architecture
+
+### Module split
+- **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records, MapStruct `mapper`s, `config` (security, caching, OpenAPI, rate limiting, WebClient), `integration` (UEX external API), `task` (scheduled jobs), `filter`/`interceptor` (correlation ID, deprecation headers), `annotation` (`@ApiDeprecation`).
+- **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
+
+The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.
+
+### Security model
+- Both modules use Spring Security with Keycloak OIDC. Backend = resource server (validates JWT); frontend = OAuth2 client (browser SSO + bearer-token relay).
+- Authorization is centralized in `@PreAuthorize` annotations on services/controllers — keep checks out of business logic. Roles mapped from JWT are prefixed with `ROLE_` and uppercased.
+- Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`. Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`. Full matrix in `ROLES_AND_PERMISSIONS.md`.
+- `LOGISTICIAN` and `MISSION_MANAGER` can additionally be granted via `is_logistician` / `is_mission_manager` flags on `app_user` (set by admins) — independent of Keycloak roles.
+- Frontend has a `BotProtectionFilter` and `SsoReAuthenticationEntryPoint`: known scanner paths return 404 directly; legitimate paths with expired sessions get a silent `prompt=none` Keycloak redirect.
+
+### Multi-user data isolation (CRITICAL)
+- Every read/write must filter by JWT `sub` unless the caller has an elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service layer, not the controller.
+- For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
+
+### Database
+- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.**
+- `DataInitializer` seeds roles/permissions on startup.
+- Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections.
+
+### Concurrency — read this before touching multi-step transactions
+The codebase has been bitten by optimistic-locking traps several times. The rules below exist because of real bugs that shipped.
+
+- **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler."
+- **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. If targeted updates are too tangled, just `window.location.reload()` on success.
+- **Pessimistic locking for bulk reorders** — use `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL) for priority shifts and reorder operations to avoid races.
+- **Intra-transaction service calls — `…WithinTransaction` pattern.** When a `@Transactional` service method modifies an entity (directly or via cascaded `repository.save()`) and then calls another service that operates on the **same entity**, the inner method's own `findById()` + `save()` + `flush()` will collide with the already-incremented `@Version` field, causing 409. Fix: expose a dedicated `completeSomethingWithinTransaction(Entity entity)` method annotated `@Transactional(propagation = MANDATORY)` that operates on the already-managed entity and relies on dirty-checking — no `save()`/`flush()` of its own. Canonical example: `JobOrderService.completeJobOrderWithinTransaction()`. Apply this consistently to handover, booking, transfer, and any similar flow.
+- **Bulk updates inside loops.** A `@Modifying` repository query with `clearAutomatically = true` (e.g. `unlinkJobOrderMaterial`) detaches the **entire** persistence context — including all sibling entities of the aggregate currently being processed. NEVER execute such a bulk update inside a loop that mutates more than one item of the same aggregate (e.g. multiple `JobOrderMaterial`s of the same `JobOrder`): subsequent iterations will operate on detached entities, and any `repository.save(entity)` call on a detached entity silently does `EntityManager.merge()`, producing a second `@Version` bump on rows already updated in the same transaction → 409. The fix (extension of the `*WithinTransaction` pattern, see `JobOrderHandoverService.createHandover()`):
+  1. Inside the loop, mutate only managed entities and rely on Hibernate dirty-checking — do NOT call `repository.save(child)` explicitly.
+  2. Collect the IDs of items that need a clearing bulk update in a `Set<UUID>` and run those bulk updates exactly once **after** the loop AND **after** persisting any new aggregate root.
+  3. If the completion check needs the freshly persisted state, re-fetch the aggregate root once via `findById(id)` to get a managed instance with up-to-date `@Version`, then hand it to the dedicated `…WithinTransaction(...)` method.
+  Apply this rule to every bulk-update + multi-item flow (handover, booking, refinery, transfer).
+
+### API conventions
+- **Versioned URI paths**: `/api/v1/...`. Breaking changes → new version (`/api/v2/...`). Use `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/...")` on retired endpoints; `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers automatically and `OpenApiDeprecationConfig` reflects it in the OpenAPI spec.
+- **DTOs only at boundaries.** Never expose JPA entities at controller boundaries. DTOs are records. All write DTOs carry Jakarta validation annotations (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO conversion; break circular refs with `@Mapping(ignore = true)`.
+- **`@Valid`** on every `@RequestBody` for write operations (POST/PUT/PATCH).
+- **Errors** — RFC 7807 `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`. Validation errors add an `errors` object (field → message). Extend `GlobalExceptionHandler` rather than throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings. Document the format in OpenAPI; keep frontend error display in sync.
+- **Pagination & sorting** — all list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total elements, pages, current page). **Whitelist allowed sort fields** in the service — never pass user input directly to `Sort` (unstable sorting + information disclosure risk).
+- **All times in UTC** — store/process as `Instant` or `OffsetDateTime`. Convert to the user's local timezone in the display layer only. Write serialization tests for timezone behavior.
+- **OpenAPI docs** — every REST endpoint must carry SpringDoc annotations (`@Operation`, `@ApiResponses`). Keep `backend/src/main/resources/api/openapi.json` in sync with controller changes.
+
+### Frontend resilience & config
+- **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts).
+- **Resilience4j** wraps every backend call (Timeout, Retry, CircuitBreaker, Bulkhead). State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
+- Use `MockWebServer` / WireMock to test error paths.
+- **Type-safe configuration** — relevant `application-*.yml` settings live in `@ConfigurationProperties` classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints: `@NotBlank`, `@URL`, `@Min`/`@Max`. Test misconfiguration during startup (`test` profile). See `*Properties` classes under `config/`.
+
+### Logging
+- Both modules emit one access-log line per request and enrich every log line with MDC fields:
+  - `correlationId` — from inbound `X-Correlation-Id` header (configurable via `APP_LOGGING_CORRELATION_ID_HEADER`) or generated UUID; echoed in the response header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend calls so both modules' logs share one id per user interaction.
+  - `userId` — JWT `sub`, or `anonymous`.
+- In `prod`, a `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`; errors split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env vars.
+- **Never log names, emails, or tokens.**
+
+## Frontend / UI rules
+
+The app follows the "DAS KARTELL" Corporate Design Manual strictly (see `Styleguide.md`):
+- **Primary brand color** `#E77E23` (orange). The logo only appears in this orange, white, or black.
+- **Backgrounds**: `#000000` / `#141414` (dark mode aesthetic).
+- **Headlines**: `Ethnocentric`, **uppercase only**, optical kerning (the font has irregular kerning — apply letter-spacing tweaks for readability).
+- **Body**: `Lato` (Light 300 standard, Bold 700 emphasis), clean sans-serif fallback.
+- **Visual style**: sci-fi / space organization / technical HUD; geometric shapes (rings, triangles), thin technical markers for content containers.
+- **Department colors are semantic** — use them for the right context (Combat red `#A3000A`, Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit green `#239E33`, Search & Rescue yellow `#FFD23F`, Marine Corps purple `#7A5E96`).
+- **Never** use `confirm()`, `alert()`, or any native browser dialog. Build custom KRT-styled modals/toasts.
+
+### Responsive design (mandatory)
+Every layout change and new component must work across **four** device classes:
+- **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first. "Fat-finger" optimization: minimum click target 44px. Collapse multi-column grids to single-column; let wide tables scroll horizontally.
+- **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit the space (permanently docked sidebars, auto-fit grids for cards/dashboards) but cap long-form text width (`max-width: 80ch` on `<p>`) for readability.
+
+## i18n
+
+- **Every** user-visible string comes from `messages.properties` (`messages_de.properties` / `messages_en.properties`). No exceptions — labels, buttons, tooltips, error messages, flash messages, alerts, placeholders, titles. No hardcoded text in HTML, JS, or Java. Translation keys for the personal-inventory feature live under `personalInventory.*` and `admin.personalInventory.*`.
+- **In `.properties` files**, German umlauts (`ä ö ü Ä Ö Ü ß`) MUST be encoded as `\uXXXX` (e.g. `ä`).
+- **In Markdown files** (`CHANGELOG.md`, `README.md`, …), German umlauts MUST be literal UTF-8 characters. Never use `\uXXXX` outside `.properties`.
+
+## Testing
+
+- Tests live in the same package structure under `src/test/java/` mirroring `src/main/java/`.
+- Naming: `*Test` suffix (e.g., `UserServiceTest`).
+- Structure: Given/When/Then (or Arrange/Act/Assert).
+- Mock external/complex dependencies with Mockito (`@Mock`, `@InjectMocks`).
+- **Every new feature ships with tests.** No exceptions.
+
+Minimal example:
+
+```java
+package de.greluc.krt.iri.basetool.backend;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class GuidelinesExampleTest {
+    @Test
+    void shouldPassExampleTest() {
+        // Given
+        boolean condition = true;
+        // When
+        // Execute the method under test
+        // Then
+        assertTrue(condition, "demonstration test");
+    }
+}
+```
+
+## Java conventions
+
+- **Constructor injection only** (favor Lombok `@RequiredArgsConstructor`). No field `@Autowired`.
+- **Records** for DTOs and immutable config wrappers.
+- **Modern Java**: switch expressions, pattern matching (`instanceof`, `switch`), sealed classes where they help with exhaustiveness.
+- **Lombok** — maximize it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Data`) to avoid boilerplate.
+- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`) wherever they communicate a real contract.
+- **Logging**: `@Slf4j` — never instantiate loggers manually.
+
+## Documentation
+
+- **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
+- Keep `README.md` current when architecture or env vars change.
+- **Javadoc** explains *why* (non-obvious choices, tricky invariants), not *what*. Skip Javadoc on trivial getters/setters.
+
+## Git
+
+Do not run destructive Git commands without explicit user instruction: `git reset --hard`, `git clean -fd`, `git push --force[-with-lease]`, `git rebase` on shared/remote branches, `git branch -D`, `git tag -d`, `git stash drop`, or anything that rewrites/discards commits or remote history. Read-only and additive operations (`status`, `log`, `diff`, `add`, `commit`, non-force `push`) are fine when the task needs them.
