@@ -34,7 +34,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${app.cors.allowed-origin-patterns:http://localhost:8080,http://localhost:10261}")
+    /**
+     * Cross-origin allowlist for the backend API. Empty by default: the backend is
+     * only addressed server-side from the Spring-Boot frontend (Thymeleaf SSR), so no
+     * direct browser-to-backend cross-origin traffic is expected, and any such call
+     * is rejected with HTTP 403. Override in environment-specific YAML when a real
+     * browser client on a different origin is introduced (e.g. a future mobile web
+     * app on https://mobile.iri-base.org).
+     */
+    @Value("${app.cors.allowed-origin-patterns:}")
     private List<String> allowedOriginPatterns;
 
     @Bean
@@ -150,8 +158,19 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(allowedOriginPatterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Accept-Language",
+                "X-Correlation-Id",
+                "X-Requested-With",
+                "X-XSRF-TOKEN"));
+        // Credentials are intentionally disabled. The backend does not authenticate
+        // browsers directly; the frontend exchanges tokens server-side and proxies
+        // every request. Allowing credentials here would magnify the impact of any
+        // future origin-list misconfiguration (open-CORS-with-credentials).
+        configuration.setAllowCredentials(false);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
