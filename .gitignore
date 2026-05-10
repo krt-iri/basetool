@@ -43,3 +43,8 @@ realm-export.json
 Mining_Hub_V0.3.0.py
 *.log.zip
 /datenschutz.md
+
+### Environment files (never commit) ###
+.env
+.env.*
+!.env.example
