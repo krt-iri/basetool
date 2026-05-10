@@ -76,18 +76,40 @@ In the `prod` profile both applications additionally write a structured JSON log
 
 ## Getting Started
 
-Prior to running any Docker Compose commands, ensure you have created a `.env` file in the root directory containing the required database credentials:
+Prior to running any Docker Compose commands, ensure you have created a `.env` file in the root directory. Copy `.env.example` and fill in real values - the compose stack uses `${VAR:?...}` syntax and refuses to start if any required variable is missing.
+
+> [!IMPORTANT]
+> **Do not ship the placeholder values shown below into production.** They are
+> illustrative only. Generate strong passwords (e.g. `openssl rand -base64 32`)
+> for every credential and rotate them before the first deployment. The
+> Keycloak bootstrap admin in particular is the realm-master account; an
+> `admin` / `admin` setup makes the entire identity provider trivially
+> compromisable.
 
 ```env
+# Backend Database configuration
 POSTGRES_DB=krt_basetool
-POSTGRES_USER=krt_user
-POSTGRES_PASSWORD=krt_password
+POSTGRES_USER=CHANGE_ME
+POSTGRES_PASSWORD=CHANGE_ME
+
+# Keycloak Database configuration
 KC_POSTGRES_DB=keycloak
-KC_POSTGRES_USER=krt_keycloak_user
-KC_POSTGRES_PASSWORD=krt_keycloak_password
-KC_BOOTSTRAP_ADMIN_USERNAME=admin
-KC_BOOTSTRAP_ADMIN_PASSWORD=admin
-REDIS_PASSWORD=your_redis_password
+KC_POSTGRES_USER=CHANGE_ME
+KC_POSTGRES_PASSWORD=CHANGE_ME
+
+# Keycloak Initial Admin User
+KC_BOOTSTRAP_ADMIN_USERNAME=CHANGE_ME
+KC_BOOTSTRAP_ADMIN_PASSWORD=CHANGE_ME
+
+# Keycloak admin-API client secret (used by backend to sync users).
+# Get / rotate this in the Keycloak admin console:
+#   Realm "iri" -> Clients -> backend-service -> Credentials -> Regenerate.
+KEYCLOAK_ADMIN_CLIENT_SECRET=CHANGE_ME
+
+# PKCS12 keystore password for backend + frontend Spring SSL.
+SERVER_SSL_KEY_STORE_PASSWORD=CHANGE_ME
+
+REDIS_PASSWORD=CHANGE_ME
 ```
 
 ### Running with Docker Compose (Production)
