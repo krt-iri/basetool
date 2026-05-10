@@ -76,9 +76,9 @@ app:
   rate-limit:
     enabled: true
     paths:
-      - /api/v1/admin/**
-    capacity: 100
-    refillTokens: 100
+      - /api/**
+    capacity: 300
+    refillTokens: 300
     refillPeriod: 1m
 
 
