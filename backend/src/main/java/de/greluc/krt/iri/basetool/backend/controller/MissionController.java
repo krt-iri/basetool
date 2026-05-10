@@ -587,7 +587,7 @@ public class MissionController {
     }
 
     @PutMapping("/{id}/owner/{userId}")
-    @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
+    @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
     @Deprecated(forRemoval = true)
     @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
             sunset = "2026-10-20",
@@ -612,7 +612,7 @@ public class MissionController {
     }
 
     @PutMapping("/{id}/owner")
-    @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
+    @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
     @Operation(
             summary = "Change the owner of a mission (version-checked)",
             description = "Updates the mission owner through the dedicated MissionOwnership aggregate. "

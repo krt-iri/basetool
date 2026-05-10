@@ -171,6 +171,46 @@ public class MissionSecurityService {
         return result;
     }
 
+    /**
+     * Authorizes changing the owner of a mission. Tighter than
+     * {@link #canManageManagers(UUID, Authentication)}: only the current owner of the
+     * mission or holders of the global {@code ROLE_ADMIN} / {@code ROLE_OFFICER}
+     * authorities may transfer ownership. Regular co-managers and holders of the
+     * mission-scoped role {@code ROLE_MISSION_MANAGER} are NOT permitted to change
+     * the owner, since they would otherwise be able to displace the original owner
+     * and grant themselves ownership of any mission they have manager rights on.
+     */
+    @Transactional(readOnly = true)
+    public boolean canChangeOwner(UUID missionId, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        if ("anonymousUser".equals(authentication.getPrincipal())) {
+            return false;
+        }
+
+        Collection<? extends GrantedAuthority> reachable =
+                roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
+        boolean isAdminOrOfficer = reachable.stream().anyMatch(a ->
+                a.getAuthority().equals("ROLE_ADMIN") ||
+                a.getAuthority().equals("ROLE_OFFICER"));
+        if (isAdminOrOfficer) {
+            return true;
+        }
+
+        Optional<Mission> missionOpt = missionRepository.findById(missionId);
+        if (missionOpt.isEmpty()) {
+            return false;
+        }
+        Mission mission = missionOpt.get();
+        if (mission.getOwner() == null) {
+            return false;
+        }
+
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        return userId != null && mission.getOwner().getId().equals(userId);
+    }
+
     public boolean isOwnerOrManager(Mission mission, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
