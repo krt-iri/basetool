@@ -71,11 +71,26 @@ function krtAutocomplete(inp, dataSource, options = {}) {
         arr.slice(0, 15).forEach(item => {
             const itemStr = typeof item === 'string' ? item : item.label || item.value || '';
             const itemVal = typeof item === 'string' ? item : item.value || '';
-            
+
             const b = document.createElement("DIV");
-            const regex = new RegExp("(" + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ")", "gi");
-            b.innerHTML = itemStr.replace(regex, "<strong>$1</strong>");
-            b.innerHTML += "<input type='hidden' value='" + itemVal.replace(/'/g, "&#39;") + "'>";
+            // Build the highlighted label using DOM nodes so itemStr is treated
+            // as text, not HTML. Only the surrounding <strong> wrapper is markup.
+            const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp("(" + escapedVal + ")", "gi");
+            const parts = itemStr.split(regex);
+            parts.forEach((part, i) => {
+                if (i % 2 === 1) {
+                    const strong = document.createElement("strong");
+                    strong.textContent = part;
+                    b.appendChild(strong);
+                } else if (part) {
+                    b.appendChild(document.createTextNode(part));
+                }
+            });
+            const hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.value = itemVal;
+            b.appendChild(hidden);
             b.addEventListener("click", function(e) {
                 inp.value = this.getElementsByTagName("input")[0].value;
                 if (options.onSelect) {

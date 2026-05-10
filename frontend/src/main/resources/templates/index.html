@@ -95,8 +95,15 @@
         if (infoContent && window.marked) {
             const raw = infoContent.getAttribute('data-markdown');
             if (raw) {
-                const html = marked.parse(raw);
-                infoContent.innerHTML = (window.DOMPurify) ? DOMPurify.sanitize(html) : html;
+                if (window.DOMPurify) {
+                    infoContent.innerHTML = DOMPurify.sanitize(marked.parse(raw));
+                } else {
+                    // DOMPurify unavailable (CDN blocked / adblocker / network issue):
+                    // fall back to plain text instead of injecting unsanitized markup,
+                    // since announcements are admin-controlled and could contain HTML.
+                    console.warn('DOMPurify not loaded; rendering announcement as plain text.');
+                    infoContent.textContent = raw;
+                }
             }
         }
     });

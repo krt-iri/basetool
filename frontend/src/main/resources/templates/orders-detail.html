@@ -391,7 +391,9 @@
             const isPiece = inv.material && inv.material.quantityType === 'PIECE';
             const qtyLabel = isPiece ? labelPiece : labelScu;
             const formattedAmount = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
-            options += `<option value="${inv.id}">${inv.material.name} (Qual. ${inv.quality}) - ${formattedAmount} ${qtyLabel} von ${inv.user.effectiveName}</option>`;
+            const matName = (inv.material && inv.material.name) || '';
+            const userName = (inv.user && inv.user.effectiveName) || '';
+            options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(matName)} (Qual. ${escapeHtml(inv.quality)}) - ${escapeHtml(formattedAmount)} ${escapeHtml(qtyLabel)} von ${escapeHtml(userName)}</option>`;
         });
 
         row.innerHTML = `
@@ -898,21 +900,21 @@
                 const csrfTokenValue = document.querySelector('meta[name="_csrf"]')?.content || '';
                 const unlinkCell = IS_LOGISTICIAN ? `
                                         <td onclick="event.stopPropagation()">
-                                            <form method="post" action="/orders/${orderId}/inventory/${item.id}/unlink" style="margin: 0;"
+                                            <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" style="margin: 0;"
                                                   onsubmit="this.querySelector('button[type=submit]').disabled=true;">
-                                                <input type="hidden" name="_csrf" value="${csrfTokenValue}">
+                                                <input type="hidden" name="_csrf" value="${escapeAttr(csrfTokenValue)}">
                                                 <button type="submit" class="btn btn-outline-danger"
                                                         style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                                        title="${MSG_INVENTORY_UNLINK_TOOLTIP}">&times;</button>
+                                                        title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
                                             </form>
                                         </td>` : '';
-                
+
                 html += `
                                     <tr>
-                                        <td>${ownerName}</td>
-                                        <td>${locationName}</td>
-                                        <td>${quality}</td>
-                                        <td>${quantity}</td>
+                                        <td>${escapeHtml(ownerName)}</td>
+                                        <td>${escapeHtml(locationName)}</td>
+                                        <td>${escapeHtml(quality)}</td>
+                                        <td>${escapeHtml(quantity)}</td>
                                         ${unlinkCell}
                                     </tr>
                 `;
