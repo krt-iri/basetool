@@ -1,6 +1,7 @@
 server:
   ssl:
     enabled: false
+    key-store-password: test-keystore-password
 spring:
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
@@ -22,3 +23,12 @@ spring:
 krt:
   uex:
     scheduler-enabled: false
+
+app:
+  keycloak:
+    sync:
+      enabled: false
+      admin-url: http://keycloak.example.com
+      realm: test
+      client-id: test-client
+      client-secret: test-secret
