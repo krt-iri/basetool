@@ -63,20 +63,25 @@ public class UserService {
     public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
         String sub = jwt.getSubject();
         if (sub == null) {
-            sub = jwt.getClaimAsString("preferred_username");
-            if (sub != null) {
-                log.warn("JWT subject (sub) is null. Falling back to preferred_username: {}", sub);
-            } else {
-                log.error("JWT subject and preferred_username are null. Cannot identify user. Claims: {}", jwt.getClaims());
-                throw new IllegalArgumentException("JWT subject must not be null");
-            }
+            // The OIDC standard requires `sub` on every ID token. A missing subject
+            // indicates a misconfigured authorization server. Refuse rather than
+            // falling back to a different claim and silently identifying users by
+            // a value an admin might rename in Keycloak.
+            log.error("JWT has no subject (sub). Refusing the request. Claims: {}", jwt.getClaims());
+            throw new org.springframework.security.authentication.AuthenticationServiceException(
+                    "JWT subject (sub) must be present");
         }
 
         try {
             return UUID.fromString(sub);
         } catch (IllegalArgumentException e) {
-            log.warn("JWT subject is not a valid UUID: {}. Using name-based UUID.", sub);
-            return UUID.nameUUIDFromBytes(sub.getBytes());
+            // Standard Keycloak issues UUIDs as subjects. A non-UUID sub is a
+            // configuration deviation; deriving a UUID via UUID.nameUUIDFromBytes
+            // would mix up identities (renaming the underlying value, two realms
+            // with similar usernames, casing differences, ...). Fail-closed.
+            log.error("JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.", sub);
+            throw new org.springframework.security.authentication.AuthenticationServiceException(
+                    "JWT subject must be a UUID");
         }
     }
 
