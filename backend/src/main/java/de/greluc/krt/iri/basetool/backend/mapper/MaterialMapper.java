@@ -17,6 +17,29 @@ public interface MaterialMapper {
     @Mapping(target = "isVolatileTime", expression = "java(dto.isVolatileTime() != null && dto.isVolatileTime() ? 1 : 0)")
     Material toEntity(MaterialDto dto);
 
+    /**
+     * Strips server-managed fields and body-supplied foreign-key references from a
+     * freshly mapped entity for the POST/create flow, so a client cannot pre-set them
+     * (mass-assignment / over-posting). {@code id} stays null so JPA performs an
+     * INSERT instead of a merge against an existing row; {@code version} is left to
+     * the persistence provider; {@code refinedMaterial} and {@code category} are not
+     * accepted through the request body here. A future create flow that needs them
+     * should look the ids up via the service layer.
+     *
+     * <p>Declared as a static helper rather than a default mapping method so MapStruct
+     * does not consider it a candidate for nested {@code MaterialDto -> Material}
+     * mappings inside other mappers.
+     */
+    static Material stripServerManaged(Material entity) {
+        if (entity != null) {
+            entity.setId(null);
+            entity.setVersion(null);
+            entity.setRefinedMaterial(null);
+            entity.setCategory(null);
+        }
+        return entity;
+    }
+
     default Boolean mapIsIllegal(Integer value) {
         return value != null && value == 1;
     }
