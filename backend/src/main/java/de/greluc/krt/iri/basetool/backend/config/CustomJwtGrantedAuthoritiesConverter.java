@@ -6,6 +6,8 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,24 +23,23 @@ import java.util.stream.Stream;
 @Slf4j
 public class CustomJwtGrantedAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
+    private static final int MAX_SYNC_ATTEMPTS = 3;
+    private static final long RETRY_BACKOFF_MILLIS = 50L;
+
     private final UserService userService;
 
     @Override
     public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
-        int attempts = 3;
-        while (attempts > 0) {
+        ObjectOptimisticLockingFailureException lastLockingFailure = null;
+        for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
             try {
                 User user = userService.syncUser(jwt);
-                
+
                 Collection<GrantedAuthority> authorities = user.getRoles().stream()
                     .flatMap(role -> {
-                        // Add ROLE_NAME
                         Stream<GrantedAuthority> roleAuth = Stream.of(new SimpleGrantedAuthority("ROLE_" + role.getName().toUpperCase().replace(" ", "_")));
-                        
-                        // Add PERMISSIONS
                         Stream<GrantedAuthority> permAuth = role.getPermissions().stream()
                             .map(SimpleGrantedAuthority::new);
-                            
                         return Stream.concat(roleAuth, permAuth);
                     })
                     .collect(Collectors.toCollection(ArrayList::new));
@@ -46,34 +47,32 @@ public class CustomJwtGrantedAuthoritiesConverter implements Converter<Jwt, Coll
                 if (user.isLogistician()) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
                 }
-                
+
                 if (user.isMissionManager()) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
                 }
-                
+
                 return authorities;
-            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
-                attempts--;
-                log.warn("Optimistic locking failure during user sync. Attempts left: {}", attempts);
-                if (attempts == 0) {
-                     return fallbackToJwtRoles(jwt, e);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                lastLockingFailure = e;
+                int attemptsLeft = MAX_SYNC_ATTEMPTS - attempt;
+                log.warn("Optimistic locking failure during user sync (attempt {}/{}). Attempts left: {}",
+                        attempt, MAX_SYNC_ATTEMPTS, attemptsLeft);
+                if (attemptsLeft > 0) {
+                    try {
+                        Thread.sleep(RETRY_BACKOFF_MILLIS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new AuthenticationServiceException(
+                                "User authority sync interrupted while retrying after optimistic locking failure", ie);
+                    }
                 }
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-            } catch (Exception e) {
-                return fallbackToJwtRoles(jwt, e);
             }
         }
-        return new ArrayList<>();
-    }
 
-    private Collection<GrantedAuthority> fallbackToJwtRoles(Jwt jwt, Exception e) {
-        log.error("Failed to sync user from JWT. Falling back to JWT roles. Error: {}", e.getMessage());
-        return userService.extractRolesFromJwt(jwt).stream()
-                .map(roleName -> new SimpleGrantedAuthority("ROLE_" + roleName.toUpperCase().replace(" ", "_")))
-                .collect(Collectors.toList());
+        log.error("Failed to sync user authorities after {} attempts due to repeated optimistic locking failures. Authentication denied.",
+                MAX_SYNC_ATTEMPTS, lastLockingFailure);
+        throw new AuthenticationServiceException(
+                "Failed to resolve user authorities after " + MAX_SYNC_ATTEMPTS + " attempts", lastLockingFailure);
     }
 }
