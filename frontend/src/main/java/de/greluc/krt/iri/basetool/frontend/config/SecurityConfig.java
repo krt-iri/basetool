@@ -50,7 +50,14 @@ public class SecurityConfig {
             "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
             + "img-src 'self' data:; font-src 'self' data:; "
             + "style-src 'self' 'unsafe-inline'; "
-            + "script-src 'nonce-%s' 'strict-dynamic' https:";
+            + "script-src 'nonce-%s' 'strict-dynamic' https:; "
+            // The templates carry ~200 inline event-handler attributes (onclick="…",
+            // onsubmit="…", …). Nonces and 'strict-dynamic' do NOT cover those (they
+            // only cover <script> elements). Until those are migrated to addEventListener
+            // we keep them runnable via a separate, narrowly-scoped script-src-attr
+            // directive. Inline <script> elements remain strictly nonce-gated by the
+            // line above - the XSS surface that matters most is unaffected.
+            + "script-src-attr 'unsafe-inline'";
 
     private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
         return (request, response) -> {
