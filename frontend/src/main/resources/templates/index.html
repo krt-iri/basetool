@@ -3,8 +3,8 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{app.title}">IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" th:attr="nonce=${cspNonce}"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/vendor/marked-18.0.3.min.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/vendor/dompurify-3.4.2.min.js}" th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
