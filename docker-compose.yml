@@ -265,7 +265,10 @@ services:
           - frontend
 
   npm:
-    image: jc21/nginx-proxy-manager:latest
+    # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
+    # do not move back to `:latest` (silent upstream changes are a supply-chain risk
+    # and break reproducibility). Consider appending @sha256:<digest> as well.
+    image: jc21/nginx-proxy-manager:2.14.0
     ports:
       - "80:80"     # Frontend / Keycloak HTTP Traffic
       - "443:443"    # Frontend / Keycloak HTTPS Traffic

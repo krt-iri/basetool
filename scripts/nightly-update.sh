@@ -1,9 +1,19 @@
 #!/bin/bash
 # =============================================================================
-# IRIDIUM Basetool – Nightly Update Script
+# IRIDIUM Basetool - Nightly Update Script
 # Fährt alle Prod-Container herunter, pullt neue Images und startet sie neu.
 # Cron-Beispiel (täglich um 03:30 Uhr):
 #   30 3 * * * /var/iri/code/scripts/nightly-update.sh >> /var/log/iri-nightly-update.log 2>&1
+#
+# Supply-chain note:
+#   `docker compose pull` resolves each external image (postgres, redis,
+#   keycloak, nginx-proxy-manager) by tag, NOT by digest. A compromised
+#   upstream image with the same tag would be pulled silently. For higher
+#   assurance, pin the externally-sourced services in docker-compose.yml to
+#   an explicit @sha256:<digest>:
+#     image: postgres:18-alpine@sha256:<digest>
+#   Refresh the digests deliberately as part of an upgrade workflow rather
+#   than letting this nightly job silently move them.
 # =============================================================================
 
 set -euo pipefail
@@ -50,10 +60,13 @@ UNHEALTHY=$(docker compose --file "${COMPOSE_FILE}" --profile "${PROFILE}" ps \
   | grep -v ": healthy" | grep -v ": $" || true)
 
 if [ -n "${UNHEALTHY}" ]; then
-  echo "[$(date '+%H:%M:%S')] [WARNUNG] Folgende Container sind nicht healthy:"
+  echo "[$(date '+%H:%M:%S')] [FEHLER] Folgende Container sind nicht healthy:"
   echo "${UNHEALTHY}"
-else
-  echo "[$(date '+%H:%M:%S')] Alle Container sind healthy."
+  echo "[$(date '+%H:%M:%S')] Nächtliches Update abgeschlossen MIT FEHLER."
+  # Non-zero exit so cron / monitoring picks this up instead of treating a
+  # silently broken stack as a normal nightly run.
+  exit 1
 fi
 
+echo "[$(date '+%H:%M:%S')] Alle Container sind healthy."
 echo "[$(date '+%H:%M:%S')] Nächtliches Update abgeschlossen."
