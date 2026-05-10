@@ -30,12 +30,17 @@
     </div>
 
     <!-- General Success Toast (Param) -->
-    <div th:if="${param.success}"
+    <!-- Only renders for keys that match the safe pattern below (alphanumeric + dots,
+         up to 80 chars). Without that gate any URL like ?success=any.translation.key
+         would let an attacker pick an arbitrary translation entry, enabling UI
+         spoofing and translation-key enumeration. Server-controlled toasts use the
+         flash-attribute "successToast" above instead. -->
+    <div th:if="${param.success != null and #strings.matches(param.success[0], '^[A-Za-z][A-Za-z0-9._-]{0,79}$')}"
          id="successNotificationParam"
          class="notification-toast"
          data-duration="5000">
         <h4 th:text="#{notification.success.title}">Aktion erfolgreich</h4>
-        <p th:text="${!#strings.isEmpty(param.success[0])} ? #{${param.success[0]}} : #{notification.success.title}"></p>
+        <p th:text="#{${param.success[0]}} ?: #{notification.success.title}"></p>
     </div>
 
     <!-- General Error Toast -->
@@ -57,12 +62,14 @@
     </div>
 
     <!-- General Error Toast (Param) -->
-    <div th:if="${param.error}"
+    <!-- Same key-pattern gate as the success variant above: prevents arbitrary
+         translation-key lookup via ?error=any.key. -->
+    <div th:if="${param.error != null and #strings.matches(param.error[0], '^[A-Za-z][A-Za-z0-9._-]{0,79}$')}"
          id="errorNotificationParam"
          class="notification-toast error-toast"
          data-duration="7000">
         <h4 th:text="#{notification.error.title}">Aktion fehlgeschlagen</h4>
-        <p th:text="${!#strings.isEmpty(param.error[0])} ? #{${param.error[0]}} : #{notification.error.title}"></p>
+        <p th:text="#{${param.error[0]}} ?: #{notification.error.title}"></p>
     </div>
 
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
