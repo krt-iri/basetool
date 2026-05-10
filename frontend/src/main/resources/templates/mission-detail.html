@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{missions.title} + ' - ' + #{app.title}">Mission Details - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
     <style>
         .form-group { margin-bottom: 1.5rem; }
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
@@ -1278,7 +1278,7 @@
             </div>
         </div>
     </div>
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MSG_ERROR_PAYOUT_UPDATE = /*[[#{error.mission.payout.update}]]*/ 'Error updating payout preference';
     const MSG_ERROR_PERMISSION_DENIED = /*[[#{error.permission.denied}]]*/ 'Permission denied';
     const MSG_ERROR_MANAGER_ADD = /*[[#{error.mission.manager.add}]]*/ 'Error adding manager';
@@ -1325,7 +1325,7 @@
     window.missionId = missionId;
     console.log('Mission ID initialized:', missionId);
 </script>
-<script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         // --- Mission panel collapse handling -----------------------------------------
         // State is persisted per user and per mission so it survives a page reload.
@@ -2060,10 +2060,17 @@
                             users.forEach(user => {
                                 const div = document.createElement("div");
                                 const regex = new RegExp("(" + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ")", "gi");
-                                const displayName = user.effectiveName;
-                                const nameHighlighted = displayName.replace(regex, "<strong>$1</strong>");
-
-                                div.innerHTML = nameHighlighted;
+                                const displayName = user.effectiveName || '';
+                                // Use DOM nodes instead of innerHTML so displayName is treated as text.
+                                displayName.split(regex).forEach((part, i) => {
+                                    if (i % 2 === 1) {
+                                        const strong = document.createElement("strong");
+                                        strong.textContent = part;
+                                        div.appendChild(strong);
+                                    } else if (part) {
+                                        div.appendChild(document.createTextNode(part));
+                                    }
+                                });
 
                                 div.addEventListener("click", function(e) {
                                     searchInput.value = displayName;
@@ -2398,7 +2405,7 @@
     }
 
     </script>
-    <script th:inline="javascript" th:if="${!isNew}">
+    <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
     function openEditFinanceModal(id, note, type, amount, version) {
         document.getElementById('edit-finance-form').action = '/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update';
         document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
@@ -2408,7 +2415,7 @@
         document.getElementById('edit-finance-entry-modal').style.display = 'flex';
     }
     </script>
-    <script>
+    <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.unit-content').forEach(content => {
             const isCollapsed = localStorage.getItem('mission-' + content.id + '-collapsed') === 'true';
@@ -2476,6 +2483,6 @@
     });
 </script>
 <!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
-<script th:src="@{/js/mission-subresource.js}" defer></script>
+<script th:src="@{/js/mission-subresource.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

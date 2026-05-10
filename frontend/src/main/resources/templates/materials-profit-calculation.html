@@ -277,7 +277,7 @@
     </div>
 </main>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
     function toggleMultiSelect(id) {
         var el = document.getElementById(id);
         var isOpened = el.classList.contains('open');
@@ -466,8 +466,8 @@
                 
                 tr.innerHTML = `
                     <td style="text-align: left;">
-                        <a href="/materials/${item.materialId}">
-                            <strong>${item.materialName}</strong>
+                        <a href="/materials/${escapeAttr(item.materialId)}">
+                            <strong>${escapeHtml(item.materialName)}</strong>
                         </a>
                     </td>
                     <td>-${formatNumber(item.minBuyPrice)}</td>

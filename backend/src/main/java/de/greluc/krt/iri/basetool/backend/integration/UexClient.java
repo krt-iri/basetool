@@ -20,7 +20,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexRefineryYieldDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexSpaceStationDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexTerminalDto;
 
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -33,19 +33,34 @@ import java.util.List;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class UexClient {
 
     private final WebClient.Builder webClientBuilder;
     private final UexProperties uexProperties;
+    /**
+     * Reusable WebClient bound to the UEX base URL. Built once after dependency
+     * injection completes (instead of per call) so the underlying connection pool
+     * is actually shared across requests. The Reactor-Netty HttpClient already
+     * carries the connect / read / write timeouts configured in WebClientConfig.
+     */
+    private WebClient client;
+
+    public UexClient(WebClient.Builder webClientBuilder, UexProperties uexProperties) {
+        this.webClientBuilder = webClientBuilder;
+        this.uexProperties = uexProperties;
+    }
+
+    @PostConstruct
+    void initClient() {
+        this.client = webClientBuilder
+                .baseUrl(uexProperties.getApiUrl())
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+                .build();
+    }
 
     public List<UexCommodityDto> getCommodities() {
         log.info("Fetching all commodities from UEX API");
         
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getCommoditiesEndpoint())
@@ -64,10 +79,6 @@ public class UexClient {
     public List<UexCommodityPriceDto> getCommoditiesPricesAll() {
         log.info("Fetching all commodities prices from UEX API");
         
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getCommoditiesPricesEndpoint())
@@ -86,10 +97,6 @@ public class UexClient {
     public List<UexStarSystemDto> getStarSystems() {
         log.info("Fetching all star systems from UEX API");
         
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getStarSystemsEndpoint())
@@ -107,10 +114,6 @@ public class UexClient {
     public List<UexCompanyDto> getCompanies() {
         log.info("Fetching all companies from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getCompaniesEndpoint())
@@ -129,10 +132,6 @@ public class UexClient {
     public List<UexVehicleDto> getVehicles() {
         log.info("Fetching all vehicles from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getVehiclesEndpoint())
@@ -151,10 +150,6 @@ public class UexClient {
     public List<UexCityDto> getCities() {
         log.info("Fetching all citys from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getCitiesEndpoint())
@@ -173,10 +168,6 @@ public class UexClient {
     public List<UexFactionDto> getFactions() {
         log.info("Fetching all factions from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getFactionsEndpoint())
@@ -195,10 +186,6 @@ public class UexClient {
     public List<UexJurisdictionDto> getJurisdictions() {
         log.info("Fetching all jurisdictions from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getJurisdictionsEndpoint())
@@ -217,10 +204,6 @@ public class UexClient {
     public List<UexMoonDto> getMoons() {
         log.info("Fetching all moons from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getMoonsEndpoint())
@@ -239,10 +222,6 @@ public class UexClient {
     public List<UexOrbitDto> getOrbits() {
         log.info("Fetching all orbits from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getOrbitsEndpoint())
@@ -261,10 +240,6 @@ public class UexClient {
     public List<UexOutpostDto> getOutposts() {
         log.info("Fetching all outposts from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getOutpostsEndpoint())
@@ -283,10 +258,6 @@ public class UexClient {
     public List<UexPlanetDto> getPlanets() {
         log.info("Fetching all planets from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getPlanetsEndpoint())
@@ -305,10 +276,6 @@ public class UexClient {
     public List<UexPoiDto> getPoi() {
         log.info("Fetching all pois from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getPoiEndpoint())
@@ -327,10 +294,6 @@ public class UexClient {
     public List<UexSpaceStationDto> getSpaceStations() {
         log.info("Fetching all spacestations from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getSpaceStationsEndpoint())
@@ -349,10 +312,6 @@ public class UexClient {
     public List<UexTerminalDto> getTerminals() {
         log.info("Fetching all terminals from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getTerminalsEndpoint())
@@ -371,10 +330,6 @@ public class UexClient {
     public List<UexRefiningMethodDto> getRefineriesMethods() {
         log.info("Fetching all refineries methods from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getRefineriesMethodsEndpoint())
@@ -393,10 +348,6 @@ public class UexClient {
     public List<UexRefineryYieldDto> getRefineriesYields() {
         log.info("Fetching all refineries yields from UEX API");
 
-        WebClient client = webClientBuilder
-                .baseUrl(uexProperties.getApiUrl())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
 
         return client.get()
                 .uri(uexProperties.getRefineriesYieldsEndpoint())

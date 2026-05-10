@@ -11,8 +11,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://db-backend:15432/krt_basetool
-    username: krt_user
-    password: krt_password
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       # Conservative Connection Pool Defaults for Production
       maximum-pool-size: 10

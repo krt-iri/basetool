@@ -330,7 +330,7 @@
     </div>
 </main>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         // Squadron Modal
         const sqModal = document.getElementById('squadron-modal');

@@ -89,7 +89,8 @@ public class SecurityHardeningIntegrationTest {
         mockMvc.perform(post("/api/v1/missions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\": \"Member Mission\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
                 .andExpect(status().isOk());
     }
 

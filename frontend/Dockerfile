@@ -34,11 +34,21 @@ WORKDIR /app/extracted
 FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
 
-# Extrahierte Layer einzeln kopieren
-COPY --from=build /app/extracted/dependencies/ ./
-COPY --from=build /app/extracted/spring-boot-loader/ ./
-COPY --from=build /app/extracted/snapshot-dependencies/ ./
-COPY --from=build /app/extracted/application/ ./
+# Non-root runtime user. Fixed UID/GID so host bind mounts (e.g. the log
+# directory mounted in docker-compose) can be pre-chowned consistently:
+#   chown -R 10001:10001 /var/iri/frontend/log
+RUN groupadd --system --gid 10001 app \
+    && useradd  --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /app/logs \
+    && chown -R 10001:10001 /app
+
+# Extrahierte Layer einzeln kopieren (owned by the runtime user)
+COPY --from=build --chown=10001:10001 /app/extracted/dependencies/ ./
+COPY --from=build --chown=10001:10001 /app/extracted/spring-boot-loader/ ./
+COPY --from=build --chown=10001:10001 /app/extracted/snapshot-dependencies/ ./
+COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
+
+USER 10001:10001
 
 EXPOSE 18081
 

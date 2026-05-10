@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -103,13 +104,17 @@ public class MaterialController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
-    public MaterialDto createMaterial(@RequestBody @NotNull MaterialDto material) {
-        return materialMapper.toDto(materialService.createMaterial(materialMapper.toEntity(material)));
+    public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialDto material) {
+        // stripServerManaged drops client-supplied id / version / refinedMaterial /
+        // category so JPA performs a clean INSERT instead of merging onto an existing
+        // row, and foreign-key relationships cannot be re-pointed via the request body.
+        Material entity = MaterialMapper.stripServerManaged(materialMapper.toEntity(material));
+        return materialMapper.toDto(materialService.createMaterial(entity));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
-    public MaterialDto updateMaterial(@PathVariable @NotNull UUID id, @RequestBody @NotNull MaterialDto material) {
+    public MaterialDto updateMaterial(@PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
         return materialMapper.toDto(materialService.updateMaterial(id, materialMapper.toEntity(material)));
     }
 

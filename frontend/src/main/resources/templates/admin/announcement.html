@@ -70,7 +70,7 @@
         </div>
     </div>
 </main>
-<script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         const deleteModal = document.getElementById('delete-confirm-modal');
         const triggerDeleteBtn = document.getElementById('trigger-delete-confirm');

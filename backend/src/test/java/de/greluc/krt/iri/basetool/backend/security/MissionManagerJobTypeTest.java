@@ -119,7 +119,8 @@ class MissionManagerJobTypeTest {
         updateRequest.put("version", participant.getVersion());
 
         mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + participant.getId())
-                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MISSION_MANAGER")))
+                        .with(jwt().jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MISSION_MANAGER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk());
@@ -132,7 +133,8 @@ class MissionManagerJobTypeTest {
         addCrewRequest.put("jobTypeIds", List.of(crewJobType.getId().toString()));
 
         mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
-                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MISSION_MANAGER")))
+                        .with(jwt().jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MISSION_MANAGER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(addCrewRequest)))
                 .andExpect(status().isOk());

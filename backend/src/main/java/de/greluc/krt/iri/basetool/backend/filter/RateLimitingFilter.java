@@ -1,5 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.filter;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.iri.basetool.backend.config.AppProblemProperties;
 import de.greluc.krt.iri.basetool.backend.config.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
@@ -9,7 +11,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,17 +20,26 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-@RequiredArgsConstructor
 public class RateLimitingFilter extends OncePerRequestFilter {
+
+    private static final Duration BUCKET_EXPIRE_AFTER_ACCESS = Duration.ofHours(1);
+    private static final long BUCKET_MAX_ENTRIES = 100_000L;
 
     private final RateLimitProperties properties;
     private final AppProblemProperties problemProperties;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
-    private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> bucketCache;
+
+    public RateLimitingFilter(RateLimitProperties properties, AppProblemProperties problemProperties) {
+        this.properties = properties;
+        this.problemProperties = problemProperties;
+        this.bucketCache = Caffeine.newBuilder()
+                .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
+                .maximumSize(BUCKET_MAX_ENTRIES)
+                .build();
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -54,7 +64,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String clientIp = resolveClientIp(request);
         String pattern = firstMatchingPattern(request.getRequestURI(), properties.getPaths());
         String key = clientIp + "|" + (pattern != null ? pattern : "");
-        Bucket bucket = cache.computeIfAbsent(key, k -> createNewBucket(properties.getCapacity(), properties.getRefillTokens(), properties.getRefillPeriod()));
+        Bucket bucket = bucketCache.get(key, k -> createNewBucket(properties.getCapacity(), properties.getRefillTokens(), properties.getRefillPeriod()));
 
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         if (probe.isConsumed()) {
@@ -69,12 +79,22 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Resolves the rate-limit key for the incoming request. {@code X-Forwarded-For} is
+     * only honored when the immediate peer ({@code request.getRemoteAddr()}) is listed
+     * by exact match in {@code app.rate-limit.trusted-proxies}; the literal {@code "*"}
+     * is intentionally NOT a valid trust value, since blanket trust lets any client
+     * spoof the header and obtain a fresh bucket per request.
+     */
     private String resolveClientIp(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
         List<String> trusted = properties.getTrustedProxies();
-        
-        boolean isTrusted = trusted != null && (trusted.contains("*") || trusted.contains(remoteAddr));
-        
+
+        boolean isTrusted = trusted != null && !trusted.isEmpty()
+                && trusted.stream()
+                        .filter(p -> p != null && !"*".equals(p))
+                        .anyMatch(remoteAddr::equals);
+
         if (isTrusted) {
             String xff = request.getHeader("X-Forwarded-For");
             if (xff != null && !xff.isBlank()) {
@@ -83,7 +103,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                 return idx > 0 ? xff.substring(0, idx).trim() : xff.trim();
             }
         }
-        
+
         return remoteAddr;
     }
 

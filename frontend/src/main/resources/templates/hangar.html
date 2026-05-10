@@ -357,7 +357,7 @@
     </div>
 </main>
 
-<script>
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
         const modal = document.getElementById("ship-modal");
         const closeBtn = document.querySelector(".close-modal");
@@ -497,10 +497,6 @@
                 }
 
                 resultModal.style.display = 'flex';
-            }
-
-            function escapeHtml(str) {
-                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
 
             if (closeResultBtn) {

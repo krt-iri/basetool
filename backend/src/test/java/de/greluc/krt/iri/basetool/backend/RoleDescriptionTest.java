@@ -61,6 +61,7 @@ class RoleDescriptionTest {
         userRepository.save(adminUser);
 
         testRole = new Role();
+        testRole.setCode("TEST_ROLE");
         testRole.setName("TestRole");
         testRole = roleRepository.save(testRole);
     }

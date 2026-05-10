@@ -90,8 +90,8 @@
     </div>
 </main>
 
-<script th:src="@{/js/autocomplete.js}"></script>
-<script th:inline="javascript">
+<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
         const locationNames = /*[[${locations.![name]}]]*/ [];
         const inpLocations = document.getElementById("filterLocations");

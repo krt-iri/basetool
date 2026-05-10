@@ -23,7 +23,8 @@ class SecurityConfigTest {
         BotProtectionFilter botProtectionFilter = mock(BotProtectionFilter.class);
         SessionDebugFilter sessionDebugFilter = mock(SessionDebugFilter.class);
         SsoReAuthenticationEntryPoint ssoEntryPoint = mock(SsoReAuthenticationEntryPoint.class);
-        SecurityConfig config = new SecurityConfig(loggingFilter, roleSyncFilter, botProtectionFilter, sessionDebugFilter, ssoEntryPoint);
+        CspNonceFilter cspNonceFilter = mock(CspNonceFilter.class);
+        SecurityConfig config = new SecurityConfig(loggingFilter, roleSyncFilter, botProtectionFilter, sessionDebugFilter, ssoEntryPoint, cspNonceFilter);
         GrantedAuthoritiesMapper mapper = config.userAuthoritiesMapper();
 
         Map<String, Object> realmAccess = new HashMap<>();

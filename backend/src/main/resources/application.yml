@@ -9,7 +9,7 @@ server:
   ssl:
     enabled: true
     key-store: classpath:keystore.p12
-    key-store-password: changeit
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
     key-store-type: PKCS12
     key-alias: basetool
   compression:
@@ -72,13 +72,13 @@ app:
       admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080}
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
-      client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:u3HM0oSRHae0KT1f9jEuakiBf1gYIxNb}
+      client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
   rate-limit:
     enabled: true
     paths:
-      - /api/v1/admin/**
-    capacity: 100
-    refillTokens: 100
+      - /api/**
+    capacity: 300
+    refillTokens: 300
     refillPeriod: 1m
 
 

@@ -107,7 +107,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     function updateRefineryOrderColors() {
         const nowMs = new Date().getTime();
         document.querySelectorAll('.refinery-order-id-display').forEach(el => {

@@ -22,22 +22,29 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initRoles() {
         return args -> {
-            createRoleIfNotFound("Squadron Member", Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ"));
-            createRoleIfNotFound("Officer", Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ", "MISSION_WRITE", "MISSION_MANAGE", "USER_MANAGE"));
-            createRoleIfNotFound("Admin", Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ", "MISSION_WRITE", "MISSION_MANAGE", "USER_MANAGE", "ROLE_MANAGE"));
-            createRoleIfNotFound("Guest", Set.of());
+            // Lookup is by `code`, not by `name`: an admin renaming a role no longer
+            // triggers a silent re-create with default permissions on the next boot.
+            createRoleIfNotFound("SQUADRON_MEMBER", "Squadron Member",
+                    Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ"));
+            createRoleIfNotFound("OFFICER", "Officer",
+                    Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ", "MISSION_WRITE", "MISSION_MANAGE", "USER_MANAGE"));
+            createRoleIfNotFound("ADMIN", "Admin",
+                    Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ", "MISSION_WRITE", "MISSION_MANAGE", "USER_MANAGE", "ROLE_MANAGE"));
+            createRoleIfNotFound("GUEST", "Guest", Set.of());
 
             createSquadronIfNotFound("IRIDIUM", "IRI", "The main squadron.");
         };
     }
 
-    private void createRoleIfNotFound(String name, Set<String> permissions) {
-        if (roleRepository.findByName(name).isEmpty()) {
-            Role role = new Role();
-            role.setName(name);
-            role.setPermissions(new HashSet<>(permissions)); // Ensure mutable
-            roleRepository.save(role);
+    private void createRoleIfNotFound(String code, String displayName, Set<String> permissions) {
+        if (roleRepository.findByCode(code).isPresent()) {
+            return;
         }
+        Role role = new Role();
+        role.setCode(code);
+        role.setName(displayName);
+        role.setPermissions(new HashSet<>(permissions)); // Ensure mutable
+        roleRepository.save(role);
     }
     private void createSquadronIfNotFound(String name, String shorthand, String description) {
         if (squadronRepository.findByShorthand(shorthand).isEmpty()) {

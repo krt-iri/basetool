@@ -6,6 +6,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.mapper.TerminalMapper;
 import de.greluc.krt.iri.basetool.backend.service.TerminalService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -44,8 +45,8 @@ public class TerminalController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public TerminalDto updateTerminal(@PathVariable @NotNull UUID id, @RequestBody @NotNull TerminalDto terminalDto) {
-        // Here we just allow toggling visibility according to the requirement, 
+    public TerminalDto updateTerminal(@PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull TerminalDto terminalDto) {
+        // Here we just allow toggling visibility according to the requirement,
         // but we mimic a normal PUT. In the Admin view, we only change 'hidden'.
         return terminalMapper.toDto(terminalService.updateTerminalVisibility(id, terminalDto.hidden()));
     }

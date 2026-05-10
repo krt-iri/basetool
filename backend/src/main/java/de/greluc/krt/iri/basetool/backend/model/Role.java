@@ -18,6 +18,17 @@ public class Role extends AbstractEntity<Long> {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Stable, machine-readable identifier (e.g. {@code ADMIN}, {@code OFFICER}).
+     * Set once at seed time and not updatable afterwards. {@link #name} is the
+     * human-readable display label and may be renamed by an admin without
+     * changing the role's identity; the seed logic in DataInitializer matches
+     * against this code so a renamed role no longer triggers a silent re-create
+     * with default permissions on the next boot.
+     */
+    @Column(unique = true, nullable = false, updatable = false, length = 64)
+    private String code;
+
     @Column(unique = true, nullable = false)
     private String name;
 

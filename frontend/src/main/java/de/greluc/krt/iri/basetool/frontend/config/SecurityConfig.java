@@ -44,6 +44,21 @@ public class SecurityConfig {
     private final BotProtectionFilter botProtectionFilter;
     private final SessionDebugFilter sessionDebugFilter;
     private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
+    private final CspNonceFilter cspNonceFilter;
+
+    private static final String CSP_TEMPLATE =
+            "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
+            + "img-src 'self' data:; font-src 'self' data:; "
+            + "style-src 'self' 'unsafe-inline'; "
+            + "script-src 'nonce-%s' 'strict-dynamic' https:";
+
+    private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
+        return (request, response) -> {
+            Object nonceAttr = request.getAttribute(CspNonceFilter.REQUEST_ATTRIBUTE);
+            String nonce = nonceAttr != null ? nonceAttr.toString() : "";
+            response.setHeader("Content-Security-Policy", String.format(CSP_TEMPLATE, nonce));
+        };
+    }
 
     @Bean
     public static RoleHierarchy roleHierarchy() {
@@ -61,6 +76,7 @@ public class SecurityConfig {
                 new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
 
         http
+            .addFilterBefore(cspNonceFilter, org.springframework.security.web.header.HeaderWriterFilter.class)
             .addFilterBefore(botProtectionFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
             .addFilterBefore(sessionDebugFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
             .addFilterBefore(requestLoggingFilter, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class)
@@ -75,7 +91,7 @@ public class SecurityConfig {
                 )
             )
             .headers(headers -> {
-                headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"));
+                headers.addHeaderWriter(cspNonceHeaderWriter());
                 headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
                 headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
                 headers.addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Permissions-Policy", "geolocation=(), camera=(), microphone=(), fullscreen=()"));

@@ -158,7 +158,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     let materialIndex = /*[[${jobOrderForm.materials.size()}]]*/ 1;
     

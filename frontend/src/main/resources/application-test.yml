@@ -1,6 +1,7 @@
 server:
   ssl:
     enabled: false
+    key-store-password: test-keystore-password
 spring:
   session:
     store-type: none

@@ -319,13 +319,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        // ex.getMessage() can contain implementation details (SQL fragments, internal
+        // paths, raw inputs that triggered a parser, ...). Return a generic detail to
+        // the client and keep the real message only in the server log.
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
                 "Invalid argument",
-                ex.getMessage(),
+                "Request contained an invalid argument. See server log with the correlation id for details.",
                 request,
                 "invalid-argument",
                 CODE_ILLEGAL_ARGUMENT);
-        logProblem(request, pd, "IllegalArgumentException", null);
+        logProblem(request, pd, "IllegalArgumentException",
+                Map.of("exceptionMessage", String.valueOf(ex.getMessage())));
         return toEntity(pd);
     }
 

@@ -35,6 +35,9 @@ class RoleHierarchyTest {
     private SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
 
     @MockitoBean
+    private CspNonceFilter cspNonceFilter;
+
+    @MockitoBean
     private ClientRegistrationRepository clientRegistrationRepository;
 
     @Autowired

@@ -101,6 +101,6 @@
         </div>
     </div>
 </main>
-<script th:src="@{/js/missions.js}" defer></script>
+<script th:src="@{/js/missions.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

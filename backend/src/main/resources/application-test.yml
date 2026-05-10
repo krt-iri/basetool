@@ -1,6 +1,7 @@
 server:
   ssl:
     enabled: false
+    key-store-password: test-keystore-password
 spring:
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
@@ -22,3 +23,16 @@ spring:
 krt:
   uex:
     scheduler-enabled: false
+
+app:
+  cors:
+    # Test-only origin used by SecurityTest CORS assertions. Production deliberately
+    # leaves this empty (no direct browser-to-backend cross-origin calls allowed).
+    allowed-origin-patterns: http://localhost:8080
+  keycloak:
+    sync:
+      enabled: false
+      admin-url: http://keycloak.example.com
+      realm: test
+      client-id: test-client
+      client-secret: test-secret
