@@ -79,7 +79,7 @@
                 <maxHistory>30</maxHistory>
                 <totalSizeCap>2GB</totalSizeCap>
             </rollingPolicy>
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <encoder class="de.greluc.krt.iri.basetool.backend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
                 <customFields>{"app":"basetool-backend"}</customFields>
