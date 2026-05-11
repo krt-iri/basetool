@@ -30,6 +30,8 @@ dependencies {
   // Caching
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
+  // Actuator for /actuator/health -- consumed by the Docker HEALTHCHECK
+  implementation("org.springframework.boot:spring-boot-starter-actuator")
   // Spring Session with Redis for persistent sessions across restarts
   implementation("org.springframework.session:spring-session-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")

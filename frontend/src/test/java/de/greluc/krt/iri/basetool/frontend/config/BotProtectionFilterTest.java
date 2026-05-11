@@ -52,8 +52,8 @@ class BotProtectionFilterTest {
             "/robots.txt",
             "/sitemap.xml",
             "/sitemap-users-1.xml",
-            "/actuator/health",
-            "/actuator",
+            "/actuator/env",
+            "/actuator/metrics",
             "/console",
             "/manager/html",
             "/jolokia",
@@ -99,7 +99,7 @@ class BotProtectionFilterTest {
             "/WP-ADMIN/install.php",
             "/Wp-Login.php",
             "/ROBOTS.TXT",
-            "/ACTUATOR/health",
+            "/ACTUATOR/env",
             "/.ENV",
             "/PHPMYADMIN/",
             "/FEED/",
@@ -270,7 +270,10 @@ class BotProtectionFilterTest {
     @Test
     void isBotPath_shouldReturnTrue_forKnownBotPrefixes() {
         assertTrue(filter.isBotPath("/wp-admin/"));
-        assertTrue(filter.isBotPath("/actuator/health"));
+        // `/actuator` (without the /health suffix) is still a bot path — only the
+        // /actuator/health sub-path is whitelisted, see test below.
+        assertTrue(filter.isBotPath("/actuator"));
+        assertTrue(filter.isBotPath("/actuator/env"));
         assertTrue(filter.isBotPath("/robots.txt"));
         assertTrue(filter.isBotPath("/.env"));
         assertTrue(filter.isBotPath("/phpmyadmin/"));
@@ -283,6 +286,15 @@ class BotProtectionFilterTest {
         assertFalse(filter.isBotPath("/orders"));
         assertFalse(filter.isBotPath("/hangar"));
         assertFalse(filter.isBotPath("/css/main.css"));
+    }
+
+    @Test
+    void isBotPath_shouldReturnFalse_forWhitelistedActuatorHealth() {
+        // The Docker HEALTHCHECK hits /actuator/health, so this exact path is
+        // explicitly whitelisted even though /actuator/* is otherwise blocked.
+        assertFalse(filter.isBotPath("/actuator/health"));
+        assertFalse(filter.isBotPath("/actuator/health/liveness"));
+        assertFalse(filter.isBotPath("/actuator/health/readiness"));
     }
 
     @Test

@@ -93,6 +93,12 @@ public class SecurityConfig {
             })
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
+                // docker-compose `depends_on: condition: service_healthy`. Other actuator
+                // endpoints stay behind authentication (default `anyRequest().authenticated()`
+                // catch-all below). `management.endpoint.health.show-details=never` keeps the
+                // response to `{"status":"UP"}` so no internal details leak.
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(
                     "/api/v1/frequency-types", "/api/v1/frequency-types/**",
                     "/api/v1/locations", "/api/v1/locations/**",

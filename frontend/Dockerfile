@@ -37,10 +37,14 @@ WORKDIR /app
 # Non-root runtime user. Fixed UID/GID so host bind mounts (e.g. the log
 # directory mounted in docker-compose) can be pre-chowned consistently:
 #   chown -R 10001:10001 /var/iri/frontend/log
+# `curl` is installed for the HEALTHCHECK directive at the bottom of this file.
 RUN groupadd --system --gid 10001 app \
     && useradd  --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app \
     && mkdir -p /app/logs \
-    && chown -R 10001:10001 /app
+    && chown -R 10001:10001 /app \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Extrahierte Layer einzeln kopieren (owned by the runtime user)
 COPY --from=build --chown=10001:10001 /app/extracted/dependencies/ ./
@@ -51,5 +55,13 @@ COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
 USER 10001:10001
 
 EXPOSE 18081
+
+# Hit the Spring Boot Actuator health endpoint. The frontend serves HTTPS with a
+# self-signed certificate (see application.yml `server.ssl`) so curl runs with -k
+# to skip cert verification. `start-period=60s` covers the JVM warm-up window so
+# Compose does not flap the container into `unhealthy` while Tomcat is still
+# binding the port.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsSk https://localhost:18081/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
