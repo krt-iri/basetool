@@ -2,6 +2,7 @@ import org.cyclonedx.Version
 
 plugins {
   java
+  checkstyle
   id("jacoco")
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)

@@ -54,6 +54,27 @@ subprojects {
       systemProperty("spring.profiles.active", "dev")
     }
   }
+
+  // Checkstyle (Gradle core plugin). Uses the Google Java Style config
+  // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
+  // 13.4.2 release tag) which enforces 2-space indents, 100-char lines,
+  // Google-style imports, naming conventions, Javadoc on public API, etc.
+  // Initial introduction is non-blocking (`ignoreFailures = true`,
+  // `maxWarnings = Int.MAX_VALUE`) so the existing codebase doesn't gate
+  // the build before the team has a chance to triage. Reports land under
+  // `<subproject>/build/reports/checkstyle/{main,test}.html`. The test
+  // source set scan is disabled — test code intentionally uses different
+  // conventions (long method names with underscores, longer lines for
+  // BDD-style assertions) that Google's style flags as noise.
+  plugins.withId("checkstyle") {
+    extensions.configure<CheckstyleExtension>("checkstyle") {
+      toolVersion = "13.4.2"
+      configFile = rootProject.file("config/checkstyle/google_checks.xml")
+      isIgnoreFailures = true
+      maxWarnings = Int.MAX_VALUE
+    }
+    tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
+  }
 }
 
 // OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.0. Aggregates over
