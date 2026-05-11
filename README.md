@@ -27,6 +27,65 @@ The project is divided into two main modules:
 *   **`backend`**: A Spring Boot application providing the REST API and managing data.
 *   **`frontend`**: A Spring Boot application with Thymeleaf for the user interface.
 
+Plus a few smaller top-level directories:
+*   **`keycloak-theme/krt-theme`**: Custom Keycloak login/account UI theme that
+    matches the IRIDIUM Basetool corporate design — orange `#E77E23` accents,
+    `Ethnocentric` and `Lato` web fonts, German default locale (`de`, `en`). See
+    [Keycloak Theme](#keycloak-theme) below for details.
+*   **`design`**: Source assets for the brand (logos, mock-ups, the
+    `Styleguide.md` reference). Not consumed by the runtime, kept in the
+    repo so designers and developers share one source of truth.
+*   **`scripts`**: One-off Python helper scripts used for repository maintenance
+    (i18n key sync, umlaut escaping, untranslated-string detection, etc.).
+
+## Keycloak Theme
+
+The custom theme lives under `keycloak-theme/krt-theme/` and contains two
+FreeMarker theme families:
+
+| Folder | Used for | Parent | Locales |
+|---|---|---|---|
+| `login/` | The Keycloak login flow (`login.ftl`, OTP, password reset, ...) | `keycloak` (Keycloak's classic theme) | `de` (default), `en` |
+| `account/` | The user-facing self-service Account Console | `keycloak.v3` (Keycloak's modern v3 account theme) | `de` (default), `en` |
+
+Both flavours pull in `Ethnocentric` and `Lato` font faces from
+`<flavour>/resources/fonts/` and a single CSS file
+(`login/resources/css/krt-login-v3.css` and
+`account/resources/css/krt-account-v3.css`) that overrides the parent theme's
+colours and typography to match the corporate design described in
+[Styleguide.md](Styleguide.md).
+
+### Wiring
+
+`docker-compose.yml` bind-mounts the theme directory directly into the Keycloak
+container so any edit takes effect on the next container restart, with no rebuild:
+
+```yaml
+keycloak:
+  volumes:
+    - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
+```
+
+The realm export (`realm-export.json`, also bind-mounted into
+`/opt/keycloak/data/import/`) sets the per-realm `loginTheme` and `accountTheme`
+to `krt-theme`, so the customisation activates as soon as Keycloak boots.
+
+### Making theme changes
+
+1. Edit the relevant FreeMarker template (`login/login.ftl`, ...) or CSS file
+   under `keycloak-theme/krt-theme/<login|account>/`.
+2. Restart only the Keycloak container so it re-reads the theme:
+   ```bash
+   docker compose --profile prod restart keycloak     # or `keycloak-dev` for the dev profile
+   ```
+   Keycloak caches theme resources by default; the restart bumps the cache.
+3. Hard-reload the login / account page (browser cache clear or
+   `Ctrl+Shift+R`) — the CSS file is served with a long cache header, so
+   without a hard reload you may keep seeing the previous version.
+
+No Java build / Docker rebuild is needed for theme-only edits; only the
+volume mount has to be in place and the container has to bounce.
+
 ## Tech Stack
 
 *   **Language**: Java 25
