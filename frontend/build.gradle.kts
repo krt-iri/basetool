@@ -1,8 +1,11 @@
+import org.cyclonedx.Version
+
 plugins {
   java
   id("jacoco")
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
+  alias(libs.plugins.cyclonedx.bom)
 }
 
 description = "frontend"
@@ -76,5 +79,14 @@ tasks.jacocoTestReport {
     xml.required.set(true)
     csv.required.set(true)
   }
+}
+
+tasks.cyclonedxBom {
+  schemaVersion.set(Version.VERSION_16)
+  jsonOutput.set(file("docs/${project.name}-bom.json"))
+  xmlOutput.set(file("docs/${project.name}-bom.xml"))
+  includeBomSerialNumber = true
+  includeLicenseText = true
+  includeBuildSystem = true
 }
 

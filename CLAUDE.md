@@ -19,6 +19,7 @@ Always use the Gradle wrapper. **Never** use the IDE test runner or the harness 
 ./gradlew :backend:bootRun                                 # backend on https://localhost:11261 (dev profile)
 ./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
 ./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
+./gradlew :frontend:cyclonedxBom                           # SBOM into frontend/docs/
 ```
 
 Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED` and a Mockito agent JVM arg.
