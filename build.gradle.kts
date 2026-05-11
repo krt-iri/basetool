@@ -53,4 +53,6 @@ subprojects {
       systemProperty("spring.profiles.active", "dev")
     }
   }
+
 }
+

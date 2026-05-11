@@ -23,9 +23,9 @@ logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-enc
 
 [versions]
 
-springBoot = "4.0.5"
+springBoot = "4.0.6"
 springDependencyManagement = "1.1.7"
-cyclonedx = "3.2.3"
+cyclonedx = "3.2.4"
 asciidoctor = "4.0.5"
 testcontainers = "1.21.4"
 flyway = "12.3.0"

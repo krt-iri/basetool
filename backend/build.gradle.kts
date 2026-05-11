@@ -9,6 +9,7 @@ plugins {
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
   alias(libs.plugins.asciidoctor.convert)
+  id("com.github.spotbugs-base") version "6.5.4"
 }
 
 group = "de.greluc.krt.iri.basetool"
@@ -104,6 +105,31 @@ extra["snippetsDir"] = file("build/generated-snippets")
 
 // Test, JavaCompile and BootRun task setup is shared with the frontend module via
 // the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
+
+// SpotBugs task for the main source set. We use the `-base` variant of the
+// plugin which does not auto-create tasks, so we register one explicitly and
+// wire it into `check`. Initial introduction is non-blocking
+// (`ignoreFailures = true`) — flip to false once the backlog has been triaged.
+tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
+  group = "verification"
+  description = "Runs SpotBugs analysis on the main source set."
+  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
+  classDirs.from(sourceSets.main.get().output.classesDirs)
+  auxClassPaths.from(sourceSets.main.get().compileClasspath)
+  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
+  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
+  ignoreFailures = true
+  reports.create("html") {
+    required.set(true)
+    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.html"))
+  }
+  reports.create("xml") {
+    required.set(true)
+    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
+  }
+  dependsOn("classes")
+}
+tasks.named("check").configure { dependsOn("spotbugsMain") }
 
 tasks {
   javadoc {
