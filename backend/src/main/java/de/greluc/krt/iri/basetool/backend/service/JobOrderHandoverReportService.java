@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 /**
  * Service responsible for generating handover report PDFs in KRT Corporate Design.
  * Supports both persisted handovers (by ID) and preview generation from raw DTO data.
@@ -69,10 +70,10 @@ public class JobOrderHandoverReportService {
                 jobOrderId, handoverId, userZone);
 
         JobOrderHandover handover = jobOrderHandoverRepository.findById(handoverId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Handover not found"));
+                .orElseThrow(() -> new NotFoundException("Handover not found"));
 
         if (!handover.getJobOrder().getId().equals(jobOrderId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Handover does not belong to this job order");
+            throw new NotFoundException("Handover does not belong to this job order");
         }
 
         ZoneId effectiveZone = userZone != null ? userZone : ZoneOffset.UTC;

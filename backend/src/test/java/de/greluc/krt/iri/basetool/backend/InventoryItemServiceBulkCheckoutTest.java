@@ -25,8 +25,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +33,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 /**
  * Unit tests for the bulk checkout functionality in {@link InventoryItemService}.
  */
@@ -157,10 +156,9 @@ class InventoryItemServiceBulkCheckoutTest {
         BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(missingItemId));
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> inventoryItemService.bulkCheckout(request, userId));
 
-        assertEquals(404, ex.getStatusCode().value());
         verify(inventoryItemRepository, never()).deleteAllById(any());
     }
 

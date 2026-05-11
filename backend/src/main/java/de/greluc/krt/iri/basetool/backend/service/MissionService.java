@@ -31,6 +31,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -68,7 +70,7 @@ public class MissionService {
     }
 
     public Mission getMissionById(@NotNull UUID id) {
-        return missionRepository.findById(id).orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+        return missionRepository.findById(id).orElseThrow(() -> new NotFoundException("Mission not found"));
     }
 
     public Optional<Mission> getNextMission(boolean allowInternal) {
@@ -87,7 +89,7 @@ public class MissionService {
 
         if (mission.getOperation() != null && mission.getOperation().getId() != null) {
             Operation op = operationRepository.findById(mission.getOperation().getId())
-                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
+                    .orElseThrow(() -> new NotFoundException("Operation not found"));
             mission.setOperation(op);
         } else {
             mission.setOperation(null);
@@ -103,7 +105,7 @@ public class MissionService {
     @Transactional
     public Mission updateMission(@NotNull UUID missionId, @NotNull Mission missionDetails) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         if (missionDetails.getVersion() != null && !mission.getVersion().equals(missionDetails.getVersion())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Mission.class, missionId);
@@ -127,7 +129,7 @@ public class MissionService {
 
         if (missionDetails.getOperation() != null && missionDetails.getOperation().getId() != null) {
             Operation op = operationRepository.findById(missionDetails.getOperation().getId())
-                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
+                    .orElseThrow(() -> new NotFoundException("Operation not found"));
             mission.setOperation(op);
         } else {
             mission.setOperation(null);
@@ -168,7 +170,7 @@ public class MissionService {
     public Mission updateCoreSection(@NotNull UUID missionId, @NotNull String name, String description,
                                      String calendarLink, String status, @NotNull Long expectedVersion) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         assertVersion(mission, expectedVersion, missionId);
         mission.setName(name);
         mission.setDescription(description);
@@ -190,7 +192,7 @@ public class MissionService {
                                          Instant actualStartTime, Instant actualEndTime,
                                          @NotNull Long expectedVersion) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         assertVersion(mission, expectedVersion, missionId);
         mission.setMeetingTime(meetingTime);
         mission.setPlannedStartTime(plannedStartTime);
@@ -219,7 +221,7 @@ public class MissionService {
     public Mission updateFlagsSection(@NotNull UUID missionId, @NotNull Boolean isInternal,
                                       @NotNull Long expectedVersion) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         assertVersion(mission, expectedVersion, missionId);
         mission.setIsInternal(isInternal);
         return missionRepository.save(mission);
@@ -234,7 +236,7 @@ public class MissionService {
     @Transactional
     public void deleteMission(@NotNull UUID missionId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
                 
         // Entkoppeln von Inventareinträgen (damit diese nicht gelöscht werden, aber die FK-Verletzung vermieden wird)
         if (mission.getInventoryEntries() != null) {
@@ -283,7 +285,7 @@ public class MissionService {
     @Transactional
     public Mission addParticipant(@NotNull UUID missionId, UUID userId, String guestName, UUID desiredJobTypeId, String comment, UUID squadronId) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         UUID effectiveUserId = userId;
         String effectiveGuestName = guestName;
@@ -323,7 +325,7 @@ public class MissionService {
 
         if (effectiveUserId != null) {
             User user = userRepository.findById(effectiveUserId)
-                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
+                    .orElseThrow(() -> new NotFoundException("User not found"));
             participant.setUser(user);
             // Registered users always belong to IRI
             squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
@@ -357,7 +359,7 @@ public class MissionService {
     public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
         return missionParticipantRepository.findById(participantId)
                 .filter(p -> p.getMission().getId().equals(missionId))
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Participant not found in mission"));
+                .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
     }
 
     /**
@@ -366,7 +368,7 @@ public class MissionService {
      */
     public List<MissionParticipant> getUnassignedParticipants(@NotNull UUID missionId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         Set<UUID> assignedParticipantIds = mission.getAssignedUnits().stream()
                 .flatMap(unit -> unit.getCrew().stream())
                 .map(crew -> crew.getParticipant().getId())
@@ -379,12 +381,12 @@ public class MissionService {
     @Transactional
     public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         boolean removed = mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
 
         if (!removed) {
-            throw new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Participant not found in this mission");
+            throw new NotFoundException("Participant not found in this mission");
         }
         
         // Also remove from any crews in this mission
@@ -404,14 +406,12 @@ public class MissionService {
                                                Instant startTime, Instant endTime,
                                                UUID squadronId, PayoutPreference payoutPreference, String guestName, Long version) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND, "Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionParticipant participant = mission.getParticipants().stream()
             .filter(p -> p.getId().equals(participantId))
             .findFirst()
-            .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND, "Participant not found in this mission"));
+            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
 
         if (version != null && !version.equals(participant.getVersion())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(MissionParticipant.class, participant.getId());
@@ -425,7 +425,7 @@ public class MissionService {
 
         if (desiredMissionJobTypeId != null) {
             JobType jt = jobTypeRepository.findById(desiredMissionJobTypeId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Desired JobType not found"));
+                .orElseThrow(() -> new NotFoundException("Desired JobType not found"));
             if (jt.getArchetype() != JobTypeArchetype.MISSION) {
                 throw new IllegalArgumentException("Desired JobType " + jt.getName() + " is not of archetype MISSION");
             }
@@ -444,7 +444,7 @@ public class MissionService {
             }
             if (squadronId != null) {
                  Squadron sq = squadronRepository.findById(squadronId)
-                     .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Squadron not found"));
+                     .orElseThrow(() -> new NotFoundException("Squadron not found"));
                  participant.setSquadron(sq);
             } else {
                  participant.setSquadron(null);
@@ -453,7 +453,7 @@ public class MissionService {
 
         if (plannedMissionJobTypeId != null) {
             JobType jt = jobTypeRepository.findById(plannedMissionJobTypeId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Planned JobType not found"));
+                .orElseThrow(() -> new NotFoundException("Planned JobType not found"));
             if (jt.getArchetype() != JobTypeArchetype.MISSION) {
                 throw new IllegalArgumentException("Planned JobType " + jt.getName() + " is not of archetype MISSION");
             }
@@ -484,7 +484,7 @@ public class MissionService {
 
     @Transactional
     public Mission checkIn(UUID missionId, UUID participantId) {
-        Mission mission = missionRepository.findById(missionId).orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+        Mission mission = missionRepository.findById(missionId).orElseThrow(() -> new NotFoundException("Mission not found"));
         MissionParticipant participant = getParticipant(missionId, participantId);
         if (mission.getActualStartTime() == null) {
             throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
@@ -496,7 +496,7 @@ public class MissionService {
 
     @Transactional
     public Mission checkOut(UUID missionId, UUID participantId) {
-        Mission mission = missionRepository.findById(missionId).orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+        Mission mission = missionRepository.findById(missionId).orElseThrow(() -> new NotFoundException("Mission not found"));
         MissionParticipant participant = getParticipant(missionId, participantId);
         if (mission.getActualEndTime() != null && Instant.now().isAfter(mission.getActualEndTime())) {
             if (participant.getStartTime() != null && mission.getActualEndTime().isBefore(participant.getStartTime())) {
@@ -517,7 +517,7 @@ public class MissionService {
         MissionParticipant participant = mission.getParticipants().stream()
                 .filter(p -> p.getId().equals(participantId))
                 .findFirst()
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Participant not found in mission"));
+                .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
 
         if (preference != null) {
             participant.setPayoutPreference(preference);
@@ -530,7 +530,7 @@ public class MissionService {
     @Transactional
     public Mission addUnitToMission(@NotNull UUID missionId, @NotNull String name, UUID shipTypeId, UUID shipId, boolean highValueUnit, Double frequency) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionUnit missionUnit = new MissionUnit();
         missionUnit.setMission(mission);
@@ -538,7 +538,7 @@ public class MissionService {
 
         if (shipTypeId != null) {
             ShipType shipType = shipTypeRepository.findById(shipTypeId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("ShipType not found"));
+                .orElseThrow(() -> new NotFoundException("ShipType not found"));
             missionUnit.setShipType(shipType);
         } else {
             missionUnit.setShipType(null);
@@ -546,7 +546,7 @@ public class MissionService {
 
         if (shipId != null) {
             Ship ship = shipRepository.findById(shipId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Ship not found"));
+                .orElseThrow(() -> new NotFoundException("Ship not found"));
             if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
                 throw new IllegalArgumentException("Ship does not match the specified ShipType");
             }
@@ -577,19 +577,19 @@ public class MissionService {
     @Transactional
     public Mission updateMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId, @NotNull String name, UUID shipTypeId, UUID shipId, boolean highValueUnit, Double frequency) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionUnit missionUnit = mission.getAssignedUnits().stream()
             .filter(u -> u.getId().equals(unitId))
             .findFirst()
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("MissionUnit not found"));
+            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
 
         missionUnit.setName(name);
         missionUnit.setHighValueUnit(highValueUnit);
 
         if (shipTypeId != null) {
             ShipType shipType = shipTypeRepository.findById(shipTypeId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("ShipType not found"));
+                .orElseThrow(() -> new NotFoundException("ShipType not found"));
             missionUnit.setShipType(shipType);
         } else {
             missionUnit.setShipType(null);
@@ -597,7 +597,7 @@ public class MissionService {
 
         if (shipId != null) {
             Ship ship = shipRepository.findById(shipId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Ship not found"));
+                .orElseThrow(() -> new NotFoundException("Ship not found"));
             if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
                 throw new IllegalArgumentException("Ship does not match the specified ShipType");
             }
@@ -629,12 +629,12 @@ public class MissionService {
     @Transactional
     public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         boolean removed = mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId));
 
         if (!removed) {
-            throw new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("MissionUnit not found in this mission");
+            throw new NotFoundException("MissionUnit not found in this mission");
         }
 
         return mission;
@@ -643,17 +643,17 @@ public class MissionService {
     @Transactional
     public Mission addCrewToShip(@NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID participantId, @NotNull Set<UUID> jobTypeIds) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionUnit missionShip = mission.getAssignedUnits().stream()
             .filter(ms -> ms != null && ms.getId() != null && ms.getId().equals(missionUnitId))
             .findFirst()
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("MissionUnit not found in this mission"));
+            .orElseThrow(() -> new NotFoundException("MissionUnit not found in this mission"));
 
         MissionParticipant participant = mission.getParticipants().stream()
             .filter(p -> p.getId().equals(participantId))
             .findFirst()
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Participant not found in this mission"));
+            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
 
         boolean isAlreadyAssigned = mission.getAssignedUnits().stream()
             .flatMap(u -> u.getCrew().stream())
@@ -680,17 +680,17 @@ public class MissionService {
     @Transactional
     public Mission updateCrewInShip(@NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId, @NotNull Set<UUID> jobTypeIds) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionUnit missionUnit = mission.getAssignedUnits().stream()
                 .filter(u -> u.getId().equals(missionUnitId))
                 .findFirst()
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("MissionUnit not found"));
+                .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
 
         MissionCrew crew = missionUnit.getCrew().stream()
                 .filter(c -> c.getId().equals(crewId))
                 .findFirst()
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Crew member not found in this unit"));
+                .orElseThrow(() -> new NotFoundException("Crew member not found in this unit"));
 
         Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
         crew.setJobTypes(jobTypes);
@@ -702,17 +702,17 @@ public class MissionService {
     @Transactional
     public Mission removeCrewFromShip(@NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         MissionUnit missionUnit = mission.getAssignedUnits().stream()
                 .filter(u -> u.getId().equals(missionUnitId))
                 .findFirst()
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("MissionUnit not found"));
+                .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
 
         boolean removed = missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId));
 
         if (!removed) {
-            throw new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Crew member not found in this unit");
+            throw new NotFoundException("Crew member not found in this unit");
         }
 
         return mission;
@@ -723,7 +723,7 @@ public class MissionService {
         if (jobTypeIds != null && !jobTypeIds.isEmpty()) {
             for (UUID jtId : jobTypeIds) {
                 JobType jt = jobTypeRepository.findById(jtId)
-                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found: " + jtId));
+                        .orElseThrow(() -> new NotFoundException("JobType not found: " + jtId));
 
                 if (jt.getArchetype() != JobTypeArchetype.CREW) {
                     throw new IllegalArgumentException("JobType " + jt.getName() + " is not of archetype CREW");
@@ -736,11 +736,11 @@ public class MissionService {
     @Transactional
     public Mission addSubMission(@NotNull UUID parentMissionId, @NotNull Mission subMission) {
         Mission parent = missionRepository.findById(parentMissionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Parent mission not found"));
+            .orElseThrow(() -> new NotFoundException("Parent mission not found"));
 
         if (subMission.getOperation() != null && subMission.getOperation().getId() != null) {
             Operation op = operationRepository.findById(subMission.getOperation().getId())
-                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
+                    .orElseThrow(() -> new NotFoundException("Operation not found"));
             subMission.setOperation(op);
         } else {
             subMission.setOperation(null);
@@ -753,10 +753,10 @@ public class MissionService {
     @Transactional
     public Mission addOrUpdateMissionFrequency(@NotNull UUID missionId, @NotNull UUID frequencyTypeId, @NotNull BigDecimal value) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         FrequencyType frequencyType = frequencyTypeRepository.findById(frequencyTypeId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("FrequencyType not found"));
+            .orElseThrow(() -> new NotFoundException("FrequencyType not found"));
 
         Optional<MissionFrequency> existingOpt = mission.getFrequencies().stream()
             .filter(f -> f.getFrequencyType().getId().equals(frequencyTypeId))
@@ -781,11 +781,11 @@ public class MissionService {
     @Transactional
     public Mission removeMissionFrequency(@NotNull UUID missionId, @NotNull UUID frequencyId) {
         Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
 
         boolean removed = mission.getFrequencies().removeIf(f -> f.getId() != null && f.getId().equals(frequencyId));
         if (!removed) {
-            throw new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Frequency not found in this mission");
+            throw new NotFoundException("Frequency not found in this mission");
         }
 
         return mission;
@@ -794,9 +794,9 @@ public class MissionService {
     @Transactional
     public Mission setMissionOwner(@NotNull UUID missionId, @NotNull UUID userId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         mission.setOwner(user);
         // Mission.owner is @OptimisticLock(excluded=true), so this does NOT bump Mission.version.
         // Sub-level optimistic locking for ownership is provided by the dedicated MissionOwnership
@@ -818,9 +818,9 @@ public class MissionService {
     public Mission updateMissionOwner(
             @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         mission.setOwner(user);
         upsertMissionOwnership(mission, user, expectedOwnershipVersion);
         return mission;
@@ -854,9 +854,9 @@ public class MissionService {
     @Transactional
     public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         mission.getManagers().add(user);
         return mission;
     }
@@ -864,7 +864,7 @@ public class MissionService {
     @Transactional
     public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
         Mission mission = missionRepository.findById(missionId)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         mission.getManagers().removeIf(u -> u.getId().equals(userId));
         return mission;
     }

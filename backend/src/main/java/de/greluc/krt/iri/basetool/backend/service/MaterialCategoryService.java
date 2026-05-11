@@ -4,14 +4,12 @@ import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.List;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 public class MaterialCategoryService {
@@ -24,7 +22,7 @@ public class MaterialCategoryService {
 
     public MaterialCategory findById(UUID id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MaterialCategory not found"));
+                .orElseThrow(() -> new NotFoundException("MaterialCategory not found"));
     }
 
     @Transactional

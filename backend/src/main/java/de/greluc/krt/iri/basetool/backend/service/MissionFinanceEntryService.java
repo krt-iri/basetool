@@ -11,20 +11,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -75,12 +75,12 @@ public class MissionFinanceEntryService {
     @Transactional
     public MissionFinanceEntryDto createEntry(MissionFinanceEntryCreateDto dto) {
         Mission mission = missionRepository.findById(dto.missionId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
         MissionParticipant participant = participantRepository.findById(dto.participantId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assigned participant not found"));
+                .orElseThrow(() -> new NotFoundException("Assigned participant not found"));
 
         if (!participant.getMission().getId().equals(mission.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Participant does not belong to this mission");
+            throw new BadRequestException("Participant does not belong to this mission");
         }
 
         MissionFinanceEntry entry = MissionFinanceEntry.builder()
@@ -99,11 +99,11 @@ public class MissionFinanceEntryService {
     @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
     public MissionFinanceEntryDto updateEntry(UUID entryId, MissionFinanceEntryUpdateDto dto) {
         MissionFinanceEntry entry = financeEntryRepository.findById(entryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Finance entry not found"));
+                .orElseThrow(() -> new NotFoundException("Finance entry not found"));
 
         // Optimistic Locking Check
         if (!entry.getVersion().equals(dto.version())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "The entry has been updated by someone else. Please reload.");
+            throw new BusinessConflictException("The entry has been updated by someone else. Please reload.");
         }
 
         entry.setNote(dto.note());
@@ -118,7 +118,7 @@ public class MissionFinanceEntryService {
     @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
     public void deleteEntry(UUID entryId) {
         MissionFinanceEntry entry = financeEntryRepository.findById(entryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Finance entry not found"));
+                .orElseThrow(() -> new NotFoundException("Finance entry not found"));
 
         financeEntryRepository.delete(entry);
     }

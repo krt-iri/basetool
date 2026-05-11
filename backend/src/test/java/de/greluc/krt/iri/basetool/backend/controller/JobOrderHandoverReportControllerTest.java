@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverReportControllerTest {
 
@@ -82,12 +83,11 @@ class JobOrderHandoverReportControllerTest {
         UUID handoverId = UUID.randomUUID();
 
         when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
-                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Handover not found"));
+                .thenThrow(new NotFoundException("Handover not found"));
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> controller.downloadHandoverReport(jobOrderId, handoverId, null));
-        assertEquals(404, ex.getStatusCode().value());
     }
 
     // -------------------------------------------------------------------------

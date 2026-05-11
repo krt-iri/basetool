@@ -19,16 +19,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -54,7 +53,7 @@ public class JobOrderService {
 
         for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
             Material material = materialRepository.findById(matDto.materialId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found: " + matDto.materialId()));
+                    .orElseThrow(() -> new NotFoundException("Material not found: " + matDto.materialId()));
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
@@ -96,16 +95,16 @@ public class JobOrderService {
     @Transactional(readOnly = true)
     public JobOrderDto getJobOrderById(UUID id) {
         JobOrder jobOrder = jobOrderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
         return mapToDtoWithStock(jobOrder);
     }
 
     @Transactional(readOnly = true)
     public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
         Material material = materialRepository.findById(materialId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found: " + materialId));
+                .orElseThrow(() -> new NotFoundException("Material not found: " + materialId));
 
         return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
                 .map(inventoryItemMapper::toDto)
@@ -139,7 +138,7 @@ public class JobOrderService {
     @Transactional
     public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
         JobOrder jobOrder = jobOrderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
         if (dto.version() != null && jobOrder.getVersion() != null && !jobOrder.getVersion().equals(dto.version())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
@@ -175,11 +174,11 @@ public class JobOrderService {
     @Transactional
     public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
         JobOrder targetOrder = jobOrderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
         Integer oldPriority = targetOrder.getPriority();
         if (oldPriority == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update priority of a completed or rejected job order");
+            throw new BadRequestException("Cannot update priority of a completed or rejected job order");
         }
         if (oldPriority.equals(newPriority)) {
             normalizePriorities();
@@ -212,7 +211,7 @@ public class JobOrderService {
     @Transactional
     public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
         JobOrder jobOrder = jobOrderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
         if (updateDto.version() != null && jobOrder.getVersion() != null && !jobOrder.getVersion().equals(updateDto.version())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
@@ -238,7 +237,7 @@ public class JobOrderService {
 
         for (CreateJobOrderMaterialDto matDto : updateDto.materials()) {
             Material material = materialRepository.findById(matDto.materialId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found: " + matDto.materialId()));
+                    .orElseThrow(() -> new NotFoundException("Material not found: " + matDto.materialId()));
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
@@ -257,7 +256,7 @@ public class JobOrderService {
     public void deleteJobOrder(UUID id) {
         jobOrderRepository.lockAllJobOrders();
         JobOrder jobOrder = jobOrderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
         Integer priority = jobOrder.getPriority();
         inventoryItemRepository.unlinkJobOrder(id);
@@ -271,9 +270,9 @@ public class JobOrderService {
     @Transactional
     public JobOrderDto addAssignee(UUID jobOrderId, UUID userId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
         jobOrder.getAssignees().add(user);
         return mapToDtoWithStock(jobOrderRepository.save(jobOrder));
     }
@@ -281,12 +280,12 @@ public class JobOrderService {
     @Transactional
     public void unlinkMaterial(UUID jobOrderId, UUID materialId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
 
         boolean exists = jobOrder.getMaterials().stream()
                 .anyMatch(m -> m.getMaterial().getId().equals(materialId));
         if (!exists) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not linked to job order: " + materialId);
+            throw new NotFoundException("Material not linked to job order: " + materialId);
         }
 
         inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
@@ -298,13 +297,13 @@ public class JobOrderService {
     @Transactional
     public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
         jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
 
         InventoryItem item = inventoryItemRepository.findById(inventoryItemId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "InventoryItem not found: " + inventoryItemId));
+                .orElseThrow(() -> new NotFoundException("InventoryItem not found: " + inventoryItemId));
 
         if (item.getJobOrder() == null || !item.getJobOrder().getId().equals(jobOrderId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "InventoryItem not linked to job order: " + inventoryItemId);
+            throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
         }
 
         item.setJobOrder(null);
@@ -313,9 +312,9 @@ public class JobOrderService {
     @Transactional
     public JobOrderDto removeAssignee(UUID jobOrderId, UUID userId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found: " + jobOrderId));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
         jobOrder.getAssignees().remove(user);
         return mapToDtoWithStock(jobOrderRepository.save(jobOrder));
     }

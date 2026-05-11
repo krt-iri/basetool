@@ -13,11 +13,9 @@ import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -26,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 /**
  * Handles the import of a CCU Game Fleetview JSON export into a user's hangar.
  *
@@ -77,19 +77,19 @@ public class HangarImportService {
      * @param userId user ID from the JWT {@code sub} claim
      * @param file   multipart file containing the CCU Game Fleetview JSON export
      * @return import result with statistics and lists of skipped ship names
-     * @throws ResponseStatusException 400 if the file is empty or cannot be parsed as JSON
-     * @throws ResponseStatusException 404 if the user is not found
+     * @throws BadRequestException if the file is empty or cannot be parsed as JSON
+     * @throws NotFoundException   if the user is not found
      */
     @Transactional
     public @NotNull FleetviewImportResponseDto importFleetview(@NotNull UUID userId, @NotNull MultipartFile file) {
         if (file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The uploaded file is empty.");
+            throw new BadRequestException("The uploaded file is empty.");
         }
 
         List<FleetviewEntryDto> entries = parseJson(file);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<String> skippedShips = new ArrayList<>();
 
@@ -180,8 +180,7 @@ public class HangarImportService {
             );
         } catch (IOException e) {
             log.warn("Fleetview import: failed to parse JSON — {}", e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "The uploaded file could not be parsed as a valid Fleetview JSON.");
+            throw new BadRequestException("The uploaded file could not be parsed as a valid Fleetview JSON.");
         }
     }
 }

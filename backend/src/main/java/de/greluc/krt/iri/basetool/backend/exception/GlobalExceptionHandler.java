@@ -72,6 +72,7 @@ public class GlobalExceptionHandler {
     public static final String CODE_CONSTRAINT_VIOLATION = "CONSTRAINT_VIOLATION";
     public static final String CODE_DUPLICATE_ENTITY = "DUPLICATE_ENTITY";
     public static final String CODE_ENTITY_IN_USE = "ENTITY_IN_USE";
+    public static final String CODE_BUSINESS_CONFLICT = "BUSINESS_CONFLICT";
     public static final String CODE_ILLEGAL_ARGUMENT = "ILLEGAL_ARGUMENT";
     public static final String CODE_BAD_REQUEST = "BAD_REQUEST";
     public static final String CODE_TYPE_MISMATCH = "TYPE_MISMATCH";
@@ -311,8 +312,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateEntityException.class)
     public ResponseEntity<ProblemDetail> handleDuplicateEntity(DuplicateEntityException ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.CONFLICT,
-                "Duplicate entity",
-                ex.getMessage(),
+                tr("problem.duplicate_entity.title"),
+                ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage()
+                        : tr("problem.duplicate_entity.detail"),
                 request,
                 "duplicate-entity",
                 CODE_DUPLICATE_ENTITY);
@@ -323,12 +326,44 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EntityInUseException.class)
     public ResponseEntity<ProblemDetail> handleEntityInUse(EntityInUseException ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.CONFLICT,
-                "Entity in use",
-                ex.getMessage(),
+                tr("problem.entity_in_use.title"),
+                ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage()
+                        : tr("problem.entity_in_use.detail"),
                 request,
                 "entity-in-use",
                 CODE_ENTITY_IN_USE);
         logProblem(request, pd, "Entity in use", null);
+        return toEntity(pd);
+    }
+
+    @ExceptionHandler(BusinessConflictException.class)
+    public ResponseEntity<ProblemDetail> handleBusinessConflict(BusinessConflictException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.CONFLICT,
+                tr("problem.business_conflict.title"),
+                ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage()
+                        : tr("problem.business_conflict.detail"),
+                request,
+                "business-conflict",
+                CODE_BUSINESS_CONFLICT);
+        logProblem(request, pd, "Business conflict", null);
+        return toEntity(pd);
+    }
+
+    // --- 400 Bad request (service-layer validation/business rule violations) --------------
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ProblemDetail> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
+                tr("problem.bad_request.title"),
+                ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage()
+                        : tr("problem.bad_request.detail"),
+                request,
+                "bad-request",
+                CODE_BAD_REQUEST);
+        logProblem(request, pd, "Bad request", null);
         return toEntity(pd);
     }
 
@@ -393,8 +428,8 @@ public class GlobalExceptionHandler {
         // information needed to triage "400 BAD_REQUEST" reports without a reproduction.
         Throwable rootCause = ex.getMostSpecificCause();
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                tr("problem.bad_request.title"),
-                tr("problem.bad_request.detail"),
+                tr("problem.unreadable_body.title"),
+                tr("problem.unreadable_body.detail"),
                 request,
                 "bad-request",
                 CODE_BAD_REQUEST);

@@ -35,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceTest {
 
@@ -160,7 +163,7 @@ class JobOrderServiceTest {
         when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
 
         // When/Then
-        assertThrows(ResponseStatusException.class, () -> jobOrderService.createJobOrder(createDto));
+        assertThrows(NotFoundException.class, () -> jobOrderService.createJobOrder(createDto));
         verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
 
@@ -296,7 +299,7 @@ class JobOrderServiceTest {
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
         // When/Then
-        assertThrows(ResponseStatusException.class, () -> {
+        assertThrows(BadRequestException.class, () -> {
             jobOrderService.updateJobOrderPriority(orderId, 2);
         });
         verify(jobOrderRepository, never()).save(any(JobOrder.class));
@@ -453,9 +456,8 @@ class JobOrderServiceTest {
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> jobOrderService.unlinkMaterial(orderId, materialId));
-        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
         verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
     }
 
@@ -466,9 +468,8 @@ class JobOrderServiceTest {
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
-        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
         verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
     }
 
@@ -499,9 +500,8 @@ class JobOrderServiceTest {
         when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
-        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
         verify(inventoryItemRepository, never()).findById(any());
     }
 
@@ -513,9 +513,8 @@ class JobOrderServiceTest {
         when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.empty());
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
-        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     @Test
@@ -534,9 +533,8 @@ class JobOrderServiceTest {
         when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> jobOrderService.unlinkInventoryItem(orderId, inventoryItemId));
-        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     @Test

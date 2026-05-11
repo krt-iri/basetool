@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
 @RestController
 @RequestMapping("/api/v1/refinery-orders")
 @RequiredArgsConstructor
@@ -108,7 +109,7 @@ public class RefineryOrderController {
         } else {
             // Normal user: must be the owner
             if (existing.getOwner() == null || !existing.getOwner().getId().equals(callerId)) {
-                throw new org.springframework.security.access.AccessDeniedException("Access denied: You do not own this refinery order");
+                throw new AccessDeniedException("Access denied: You do not own this refinery order");
             }
         }
 

@@ -18,9 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,6 +31,10 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 @RestController
 @RequestMapping("/api/v1/missions")
 @RequiredArgsConstructor
@@ -500,7 +502,7 @@ public class MissionController {
             if (matches.size() > 1) {
                 log.info("[DEBUG_LOG] Participant name '{}' is ambiguous ({} matches) for mission {}",
                         finalGuestName, matches.size(), id);
-                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Participant name is ambiguous.");
+                throw new BusinessConflictException("Participant name is ambiguous.");
             }
             if (matches.size() == 1) {
                 if (jwt != null) {
@@ -510,7 +512,7 @@ public class MissionController {
                             request.guestName(), finalUserId, id);
                 } else {
                     // Anonymous user tried to add a name that belongs to a registered member -> keep spoofing protection.
-                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Guest name is already taken.");
+                    throw new BadRequestException("Guest name is already taken.");
                 }
             }
         }
@@ -654,8 +656,7 @@ public class MissionController {
         return mission.getAssignedUnits().stream()
                 .filter(u -> unitId.equals(u.getId()))
                 .findFirst()
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Mission unit not found"));
+                .orElseThrow(() -> new NotFoundException("Mission unit not found"));
     }
 
     private de.greluc.krt.iri.basetool.backend.model.MissionParticipant findParticipant(
@@ -663,8 +664,7 @@ public class MissionController {
         return mission.getParticipants().stream()
                 .filter(p -> participantId.equals(p.getId()))
                 .findFirst()
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Participant not found"));
+                .orElseThrow(() -> new NotFoundException("Participant not found"));
     }
 
     private de.greluc.krt.iri.basetool.backend.model.MissionCrew findCrew(
@@ -672,8 +672,7 @@ public class MissionController {
         return unit.getCrew().stream()
                 .filter(c -> crewId.equals(c.getId()))
                 .findFirst()
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Crew member not found"));
+                .orElseThrow(() -> new NotFoundException("Crew member not found"));
     }
 
     // --- Units ---
@@ -838,14 +837,14 @@ public class MissionController {
         if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
             List<User> matches = userService.findMatchesByExactName(finalGuestName);
             if (matches.size() > 1) {
-                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Participant name is ambiguous.");
+                throw new BusinessConflictException("Participant name is ambiguous.");
             }
             if (matches.size() == 1) {
                 if (jwt != null) {
                     finalUserId = matches.get(0).getId();
                     finalGuestName = null;
                 } else {
-                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Guest name is already taken.");
+                    throw new BadRequestException("Guest name is already taken.");
                 }
             }
         }

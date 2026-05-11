@@ -22,15 +22,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.List;
 import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,17 +50,17 @@ public class HangarService {
 
     @Transactional
     public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
         Ship ship = new Ship();
         ship.setName(dto.name());
         ship.setInsurance(dto.insurance());
         ship.setFitted(dto.fitted());
         ship.setOwner(user);
         ship.setShipType(shipTypeRepository.findById(dto.shipTypeId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "ShipType not found")));
+                .orElseThrow(() -> new BadRequestException("ShipType not found")));
         if (dto.locationId() != null) {
             ship.setLocation(locationRepository.findById(dto.locationId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location not found")));
+                    .orElseThrow(() -> new BadRequestException("Location not found")));
         }
         return shipRepository.save(ship);
     }
@@ -113,7 +112,7 @@ public class HangarService {
     @Transactional
     public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
         Ship ship = shipRepository.findById(shipId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ship not found"));
+            .orElseThrow(() -> new NotFoundException("Ship not found"));
 
         if (dto.version() != null && ship.getVersion() != null && !ship.getVersion().equals(dto.version())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Ship.class, shipId);
@@ -128,11 +127,11 @@ public class HangarService {
         ship.setFitted(dto.fitted());
         
         ship.setShipType(shipTypeRepository.findById(dto.shipTypeId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "ShipType not found")));
+                .orElseThrow(() -> new BadRequestException("ShipType not found")));
 
         if (dto.locationId() != null) {
             ship.setLocation(locationRepository.findById(dto.locationId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location not found")));
+                    .orElseThrow(() -> new BadRequestException("Location not found")));
         } else {
             ship.setLocation(null);
         }
@@ -143,7 +142,7 @@ public class HangarService {
     @Transactional
     public void deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
         Ship ship = shipRepository.findById(shipId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ship not found"));
+            .orElseThrow(() -> new NotFoundException("Ship not found"));
 
         if (ship.getOwner() == null || ship.getOwner().getId() == null || !ship.getOwner().getId().equals(userId)) {
             throw new AccessDeniedException("Access denied: You do not own this ship");

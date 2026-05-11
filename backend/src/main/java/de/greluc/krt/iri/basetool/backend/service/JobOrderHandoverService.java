@@ -13,10 +13,8 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +22,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -76,7 +76,7 @@ public class JobOrderHandoverService {
     @Transactional
     public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found"));
 
         JobOrderHandover handover = new JobOrderHandover();
         handover.setJobOrder(jobOrder);
@@ -95,20 +95,20 @@ public class JobOrderHandoverService {
             // NOT referenced from JobOrderHandoverItem anymore so that emptying the inventory does not
             // break historical handover records (see CHANGELOG / V64 migration).
             InventoryItem inventoryItem = inventoryItemRepository.findByIdForUpdate(itemDto.inventoryItemId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+                    .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
             if (inventoryItem.getJobOrder() == null || !inventoryItem.getJobOrder().getId().equals(jobOrderId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item does not belong to this JobOrder");
+                throw new BadRequestException("Inventory item does not belong to this JobOrder");
             }
 
             if (itemDto.amount() > inventoryItem.getAmount() + 0.0001) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot hand over more than the available amount");
+                throw new BadRequestException("Cannot hand over more than the available amount");
             }
             QuantityType quantityType = inventoryItem.getMaterial() != null
                     ? inventoryItem.getMaterial().getQuantityType()
                     : null;
             if (quantityType == QuantityType.PIECE && itemDto.amount() % 1 != 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be a whole number for PIECE materials");
+                throw new BadRequestException("Amount must be a whole number for PIECE materials");
             }
 
             double remainingAmount = inventoryItem.getAmount() - itemDto.amount();
@@ -166,7 +166,7 @@ public class JobOrderHandoverService {
         // with up-to-date {@code @Version}s. The previous bulk unlinks (and any auto-flush) have
         // already detached the original {@code jobOrder} reference from the session.
         JobOrder managedJobOrder = jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+                .orElseThrow(() -> new NotFoundException("JobOrder not found"));
 
         boolean allFulfilled = managedJobOrder.getMaterials().stream()
                 .allMatch(mat -> mat.getAmount() <= 0.0001);
