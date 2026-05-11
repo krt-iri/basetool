@@ -58,7 +58,7 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 - For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
 
 ### Database
-- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.**
+- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.** Full conventions (destructive-ops two-phase rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live in [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) — read that before adding a migration.
 - `DataInitializer` seeds roles/permissions on startup.
 - Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections.
 
