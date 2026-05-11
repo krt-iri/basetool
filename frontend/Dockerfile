@@ -16,9 +16,14 @@ RUN chmod +x gradlew
 # Dependencies herunterladen, um sie im Docker-Cache zu behalten
 RUN ./gradlew :frontend:dependencies --no-daemon || true
 
-# Quellcode kopieren und Anwendung bauen
+# Quellcode kopieren und Anwendung bauen.
+# `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain` skips the
+# static-analysis steps that the `check` task pulls in via `build`. Those tools
+# are meant for developer / CI workflows — running them inside the production
+# image build only adds minutes and needs auxiliary files (`config/checkstyle/`)
+# that are not part of the Docker context. CI runs `./gradlew check` separately.
 COPY frontend/src/ frontend/src/
-RUN ./gradlew :frontend:build -x test --no-daemon
+RUN ./gradlew :frontend:build -x test -x checkstyleMain -x spotbugsMain --no-daemon
 
 # Layered JAR extrahieren
 WORKDIR /app/frontend/build/libs
