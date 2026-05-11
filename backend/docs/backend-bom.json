@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:120b67d5-b7b6-464b-858a-f162cd1b0752",
+  "serialNumber" : "urn:uuid:d2a67bd4-7796-4275-9452-300bed8246ad",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-11T19:40:47Z",
+    "timestamp" : "2026-05-11T19:56:27Z",
     "tools" : {
       "components" : [
         {
@@ -2168,6 +2168,79 @@
         {
           "name" : "cdx:maven:package:test",
           "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar",
+      "publisher" : "TNG Technology Consulting GmbH",
+      "group" : "com.tngtech.archunit",
+      "name" : "archunit",
+      "version" : "1.3.2",
+      "description" : "A Java architecture test library, to specify and assert architecture rules in plain Java - Module 'archunit'",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "e07bba27c042b98d3430d9d3a735ee49"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "688c4dd3e0ef7eb8b6225afbd530910d6c69bc35"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "e170d48f34e7167659fc58f53eb89b7c714ca6108e9a11164e60012ecf8119da"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d71d61a3a420d1a409bb34f181092dad205d38d241b1401402a13d1b38afe9411c08d4f1fadb96e24dec2097e4398a13477ba622480abb6ae0be18c1703d0e25"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "f667e3f083f89cc71f54ceb3df41fd13c85d9751d290bba39aa2767dde5db73792f20e72713b750a93af15979c40224a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "1b6dda729cc8eb9eab517a47b0e305637bd84d4f2c47e63f049ce5b2715519352e5e298941dd453bd8eef8e1e799d2e7"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "ad8ad9a30c2d05535ca37defa35de47d7816c573f427b9728ffc2b47bc1b32e0"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "aff3fc7be315e6ff17d9bfa39d18038612cc942eb5361e55a1d90feb5fb9fe98104348aa09c0d9a13a88bffd8f59903e2d4ac8a7a563ee456e060711e0609462"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        },
+        {
+          "license" : {
+            "id" : "BSD-4-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://www.tngtech.com/"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/TNG/ArchUnit"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "true"
         }
       ]
     },
@@ -18474,6 +18547,12 @@
       "dependsOn" : [ ]
     },
     {
+      "ref" : "pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/com.vaadin.external.google/android-json@0.0.20131108.vaadin1?type=jar",
       "dependsOn" : [ ]
     },
@@ -18515,6 +18594,7 @@
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
         "pkg:maven/com.h2database/h2@2.4.240?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar",
+        "pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar",
         "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar",

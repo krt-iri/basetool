@@ -54,6 +54,10 @@ dependencies {
   testImplementation("org.springframework.security:spring-security-test")
   // MockWebServer for HTTP simulations in WebClient tests
   testImplementation("com.squareup.okhttp3:mockwebserver:_")
+  // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform
+  // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
+  // frontend's "no JpaRepository / no direct JDBC" rule.
+  testImplementation("com.tngtech.archunit:archunit:1.3.2")
 }
 
 // Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module

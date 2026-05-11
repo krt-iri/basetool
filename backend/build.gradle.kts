@@ -76,6 +76,13 @@ dependencies {
   testImplementation("com.fasterxml.jackson.core:jackson-databind")
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.testcontainers.postgresql)
+  // ArchUnit core (no archunit-junit5: the latter brings its own JUnit Platform
+  // version that clashes with Spring Boot 4's. We invoke `.check(CLASSES)` from
+  // plain @Test methods, which is enough for our rule set).
+  // Pin the architectural rules from CLAUDE.md (Controllers do not return JPA
+  // entities, service-layer code does not touch SecurityContextHolder, REST
+  // endpoints are authorisation-annotated, ...). See ArchitectureTest.
+  testImplementation("com.tngtech.archunit:archunit:1.3.2")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
   testRuntimeOnly("com.h2database:h2")
 }
