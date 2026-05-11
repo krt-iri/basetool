@@ -9,10 +9,8 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -233,8 +231,13 @@ public class JobOrderHandoverReportService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
+            // Falls through to GlobalExceptionHandler.handleAllExceptions which produces a 500
+            // RFC 7807 response with a localised generic "internal error" detail and a
+            // correlation id linking back to the ERROR log line below. The cause is preserved
+            // for the stacktrace; the exception message is server-internal and never leaks to
+            // the API client.
             log.error("Failed to generate handover report PDF", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "PDF generation failed");
+            throw new RuntimeException("PDF generation failed", e);
         }
     }
 

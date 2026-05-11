@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -135,12 +134,15 @@ class JobOrderHandoverReportControllerTest {
                 "#1", LocalDateTime.now(), "Pilot", List.of()
         );
 
+        // Service wraps unexpected failures in a plain RuntimeException; the
+        // GlobalExceptionHandler.handleAllExceptions fallback turns it into a localised
+        // RFC 7807 500 response with a correlation id at the HTTP boundary.
         when(jobOrderHandoverReportService.generateHandoverReportPreview(any()))
-                .thenThrow(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "PDF generation failed"));
+                .thenThrow(new RuntimeException("PDF generation failed"));
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> controller.previewHandoverReport(jobOrderId, dto));
-        assertEquals(500, ex.getStatusCode().value());
+        assertEquals("PDF generation failed", ex.getMessage());
     }
 }
