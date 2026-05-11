@@ -1,5 +1,6 @@
 plugins {
   id("idea")
+  id("org.owasp.dependencycheck") version "12.2.0"
 }
 
 allprojects {
@@ -53,6 +54,21 @@ subprojects {
       systemProperty("spring.profiles.active", "dev")
     }
   }
+}
 
+// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.0. Aggregates over
+// all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate stays
+// wide open (`failBuildOnCVSS = 11`) for the first iteration so the team
+// triages findings before the gate turns strict. The plugin's first invocation
+// downloads the NVD feed (~500 MB cached under
+// `~/.gradle/dependency-check-data`) and takes 5-15 minutes; subsequent runs
+// are seconds. Set `-PnvdApiKey=<key>` to avoid public NVD rate limits.
+dependencyCheck {
+  failBuildOnCVSS = 11.0f
+  formats = listOf("HTML", "SARIF")
+  outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
+  if (project.findProperty("nvdApiKey") != null) {
+    nvd.apiKey = project.property("nvdApiKey") as String
+  }
 }
 
