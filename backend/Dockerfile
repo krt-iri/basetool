@@ -50,6 +50,6 @@ COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
 
 USER 10001:10001
 
-EXPOSE 10261
+EXPOSE 11261
 
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

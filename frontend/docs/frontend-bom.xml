@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:ca225cab-e658-42b7-bac9-ce00adbad278" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:717c9531-3105-42bd-9b6b-54557e47d965" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-11T11:38:12Z</timestamp>
+    <timestamp>2026-05-11T11:41:16Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -2953,27 +2953,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.jetbrains/annotations@26.0.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar">
       <group>org.jetbrains</group>
       <name>annotations</name>
-      <version>26.0.2</version>
+      <version>26.1.0</version>
       <description>A set of annotations used for code inspection support and code documentation.</description>
       <hashes>
-        <hash alg="MD5">ef0e782af9ee48fac1156485366d7cc9</hash>
-        <hash alg="SHA-1">c7ce3cdeda3d18909368dfe5977332dfad326c6d</hash>
-        <hash alg="SHA-256">2037be378980d3ba9333e97955f3b2cde392aa124d04ca73ce2eee6657199297</hash>
-        <hash alg="SHA-512">c7be38957318874b837d029dc7b2a1f8b009feaa5362a56cba4f4c8a7d502993b3c900ee338eb9c9ee9494d7fd946bd280403eee28b244d213edb0b145a9ebfd</hash>
-        <hash alg="SHA-384">6a66cebde6fc0202399aab4cc1b84d50cdcc5906433cb71604e404525e10f2086900730449c00daf0a922a2036a35314</hash>
-        <hash alg="SHA3-384">cdafaaa1672616377ba393f61c62cebf9996ba62db4df3a18586aaa100a5875db9a1e132cfbb2e098c37d9809fab632d</hash>
-        <hash alg="SHA3-256">dac6cdbea13b4fd7c84a6254d7d65859b8b74139ba0eeb662e86f5dcf1fce93f</hash>
-        <hash alg="SHA3-512">89980b6f753349bb6fa2149e404d84937d8d90edd626b856aa5de23dbd82966d22b93f053761a5cfd8ec440c069a023244949239965be3ce5485711dde0104d6</hash>
+        <hash alg="MD5">29c6b7959db13e3ac50ef35cf815368e</hash>
+        <hash alg="SHA-1">c1e9226d7ca6661020c58c94397da0cc3673d5e4</hash>
+        <hash alg="SHA-256">ebc7aec252ed0c7d2d04c039d7f00e69f7b86b1f493c741d67b3ef31b986b054</hash>
+        <hash alg="SHA-512">f1ccde58143b38ce7d064b1e9800cd84c438d3f992727620a136e86151fe2839e10a77fd2a1424fd4e7516aa4465cae1692b9cc0d57fd35c41651c90c591ad00</hash>
+        <hash alg="SHA-384">cf5064bdfe480d507badf91db81ed536d9e09c4b36a64f3617c0f1a85cff691899df3c81b583a27bd520e2b021bf749a</hash>
+        <hash alg="SHA3-384">a2755b145efee24f4b3efeb505c3ffef6ced3945d71b8f89c8c89c88f853b2a7eb2b4cd0cef107b75a49aa81459cf0a1</hash>
+        <hash alg="SHA3-256">8ab2841de7e4aca09c5b3b96424d673f8af34b58b7b4309078a492a8335dc15e</hash>
+        <hash alg="SHA3-512">b73e20fbab9b11c269fcaf9f09fb189cb5601a20e1ced3f058f853dbe7b38f32b5ba0829a9b148e45655e672238d4f1ddd6c6e2103624e228477882a9f6f36ef</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.jetbrains/annotations@26.0.2?type=jar</purl>
+      <purl>pkg:maven/org.jetbrains/annotations@26.1.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -6695,7 +6695,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
-      <dependency ref="pkg:maven/org.jetbrains/annotations@26.0.2?type=jar"/>
+      <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.projectlombok/lombok@1.18.44?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-configuration-processor@4.0.5?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.0.5?type=jar"/>
@@ -7036,7 +7036,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.jetbrains/annotations@13.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.jetbrains/annotations@13.0?type=jar"/>
-    <dependency ref="pkg:maven/org.jetbrains/annotations@26.0.2?type=jar"/>
+    <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
     <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"/>
     <dependency ref="pkg:maven/org.junit.jupiter/junit-jupiter-api@6.0.3?type=jar">
       <dependency ref="pkg:maven/org.apiguardian/apiguardian-api@1.1.2?type=jar"/>

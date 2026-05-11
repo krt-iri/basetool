@@ -40,7 +40,7 @@ dependencies {
   
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
-  compileOnly("org.jetbrains:annotations:26.0.2")
+  compileOnly("org.jetbrains:annotations:_")
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
   

@@ -58,7 +58,7 @@ dependencies {
 
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
-  compileOnly("org.jetbrains:annotations:26.1.0")
+  compileOnly("org.jetbrains:annotations:_")
   // PDF generation
   implementation("com.github.librepdf:openpdf:_")
   // Ensure MapStruct understands Lombok-generated accessors
