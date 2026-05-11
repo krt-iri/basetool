@@ -102,33 +102,10 @@ configurations {
 
 extra["snippetsDir"] = file("build/generated-snippets")
 
-tasks.withType<Test> {
-  useJUnitPlatform()
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "test")
-  val mockitoCore = classpath.find { it.name.contains("mockito-core") }
-  if (mockitoCore != null) {
-    jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
-  }
-}
-
-tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "dev")
-}
-
-
+// Test, JavaCompile and BootRun task setup is shared with the frontend module via
+// the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
 
 tasks {
-  withType(JavaCompile::class.java) {
-    options.encoding = "UTF-8"
-    options.compilerArgs.add("-Xlint:unchecked")
-    options.compilerArgs.add("-Xlint:deprecation")
-  }
-
-  build {
-  }
-
   javadoc {
     options {
       (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet")

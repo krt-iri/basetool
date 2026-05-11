@@ -51,27 +51,11 @@ dependencies {
   testImplementation("com.squareup.okhttp3:mockwebserver:_")
 }
 
-tasks.withType<Test> {
-  useJUnitPlatform()
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "test")
-  val mockitoCore = classpath.find { it.name.contains("mockito-core") }
-  if (mockitoCore != null) {
-    jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
-  }
+// Test, JavaCompile and BootRun task setup is shared with the backend module via
+// the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
+// The frontend adds JaCoCo report wiring on top.
+tasks.withType<Test>().configureEach {
   finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.withType<JavaCompile> {
-  options.encoding = "UTF-8"
-  options.compilerArgs.add("-parameters")
-  options.compilerArgs.add("-Xlint:unchecked")
-  options.compilerArgs.add("-Xlint:deprecation")
-}
-
-tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "dev")
 }
 
 tasks.jacocoTestReport {
