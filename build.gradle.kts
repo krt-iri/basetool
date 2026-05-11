@@ -1,6 +1,10 @@
 plugins {
   id("idea")
   id("org.owasp.dependencycheck") version "12.2.0"
+  // Pulled in with `apply false` so the PitestPluginExtension type is on the
+  // root build script's classpath for the `subprojects { plugins.withId(...) }`
+  // configuration block below. Each subproject still applies the plugin itself.
+  id("info.solidsoft.pitest") version "1.19.0" apply false
 }
 
 allprojects {
@@ -69,6 +73,54 @@ subprojects {
         csv.required.set(true)
         html.required.set(true)
       }
+    }
+  }
+
+  // Pitest mutation testing (info.solidsoft.pitest). Runs on demand via
+  // `./gradlew :<module>:pitest` — intentionally NOT wired into `check`
+  // because a full mutation run takes O(minutes) per service and is far too
+  // slow for the standard PR-build path. Scope defaults to the business-logic
+  // service layer (`...basetool.<module>.service.*`); DTOs, mappers,
+  // repositories and config classes are excluded because mutating them rarely
+  // catches real test-suite gaps. Reports land under
+  // `<module>/build/reports/pitest/index.html`.
+  //
+  // Tuning notes:
+  // - `threads = 4` keeps a single-developer laptop responsive while still
+  //   parallelising mutation runs across test classes.
+  // - JVM args mirror the regular Test task (`--enable-native-access` plus
+  //   `-Xshare:off -javaagent:<mockito-core>` so Mockito 5+ self-attaches in
+  //   PIT's isolated minion processes; without that the green-suite
+  //   prerequisite fails before any mutation is generated).
+  // - The first invocation will almost certainly fail because some service
+  //   tests rely on a Spring context that PIT's minion process does not
+  //   start; the team should add the affected test classes to
+  //   `excludedTestClasses` (or move them to `*IntegrationTest` naming) as a
+  //   follow-up, then tighten `mutationThreshold` / `coverageThreshold` to
+  //   make the gate strict.
+  plugins.withId("info.solidsoft.pitest") {
+    extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
+      junit5PluginVersion.set("1.2.3")
+      targetClasses.set(listOf("de.greluc.krt.iri.basetool.${project.name}.service.*"))
+      targetTests.set(listOf("de.greluc.krt.iri.basetool.${project.name}.service.*Test"))
+      threads.set(4)
+      outputFormats.set(listOf("HTML", "XML"))
+      timestampedReports.set(false)
+
+      // Build the same JVM-arg list the regular Test task uses, so Mockito 5+
+      // can self-attach as a Java agent inside PIT's isolated minions and the
+      // native-access warning is silenced. The mockito-core path is resolved
+      // lazily from the test runtime classpath.
+      val testClasspath = configurations.getByName("testRuntimeClasspath")
+      jvmArgs.set(provider {
+        val args = mutableListOf("--enable-native-access=ALL-UNNAMED")
+        val mockitoCore = testClasspath.files.find { it.name.contains("mockito-core") }
+        if (mockitoCore != null) {
+          args += "-Xshare:off"
+          args += "-javaagent:${mockitoCore.absolutePath}"
+        }
+        args
+      })
     }
   }
 

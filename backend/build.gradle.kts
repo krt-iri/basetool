@@ -12,6 +12,7 @@ plugins {
   alias(libs.plugins.cyclonedx.bom)
   alias(libs.plugins.asciidoctor.convert)
   id("com.github.spotbugs-base") version "6.5.4"
+  id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "de.greluc.krt.iri.basetool"

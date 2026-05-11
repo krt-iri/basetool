@@ -8,6 +8,7 @@ plugins {
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
   id("com.github.spotbugs-base") version "6.5.4"
+  id("info.solidsoft.pitest") version "1.19.0"
 }
 
 description = "frontend"
