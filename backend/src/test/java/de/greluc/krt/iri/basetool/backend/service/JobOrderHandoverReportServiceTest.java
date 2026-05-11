@@ -14,8 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +24,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverReportServiceTest {
 
@@ -87,9 +86,8 @@ class JobOrderHandoverReportServiceTest {
         when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.empty());
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> service.generateHandoverReport(jobOrderId, handoverId, null));
-        assertEquals(404, ex.getStatusCode().value());
     }
 
     @Test
@@ -104,9 +102,8 @@ class JobOrderHandoverReportServiceTest {
         when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> service.generateHandoverReport(jobOrderId, handoverId, null));
-        assertEquals(404, ex.getStatusCode().value());
     }
 
     @Test

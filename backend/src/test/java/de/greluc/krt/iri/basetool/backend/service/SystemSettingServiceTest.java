@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.Optional;
@@ -60,7 +60,7 @@ class SystemSettingServiceTest {
     void getSetting_NotFound_ShouldThrowException() {
         when(systemSettingRepository.findById("unknown_key")).thenReturn(Optional.empty());
 
-        assertThrows(ResponseStatusException.class, () -> systemSettingService.getSetting("unknown_key"));
+        assertThrows(NotFoundException.class, () -> systemSettingService.getSetting("unknown_key"));
     }
 
     @Test

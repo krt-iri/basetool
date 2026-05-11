@@ -7,8 +7,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -28,6 +32,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -60,9 +65,22 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         AppProblemProperties props = new AppProblemProperties();
         props.setBaseUri("https://iri-base.org/problems/");
-        handler = new GlobalExceptionHandler(props);
+        // Use the real messages bundle so the test catches missing or wrong i18n keys.
+        // Locale is forced to English to keep these assertions stable regardless of the
+        // JVM default locale on the developer / CI machine.
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("messages");
+        messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        handler = new GlobalExceptionHandler(props, messageSource);
         request = mock(HttpServletRequest.class);
         when(request.getRequestURI()).thenReturn("/api/v1/test");
+    }
+
+    @AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private static void assertCommon(ResponseEntity<ProblemDetail> response, HttpStatus expectedStatus,

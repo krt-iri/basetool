@@ -30,8 +30,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 
 import java.util.List;
 import java.util.Optional;
@@ -524,7 +526,7 @@ class InventoryItemServiceTest {
 
         when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
-        assertThrows(ResponseStatusException.class, () -> 
+        assertThrows(BadRequestException.class, () ->
             inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false));
     }
     @Test
@@ -869,7 +871,7 @@ class InventoryItemServiceTest {
         when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.empty());
 
         // When / Then
-        assertThrows(ResponseStatusException.class,
+        assertThrows(NotFoundException.class,
                 () -> inventoryItemService.getMaterialCollection(jobOrderId));
     }
 

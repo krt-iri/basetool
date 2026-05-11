@@ -78,8 +78,9 @@
                         <tr th:each="cat : ${categories}">
                             <td th:text="${cat.name}">Category Name</td>
                             <td>
-                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" style="display:inline;">
-                                    <button type="submit" class="btn btn-danger" th:text="#{general.delete}" th:data-confirm="#{admin.materials.categories.delete.confirm}" onclick="return confirm(this.getAttribute('data-confirm'));">Löschen</button>
+                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" style="display:inline;"
+                                      data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}">
+                                    <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Löschen</button>
                                 </form>
                             </td>
                         </tr>
@@ -174,6 +175,29 @@
         const materialNames = /*[[${materials.![name]}]]*/ [];
         const inpMaterials = document.getElementById("filterMaterials");
         if(inpMaterials) krtAutocomplete(inpMaterials, materialNames);
+
+        // KRT-styled confirmation modal for forms marked with data-krt-confirm.
+        // Replaces native window.confirm() per the no-native-dialogs UI rule.
+        document.querySelectorAll('form[data-krt-confirm]').forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.dataset.krtConfirmed === 'true') {
+                    return;
+                }
+                event.preventDefault();
+                const message = form.getAttribute('data-krt-confirm-message') || '';
+                if (typeof window.showKrtConfirm !== 'function') {
+                    form.dataset.krtConfirmed = 'true';
+                    form.submit();
+                    return;
+                }
+                window.showKrtConfirm(null, message).then(function(ok) {
+                    if (ok) {
+                        form.dataset.krtConfirmed = 'true';
+                        form.submit();
+                    }
+                });
+            });
+        });
     });
 
     function filterTable(tableId, query) {

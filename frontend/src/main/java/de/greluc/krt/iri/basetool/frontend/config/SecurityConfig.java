@@ -107,6 +107,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/missions/*/managers", "/missions/*/managers/*").authenticated()
                 .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/missions/*/managers/*").authenticated()
+                // Actuator health endpoint reached by the Docker HEALTHCHECK / compose
+                // service_healthy gating. Other actuator endpoints fall through to the
+                // anyRequest().authenticated() catch-all below.
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/", "/error", "/css/**", "/js/**", "/images/**", "/logos/**", "/fonts/**", "/impressum", "/privacy", "/terms").permitAll()
                 .requestMatchers("/missions", "/missions/").permitAll()
                 .requestMatchers("/missions/**").permitAll() // Still permitAll for general access, @PreAuthorize or logic inside handles details

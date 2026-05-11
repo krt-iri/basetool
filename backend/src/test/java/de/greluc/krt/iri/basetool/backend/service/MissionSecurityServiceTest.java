@@ -20,9 +20,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @ExtendWith(MockitoExtension.class)
 class MissionSecurityServiceTest {
 
@@ -234,9 +232,8 @@ class MissionSecurityServiceTest {
         UUID participantId = UUID.randomUUID();
         when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.empty());
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
-        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     @Test

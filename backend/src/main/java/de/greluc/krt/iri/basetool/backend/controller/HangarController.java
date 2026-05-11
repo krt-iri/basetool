@@ -22,6 +22,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,9 +72,17 @@ public class HangarController {
     public PageResponse<SquadronShipOverviewDto> getSquadronOverview(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String sort) {
+            @RequestParam(required = false) String sort,
+            Authentication authentication) {
+        // Role-based shaping of the response is decided HERE, at the HTTP boundary, so
+        // the service stays pure business logic and does not need to read
+        // SecurityContextHolder itself (architecture rule enforced by ArchitectureTest).
+        boolean includeOwnerDetails = authentication != null
+                && authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_OFFICER".equals(role));
         Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("shipType.name"), "shipType.name");
-        Page<SquadronShipOverviewDto> p = hangarService.getSquadronOverview(pageable);
+        Page<SquadronShipOverviewDto> p = hangarService.getSquadronOverview(pageable, includeOwnerDetails);
         return new PageResponse<>(p.getContent(), p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
     }
 

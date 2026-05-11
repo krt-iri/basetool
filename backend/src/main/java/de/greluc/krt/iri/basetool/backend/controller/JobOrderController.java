@@ -33,13 +33,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -260,7 +259,7 @@ public class JobOrderController {
                         .anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN"));
             }
             if (!isAdminOrOfficer) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to modify other users' assignments");
+                throw new AccessDeniedException("Not allowed to modify other users' assignments");
             }
         }
     }

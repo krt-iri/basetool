@@ -10,18 +10,17 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -44,14 +43,14 @@ public class MissionSecurityService {
      *
      * <p>If the participant does not exist (e.g. the frontend holds a stale row whose
      * entry was concurrently deleted in another tab), this method translates the
-     * missing row into a {@code 404 Not Found} via {@link ResponseStatusException}
+     * missing row into a {@code 404 Not Found} via {@link de.greluc.krt.iri.basetool.backend.exception.NotFoundException}
      * instead of letting a plain {@link RuntimeException} bubble up as a generic
      * {@code 500 Internal Server Error} (see RFC7807 Problem Details).
      */
     @Transactional(readOnly = true)
     public boolean canAccessParticipant(UUID missionId, UUID participantId, Authentication authentication) {
         MissionParticipant p = missionParticipantRepository.findById(participantId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Participant not found"));
+                .orElseThrow(() -> new NotFoundException("Participant not found"));
 
         if (!p.getMission().getId().equals(missionId)) {
             log.warn("Mission ID mismatch: {} != {}", p.getMission().getId(), missionId);

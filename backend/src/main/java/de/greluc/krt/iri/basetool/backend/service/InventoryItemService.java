@@ -25,16 +25,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -64,14 +63,14 @@ public class InventoryItemService {
     @Transactional(readOnly = true)
     public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
         Material material = materialRepository.findById(materialId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
+                .orElseThrow(() -> new NotFoundException("Material not found"));
         return inventoryItemRepository.findByMaterialAndPersonalFalse(material, pageable).map(inventoryItemMapper::toDto);
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return inventoryItemRepository.findByUser(user, pageable).map(inventoryItemMapper::toDto);
     }
 
@@ -88,7 +87,7 @@ public class InventoryItemService {
     @Transactional(readOnly = true)
     public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto> getMyAggregatedInventory(UUID userId, List<UUID> materialIds, Integer minQuality, List<UUID> jobOrderIds, List<UUID> missionIds) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
         boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
         boolean hasMissions = missionIds != null && !missionIds.isEmpty();
@@ -187,28 +186,28 @@ public class InventoryItemService {
         }
 
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Material material = materialRepository.findById(dto.materialId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
+                .orElseThrow(() -> new NotFoundException("Material not found"));
         Location location = locationRepository.findById(dto.locationId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+                .orElseThrow(() -> new NotFoundException("Location not found"));
 
         Mission mission = null;
         if (dto.missionId() != null) {
             mission = missionRepository.findById(dto.missionId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
+                    .orElseThrow(() -> new NotFoundException("Mission not found"));
         }
 
         JobOrder jobOrder = null;
         if (dto.jobOrderId() != null) {
             jobOrder = jobOrderRepository.findById(dto.jobOrderId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+                    .orElseThrow(() -> new NotFoundException("JobOrder not found"));
         }
 
         Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
 
         if (Boolean.TRUE.equals(isPersonal) && (mission != null || jobOrder != null)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Personal items cannot be assigned to a mission or job order");
+            throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
         }
 
         java.util.List<InventoryItem> existingItems = inventoryItemRepository.findMatchingInventoryItem(
@@ -245,7 +244,7 @@ public class InventoryItemService {
     @Transactional
     public InventoryItemDto updateInventoryItem(UUID id, InventoryItemUpdateDto dto, UUID currentUserId, boolean isLogistician) {
         InventoryItem item = inventoryItemRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+                .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
         if (!item.getUser().getId().equals(currentUserId)) {
             if (item.getPersonal() || !isLogistician) {
@@ -261,15 +260,15 @@ public class InventoryItemService {
         item.setPersonal(isPersonal);
 
         if (Boolean.TRUE.equals(isPersonal) && (dto.missionId() != null || dto.jobOrderId() != null)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Personal items cannot be assigned to a mission or job order");
+            throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
         }
 
         Material material = materialRepository.findById(dto.materialId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found"));
+                .orElseThrow(() -> new NotFoundException("Material not found"));
         item.setMaterial(material);
 
         Location location = locationRepository.findById(dto.locationId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+                .orElseThrow(() -> new NotFoundException("Location not found"));
         item.setLocation(location);
 
         item.setQuality(dto.quality());
@@ -277,7 +276,7 @@ public class InventoryItemService {
 
         if (dto.jobOrderId() != null) {
             JobOrder jobOrder = jobOrderRepository.findById(dto.jobOrderId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "JobOrder not found"));
+                    .orElseThrow(() -> new NotFoundException("JobOrder not found"));
             item.setJobOrder(jobOrder);
         } else {
             item.setJobOrder(null);
@@ -285,7 +284,7 @@ public class InventoryItemService {
 
         if (dto.missionId() != null) {
             Mission mission = missionRepository.findById(dto.missionId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
+                    .orElseThrow(() -> new NotFoundException("Mission not found"));
             item.setMission(mission);
         } else {
             item.setMission(null);
@@ -331,7 +330,7 @@ public class InventoryItemService {
     @Transactional
     public InventoryItemDto updateNote(UUID id, InventoryItemNoteUpdateRequest request, UUID currentUserId, boolean isLogistician) {
         InventoryItem item = inventoryItemRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+                .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
         boolean isOwner = item.getUser().getId().equals(currentUserId);
         if (!isOwner && !isLogistician) {
@@ -357,7 +356,7 @@ public class InventoryItemService {
     @Transactional
     public InventoryItemDto bookOutInventoryItem(UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
         InventoryItem item = inventoryItemRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+                .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
         if (dto.version() != null && item.getVersion() != null && !item.getVersion().equals(dto.version())) {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(InventoryItem.class, id);
@@ -368,7 +367,7 @@ public class InventoryItemService {
         }
 
         if (dto.amount() > item.getAmount()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot book out more than the available amount");
+            throw new BadRequestException("Cannot book out more than the available amount");
         }
 
         CheckoutType checkoutType = dto.type();
@@ -378,10 +377,10 @@ public class InventoryItemService {
 
         if (checkoutType == CheckoutType.SELL) {
             if (dto.terminal() == null || dto.terminal().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Terminal is required for selling");
+                throw new BadRequestException("Terminal is required for selling");
             }
             if (dto.sellAmount() == null || dto.sellAmount().compareTo(java.math.BigDecimal.ZERO) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sell amount is required and must be positive");
+                throw new BadRequestException("Sell amount is required and must be positive");
             }
         }
 
@@ -391,17 +390,17 @@ public class InventoryItemService {
             User targetUser = item.getUser();
             if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
                 targetUser = userRepository.findById(dto.targetUserId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user not found"));
+                        .orElseThrow(() -> new NotFoundException("Target user not found"));
             }
 
             Location targetLocation = item.getLocation();
             if (dto.targetLocationId() != null && !dto.targetLocationId().equals(item.getLocation().getId())) {
                 targetLocation = locationRepository.findById(dto.targetLocationId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target location not found"));
+                        .orElseThrow(() -> new NotFoundException("Target location not found"));
             }
 
             if (targetUser.getId().equals(item.getUser().getId()) && targetLocation.getId().equals(item.getLocation().getId())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transfer must change either the user or the location");
+                throw new BadRequestException("Transfer must change either the user or the location");
             }
 
             InventoryItem newItem = new InventoryItem();
@@ -423,7 +422,7 @@ public class InventoryItemService {
             return inventoryItemMapper.toDto(savedNew);
         } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
             MissionParticipant participant = missionParticipantRepository.findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "You must be a participant of the mission to sell its items"));
+                    .orElseThrow(() -> new BadRequestException("You must be a participant of the mission to sell its items"));
 
             MissionFinanceEntry entry = new MissionFinanceEntry();
             entry.setMission(item.getMission());
@@ -460,8 +459,7 @@ public class InventoryItemService {
 
         for (UUID itemId : request.itemIds()) {
             InventoryItem item = inventoryItemRepository.findByIdForUpdate(itemId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Inventory item not found: " + itemId));
+                    .orElseThrow(() -> new NotFoundException("Inventory item not found: " + itemId));
 
             if (!item.getUser().getId().equals(currentUserId)) {
                 log.warn("User {} attempted to bulk-checkout item {} owned by {}",
@@ -493,7 +491,7 @@ public class InventoryItemService {
     @Transactional(readOnly = true)
     public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
         jobOrderRepository.findById(jobOrderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job order not found"));
+                .orElseThrow(() -> new NotFoundException("Job order not found"));
         return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
                 .map(item -> {
                     String ownerName = item.getUser().getDisplayName() != null
@@ -528,7 +526,7 @@ public class InventoryItemService {
     @Transactional
     public InventoryItemDto updateDelivered(UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
         InventoryItem item = inventoryItemRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+                .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
         if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
             throw new AccessDeniedException("You are not allowed to update this inventory item");

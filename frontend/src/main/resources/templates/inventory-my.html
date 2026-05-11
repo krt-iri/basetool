@@ -1192,20 +1192,20 @@
                 if (typeof window.showFrontendSuccessToast === 'function') {
                     window.showFrontendSuccessToast('[[#{success.inventory.update}]]');
                 } else {
-                    alert('[[#{success.inventory.update}]]');
+                    console.info('[[#{success.inventory.update}]]');
                 }
             } else if (response.status === 409) {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast('[[#{error.inventory.update.conflict}]]');
                 } else {
-                    alert('[[#{error.inventory.update.conflict}]]');
+                    console.error('[[#{error.inventory.update.conflict}]]');
                 }
                 setTimeout(() => location.reload(), 2000);
             } else {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast('[[#{error.inventory.update.failed}]]');
                 } else {
-                    alert('[[#{error.inventory.update.failed}]]');
+                    console.error('[[#{error.inventory.update.failed}]]');
                 }
             }
         } catch (e) {
@@ -1213,7 +1213,7 @@
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast('[[#{error.inventory.update.failed}]]');
             } else {
-                alert('[[#{error.inventory.update.failed}]]');
+                console.error('[[#{error.inventory.update.failed}]]');
             }
         }
     }

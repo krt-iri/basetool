@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverServiceTest {
 
@@ -159,7 +160,7 @@ class JobOrderHandoverServiceTest {
         when(inventoryItemRepository.findByIdForUpdate(inventoryId)).thenReturn(Optional.of(inventoryItem));
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.createHandover(orderId, createDto));
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
         assertTrue(ex.getMessage().contains("Cannot hand over more than the available amount"));
     }
 
@@ -179,7 +180,7 @@ class JobOrderHandoverServiceTest {
         // When & Then — before fix: this threw "Inventory item does not belong to this JobOrder"
         // because jobOrder was null (not eagerly loaded). After fix (@EntityGraph on findByIdForUpdate)
         // the jobOrder is always loaded and the check works correctly.
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.createHandover(orderId, createDto));
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
         assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
     }
 
@@ -346,7 +347,7 @@ class JobOrderHandoverServiceTest {
         when(inventoryItemRepository.findByIdForUpdate(inventoryId)).thenReturn(Optional.of(inventoryItem));
 
         // When & Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.createHandover(orderId, createDto));
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
         assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
     }
 
@@ -359,11 +360,10 @@ class JobOrderHandoverServiceTest {
         when(inventoryItemRepository.findByIdForUpdate(inventoryId)).thenReturn(Optional.of(inventoryItem));
 
         // When & Then — must reject with 400 Bad Request
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> service.createHandover(orderId, createDto));
         assertTrue(ex.getMessage().contains("Cannot hand over more than the available amount"),
                 "Exception message must indicate amount exceeds available stock");
-        assertEquals(400, ex.getStatusCode().value());
         // Inventory item must NOT be modified
         verify(inventoryItemRepository, never()).save(any());
         verify(inventoryItemRepository, never()).delete(any());
@@ -444,11 +444,10 @@ class JobOrderHandoverServiceTest {
         when(inventoryItemRepository.findByIdForUpdate(inventoryId)).thenReturn(Optional.of(inventoryItem));
 
         // When & Then — must reject with 400 Bad Request because 2.5 is not a whole number
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> service.createHandover(orderId, createDto));
         assertTrue(ex.getMessage().contains("Amount must be a whole number for PIECE materials"),
                 "Exception message must indicate that only integers are allowed for PIECE materials");
-        assertEquals(400, ex.getStatusCode().value());
         // Inventory item must NOT be modified
         verify(inventoryItemRepository, never()).save(any());
         verify(inventoryItemRepository, never()).delete(any());

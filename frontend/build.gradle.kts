@@ -1,8 +1,14 @@
+import org.cyclonedx.Version
+
 plugins {
   java
+  checkstyle
   id("jacoco")
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
+  alias(libs.plugins.cyclonedx.bom)
+  id("com.github.spotbugs-base") version "6.5.4"
+  id("info.solidsoft.pitest") version "1.19.0"
 }
 
 description = "frontend"
@@ -27,6 +33,8 @@ dependencies {
   // Caching
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
+  // Actuator for /actuator/health -- consumed by the Docker HEALTHCHECK
+  implementation("org.springframework.boot:spring-boot-starter-actuator")
   // Spring Session with Redis for persistent sessions across restarts
   implementation("org.springframework.session:spring-session-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -37,7 +45,7 @@ dependencies {
   
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
-  compileOnly("org.jetbrains:annotations:26.0.2")
+  compileOnly("org.jetbrains:annotations:_")
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
   
@@ -46,35 +54,46 @@ dependencies {
   testImplementation("org.springframework.security:spring-security-test")
   // MockWebServer for HTTP simulations in WebClient tests
   testImplementation("com.squareup.okhttp3:mockwebserver:_")
+  // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform
+  // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
+  // frontend's "no JpaRepository / no direct JDBC" rule.
+  testImplementation("com.tngtech.archunit:archunit:1.3.2")
 }
 
-tasks.withType<Test> {
-  useJUnitPlatform()
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "test")
-  val mockitoCore = classpath.find { it.name.contains("mockito-core") }
-  if (mockitoCore != null) {
-    jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
+// Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module
+// via the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks.
+
+// SpotBugs task for the main source set. We use the `-base` variant of the
+// plugin which does not auto-create tasks, so we register one explicitly and
+// wire it into `check`. Initial introduction is non-blocking
+// (`ignoreFailures = true`) — flip to false once the backlog has been triaged.
+tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
+  group = "verification"
+  description = "Runs SpotBugs analysis on the main source set."
+  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
+  classDirs.from(sourceSets.main.get().output.classesDirs)
+  auxClassPaths.from(sourceSets.main.get().compileClasspath)
+  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
+  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
+  ignoreFailures = true
+  reports.create("html") {
+    required.set(true)
+    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.html"))
   }
-  finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.withType<JavaCompile> {
-  options.encoding = "UTF-8"
-  options.compilerArgs.add("-parameters")
-  options.compilerArgs.add("-Xlint:unchecked")
-  options.compilerArgs.add("-Xlint:deprecation")
-}
-
-tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty("spring.profiles.active", "dev")
-}
-
-tasks.jacocoTestReport {
-  reports {
-    xml.required.set(true)
-    csv.required.set(true)
+  reports.create("xml") {
+    required.set(true)
+    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
   }
+  dependsOn("classes")
+}
+tasks.named("check").configure { dependsOn("spotbugsMain") }
+
+tasks.cyclonedxBom {
+  schemaVersion.set(Version.VERSION_16)
+  jsonOutput.set(file("docs/${project.name}-bom.json"))
+  xmlOutput.set(file("docs/${project.name}-bom.xml"))
+  includeBomSerialNumber = true
+  includeLicenseText = true
+  includeBuildSystem = true
 }
 

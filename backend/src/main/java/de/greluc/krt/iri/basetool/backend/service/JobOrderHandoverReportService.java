@@ -9,10 +9,8 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -24,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 /**
  * Service responsible for generating handover report PDFs in KRT Corporate Design.
  * Supports both persisted handovers (by ID) and preview generation from raw DTO data.
@@ -69,10 +68,10 @@ public class JobOrderHandoverReportService {
                 jobOrderId, handoverId, userZone);
 
         JobOrderHandover handover = jobOrderHandoverRepository.findById(handoverId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Handover not found"));
+                .orElseThrow(() -> new NotFoundException("Handover not found"));
 
         if (!handover.getJobOrder().getId().equals(jobOrderId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Handover does not belong to this job order");
+            throw new NotFoundException("Handover does not belong to this job order");
         }
 
         ZoneId effectiveZone = userZone != null ? userZone : ZoneOffset.UTC;
@@ -232,8 +231,13 @@ public class JobOrderHandoverReportService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
+            // Falls through to GlobalExceptionHandler.handleAllExceptions which produces a 500
+            // RFC 7807 response with a localised generic "internal error" detail and a
+            // correlation id linking back to the ERROR log line below. The cause is preserved
+            // for the stacktrace; the exception message is server-internal and never leaks to
+            // the API client.
             log.error("Failed to generate handover report PDF", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "PDF generation failed");
+            throw new RuntimeException("PDF generation failed", e);
         }
     }
 

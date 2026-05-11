@@ -16,8 +16,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @ExtendWith(MockitoExtension.class)
 class HangarImportServiceTest {
 
@@ -392,9 +392,8 @@ class HangarImportServiceTest {
                 "application/json", new byte[0]);
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> hangarImportService.importFleetview(userId, emptyFile));
-        assertThat(ex.getStatusCode().value()).isEqualTo(400);
     }
 
     // -------------------------------------------------------------------------
@@ -408,9 +407,8 @@ class HangarImportServiceTest {
         MockMultipartFile file = multipartFile("THIS IS NOT JSON");
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> hangarImportService.importFleetview(userId, file));
-        assertThat(ex.getStatusCode().value()).isEqualTo(400);
     }
 
     // -------------------------------------------------------------------------
@@ -429,9 +427,8 @@ class HangarImportServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When / Then
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> hangarImportService.importFleetview(userId, file));
-        assertThat(ex.getStatusCode().value()).isEqualTo(404);
     }
 
     // -------------------------------------------------------------------------

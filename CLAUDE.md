@@ -19,6 +19,7 @@ Always use the Gradle wrapper. **Never** use the IDE test runner or the harness 
 ./gradlew :backend:bootRun                                 # backend on https://localhost:11261 (dev profile)
 ./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
 ./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
+./gradlew :frontend:cyclonedxBom                           # SBOM into frontend/docs/
 ```
 
 Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED` and a Mockito agent JVM arg.
@@ -47,7 +48,7 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 
 ### Security model
 - Both modules use Spring Security with Keycloak OIDC. Backend = resource server (validates JWT); frontend = OAuth2 client (browser SSO + bearer-token relay).
-- Authorization is centralized in `@PreAuthorize` annotations on services/controllers — keep checks out of business logic. Roles mapped from JWT are prefixed with `ROLE_` and uppercased.
+- Authorization is centralized in `@PreAuthorize` annotations on services/controllers — keep checks out of business logic. Roles mapped from JWT are prefixed with `ROLE_` and uppercased. The architectural invariants here (no `SecurityContextHolder` outside the auth-helper service, every `@RestController` carries at least one `@PreAuthorize`, controllers do not return JPA entities, frontend does not depend on Spring Data JPA) are enforced as ArchUnit rules in [`backend/.../ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java) and [`frontend/.../ArchitectureTest.java`](frontend/src/test/java/de/greluc/krt/iri/basetool/frontend/ArchitectureTest.java) — adding a new violation will fail `./gradlew test`.
 - Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`. Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`. Full matrix in `ROLES_AND_PERMISSIONS.md`.
 - `LOGISTICIAN` and `MISSION_MANAGER` can additionally be granted via `is_logistician` / `is_mission_manager` flags on `app_user` (set by admins) — independent of Keycloak roles.
 - Frontend has a `BotProtectionFilter` and `SsoReAuthenticationEntryPoint`: known scanner paths return 404 directly; legitimate paths with expired sessions get a silent `prompt=none` Keycloak redirect.
@@ -57,7 +58,7 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 - For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
 
 ### Database
-- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.**
+- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.** Full conventions (destructive-ops two-phase rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live in [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) — read that before adding a migration.
 - `DataInitializer` seeds roles/permissions on startup.
 - Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections.
 

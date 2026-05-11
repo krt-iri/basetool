@@ -125,6 +125,19 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     }
 
     /**
+     * URIs that look like bot/scanner targets at first glance but are in fact legitimate
+     * endpoints the application owns. They short-circuit {@link #isBotPath(String)} so the
+     * regular filter chain (and Spring Security) gets a chance to handle them.
+     *
+     * <p>Currently only the Spring Boot Actuator health endpoint is whitelisted — it is
+     * exposed publicly so the Docker {@code HEALTHCHECK} directive can reach it without
+     * authentication; every other {@code /actuator/...} path stays blocked.
+     */
+    static final Set<String> LEGITIMATE_PATHS = Set.of(
+            "/actuator/health"
+    );
+
+    /**
      * Returns {@code true} if the given URI starts with a known bot/scanner path prefix.
      *
      * @param uri the request URI to check (must not be {@code null})
@@ -132,6 +145,11 @@ public class BotProtectionFilter extends OncePerRequestFilter {
      */
     boolean isBotPath(@NotNull String uri) {
         String lowerUri = uri.toLowerCase();
+        for (String legit : LEGITIMATE_PATHS) {
+            if (lowerUri.equals(legit) || lowerUri.startsWith(legit + "/")) {
+                return false;
+            }
+        }
         for (String prefix : BOT_PATH_PREFIXES) {
             if (lowerUri.startsWith(prefix)) {
                 return true;
