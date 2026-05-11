@@ -35,7 +35,7 @@
          would let an attacker pick an arbitrary translation entry, enabling UI
          spoofing and translation-key enumeration. Server-controlled toasts use the
          flash-attribute "successToast" above instead. -->
-    <div th:if="${param.success != null and #strings.matches(param.success[0], '^[A-Za-z][A-Za-z0-9._-]{0,79}$')}"
+    <div th:if="${param.success != null and param.success[0] matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'}"
          id="successNotificationParam"
          class="notification-toast"
          data-duration="5000">
@@ -64,7 +64,7 @@
     <!-- General Error Toast (Param) -->
     <!-- Same key-pattern gate as the success variant above: prevents arbitrary
          translation-key lookup via ?error=any.key. -->
-    <div th:if="${param.error != null and #strings.matches(param.error[0], '^[A-Za-z][A-Za-z0-9._-]{0,79}$')}"
+    <div th:if="${param.error != null and param.error[0] matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'}"
          id="errorNotificationParam"
          class="notification-toast error-toast"
          data-duration="7000">
