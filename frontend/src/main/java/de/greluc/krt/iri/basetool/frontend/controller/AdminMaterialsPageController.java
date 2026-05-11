@@ -73,7 +73,7 @@ public class AdminMaterialsPageController {
             redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
         } catch (Exception e) {
             log.error("Create category failed", e);
-            redirectAttributes.addFlashAttribute("errorToast", "Error creating category");
+            redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
         }
         return "redirect:/admin/materials";
     }
@@ -85,7 +85,7 @@ public class AdminMaterialsPageController {
             redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
         } catch (Exception e) {
             log.error("Delete category failed", e);
-            redirectAttributes.addFlashAttribute("errorToast", "Error deleting category");
+            redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
         }
         return "redirect:/admin/materials";
     }
