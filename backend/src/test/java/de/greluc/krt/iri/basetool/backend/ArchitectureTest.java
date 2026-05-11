@@ -55,12 +55,7 @@ class ArchitectureTest {
     private static final java.util.Set<String> SECURITY_CONTEXT_HOLDER_EXCEPTIONS = java.util.Set.of(
             // Legitimate auth-helper that the rest of the codebase calls into instead of
             // touching SecurityContextHolder directly. This IS the seam.
-            "de.greluc.krt.iri.basetool.backend.service.UserService",
-            // Known existing exception: the squadron overview returns extended details
-            // only for OFFICER/ADMIN callers. Long-term the role decision should move
-            // to the controller (passing a boolean into the service), see follow-up
-            // task. Tracked here so a new violation in this rule does not get hidden.
-            "de.greluc.krt.iri.basetool.backend.service.HangarService"
+            "de.greluc.krt.iri.basetool.backend.service.UserService"
     );
 
     @Test

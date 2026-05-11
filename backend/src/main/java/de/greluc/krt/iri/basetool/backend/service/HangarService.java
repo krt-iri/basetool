@@ -17,8 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,27 +67,31 @@ public class HangarService {
         return shipRepository.findByOwnerId(userId, pageable);
     }
 
-    public Page<SquadronShipOverviewDto> getSquadronOverview(Pageable pageable) {
+    /**
+     * Returns the per-ship-type squadron overview. When {@code includeOwnerDetails} is
+     * {@code true} the returned DTOs carry the per-ship owner/location/fitted breakdown;
+     * when {@code false} only the aggregated counts are exposed.
+     *
+     * <p>The role-based decision (only ADMIN/OFFICER see the owner breakdown) lives in
+     * {@code HangarController} so this method stays pure business logic and the service
+     * layer keeps its hands off {@link org.springframework.security.core.context.SecurityContextHolder}
+     * — see the architecture rule enforced by {@code ArchitectureTest}.
+     */
+    public Page<SquadronShipOverviewDto> getSquadronOverview(Pageable pageable, boolean includeOwnerDetails) {
         Page<Object[]> p = shipRepository.countShipsByType(pageable);
 
-        boolean includeDetails = false;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            includeDetails = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
-        }
-
-        final boolean fetchDetails = includeDetails;
-        List<de.greluc.krt.iri.basetool.backend.model.ShipType> types = fetchDetails 
+        List<de.greluc.krt.iri.basetool.backend.model.ShipType> types = includeOwnerDetails
                 ? p.getContent().stream().map(obj -> (de.greluc.krt.iri.basetool.backend.model.ShipType) obj[0]).toList()
                 : java.util.Collections.emptyList();
-                
-        List<Ship> ships = fetchDetails && !types.isEmpty() ? shipRepository.findByShipTypeIn(types) : java.util.Collections.emptyList();
+
+        List<Ship> ships = includeOwnerDetails && !types.isEmpty()
+                ? shipRepository.findByShipTypeIn(types)
+                : java.util.Collections.emptyList();
 
         return p.map(obj -> {
             de.greluc.krt.iri.basetool.backend.model.ShipType type = (de.greluc.krt.iri.basetool.backend.model.ShipType) obj[0];
             List<SquadronShipDetailDto> details = null;
-            if (fetchDetails) {
+            if (includeOwnerDetails) {
                 details = ships.stream()
                         .filter(s -> s.getShipType().getId().equals(type.getId()))
                         .map(s -> new SquadronShipDetailDto(
