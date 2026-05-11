@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:47b577ff-225e-43b4-904f-8cf1fb9f8220" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:e06fd08f-6bb0-40da-9c59-8426daf9a8ea" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-11T19:24:46Z</timestamp>
+    <timestamp>2026-05-11T19:34:33Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -3975,6 +3975,114 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>http://github.com/hibernate/hibernate-validator</url>
         </reference>
       </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar">
+      <group>org.jacoco</group>
+      <name>org.jacoco.agent</name>
+      <version>0.8.14</version>
+      <description>JaCoCo Agent</description>
+      <hashes>
+        <hash alg="MD5">80ca49511ad2aaadecb86b631b400f10</hash>
+        <hash alg="SHA-1">bca1f6d49506da3eb9d0d3b9acbcfdd1fb22c14e</hash>
+        <hash alg="SHA-256">20be9853385bdfc65a5929643412d09243d14514304b89ba23a265158cc8792b</hash>
+        <hash alg="SHA-512">01b6bedbc736f2e7350c2046b96861556d39552322758eaa874bbcca479d66c19621755ed98d80df3e80d77a48eb1713ec0dc771c4b481893b9307748cbbe756</hash>
+        <hash alg="SHA-384">3922fdf1f5b4b8ee23da68fc5e91aea0d628d9b4d5f25d457412b8cde472e0ddf02771a23c032bb9792d1e7a4a0bdaf8</hash>
+        <hash alg="SHA3-384">de955ba95663b36d1527dfb458c549122899be99665416b42d8624d0d7dc788fed1d49a864f4422334e32f49c476f50c</hash>
+        <hash alg="SHA3-256">a1f35cf33933c5694674fb79cddbb2502838f86d8c475b888b603a311cedd71a</hash>
+        <hash alg="SHA3-512">f76c8e39568f4d0c81a07856c4f32ba7cd16bec92c4e43d17d2c347fd1020796e8fa7b63b8d0182f8992f966d3d52b2967e4cc2b09f77f3baea0ad78973f44e6</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar">
+      <group>org.jacoco</group>
+      <name>org.jacoco.ant</name>
+      <version>0.8.14</version>
+      <description>JaCoCo Ant Tasks</description>
+      <hashes>
+        <hash alg="MD5">341aaffda886f24b74fcd67f8ec27b27</hash>
+        <hash alg="SHA-1">f52b386d3440618462eb656584b6f655a655c2b1</hash>
+        <hash alg="SHA-256">9fff68954d5de3aad2bf838eaf886ed67d2c22a2d6c6f095548bade8c45caeae</hash>
+        <hash alg="SHA-512">d51e08c8735a1310de5689844214ee592bb1ca93064675d1c27e47e01c3a397aed9083e54ee26c3e9b430e40681043095ee10022d59af0239900af7b6e2bea93</hash>
+        <hash alg="SHA-384">74cb9ca8ecf147b874c58fe63ab8ee1fa59b8e400455649c560003e131a1a18afdf267b1433b8f4cd05fcfba78d1eba5</hash>
+        <hash alg="SHA3-384">a3cebdaf7f6c0f09791a58b78e8a9d22bd2d421c992dd7dae361433b02bf8570c2c631716cb0250ac19a804d8a21117c</hash>
+        <hash alg="SHA3-256">19b57ba4469ba11d25ce0d7f4dc83b2a659b164ed300665e225f15abb640763f</hash>
+        <hash alg="SHA3-512">52039c46db985ff61d5ba258670890e5d99de928a2bce4a6b1e3f45dc51021483a279ce71f5b053c83c2f047b2ac83dd8812d8814e90bae124276457b11578b5</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar">
+      <group>org.jacoco</group>
+      <name>org.jacoco.core</name>
+      <version>0.8.14</version>
+      <description>JaCoCo Core</description>
+      <hashes>
+        <hash alg="MD5">07f7ab938a007b6146aede8407c2b117</hash>
+        <hash alg="SHA-1">5d317827447ab203bb90ecc7597850baae9c8565</hash>
+        <hash alg="SHA-256">28abbf0eea5a08e4f24097f2fbac663ca17c341c25c3a04d90d6cd325943c995</hash>
+        <hash alg="SHA-512">3af7632e45398541202f3c1073978fdb54bad3dbb07c1a7c2bc412c060d148c1877bfb5d697674c22acd57dee9811e64f5a3113b79f275bc71b87876ff882faf</hash>
+        <hash alg="SHA-384">ee13a5eac4c0ff720e17bbdf66edc79453f66a2364e143dba49f8446305f463a251d3f4bc1b97a9a231cfd36cb2b142d</hash>
+        <hash alg="SHA3-384">06dbe89f54d4ba4da2c4ffc550802d2c732a0c374d61253a76b0d127ae420e4429e9345bc06cfd8e2dd6031b78bdd6c7</hash>
+        <hash alg="SHA3-256">600c45651d6e2be92fb1a88c41ecf565343c86b36e05da3405b08e761bae3f40</hash>
+        <hash alg="SHA3-512">6682a21604e11d144235a88348afa030689e8fc1dbfdd6f1c65c08662dc34ef95e32c00b4815e6a2a4114085db8187e2cc045a814f183ce10aedc1e8425a7f53</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar">
+      <group>org.jacoco</group>
+      <name>org.jacoco.report</name>
+      <version>0.8.14</version>
+      <description>JaCoCo Report</description>
+      <hashes>
+        <hash alg="MD5">00cef8f0702d2c26201078f566552014</hash>
+        <hash alg="SHA-1">d25b1c200c0c6e82baac3c0ddb8b9e38f13a5f6c</hash>
+        <hash alg="SHA-256">a3e2026060ab8b8d5c650706406234bb4c033dfd5376afeb8b1666e8ed27c453</hash>
+        <hash alg="SHA-512">ea4c40c7240bea5148dc415078a71d5a5ae767a8ad945fca068aac2f765ab3f6191ed29575930fbf44e4919be4f4a8dce914f3bb62af6cbe0d5761c5237090ed</hash>
+        <hash alg="SHA-384">723d1e0cc46581e2b041d912153acfaf256a215aa4e865fde890443e0a5b30aa192aab6b4bc0c1215c9d663cc32f19a8</hash>
+        <hash alg="SHA3-384">b2ba55c38524d8f1cadbc4eb6f32b5e00edd0e7703b884db173cadbc68f5e5aa5c21e05c227a4654c1738502c3142b6e</hash>
+        <hash alg="SHA3-256">d8f2e63fa5221fb485d8adc695f6fa8793e164d727028200c831687c37063396</hash>
+        <hash alg="SHA3-512">952683b971397290986e39b015cace74dfac8793e4bb7de86312c0a6d7b72b9cc525e461f8fff3c0097fec348a0f23462f460efb01d3d10349836c5b1fd954a8</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar</purl>
+      <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
@@ -8837,6 +8945,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar"/>
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.junit.platform/junit-platform-launcher@6.0.3?type=jar"/>
       <dependency ref="pkg:maven/org.mapstruct/mapstruct-processor@1.6.3?type=jar"/>
@@ -9209,6 +9319,20 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.fasterxml/classmate@1.7.3?type=jar"/>
       <dependency ref="pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
+    <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar">
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar"/>
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar">
+      <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar">
+      <dependency ref="pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.javassist/javassist@3.28.0-GA?type=jar"/>
     <dependency ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"/>

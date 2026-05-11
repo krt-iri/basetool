@@ -4,6 +4,7 @@ import org.cyclonedx.Version
 plugins {
   java
   checkstyle
+  id("jacoco")
   id("application")
   id("idea")
   alias(libs.plugins.spring.boot)

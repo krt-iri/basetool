@@ -55,12 +55,8 @@ dependencies {
   testImplementation("com.squareup.okhttp3:mockwebserver:_")
 }
 
-// Test, JavaCompile and BootRun task setup is shared with the backend module via
-// the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
-// The frontend adds JaCoCo report wiring on top.
-tasks.withType<Test>().configureEach {
-  finalizedBy(tasks.jacocoTestReport)
-}
+// Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module
+// via the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks.
 
 // SpotBugs task for the main source set. We use the `-base` variant of the
 // plugin which does not auto-create tasks, so we register one explicitly and
@@ -86,13 +82,6 @@ tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   dependsOn("classes")
 }
 tasks.named("check").configure { dependsOn("spotbugsMain") }
-
-tasks.jacocoTestReport {
-  reports {
-    xml.required.set(true)
-    csv.required.set(true)
-  }
-}
 
 tasks.cyclonedxBom {
   schemaVersion.set(Version.VERSION_16)

@@ -55,6 +55,23 @@ subprojects {
     }
   }
 
+  // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
+  // reports after every test run so CI / SonarQube / IDEs can consume the
+  // data without re-running tests. Each subproject that opts in via
+  // `plugins { jacoco }` automatically picks up this configuration.
+  plugins.withId("jacoco") {
+    tasks.withType<Test>().configureEach {
+      finalizedBy(tasks.named("jacocoTestReport"))
+    }
+    tasks.named<JacocoReport>("jacocoTestReport") {
+      reports {
+        xml.required.set(true)
+        csv.required.set(true)
+        html.required.set(true)
+      }
+    }
+  }
+
   // Checkstyle (Gradle core plugin). Uses the Google Java Style config
   // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
   // 13.4.2 release tag) which enforces 2-space indents, 100-char lines,

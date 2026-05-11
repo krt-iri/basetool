@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:47b577ff-225e-43b4-904f-8cf1fb9f8220",
+  "serialNumber" : "urn:uuid:e06fd08f-6bb0-40da-9c59-8426daf9a8ea",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-11T19:24:46Z",
+    "timestamp" : "2026-05-11T19:34:33Z",
     "tools" : {
       "components" : [
         {
@@ -8052,6 +8052,238 @@
           "url" : "http://github.com/hibernate/hibernate-validator"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
+      "group" : "org.jacoco",
+      "name" : "org.jacoco.agent",
+      "version" : "0.8.14",
+      "description" : "JaCoCo Agent",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "80ca49511ad2aaadecb86b631b400f10"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "bca1f6d49506da3eb9d0d3b9acbcfdd1fb22c14e"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "20be9853385bdfc65a5929643412d09243d14514304b89ba23a265158cc8792b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "01b6bedbc736f2e7350c2046b96861556d39552322758eaa874bbcca479d66c19621755ed98d80df3e80d77a48eb1713ec0dc771c4b481893b9307748cbbe756"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "3922fdf1f5b4b8ee23da68fc5e91aea0d628d9b4d5f25d457412b8cde472e0ddf02771a23c032bb9792d1e7a4a0bdaf8"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "de955ba95663b36d1527dfb458c549122899be99665416b42d8624d0d7dc788fed1d49a864f4422334e32f49c476f50c"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "a1f35cf33933c5694674fb79cddbb2502838f86d8c475b888b603a311cedd71a"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "f76c8e39568f4d0c81a07856c4f32ba7cd16bec92c4e43d17d2c347fd1020796e8fa7b63b8d0182f8992f966d3d52b2967e4cc2b09f77f3baea0ad78973f44e6"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "EPL-2.0",
+            "url" : "https://www.eclipse.org/legal/epl-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
+      "group" : "org.jacoco",
+      "name" : "org.jacoco.ant",
+      "version" : "0.8.14",
+      "description" : "JaCoCo Ant Tasks",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "341aaffda886f24b74fcd67f8ec27b27"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "f52b386d3440618462eb656584b6f655a655c2b1"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "9fff68954d5de3aad2bf838eaf886ed67d2c22a2d6c6f095548bade8c45caeae"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d51e08c8735a1310de5689844214ee592bb1ca93064675d1c27e47e01c3a397aed9083e54ee26c3e9b430e40681043095ee10022d59af0239900af7b6e2bea93"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "74cb9ca8ecf147b874c58fe63ab8ee1fa59b8e400455649c560003e131a1a18afdf267b1433b8f4cd05fcfba78d1eba5"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "a3cebdaf7f6c0f09791a58b78e8a9d22bd2d421c992dd7dae361433b02bf8570c2c631716cb0250ac19a804d8a21117c"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "19b57ba4469ba11d25ce0d7f4dc83b2a659b164ed300665e225f15abb640763f"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "52039c46db985ff61d5ba258670890e5d99de928a2bce4a6b1e3f45dc51021483a279ce71f5b053c83c2f047b2ac83dd8812d8814e90bae124276457b11578b5"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "EPL-2.0",
+            "url" : "https://www.eclipse.org/legal/epl-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar",
+      "group" : "org.jacoco",
+      "name" : "org.jacoco.core",
+      "version" : "0.8.14",
+      "description" : "JaCoCo Core",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "07f7ab938a007b6146aede8407c2b117"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "5d317827447ab203bb90ecc7597850baae9c8565"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "28abbf0eea5a08e4f24097f2fbac663ca17c341c25c3a04d90d6cd325943c995"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "3af7632e45398541202f3c1073978fdb54bad3dbb07c1a7c2bc412c060d148c1877bfb5d697674c22acd57dee9811e64f5a3113b79f275bc71b87876ff882faf"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "ee13a5eac4c0ff720e17bbdf66edc79453f66a2364e143dba49f8446305f463a251d3f4bc1b97a9a231cfd36cb2b142d"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "06dbe89f54d4ba4da2c4ffc550802d2c732a0c374d61253a76b0d127ae420e4429e9345bc06cfd8e2dd6031b78bdd6c7"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "600c45651d6e2be92fb1a88c41ecf565343c86b36e05da3405b08e761bae3f40"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "6682a21604e11d144235a88348afa030689e8fc1dbfdd6f1c65c08662dc34ef95e32c00b4815e6a2a4114085db8187e2cc045a814f183ce10aedc1e8425a7f53"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "EPL-2.0",
+            "url" : "https://www.eclipse.org/legal/epl-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar",
+      "group" : "org.jacoco",
+      "name" : "org.jacoco.report",
+      "version" : "0.8.14",
+      "description" : "JaCoCo Report",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "00cef8f0702d2c26201078f566552014"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "d25b1c200c0c6e82baac3c0ddb8b9e38f13a5f6c"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "a3e2026060ab8b8d5c650706406234bb4c033dfd5376afeb8b1666e8ed27c453"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "ea4c40c7240bea5148dc415078a71d5a5ae767a8ad945fca068aac2f765ab3f6191ed29575930fbf44e4919be4f4a8dce914f3bb62af6cbe0d5761c5237090ed"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "723d1e0cc46581e2b041d912153acfaf256a215aa4e865fde890443e0a5b30aa192aab6b4bc0c1215c9d663cc32f19a8"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "b2ba55c38524d8f1cadbc4eb6f32b5e00edd0e7703b884db173cadbc68f5e5aa5c21e05c227a4654c1738502c3142b6e"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "d8f2e63fa5221fb485d8adc695f6fa8793e164d727028200c831687c37063396"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "952683b971397290986e39b015cace74dfac8793e4bb7de86312c0a6d7b72b9cc525e461f8fff3c0097fec348a0f23462f460efb01d3d10349836c5b1fd954a8"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "EPL-2.0",
+            "url" : "https://www.eclipse.org/legal/epl-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -17411,6 +17643,8 @@
         "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar",
         "pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar",
+        "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
+        "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
         "pkg:maven/org.junit.platform/junit-platform-launcher@6.0.3?type=jar",
         "pkg:maven/org.mapstruct/mapstruct-processor@1.6.3?type=jar",
@@ -18050,6 +18284,32 @@
         "pkg:maven/com.fasterxml/classmate@1.7.3?type=jar",
         "pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar",
         "pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
+        "pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar",
+        "pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar",
+        "pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar",
+        "pkg:maven/org.ow2.asm/asm@9.9?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.jacoco/org.jacoco.report@0.8.14?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.jacoco/org.jacoco.core@0.8.14?type=jar"
       ]
     },
     {
