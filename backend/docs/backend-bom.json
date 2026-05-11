@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:be97e6bf-cdee-47a1-9b1f-173e497488ab",
+  "serialNumber" : "urn:uuid:7eeb7c63-4417-4998-a4f4-1b016506fa0b",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-04T17:23:07Z",
+    "timestamp" : "2026-05-11T10:59:05Z",
     "tools" : {
       "components" : [
         {
@@ -22,7 +22,13 @@
       "name" : "backend",
       "version" : "0.0.1-SNAPSHOT",
       "purl" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
-      "modified" : false
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/krt-iri/basetool.git"
+        }
+      ]
     }
   },
   "components" : [

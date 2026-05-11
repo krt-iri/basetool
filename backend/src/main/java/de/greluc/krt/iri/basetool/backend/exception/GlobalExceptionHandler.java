@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
 import org.slf4j.MDC;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -80,9 +83,23 @@ public class GlobalExceptionHandler {
     private static final String MDC_CORRELATION_ID = "correlationId";
 
     private final AppProblemProperties problemProperties;
+    private final MessageSource messageSource;
 
     private URI type(String suffix) {
         return URI.create(problemProperties.getBaseUri() + suffix);
+    }
+
+    /**
+     * Resolve a localized message via Spring's {@link MessageSource} using the locale from
+     * {@link LocaleContextHolder} (populated from the {@code Accept-Language} header by Spring's
+     * default {@code AcceptHeaderLocaleResolver}). If the key is missing in the bundle, the key
+     * itself is returned as the default — which makes missing translations obvious in QA without
+     * crashing production. Keys live in {@code backend/src/main/resources/messages*.properties}
+     * under the {@code problem.*.title} / {@code problem.*.detail} convention.
+     */
+    private String tr(String key, Object... args) {
+        Locale locale = LocaleContextHolder.getLocale();
+        return messageSource.getMessage(key, args, key, locale);
     }
 
     private static ResponseEntity<ProblemDetail> toEntity(ProblemDetail pd) {
@@ -147,8 +164,8 @@ public class GlobalExceptionHandler {
             StaleObjectStateException.class})
     public ResponseEntity<ProblemDetail> handleOptimisticLockingFailure(Exception ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.CONFLICT,
-                "Concurrency conflict",
-                "The resource has been updated by another user. Please reload and try again.",
+                tr("problem.optimistic_lock.title"),
+                tr("problem.optimistic_lock.detail"),
                 request,
                 "concurrency-conflict",
                 CODE_OPTIMISTIC_LOCK);
@@ -163,8 +180,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handlePessimisticLocking(PessimisticLockingFailureException ex,
                                                                   HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.CONFLICT,
-                "Resource busy",
-                "The operation is currently being performed by another user. Please try again in a moment.",
+                tr("problem.pessimistic_lock.title"),
+                tr("problem.pessimistic_lock.detail"),
                 request,
                 "pessimistic-lock",
                 CODE_PESSIMISTIC_LOCK);
@@ -178,8 +195,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.UNAUTHORIZED,
-                "Authentication required",
-                "You must be signed in to perform this action.",
+                tr("problem.unauthenticated.title"),
+                tr("problem.unauthenticated.detail"),
                 request,
                 "unauthenticated",
                 CODE_UNAUTHENTICATED);
@@ -201,8 +218,8 @@ public class GlobalExceptionHandler {
         // Do NOT echo ex.getMessage() to clients (may contain SpEL or required-role hints) -
         // keep the user-facing detail generic and put the diagnostic info into the WARN log only.
         ProblemDetail pd = problem(HttpStatus.FORBIDDEN,
-                "Access denied",
-                "You are not authorized to perform this action.",
+                tr("problem.access_denied.title"),
+                tr("problem.access_denied.detail"),
                 request,
                 "access-denied",
                 CODE_ACCESS_DENIED);
@@ -241,8 +258,8 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getGlobalErrors().forEach(globalError ->
                 logSummary.add("[" + globalError.getObjectName() + "] " + globalError.getDefaultMessage()));
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                "Validation failed",
-                "One or more fields have invalid values.",
+                tr("problem.validation_failed.title"),
+                tr("problem.validation_failed.detail"),
                 request,
                 "constraint-violation",
                 CODE_VALIDATION_FAILED);
@@ -276,8 +293,8 @@ public class GlobalExceptionHandler {
             logSummary.add(field + "=" + v.getMessage());
         });
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                "Validation failed",
-                "One or more request parameters have invalid values.",
+                tr("problem.constraint_violation.title"),
+                tr("problem.constraint_violation.detail"),
                 request,
                 "constraint-violation",
                 CODE_CONSTRAINT_VIOLATION);
@@ -323,8 +340,8 @@ public class GlobalExceptionHandler {
         // paths, raw inputs that triggered a parser, ...). Return a generic detail to
         // the client and keep the real message only in the server log.
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                "Invalid argument",
-                "Request contained an invalid argument. See server log with the correlation id for details.",
+                tr("problem.illegal_argument.title"),
+                tr("problem.illegal_argument.detail"),
                 request,
                 "invalid-argument",
                 CODE_ILLEGAL_ARGUMENT);
@@ -376,8 +393,8 @@ public class GlobalExceptionHandler {
         // information needed to triage "400 BAD_REQUEST" reports without a reproduction.
         Throwable rootCause = ex.getMostSpecificCause();
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                "Bad Request",
-                "The request body could not be read or parsed.",
+                tr("problem.bad_request.title"),
+                tr("problem.bad_request.detail"),
                 request,
                 "bad-request",
                 CODE_BAD_REQUEST);
@@ -413,8 +430,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException ex,
                                                                       HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.CONFLICT,
-                "Data integrity violation",
-                "The operation could not be completed due to a database constraint violation.",
+                tr("problem.data_integrity.title"),
+                tr("problem.data_integrity.detail"),
                 request,
                 "data-integrity-violation",
                 CODE_DATA_INTEGRITY);
@@ -443,8 +460,8 @@ public class GlobalExceptionHandler {
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
             HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST,
-                "Type mismatch",
-                "Invalid value for parameter '" + ex.getName() + "'.",
+                tr("problem.type_mismatch.title"),
+                tr("problem.type_mismatch.detail", ex.getName()),
                 request,
                 "type-mismatch",
                 CODE_TYPE_MISMATCH);
@@ -460,8 +477,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
                                                                   HttpServletRequest request) {
         ProblemDetail pd = problem(HttpStatus.METHOD_NOT_ALLOWED,
-                "Method not allowed",
-                "HTTP method '" + ex.getMethod() + "' is not supported for this endpoint.",
+                tr("problem.method_not_allowed.title"),
+                tr("problem.method_not_allowed.detail", ex.getMethod()),
                 request,
                 "method-not-allowed",
                 CODE_METHOD_NOT_ALLOWED);
@@ -486,11 +503,13 @@ public class GlobalExceptionHandler {
         // deleted mission IDs). Log at DEBUG only and do NOT include the stacktrace to keep
         // the error log focused on real problems.
         log.debug("Not found at {}: {}", request.getRequestURI(), ex.getMessage());
+        // Service-level NotFoundException messages are typically already i18n-resolved or domain
+        // identifiers; fall back to a localized generic message only when no detail was provided.
         String detail = (ex.getMessage() != null && !ex.getMessage().isBlank())
                 ? ex.getMessage()
-                : "The requested resource was not found.";
+                : tr("problem.not_found.detail");
         ProblemDetail pd = problem(HttpStatus.NOT_FOUND,
-                "Not Found",
+                tr("problem.not_found.title"),
                 detail,
                 request,
                 "not-found",
@@ -511,8 +530,8 @@ public class GlobalExceptionHandler {
             MDC.remove(MDC_CORRELATION_ID);
         }
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please contact the administrator if the problem persists.");
-        pd.setTitle("Internal Server Error");
+                tr("problem.internal_error.detail"));
+        pd.setTitle(tr("problem.internal_error.title"));
         pd.setType(type("internal-error"));
         pd.setInstance(URI.create(request.getRequestURI()));
         pd.setProperty("code", CODE_INTERNAL_ERROR);

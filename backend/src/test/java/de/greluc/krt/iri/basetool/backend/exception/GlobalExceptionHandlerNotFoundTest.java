@@ -2,14 +2,18 @@ package de.greluc.krt.iri.basetool.backend.exception;
 
 import de.greluc.krt.iri.basetool.backend.config.AppProblemProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.net.URI;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,9 +33,19 @@ class GlobalExceptionHandlerNotFoundTest {
     void setUp() {
         AppProblemProperties props = new AppProblemProperties();
         props.setBaseUri("https://iri-base.org/problems/");
-        handler = new GlobalExceptionHandler(props);
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("messages");
+        messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        handler = new GlobalExceptionHandler(props, messageSource);
         request = mock(HttpServletRequest.class);
         when(request.getRequestURI()).thenReturn("/api/v1/missions/abc");
+    }
+
+    @AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     @Test
