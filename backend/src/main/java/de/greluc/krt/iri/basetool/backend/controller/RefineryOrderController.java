@@ -6,6 +6,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.iri.basetool.backend.mapper.RefineryOrderMapper;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
@@ -13,16 +14,13 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -36,7 +34,7 @@ public class RefineryOrderController {
     private final RefineryOrderService refineryOrderService;
     private final UserService userService;
     private final RefineryOrderMapper mapper;
-    private final RoleHierarchy roleHierarchy;
+    private final AuthHelperService authHelperService;
 
     // User endpoints
 
@@ -60,7 +58,7 @@ public class RefineryOrderController {
     public RefineryOrderDto getRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
         RefineryOrder order = refineryOrderService.getRefineryOrder(id);
         
-        if (isLogisticianOrAbove() || (order.getOwner() != null && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
+        if (authHelperService.isLogisticianOrAbove() || (order.getOwner() != null && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
             return mapper.toDto(order);
         }
         
@@ -72,7 +70,7 @@ public class RefineryOrderController {
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     public List<RefineryOrderListDto> getMissionRefineryOrders(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         if (isLogistician) {
             return refineryOrderService.getMissionRefineryOrders(missionId).stream().map(mapper::toListDto).toList();
         }
@@ -84,7 +82,7 @@ public class RefineryOrderController {
     public RefineryOrderDto createMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
         UUID userId = userService.getUserIdFromJwt(jwt);
         if (orderDto.owner() != null && orderDto.owner().id() != null) {
-            if (isLogisticianOrAbove()) {
+            if (authHelperService.isLogisticianOrAbove()) {
                 userId = orderDto.owner().id();
             }
         }
@@ -97,7 +95,7 @@ public class RefineryOrderController {
         UUID callerId = userService.getUserIdFromJwt(jwt);
         RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
         
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         
         UUID targetUserId = callerId;
         if (isLogistician) {
@@ -119,25 +117,13 @@ public class RefineryOrderController {
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public void deleteMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
-        refineryOrderService.deleteRefineryOrder(userService.getUserIdFromJwt(jwt), id, isLogisticianOrAbove());
+        refineryOrderService.deleteRefineryOrder(userService.getUserIdFromJwt(jwt), id, authHelperService.isLogisticianOrAbove());
     }
 
     @PostMapping("/{id}/store")
     @PreAuthorize("isAuthenticated()")
     public void storeMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
-        refineryOrderService.storeRefineryOrder(userService.getUserIdFromJwt(jwt), id, dto, isLogisticianOrAbove());
-    }
-
-    private boolean isLogisticianOrAbove() {
-        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            Collection<? extends GrantedAuthority> reachableAuthorities = roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities());
-            return reachableAuthorities.stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN") ||
-                                   a.getAuthority().equals("ROLE_ADMIN") ||
-                                   a.getAuthority().equals("ROLE_OFFICER"));
-        }
-        return false;
+        refineryOrderService.storeRefineryOrder(userService.getUserIdFromJwt(jwt), id, dto, authHelperService.isLogisticianOrAbove());
     }
 
     // Admin/Officer endpoints

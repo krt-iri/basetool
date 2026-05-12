@@ -231,13 +231,13 @@ public class JobOrderHandoverReportService {
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
-            // Falls through to GlobalExceptionHandler.handleAllExceptions which produces a 500
-            // RFC 7807 response with a localised generic "internal error" detail and a
-            // correlation id linking back to the ERROR log line below. The cause is preserved
-            // for the stacktrace; the exception message is server-internal and never leaks to
-            // the API client.
-            log.error("Failed to generate handover report PDF", e);
-            throw new RuntimeException("PDF generation failed", e);
+            // Caught by GlobalExceptionHandler.handleReportGeneration which produces a 500
+            // RFC 7807 response with the stable code REPORT_GENERATION_FAILED and a localised
+            // generic detail. The cause is preserved on the exception so the ERROR log line
+            // emitted by the handler carries the full PDF-library stacktrace; the exception
+            // message itself is server-internal and never leaks to the API client.
+            throw new de.greluc.krt.iri.basetool.backend.exception.ReportGenerationException(
+                    "PDF generation failed", e);
         }
     }
 

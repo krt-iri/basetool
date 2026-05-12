@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:d2a67bd4-7796-4275-9452-300bed8246ad",
+  "serialNumber" : "urn:uuid:32af32d6-e0f4-4a16-b58f-25a6733ada59",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-11T19:56:27Z",
+    "timestamp" : "2026-05-12T06:09:38Z",
     "tools" : {
       "components" : [
         {
@@ -1836,75 +1836,6 @@
         {
           "name" : "cdx:maven:package:test",
           "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.h2database/h2@2.4.240?type=jar",
-      "group" : "com.h2database",
-      "name" : "h2",
-      "version" : "2.4.240",
-      "description" : "H2 Database Engine",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "fb14a47b07dfd4381a608d3adb89dc25"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "686180ad33981ad943fdc0ab381e619b2c2fdfe5"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "29b70e427cc1c40cdc376283adbb0cc62853073797bb5fe5761f81fe73d57ce0"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "dfe71fb621ae7e3b737da883325ff557a03db185d0b5e27800911e8512866cf4fc4e555de7be1d93cc5abb5903d9588a10d746812438a8e019bc9729131df218"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "89ffc001b299d9aa9017e30c901539042c1bceadfb329073395ba97d59068d6dbfdf50486507d977086eddad7760dfea"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "fe8e25377fa6fd15dbfb2f81673d20a199a7cdbb8c36de512820c6d41d45933044d6e508235ca946dc8fa4c1e83efd66"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "655173946406292168468f9f805f3642c920dcb48cb7a59a2efcd9f0a3738c0e"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "e2de4ce8067df0c23746f6357952afd8b0a73018b2a7eea77bc85a1bc21f1baff2aee69d829a15dcf83670079802d46be71f071c185f431908db974e88958f52"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "MPL-2.0"
-          }
-        },
-        {
-          "license" : {
-            "name" : "EPL 1.0",
-            "url" : "https://opensource.org/licenses/eclipse-1.0.php"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.h2database/h2@2.4.240?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/h2database/h2database"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "true"
         }
       ]
     },
@@ -18514,10 +18445,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.h2database/h2@2.4.240?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/com.jayway.jsonpath/json-path@2.10.0?type=jar",
       "dependsOn" : [
         "pkg:maven/net.minidev/json-smart@2.6.0?type=jar",
@@ -18592,7 +18519,6 @@
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar",
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
-        "pkg:maven/com.h2database/h2@2.4.240?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar",
         "pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar",

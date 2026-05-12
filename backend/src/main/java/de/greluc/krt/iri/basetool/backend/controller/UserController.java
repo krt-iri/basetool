@@ -77,11 +77,13 @@ public class UserController {
     }
 
     @PutMapping("/me/description")
+    @PreAuthorize("isAuthenticated()")
     public UserDto updateMyDescription(@AuthenticationPrincipal Jwt jwt, @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
         return userMapper.toDto(userService.updateUserDescription(userService.getUserIdFromJwt(jwt), request.getDescription(), request.getDisplayName(), request.getVersion()));
     }
 
     @PutMapping("/me/read-announcement/{announcementId}")
+    @PreAuthorize("isAuthenticated()")
     public UserDto updateReadAnnouncement(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID announcementId) {
         return userMapper.toDto(userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId));
     }

@@ -61,17 +61,17 @@
                     <td th:text="${user.lastName}">Nachname</td>
                     <td th:text="${user.rank}">Rang</td>
                     <td>
-                        <input type="checkbox" 
-                               th:checked="${user.isLogistician}" 
+                        <input type="checkbox"
+                               th:checked="${user.isLogistician}"
                                th:data-user-id="${user.id}"
-                               onchange="updateLogisticianStatus(this.getAttribute('data-user-id'), this.checked)"
+                               data-trigger="members-toggle-logistician"
                                th:disabled="${#authentication.principal.subject == user.id.toString()}">
                     </td>
                     <td>
-                        <input type="checkbox" 
-                               th:checked="${user.isMissionManager}" 
+                        <input type="checkbox"
+                               th:checked="${user.isMissionManager}"
                                th:data-user-id="${user.id}"
-                               onchange="updateMissionManagerStatus(this.getAttribute('data-user-id'), this.checked)"
+                               data-trigger="members-toggle-mission-manager"
                                th:disabled="${#authentication.principal.subject == user.id.toString()}">
                     </td>
                     <td>
@@ -84,7 +84,7 @@
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
                                     class="btn btn-danger"
                                     th:data-user-id="${user.id}"
-                                    onclick="deleteUser(this.getAttribute('data-user-id'))"
+                                    data-trigger="members-delete-user"
                                     th:text="#{members.delete}">Löschen</button>
                         </div>
                     </td>
@@ -191,6 +191,22 @@
         const form = document.getElementById('delete-user-form');
         form.action = `/members/${userId}/delete`;
         form.submit();
+    }
+
+    // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
+    // The matching data-trigger attributes are set on the checkboxes / delete button
+    // above; using the global event-delegation helper keeps the wiring working when
+    // Thymeleaf re-renders the member table on filter/pagination changes.
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'members-toggle-logistician', function (el) {
+            updateLogisticianStatus(el.getAttribute('data-user-id'), el.checked);
+        });
+        window.krtEvents.on('change', 'members-toggle-mission-manager', function (el) {
+            updateMissionManagerStatus(el.getAttribute('data-user-id'), el.checked);
+        });
+        window.krtEvents.on('click', 'members-delete-user', function (el) {
+            deleteUser(el.getAttribute('data-user-id'));
+        });
     }
 </script>
 </body>

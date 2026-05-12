@@ -31,8 +31,8 @@
 
         <div class="krt-pi-actionbar">
             <button type="button" class="btn krt-pi-create"
+                    data-trigger="pi-open-create"
                     th:attr="data-action=@{/personal-inventory/add}"
-                    onclick="krtPersonalInventory.openCreate(this)"
                     th:text="#{personalInventory.action.create}">Eintrag anlegen</button>
 
             <form th:action="@{/personal-inventory}" method="get" class="krt-pi-filter no-track">
@@ -71,6 +71,7 @@
                     <td>
                         <div class="krt-pi-actions">
                             <button type="button" class="btn"
+                                    data-trigger="pi-open-edit"
                                     th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/update'},
                                              data-id=${item.id},
                                              data-version=${item.version},
@@ -80,12 +81,11 @@
                                              data-location-uex-id=${item.locationUexId},
                                              data-location-type=${item.locationType?.name()},
                                              data-location-name=${item.locationName}"
-                                    onclick="krtPersonalInventory.openEdit(this)"
                                     th:text="#{personalInventory.action.edit}">Bearbeiten</button>
                             <button type="button" class="btn btn-secondary"
+                                    data-trigger="pi-open-delete"
                                     th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/delete'},
                                              data-name=${item.name}"
-                                    onclick="krtPersonalInventory.openDelete(this)"
                                     th:text="#{personalInventory.action.delete}">Loeschen</button>
                         </div>
                     </td>
@@ -99,7 +99,7 @@
 <!-- Create / Edit modal (KRT-styled, no native confirm/alert) -->
 <div id="krt-pi-modal" class="modal" th:style="${showItemModal != null ? 'display:block' : 'display:none'}">
     <div class="modal-content hud-box">
-        <span class="close" onclick="krtPersonalInventory.closeModal()">&times;</span>
+        <span class="close" data-trigger="pi-close-modal">&times;</span>
         <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
 
         <form id="krt-pi-form"
@@ -127,7 +127,7 @@
                 <label for="krt-pi-quantity" th:text="#{personalInventory.field.quantity}">Menge</label>
                 <input id="krt-pi-quantity" type="number" min="1" step="1" inputmode="numeric"
                        pattern="[0-9]*" required th:field="*{quantity}"
-                       oninput="krtPersonalInventory.sanitizeQuantity(this)">
+                       data-trigger="pi-sanitize-quantity">
             </div>
 
             <div class="form-group krt-pi-typeahead">
@@ -145,7 +145,7 @@
 
             <div class="krt-pi-modal-actions">
                 <button type="submit" class="btn" th:text="#{personalInventory.action.save}">Speichern</button>
-                <button type="button" class="btn btn-secondary" onclick="krtPersonalInventory.closeModal()" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-trigger="pi-close-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
@@ -154,14 +154,14 @@
 <!-- Delete confirmation modal (KRT-styled, replaces native confirm()) -->
 <div id="krt-pi-delete-modal" class="modal" style="display:none;">
     <div class="modal-content hud-box">
-        <span class="close" onclick="krtPersonalInventory.closeDelete()">&times;</span>
+        <span class="close" data-trigger="pi-close-delete">&times;</span>
         <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
         <p id="krt-pi-delete-message" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div class="krt-pi-modal-actions">
                 <button type="submit" class="btn krt-danger" th:text="#{personalInventory.action.delete.confirm.ok}">Loeschen</button>
-                <button type="button" class="btn btn-secondary" onclick="krtPersonalInventory.closeDelete()" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-trigger="pi-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>

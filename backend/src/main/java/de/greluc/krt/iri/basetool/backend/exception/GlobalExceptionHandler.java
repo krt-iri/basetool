@@ -79,6 +79,8 @@ public class GlobalExceptionHandler {
     public static final String CODE_DATA_INTEGRITY = "DATA_INTEGRITY_VIOLATION";
     public static final String CODE_NOT_FOUND = "NOT_FOUND";
     public static final String CODE_METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
+    public static final String CODE_EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR";
+    public static final String CODE_REPORT_GENERATION_FAILED = "REPORT_GENERATION_FAILED";
     public static final String CODE_INTERNAL_ERROR = "INTERNAL_ERROR";
 
     private static final String MDC_CORRELATION_ID = "correlationId";
@@ -549,6 +551,65 @@ public class GlobalExceptionHandler {
                 request,
                 "not-found",
                 CODE_NOT_FOUND);
+        return toEntity(pd);
+    }
+
+    // --- 502 Upstream service errors (Keycloak, UEX, …) -----------------------------------
+
+    /**
+     * Mapped distinctly from the generic 500 fallback so an upstream outage is monitorable as
+     * its own class of problem ({@code code=EXTERNAL_SERVICE_ERROR}). The user-facing
+     * {@code detail} is a localized generic message — the underlying exception message
+     * (which may contain raw response bodies from the upstream system) is logged at ERROR
+     * with the full stacktrace so triage has access to it without leaking it through the API.
+     */
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<ProblemDetail> handleExternalService(ExternalServiceException ex,
+                                                               HttpServletRequest request) {
+        String cid = correlationId();
+        MDC.put(MDC_CORRELATION_ID, cid);
+        try {
+            log.error("Upstream service error at {} [correlationId={}]", request.getRequestURI(), cid, ex);
+        } finally {
+            MDC.remove(MDC_CORRELATION_ID);
+        }
+        ProblemDetail pd = problem(HttpStatus.BAD_GATEWAY,
+                tr("problem.external_service.title"),
+                tr("problem.external_service.detail"),
+                request,
+                "external-service-error",
+                CODE_EXTERNAL_SERVICE_ERROR);
+        // Overwrite the freshly generated correlation id with the one we used for the log
+        // line so the client-visible id matches the server log entry exactly.
+        pd.setProperty("correlationId", cid);
+        return toEntity(pd);
+    }
+
+    // --- 500 Report generation failures ---------------------------------------------------
+
+    /**
+     * Carved out from the generic 500 fallback so the report pipeline (PDF, CSV, …) has its
+     * own monitorable error category ({@code code=REPORT_GENERATION_FAILED}). The detail
+     * shown to the client is intentionally generic to avoid leaking library-internal
+     * messages (font/encoding errors, file-path fragments, …) into the response body.
+     */
+    @ExceptionHandler(ReportGenerationException.class)
+    public ResponseEntity<ProblemDetail> handleReportGeneration(ReportGenerationException ex,
+                                                                HttpServletRequest request) {
+        String cid = correlationId();
+        MDC.put(MDC_CORRELATION_ID, cid);
+        try {
+            log.error("Report generation failed at {} [correlationId={}]", request.getRequestURI(), cid, ex);
+        } finally {
+            MDC.remove(MDC_CORRELATION_ID);
+        }
+        ProblemDetail pd = problem(HttpStatus.INTERNAL_SERVER_ERROR,
+                tr("problem.report_generation_failed.title"),
+                tr("problem.report_generation_failed.detail"),
+                request,
+                "report-generation-failed",
+                CODE_REPORT_GENERATION_FAILED);
+        pd.setProperty("correlationId", cid);
         return toEntity(pd);
     }
 

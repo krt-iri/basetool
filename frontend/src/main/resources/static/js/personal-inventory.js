@@ -8,6 +8,11 @@
  *    rendering combined CITY + SPACE_STATION results and writing the chosen
  *    UEX id and type into the hidden form fields.
  *
+ * Wiring: this module uses the global `krtEvents.on` event-delegation helper
+ * (see static/js/event-delegation.js) to bind logical actions declared in the
+ * template as `data-trigger="pi-…"` attributes — no inline `onclick="…"` is
+ * required, which is what lets the CSP forbid `script-src-attr 'unsafe-inline'`.
+ *
  * The module purposely avoids any inline alert()/confirm()/prompt() calls
  * (KRT corporate design rule) and reads its translatable strings from
  * window.krtPersonalInventoryI18n which the Thymeleaf template populates.
@@ -198,12 +203,21 @@
         init();
     }
 
-    window.krtPersonalInventory = {
-        openCreate: openCreate,
-        openEdit: openEdit,
-        closeModal: closeModal,
-        openDelete: openDelete,
-        closeDelete: closeDelete,
-        sanitizeQuantity: sanitizeQuantity
-    };
+    // Delegated event bindings via the global event-delegation helper. The
+    // matching `data-trigger="pi-…"` attributes are set on the buttons / inputs
+    // in personal-inventory.html. Using delegated listeners (rather than
+    // querySelectorAll + addEventListener per node) keeps the wiring working for
+    // table rows that are re-rendered by Thymeleaf on form errors without
+    // requiring a re-bind. The legacy `window.krtPersonalInventory.x(this)`
+    // global is intentionally removed — every template entry point now goes
+    // through `data-trigger` so the CSP can later drop
+    // `script-src-attr 'unsafe-inline'`.
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'pi-open-create', openCreate);
+        window.krtEvents.on('click', 'pi-open-edit', openEdit);
+        window.krtEvents.on('click', 'pi-open-delete', openDelete);
+        window.krtEvents.on('click', 'pi-close-modal', closeModal);
+        window.krtEvents.on('click', 'pi-close-delete', closeDelete);
+        window.krtEvents.on('input', 'pi-sanitize-quantity', sanitizeQuantity);
+    }
 })();
