@@ -63,34 +63,34 @@ public class RefineryOrderService {
 
     public RefineryOrder getRefineryOrder(@NotNull UUID id) {
         return refineryOrderRepository.findById(id)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefineryOrder not found"));
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.refinery_order.not_found"));
     }
 
     @Transactional
     public RefineryOrder createRefineryOrder(@NotNull UUID userId, @NotNull RefineryOrder order) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("User not found"));
-        
+            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.user.not_found"));
+
         order.setOwner(user);
 
         if (order.getLocation() != null && order.getLocation().getId() != null) {
             order.setLocation(locationRepository.findById(order.getLocation().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.location.not_found")));
             validateLocationHasRefinery(order.getLocation());
         } else {
-            throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Location is required");
+            throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("error.refinery_order.location_required");
         }
 
         if (order.getMission() != null && order.getMission().getId() != null) {
             order.setMission(missionRepository.findById(order.getMission().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.mission.not_found")));
         } else {
             order.setMission(null);
         }
 
         if (order.getRefiningMethod() != null && order.getRefiningMethod().getId() != null) {
             order.setRefiningMethod(refiningMethodRepository.findById(order.getRefiningMethod().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefiningMethod not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.refining_method.not_found")));
         } else {
             order.setRefiningMethod(null);
         }
@@ -100,8 +100,8 @@ public class RefineryOrderService {
             order.getGoods().forEach(good -> {
                 if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
-                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Input Material not found"));
-                    
+                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.material.input.not_found"));
+
                     if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
                     }
@@ -109,12 +109,12 @@ public class RefineryOrderService {
 
                     if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
                         de.greluc.krt.iri.basetool.backend.model.Material outMat = materialRepository.findById(good.getOutputMaterial().getId())
-                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Output Material not found"));
-                            
+                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.material.output.not_found"));
+
                         if (inMat.getRefinedMaterial() != null && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
                             throw new IllegalArgumentException("Output material must match the refined material of the input material.");
                         }
-                        
+
                         good.setOutputMaterial(outMat);
                     } else {
                         if (inMat.getRefinedMaterial() != null) {
@@ -124,7 +124,7 @@ public class RefineryOrderService {
                         }
                     }
                 } else {
-                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Input Material is required for refined goods");
+                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("error.refinery_order.input_material_required");
                 }
                 good.setRefineryOrder(order);
             });
@@ -165,20 +165,20 @@ public class RefineryOrderService {
 
         if (details.getLocation() != null && details.getLocation().getId() != null) {
             order.setLocation(locationRepository.findById(details.getLocation().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.location.not_found")));
             validateLocationHasRefinery(order.getLocation());
         }
 
         if (details.getMission() != null && details.getMission().getId() != null) {
             order.setMission(missionRepository.findById(details.getMission().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Mission not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.mission.not_found")));
         } else if (details.getMission() == null) {
              order.setMission(null);
         }
 
         if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
             order.setRefiningMethod(refiningMethodRepository.findById(details.getRefiningMethod().getId())
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("RefiningMethod not found")));
+                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.refining_method.not_found")));
         } else if (details.getRefiningMethod() == null) {
             order.setRefiningMethod(null);
         }
@@ -199,8 +199,8 @@ public class RefineryOrderService {
             details.getGoods().forEach(good -> {
                 if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
                     de.greluc.krt.iri.basetool.backend.model.Material inMat = materialRepository.findById(good.getInputMaterial().getId())
-                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Input Material not found"));
-                    
+                        .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.material.input.not_found"));
+
                     if (inMat.getType() != de.greluc.krt.iri.basetool.backend.model.MaterialType.RAW && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
                         throw new IllegalArgumentException("Refinery goods input must be of type RAW. Material '" + inMat.getName() + "' is " + inMat.getType());
                     }
@@ -208,12 +208,12 @@ public class RefineryOrderService {
 
                     if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
                         de.greluc.krt.iri.basetool.backend.model.Material outMat = materialRepository.findById(good.getOutputMaterial().getId())
-                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Output Material not found"));
-                            
+                            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("error.material.output.not_found"));
+
                         if (inMat.getRefinedMaterial() != null && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
                             throw new IllegalArgumentException("Output material must match the refined material of the input material.");
                         }
-                        
+
                         good.setOutputMaterial(outMat);
                     } else {
                         if (inMat.getRefinedMaterial() != null) {
@@ -223,7 +223,7 @@ public class RefineryOrderService {
                         }
                     }
                 } else {
-                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Input Material is required for refined goods");
+                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("error.refinery_order.input_material_required");
                 }
                 good.setRefineryOrder(order);
                 order.getGoods().add(good);
