@@ -36,8 +36,12 @@ public class Role extends AbstractEntity<Long> {
     private String description;
 
 
+    // @ToString.Exclude on the LAZY ElementCollection so a logged Role outside
+    // of a Hibernate session does not trigger LazyInitializationException
+    // (matches the InventoryItem / Mission / RefineryOrder pattern).
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"))
     @Column(name = "permission")
+    @ToString.Exclude
     private Set<String> permissions = new HashSet<>();
 }
