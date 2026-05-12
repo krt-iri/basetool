@@ -55,26 +55,28 @@ public class PersonalInventoryPageController {
         if (!model.containsAttribute("personalInventoryForm")) {
             model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
         }
-        model.addAttribute("filterQuery", q == null ? "" : q);
-
-        PageResponse<PersonalInventoryItemDto> items = fetchItems(q, page, size, sort);
-        model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
-        model.addAttribute("page", items);
-
+        populateListing(model, q, page, size, sort);
         return "personal-inventory";
     }
 
     @PostMapping("/add")
     public String add(@Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
                       BindingResult bindingResult,
+                      Model model,
                       RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute(
-                    "org.springframework.validation.BindingResult.personalInventoryForm", bindingResult);
-            redirectAttributes.addFlashAttribute("personalInventoryForm", form);
-            redirectAttributes.addFlashAttribute("showItemModal", true);
-            redirectAttributes.addFlashAttribute("modalAction", "/personal-inventory/add");
-            return "redirect:/personal-inventory";
+            // Render the list view directly instead of redirecting. We must NOT push the
+            // BindingResult into a FlashAttribute: BeanPropertyBindingResult holds a back-
+            // reference to its model map (which in turn re-contains the BindingResult), and
+            // the GenericJacksonJsonRedisSerializer used for Spring Session blows up on the
+            // self-referencing cycle with `Document nesting depth (501) exceeds the maximum
+            // allowed (500)`. Spring already exposes both `personalInventoryForm` and the
+            // associated BindingResult through @ModelAttribute, so the modal can re-display
+            // the user's input and the field errors without any flash hand-off.
+            model.addAttribute("showItemModal", true);
+            model.addAttribute("modalAction", "/personal-inventory/add");
+            populateListing(model, null, null, null, null);
+            return "personal-inventory";
         }
 
         try {
@@ -99,14 +101,15 @@ public class PersonalInventoryPageController {
     public String update(@PathVariable @NotNull UUID id,
                          @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
                          BindingResult bindingResult,
+                         Model model,
                          RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute(
-                    "org.springframework.validation.BindingResult.personalInventoryForm", bindingResult);
-            redirectAttributes.addFlashAttribute("personalInventoryForm", form);
-            redirectAttributes.addFlashAttribute("showItemModal", true);
-            redirectAttributes.addFlashAttribute("modalAction", "/personal-inventory/" + id + "/update");
-            return "redirect:/personal-inventory";
+            // Same rationale as add(): render directly to avoid pushing the
+            // self-referencing BindingResult through the Redis-backed FlashMap.
+            model.addAttribute("showItemModal", true);
+            model.addAttribute("modalAction", "/personal-inventory/" + id + "/update");
+            populateListing(model, null, null, null, null);
+            return "personal-inventory";
         }
 
         try {
@@ -159,6 +162,19 @@ public class PersonalInventoryPageController {
             log.warn("UEX location typeahead failed for query='{}': {}", q, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Populates the model attributes that the {@code personal-inventory} template needs to
+     * render the listing under the modal: the filter query echoed into the search input, the
+     * fetched item list and the page metadata used by the pagination fragment. Used both by
+     * the GET handler and by the POST handlers when re-rendering after a validation error.
+     */
+    private void populateListing(Model model, String q, Integer page, Integer size, String sort) {
+        model.addAttribute("filterQuery", q == null ? "" : q);
+        PageResponse<PersonalInventoryItemDto> items = fetchItems(q, page, size, sort);
+        model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
+        model.addAttribute("page", items);
     }
 
     private PageResponse<PersonalInventoryItemDto> fetchItems(String q, Integer page, Integer size, String sort) {

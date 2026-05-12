@@ -14,6 +14,9 @@ import org.springframework.session.FlushMode;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.validation.AbstractBindingResult;
+import org.springframework.validation.Errors;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
@@ -101,32 +104,86 @@ public class RedisSessionConfig {
      */
     @Bean
     public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
-        // Build a Jackson 3 JsonMapper with all Spring Security + OAuth2 modules.
-        // SecurityJacksonModules.getModules() automatically includes CoreJacksonModule,
-        // OAuth2ClientJacksonModule (OidcUser, tokens, etc.), WebJacksonModule, and others.
-        //
-        // IMPORTANT — Jackson 3 type validator behavior:
-        // In Jackson 3, BasicPolymorphicTypeValidator.allowIfSubType(String) checks whether the
-        // candidate class is a subtype of a class/interface with that exact fully-qualified name.
-        // It does NOT perform prefix/package matching on the class name string.
-        // Therefore, allowIfSubType("java.lang.") does NOT match java.lang.Long (a final class
-        // with no superclass named "java.lang.").
-        //
-        // The correct approach for Spring Session, which serializes many heterogeneous types
-        // (Long, HashMap, Instant, OidcUser, OAuth2AuthorizedClient, etc.), is to use
-        // allowIfBaseType(Object.class): this permits any class that is a subtype of Object,
-        // which is effectively all Java classes. This is the minimal safe option for session
-        // serialization because the session data is trusted (it originates from our own application
-        // and Keycloak's OAuth2 flow — not from user-controlled input).
+        return new GenericJacksonJsonRedisSerializer(buildSessionJsonMapper(getClass().getClassLoader()));
+    }
+
+    /**
+     * Build the {@link JsonMapper} used by {@link #springSessionDefaultRedisSerializer()}.
+     * Extracted into a package-private static factory so the configuration of polymorphic-type
+     * handling, the Spring Security / OAuth2 modules and the {@link BindingResultMixin} stays
+     * unit-testable without bootstrapping the full Spring application context.
+     *
+     * <p>Configuration notes:
+     * <ul>
+     *   <li><b>Type validator:</b> Jackson 3's {@code BasicPolymorphicTypeValidator
+     *       .allowIfSubType(String)} checks the class hierarchy for a class/interface with the
+     *       given fully-qualified name; it does NOT match by package prefix the way the
+     *       Jackson 2 default validator did. {@code "java.lang."} therefore would NOT match
+     *       {@code java.lang.Long} (a final class with no parent of that name). Spring
+     *       Session serialises many heterogeneous types — {@code Long}, {@code HashMap},
+     *       {@code Instant}, {@code OidcUser}, {@code OAuth2AuthorizedClient} — so we use
+     *       {@code allowIfBaseType(Object.class)}: every class is a subtype of {@code Object}.
+     *       Safe because session data originates from our own code plus Keycloak's OAuth2 flow,
+     *       not from user-controlled input.</li>
+     *   <li><b>Spring Security modules:</b> {@code SecurityJacksonModules.getModules(loader, …)}
+     *       registers {@code CoreJacksonModule} (SecurityContext / Authentication /
+     *       GrantedAuthority), {@code OAuth2ClientJacksonModule} (OidcUser, tokens, authorized
+     *       clients), {@code WebJacksonModule} / {@code WebServletJacksonModule} and any other
+     *       Spring Security module found on the classpath. Without these the session writes
+     *       silently lose the authentication context on the next read.</li>
+     *   <li><b>BindingResult mix-in:</b> page controllers across the frontend push form
+     *       {@code BindingResult}s into {@code RedirectAttributes} flash attributes when
+     *       validation fails (PRG pattern). {@code BeanPropertyBindingResult.getModel()}
+     *       returns a {@code LinkedHashMap} that re-contains the BindingResult itself, so
+     *       naive serialisation recurses {@code BindingResult -> model -> BindingResult -> ...}
+     *       until Jackson trips its {@code Document nesting depth (500)} guard and the session
+     *       commit fails with HTTP 500. The mix-in hides the synthesised {@code model}
+     *       property from serialisation; field errors, the bound target object, the object
+     *       name and the nested-path are all preserved so {@code th:errors} / {@code th:field}
+     *       still work on the next render. Mix-in is registered on both the {@link Errors}
+     *       interface and the {@link AbstractBindingResult} base class so every concrete
+     *       BindingResult subtype inherits it regardless of Jackson's resolution order.</li>
+     * </ul>
+     */
+    static JsonMapper buildSessionJsonMapper(ClassLoader loader) {
         BasicPolymorphicTypeValidator.Builder typeValidatorBuilder = BasicPolymorphicTypeValidator.builder()
             .allowIfBaseType(Object.class);
-
-        ClassLoader loader = getClass().getClassLoader();
-        JsonMapper mapper = JsonMapper.builder()
+        return JsonMapper.builder()
             .addModules(SecurityJacksonModules.getModules(loader, typeValidatorBuilder))
+            .addMixIn(Errors.class, BindingResultMixin.class)
+            .addMixIn(AbstractBindingResult.class, BindingResultMixin.class)
             .build();
+    }
 
-        return new GenericJacksonJsonRedisSerializer(mapper);
+    /**
+     * Jackson mix-in that hides internal {@link BeanPropertyBindingResult} properties from
+     * the session serialiser. Three classes of problem to suppress:
+     * <ol>
+     *   <li>{@code model} — re-contains the BindingResult itself, causes the
+     *       {@code Document nesting depth (500)} crash described in
+     *       {@link #buildSessionJsonMapper(ClassLoader)}.</li>
+     *   <li>{@code propertyAccessor} — exposes a {@code BeanWrapperImpl} whose
+     *       {@code propertyDescriptors} drag in {@code java.lang.reflect.Method} and the
+     *       {@code sun.reflect.annotation.AnnotatedTypeFactory$*} non-public JDK internals,
+     *       which Jackson cannot serialise under the JPMS access rules (fails with
+     *       {@code class is not public: sun.reflect.annotation.…/invokeSpecial}).</li>
+     *   <li>The rest (message-codes resolver, property-editor registry, suppressed-fields,
+     *       raw field value lookups) is implementation detail that the Thymeleaf re-render
+     *       path does not need and that pulls more internals into the serialised graph.</li>
+     * </ol>
+     * Whitelisted (i.e. NOT ignored): {@code objectName}, {@code nestedPath}, {@code target},
+     * {@code fieldErrors}, {@code globalErrors}, {@code allErrors}, {@code errorCount} —
+     * everything {@code th:errors} / {@code th:field} consume on the next render.
+     */
+    @JsonIgnoreProperties({
+        "model",
+        "propertyAccessor",
+        "messageCodesResolver",
+        "propertyEditorRegistry",
+        "suppressedFields",
+        "rawFieldValue"
+    })
+    abstract static class BindingResultMixin {
     }
 
     /**
