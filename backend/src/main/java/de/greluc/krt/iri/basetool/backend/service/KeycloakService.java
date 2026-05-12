@@ -106,9 +106,11 @@ public class KeycloakService {
                 return (String) response.get("access_token");
             }
 
-            throw new RuntimeException("Could not retrieve access token from Keycloak. Response: " + response);
+            throw new de.greluc.krt.iri.basetool.backend.exception.ExternalServiceException(
+                    "Could not retrieve access token from Keycloak. Response: " + response);
         } catch (RestClientResponseException e) {
-            throw new RuntimeException("Keycloak returned error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(), e);
+            throw new de.greluc.krt.iri.basetool.backend.exception.ExternalServiceException(
+                    "Keycloak returned error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(), e);
         }
     }
 }

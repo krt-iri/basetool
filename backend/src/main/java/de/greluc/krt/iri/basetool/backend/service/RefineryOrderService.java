@@ -78,7 +78,7 @@ public class RefineryOrderService {
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Location not found")));
             validateLocationHasRefinery(order.getLocation());
         } else {
-            throw new RuntimeException("Location is required");
+            throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Location is required");
         }
 
         if (order.getMission() != null && order.getMission().getId() != null) {
@@ -124,7 +124,7 @@ public class RefineryOrderService {
                         }
                     }
                 } else {
-                    throw new RuntimeException("Input Material is required for refined goods");
+                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Input Material is required for refined goods");
                 }
                 good.setRefineryOrder(order);
             });
@@ -223,7 +223,7 @@ public class RefineryOrderService {
                         }
                     }
                 } else {
-                    throw new RuntimeException("Input Material is required for refined goods");
+                    throw new de.greluc.krt.iri.basetool.backend.exception.BadRequestException("Input Material is required for refined goods");
                 }
                 good.setRefineryOrder(order);
                 order.getGoods().add(good);
