@@ -161,7 +161,7 @@ class InventoryPageControllerTest {
         InventoryItemDto expectedDto = new InventoryItemDto(UUID.randomUUID(), null, null, null, 10, 100.0, false, null, null, null, null, null, 1L);
         when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(expectedDto);
         
-        String view = controller.addInventoryItem(form, bindingResult, redirectAttributes);
+        String view = controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
         
         assertEquals("redirect:/inventory", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
@@ -174,10 +174,12 @@ class InventoryPageControllerTest {
         when(bindingResult.hasErrors()).thenReturn(true);
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
         
-        String view = controller.addInventoryItem(form, bindingResult, redirectAttributes);
-        
-        assertEquals("redirect:/inventory/input", view);
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("inventoryForm"));
+        String view = controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
+
+        // After the render-instead-redirect refactor a validation error renders the
+        // input view inline rather than redirecting; BindingResult stays request-scoped
+        // (see RedisSessionConfig — no more self-referencing flash attribute).
+        assertEquals("inventory-input", view);
     }
 
     @Test
@@ -189,7 +191,7 @@ class InventoryPageControllerTest {
 
         when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(new RuntimeException("Error"));
         
-        String view = controller.addInventoryItem(form, bindingResult, redirectAttributes);
+        String view = controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
         
         assertEquals("redirect:/inventory/input", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
@@ -207,7 +209,7 @@ class InventoryPageControllerTest {
 
         when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
 
-        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, "/inventory/all");
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
         
         assertEquals("redirect:/inventory/all", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
@@ -223,7 +225,7 @@ class InventoryPageControllerTest {
 
         when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenThrow(new RuntimeException("Update error"));
 
-        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, "/inventory/all");
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
         
         assertEquals("redirect:/inventory/all", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
@@ -242,7 +244,7 @@ class InventoryPageControllerTest {
         when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
 
         String referer = "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
-        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, referer);
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, new ConcurrentModel(), redirectAttributes, referer);
 
         assertEquals("redirect:/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222", view);
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
@@ -259,10 +261,15 @@ class InventoryPageControllerTest {
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
         String referer = "https://example.org/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2";
-        String view = controller.bookOutInventoryItem(id, form, bindingResult, redirectAttributes, referer);
+        ConcurrentModel renderModel = new ConcurrentModel();
+        String view = controller.bookOutInventoryItem(id, form, bindingResult, renderModel, redirectAttributes, referer);
 
-        assertEquals("redirect:/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2", view);
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
+        // After the render-instead-redirect refactor a validation error during book-out
+        // re-renders the originating listing (admin variant here) inline; the URL filters
+        // are not re-applied, the errorToast lives on the request-scoped Model instead.
+        assertEquals("inventory-admin", view);
+        assertEquals("error.validation.failed", renderModel.getAttribute("errorToast"));
+        assertEquals(id, renderModel.getAttribute("showBookOutModal"));
     }
 
     @Test

@@ -94,11 +94,15 @@ public class ProfileController {
     }
 
     @PostMapping("/profile/description")
-    public String updateDescription(@Valid @ModelAttribute("profileDescriptionForm") ProfileDescriptionForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String updateDescription(@Valid @ModelAttribute("profileDescriptionForm") ProfileDescriptionForm form,
+                                    BindingResult bindingResult,
+                                    Model model,
+                                    @AuthenticationPrincipal OidcUser principal,
+                                    RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.profileDescriptionForm", bindingResult);
-            redirectAttributes.addFlashAttribute("profileDescriptionForm", form);
-            return "redirect:/profile";
+            // Render the profile view directly; the BindingResult stays request-scoped so it
+            // never goes through a Redis-serialised FlashMap (see RedisSessionConfig).
+            return profile(model, principal);
         }
         try {
             backendApiClient.put("/api/v1/users/me/description", Map.of(

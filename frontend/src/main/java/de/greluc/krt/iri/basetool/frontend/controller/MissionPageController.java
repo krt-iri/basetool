@@ -421,13 +421,13 @@ public class MissionPageController {
     public String addParticipant(@PathVariable @NotNull UUID id,
                                  @Valid @ModelAttribute("participantForm") ParticipantForm form,
                                  BindingResult bindingResult,
+                                 Model model,
                                  RedirectAttributes redirectAttributes,
                                  @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.participantForm", bindingResult);
-            redirectAttributes.addFlashAttribute("participantForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "participant-modal");
-            return "redirect:/missions/" + id;
+            // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
+            model.addAttribute("openModal", "participant-modal");
+            return missionDetail(id, model, principal);
         }
         try {
             Map<String, Object> body = new HashMap<>();
@@ -587,14 +587,13 @@ public class MissionPageController {
     public String updateParticipant(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId,
                                     @Valid @ModelAttribute("participantForm") ParticipantForm form,
                                     BindingResult bindingResult,
+                                    Model model,
                                     RedirectAttributes redirectAttributes,
                                     @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.participantForm", bindingResult);
-            redirectAttributes.addFlashAttribute("participantForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "edit-participant-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/missions/" + id + "/participants/" + participantId + "/update");
-            return "redirect:/missions/" + id;
+            model.addAttribute("openModal", "edit-participant-modal");
+            model.addAttribute("modalAction", "/missions/" + id + "/participants/" + participantId + "/update");
+            return missionDetail(id, model, principal);
         }
         try {
             Map<String, Object> body = new HashMap<>();
@@ -697,13 +696,13 @@ public class MissionPageController {
     public String addCrew(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId,
                           @Valid @ModelAttribute("crewForm") CrewForm form,
                           BindingResult bindingResult,
-                          RedirectAttributes redirectAttributes) {
+                          Model model,
+                          RedirectAttributes redirectAttributes,
+                          @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.crewForm", bindingResult);
-            redirectAttributes.addFlashAttribute("crewForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "assign-crew-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew");
-            return "redirect:/missions/" + id;
+            model.addAttribute("openModal", "assign-crew-modal");
+            model.addAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew");
+            return missionDetail(id, model, principal);
         }
          try {
              Map<String, Object> body = new HashMap<>();
@@ -726,13 +725,13 @@ public class MissionPageController {
     public String updateCrew(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId, @PathVariable @NotNull UUID crewId,
                              @Valid @ModelAttribute("crewForm") CrewForm form,
                              BindingResult bindingResult,
-                             RedirectAttributes redirectAttributes) {
+                             Model model,
+                             RedirectAttributes redirectAttributes,
+                             @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.crewForm", bindingResult);
-            redirectAttributes.addFlashAttribute("crewForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "edit-crew-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/update");
-            return "redirect:/missions/" + id;
+            model.addAttribute("openModal", "edit-crew-modal");
+            model.addAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/update");
+            return missionDetail(id, model, principal);
         }
          try {
              Map<String, Object> body = new HashMap<>();
@@ -781,11 +780,12 @@ public class MissionPageController {
     @PreAuthorize("isAuthenticated()")
     public String createMission(@Valid @ModelAttribute("missionForm") MissionForm form,
                                 BindingResult bindingResult,
+                                Model model,
+                                @AuthenticationPrincipal OidcUser principal,
                                 RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.missionForm", bindingResult);
-            redirectAttributes.addFlashAttribute("missionForm", form);
-            return "redirect:/missions/new";
+            // Render the create form directly; BindingResult stays request-scoped.
+            return createMissionForm(model, principal);
         }
          try {
              Instant meetingTime = (form.meetingTime() != null && !form.meetingTime().isBlank()) ? parseToInstant(form.meetingTime()) : null;
@@ -839,11 +839,11 @@ public class MissionPageController {
     public String updateMission(@PathVariable @NotNull UUID id,
                                 @Valid @ModelAttribute("missionForm") MissionForm form,
                                 BindingResult bindingResult,
+                                Model model,
+                                @AuthenticationPrincipal OidcUser principal,
                                 RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.missionForm", bindingResult);
-            redirectAttributes.addFlashAttribute("missionForm", form);
-            return "redirect:/missions/" + id;
+            return missionDetail(id, model, principal);
         }
          try {
              Instant meetingTime = (form.meetingTime() != null && !form.meetingTime().isBlank()) ? parseToInstant(form.meetingTime()) : null;
