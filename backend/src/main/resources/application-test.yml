@@ -1,19 +1,50 @@
+# Test profile.
+#
+# Spring-Boot integration tests run against a real Postgres container started on
+# demand by Testcontainers' JDBC-URL trick: when the URL starts with `jdbc:tc:...`
+# the Testcontainers' `ContainerDatabaseDriver` boots a `postgres:18-alpine`
+# container the first time a Spring context requests the DataSource and reuses it
+# for subsequent contexts (controlled by Testcontainers' container reuse — see
+# `TC_DAEMON` / `~/.testcontainers.properties` if you want cross-build reuse).
+#
+# Why Postgres (not H2)? Production runs on Postgres, our Flyway migrations carry
+# Postgres-specific syntax (JSONB, GIN, pg_trgm, ON CONFLICT, gen_random_uuid),
+# and `ddl-auto: validate` only catches schema drift if the schema being validated
+# was produced by Flyway. Running tests on H2 reintroduced the exact "mock/prod
+# divergence" risk CLAUDE.md warns about (see PROJECT_REVIEW.md §1.3).
+#
+# Tests that are pure Mockito unit tests (`@ExtendWith(MockitoExtension.class)`
+# without `@SpringBootTest`) do NOT load this YAML and start no container, so the
+# fast feedback loop for service-layer unit tests is unchanged.
 server:
   ssl:
     enabled: false
     key-store-password: test-keystore-password
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driverClassName: org.h2.Driver
-    username: sa
-    password: password
+    url: jdbc:tc:postgresql:18-alpine:///testdb
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
+    hikari:
+      # Keep the test pool small — every @SpringBootTest spins up its own
+      # ApplicationContext, and we do not want to flood the shared Testcontainer
+      # with idle connections across parallel test classes.
+      maximum-pool-size: 5
+      minimum-idle: 0
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
     hibernate:
-      ddl-auto: create-drop
+      # `validate` so the test schema produced by Flyway has to match the entity
+      # annotations exactly — the same contract as prod (application-prod.yml).
+      ddl-auto: validate
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
   security:
     oauth2:
       resourceserver:

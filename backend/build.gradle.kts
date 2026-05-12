@@ -84,7 +84,6 @@ dependencies {
   // endpoints are authorisation-annotated, ...). See ArchitectureTest.
   testImplementation("com.tngtech.archunit:archunit:1.3.2")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-  testRuntimeOnly("com.h2database:h2")
 }
 
 java {
