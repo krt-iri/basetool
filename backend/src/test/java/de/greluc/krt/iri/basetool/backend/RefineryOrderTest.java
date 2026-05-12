@@ -351,38 +351,6 @@ class RefineryOrderTest {
         assertNull(saved.getMission());
     }
     @Test
-    void testCreateRefineryOrder_WithDynamicPayload() throws Exception {
-        java.util.Map<String, Object> orderDto = new java.util.HashMap<>();
-        orderDto.put("startedAt", "2026-03-27T18:35:59.123Z");
-        orderDto.put("durationMinutes", 10);
-        orderDto.put("expenses", 100);
-        orderDto.put("location", java.util.Map.of("id", station.getId().toString()));
-        orderDto.put("refiningMethod", java.util.Map.of("id", dinyx.getId().toString()));
-        
-        java.util.List<java.util.Map<String, Object>> goodsDto = new java.util.ArrayList<>();
-        java.util.Map<String, Object> good = new java.util.HashMap<>();
-        good.put("inputMaterial", java.util.Map.of("id", quantanium.getId().toString()));
-        good.put("inputQuantity", 100);
-        good.put("outputQuantity", 200);
-        good.put("quality", 500);
-        goodsDto.add(good);
-        
-        orderDto.put("goods", goodsDto);
-        
-        String json = objectMapper.writeValueAsString(orderDto);
-
-        org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/refinery-orders")
-                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString())).authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json))
-                .andReturn();
-
-        if (result.getResolvedException() != null) {
-            result.getResolvedException().printStackTrace();
-        }
-    }
-
-    @Test
     void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
         // User creates order
         RefineryOrder order = new RefineryOrder();
