@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.KeycloakUserDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -19,6 +20,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class KeycloakService {
+
+    /**
+     * RFC 6750 Bearer-token authentication scheme prefix used when handing the
+     * access token to Keycloak's admin REST API. Centralised here so the literal
+     * never gets typed by hand at a call site — open-coding {@code "Bearer " + token}
+     * in a log statement or a future request builder is the canonical way to
+     * accidentally leak a raw token into the logs (the PII masker catches it, but
+     * defence in depth is cheaper than auditing every new log line).
+     */
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private final KeycloakSyncProperties properties;
 
@@ -36,7 +47,7 @@ public class KeycloakService {
                     .build()
                     .get()
                     .uri("/admin/realms/{realm}/users", properties.getRealm())
-                    .header("Authorization", "Bearer " + token)
+                    .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
 
@@ -70,7 +81,7 @@ public class KeycloakService {
                     .build()
                     .get()
                     .uri("/admin/realms/{realm}/users/{id}/role-mappings/realm", properties.getRealm(), userId)
-                    .header("Authorization", "Bearer " + token)
+                    .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
 
