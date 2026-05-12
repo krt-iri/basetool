@@ -38,6 +38,14 @@ class UserServiceDeleteTest {
     private MissionParticipantRepository missionParticipantRepository;
     @Mock
     private RoleRepository roleRepository;
+    // Required so the AuthHelperService constructor parameter of UserService is
+    // satisfied. shouldThrowExceptionIfNoAdminFound exercises the deleteUser
+    // fallback path through getCurrentUser(), which dereferences authHelperService —
+    // a null mock would surface as a NullPointerException instead of the expected
+    // IllegalStateException. Other tests in this class never reach getCurrentUser()
+    // so they do not need any stubbing on the mock.
+    @Mock
+    private AuthHelperService authHelperService;
 
     @InjectMocks
     private UserService userService;

@@ -87,18 +87,21 @@ public class HangarController {
     }
 
     @PostMapping("/ships")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public ShipDto addShip(@AuthenticationPrincipal Jwt jwt, @RequestBody @Valid ShipRequestDto shipRequest) {
         return shipMapper.toDto(hangarService.addShip(userService.getUserIdFromJwt(jwt), shipRequest));
     }
 
     @PutMapping("/ships/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public ShipDto updateMyShip(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
         return shipMapper.toDto(hangarService.updateShip(userService.getUserIdFromJwt(jwt), id, shipRequest));
     }
 
     @DeleteMapping("/ships/{id}")
+    @PreAuthorize("isAuthenticated()")
     public void deleteMyShip(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
         hangarService.deleteShip(userService.getUserIdFromJwt(jwt), id);
     }
@@ -152,6 +155,7 @@ public class HangarController {
     }
 
     @PostMapping("/import/fleetview")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public FleetviewImportResponseDto importFleetview(@AuthenticationPrincipal Jwt jwt,
                                                      @RequestParam("file") @NotNull MultipartFile file) {

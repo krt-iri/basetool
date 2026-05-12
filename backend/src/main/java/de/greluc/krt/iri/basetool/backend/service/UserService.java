@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import java.util.*;
@@ -36,6 +35,7 @@ public class UserService {
     private final MissionRepository missionRepository;
     private final JobOrderRepository jobOrderRepository;
     private final MissionParticipantRepository missionParticipantRepository;
+    private final AuthHelperService authHelperService;
 
     public boolean isUsernameOrDisplayNameTaken(@NotNull String name) {
         return !findMatchesByExactName(name).isEmpty();
@@ -307,7 +307,7 @@ public class UserService {
     }
 
     public Optional<User> getCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Authentication auth = authHelperService.rawAuthentication();
         if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof Jwt jwt)) {
             return Optional.empty();
         }

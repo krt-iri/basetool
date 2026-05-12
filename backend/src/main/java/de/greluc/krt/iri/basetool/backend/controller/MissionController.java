@@ -297,6 +297,7 @@ public class MissionController {
 
     @PostMapping("/{id}/join")
     @Operation(summary = "Join a mission")
+    @PreAuthorize("isAuthenticated()")
     public MissionDto joinMission(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
         return missionMapper.toDto(missionService.addParticipant(id, userService.getUserIdFromJwt(jwt)));
     }
@@ -480,6 +481,7 @@ public class MissionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Anonymous users cannot add registered users"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Participant name is ambiguous and matches more than one registered user")
     })
+    @PreAuthorize("permitAll()")
     public MissionDto addParticipantPublic(@PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request, @AuthenticationPrincipal Jwt jwt) {
         UUID finalUserId = request.userId();
         String finalGuestName = request.guestName();
@@ -814,6 +816,7 @@ public class MissionController {
                     + "(case-insensitive resolution against registered users). Authenticated users may always add "
                     + "themselves; adding other registered users is restricted to managers/officers/admins. "
                     + "Anonymous users may only add guest entries.")
+    @PreAuthorize("permitAll()")
     public List<MissionParticipantDto> addParticipantSlim(@PathVariable @NotNull UUID id,
                                                           @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
                                                           @AuthenticationPrincipal Jwt jwt,

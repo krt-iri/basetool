@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.model.dto.*;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
@@ -13,18 +14,13 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -35,7 +31,7 @@ import java.util.UUID;
 public class InventoryItemController {
     private final InventoryItemService inventoryItemService;
     private final UserService userService;
-    private final RoleHierarchy roleHierarchy;
+    private final AuthHelperService authHelperService;
 
     @GetMapping("/aggregated")
     @Transactional(readOnly = true)
@@ -109,19 +105,21 @@ public class InventoryItemController {
     }
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public InventoryItemDto createInventoryItem(
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid InventoryItemCreateDto dto) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         return inventoryItemService.createInventoryItem(dto, userService.getUserIdFromJwt(jwt), isLogistician);
     }
 
     @PostMapping("/{id}/book-out")
+    @PreAuthorize("isAuthenticated()")
     public org.springframework.http.ResponseEntity<InventoryItemDto> bookOutInventoryItem(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable @NotNull UUID id,
             @RequestBody @Valid InventoryItemBookOutDto dto) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         InventoryItemDto result = inventoryItemService.bookOutInventoryItem(id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
         if (result == null) {
             return org.springframework.http.ResponseEntity.noContent().build();
@@ -135,11 +133,12 @@ public class InventoryItemController {
      * hierarchy) role. Optimistic locking is enforced via the {@code version} field in the request.
      */
     @PutMapping("/{id}/note")
+    @PreAuthorize("isAuthenticated()")
     public InventoryItemDto updateInventoryItemNote(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable @NotNull UUID id,
             @RequestBody @Valid InventoryItemNoteUpdateRequest request) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         return inventoryItemService.updateNote(id, request, userService.getUserIdFromJwt(jwt), isLogistician);
     }
 
@@ -173,28 +172,18 @@ public class InventoryItemController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable @NotNull UUID id,
             @RequestBody @Valid UpdateDeliveredRequest request) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         return inventoryItemService.updateDelivered(id, request, userService.getUserIdFromJwt(jwt), isLogistician);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public InventoryItemDto updateInventoryItem(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable @NotNull UUID id,
             @RequestBody @Valid InventoryItemUpdateDto dto) {
-        boolean isLogistician = isLogisticianOrAbove();
+        boolean isLogistician = authHelperService.isLogisticianOrAbove();
         return inventoryItemService.updateInventoryItem(id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
     }
 
-    private boolean isLogisticianOrAbove() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null) {
-            Collection<? extends GrantedAuthority> reachableAuthorities = roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities());
-            return reachableAuthorities.stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN") ||
-                                   a.getAuthority().equals("ROLE_ADMIN") ||
-                                   a.getAuthority().equals("ROLE_OFFICER"));
-        }
-        return false;
-    }
 }

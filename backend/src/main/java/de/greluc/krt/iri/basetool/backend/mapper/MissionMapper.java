@@ -2,19 +2,26 @@ package de.greluc.krt.iri.basetool.backend.mapper;
 
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.model.dto.*;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 
 @Mapper(componentModel = "spring", uses = {ShipMapper.class, UserMapper.class, InventoryItemMapper.class, RefineryOrderMapper.class, OperationMapper.class}, unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public abstract class MissionMapper {
 
+    // MapStruct generates a concrete subclass via the annotation processor; the
+    // generated subclass cannot accept additional constructor parameters, so we
+    // fall back to field-level @Autowired here. The architectural concern of
+    // touching SecurityContextHolder directly is solved by routing through
+    // AuthHelperService — the mapper itself no longer depends on Spring's
+    // security-context classes.
     @Autowired
     protected MissionSecurityService missionSecurityService;
+
+    @Autowired
+    protected AuthHelperService authHelperService;
 
     @Mapping(target = "description", expression = "java(resolveDescription(mission))")
     @Mapping(target = "canEdit", expression = "java(resolveCanEdit(mission))")
@@ -40,8 +47,7 @@ public abstract class MissionMapper {
 
     public String resolveDescription(Mission mission) {
         if (mission == null || mission.getDescription() == null) return null;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
+        if (authHelperService.isAuthenticated()) {
             return mission.getDescription();
         }
         return null;
@@ -49,14 +55,12 @@ public abstract class MissionMapper {
 
     public boolean resolveCanEdit(Mission mission) {
         if (mission == null) return false;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return missionSecurityService.canManageMission(mission.getId(), auth);
+        return missionSecurityService.canManageMission(mission.getId(), authHelperService.rawAuthentication());
     }
 
     public boolean resolveCanManageManagers(Mission mission) {
         if (mission == null) return false;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return missionSecurityService.canManageManagers(mission.getId(), auth);
+        return missionSecurityService.canManageManagers(mission.getId(), authHelperService.rawAuthentication());
     }
 
     /**

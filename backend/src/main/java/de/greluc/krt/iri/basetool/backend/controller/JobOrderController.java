@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
@@ -23,17 +24,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -48,7 +44,7 @@ public class JobOrderController {
     private final JobOrderHandoverService jobOrderHandoverService;
     private final JobOrderHandoverReportService jobOrderHandoverReportService;
     private final UserService userService;
-    private final RoleHierarchy roleHierarchy;
+    private final AuthHelperService authHelperService;
 
     @PostMapping("/{id}/handovers")
     @ResponseStatus(HttpStatus.CREATED)
@@ -114,6 +110,7 @@ public class JobOrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new job order", description = "Allows anyone to create a job order.")
+    @PreAuthorize("permitAll()")
     public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
         return jobOrderService.createJobOrder(dto);
     }
@@ -250,17 +247,8 @@ public class JobOrderController {
 
     private void verifyAssigneeAccess(Jwt jwt, UUID targetUserId) {
         UUID currentUserId = userService.getUserIdFromJwt(jwt);
-        if (!currentUserId.equals(targetUserId)) {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isAdminOrOfficer = false;
-            if (auth != null) {
-                Collection<? extends GrantedAuthority> reachableAuthorities = roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities());
-                isAdminOrOfficer = reachableAuthorities.stream()
-                        .anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN"));
-            }
-            if (!isAdminOrOfficer) {
-                throw new AccessDeniedException("Not allowed to modify other users' assignments");
-            }
+        if (!currentUserId.equals(targetUserId) && !authHelperService.isLogisticianOrAbove()) {
+            throw new AccessDeniedException("Not allowed to modify other users' assignments");
         }
     }
 }
