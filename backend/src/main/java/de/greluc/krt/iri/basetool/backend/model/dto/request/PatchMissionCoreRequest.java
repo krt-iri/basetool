@@ -6,13 +6,13 @@ import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request DTO fuer ein partielles Update der Stammdaten (Core-Section) eines Einsatzes.
+ * Request DTO for a partial update of the master data (core section) of a mission.
  *
- * <p>Dieses DTO erlaubt es mehreren Nutzern gleichzeitig an verschiedenen Sektionen der
- * Einsatz-Detailseite zu arbeiten, ohne dass Aenderungen an anderen Sektionen (z.B. Teilnehmer,
- * Zeitplan, Ort) zum Verlust der Eingaben in dieser Section fuehren. Optimistisches Locking
- * erfolgt ausschliesslich ueber das {@code version}-Feld der Parent-{@code Mission}; Sub-
- * Collections sind mittels {@code @OptimisticLock(excluded = true)} entkoppelt.
+ * <p>This DTO allows multiple users to work concurrently on different sections of the
+ * mission detail page without changes in other sections (e.g. participants, schedule,
+ * location) causing input loss in this section. Optimistic locking is applied solely
+ * via the {@code version} field of the parent {@code Mission}; sub-collections are
+ * decoupled by means of {@code @OptimisticLock(excluded = true)}.
  */
 public record PatchMissionCoreRequest(
         @NotBlank @Size(max = 255) String name,

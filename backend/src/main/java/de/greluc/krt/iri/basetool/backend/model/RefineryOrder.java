@@ -45,29 +45,29 @@ public class RefineryOrder extends AbstractEntity<UUID> {
     private RefiningMethod refiningMethod;
 
     /**
-     * Auftragskosten. Muss >= 0 sein. Optional: 0 wird beim Speichern wie "nicht gesetzt"
-     * behandelt und als {@code null} persistiert. Die Profit-Berechnung behandelt {@code null} als 0.
+     * Order costs. Must be >= 0. Optional: 0 is treated as "not set" on save and persisted
+     * as {@code null}. The profit calculation treats {@code null} as 0.
      */
     @PositiveOrZero
     private Double expenses;
 
     /**
-     * Sonstige Kosten neben den regulaeren {@link #expenses}. Muss >= 0 sein.
-     * Optional: 0 wird beim Speichern wie "nicht gesetzt" behandelt und als {@code null} persistiert.
+     * Other costs in addition to the regular {@link #expenses}. Must be >= 0.
+     * Optional: 0 is treated as "not set" on save and persisted as {@code null}.
      */
     @PositiveOrZero
     private Double otherExpenses;
 
     /**
-     * Einnahmen durch den Verkauf roher Erze ("Ore Sales"). Muss >= 0 sein.
-     * Optional: 0 wird beim Speichern wie "nicht gesetzt" behandelt und als {@code null} persistiert.
+     * Revenue from selling raw ores ("Ore Sales"). Must be >= 0.
+     * Optional: 0 is treated as "not set" on save and persisted as {@code null}.
      */
     @PositiveOrZero
     private Double oreSales;
 
     /**
-     * Berechneter Gewinn/Verlust: oreSales - expenses - otherExpenses. Kann negativ sein.
-     * Wird nicht persistiert, sondern serverseitig aus den Rohdaten abgeleitet.
+     * Computed profit/loss: oreSales - expenses - otherExpenses. May be negative.
+     * Not persisted; derived server-side from the raw values.
      */
     @Transient
     public Double getProfit() {

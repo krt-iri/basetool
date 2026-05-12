@@ -5,18 +5,18 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 
 /**
- * Request DTO für das Setzen der tatsächlichen Start-/Endzeit eines Einsatzes
- * via der "Jetzt"-Buttons in den Einsatz-Details.
+ * Request DTO for setting the actual start/end time of a mission
+ * via the "Now" buttons on the mission detail page.
  *
- * <p>Das Feld {@code version} ist zwingend erforderlich, damit Spring Data JPAs
- * Optimistic Locking ({@code ObjectOptimisticLockingFailureException}) bei parallelen
- * Änderungen greift und der Endpoint mit HTTP 409 antworten kann. Die Validierung
- * (erlaubte Werte für {@code field}, Präsenz von {@code version}) wird im Controller
- * durchgeführt, um konsistent HTTP 400 zurückzugeben.</p>
+ * <p>The {@code version} field is mandatory so that Spring Data JPA's optimistic locking
+ * ({@code ObjectOptimisticLockingFailureException}) engages on concurrent changes and the
+ * endpoint can respond with HTTP 409. Validation (allowed values for {@code field},
+ * presence of {@code version}) is performed in the controller to consistently return
+ * HTTP 400.</p>
  *
- * @param field   Name des zu aktualisierenden Feldes ({@code actualStartTime} oder {@code actualEndTime}).
- * @param value   Zu setzender UTC-Zeitpunkt ({@link Instant}). {@code null} entfernt den Wert.
- * @param version Aktuelle Entity-Version (Optimistic Locking).
+ * @param field   Name of the field to update ({@code actualStartTime} or {@code actualEndTime}).
+ * @param value   UTC instant to set ({@link Instant}). {@code null} clears the value.
+ * @param version Current entity version (optimistic locking).
  */
 public record MissionActualTimeUpdateRequest(
         @Nullable String field,

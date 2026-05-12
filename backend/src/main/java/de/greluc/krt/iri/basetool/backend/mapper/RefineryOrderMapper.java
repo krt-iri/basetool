@@ -24,8 +24,8 @@ public interface RefineryOrderMapper {
     RefineryOrder toEntity(RefineryOrderDto dto);
 
     /**
-     * Berechnet Gewinn/Verlust = oreSales - expenses - otherExpenses fuer den Auftrag.
-     * Null-Werte werden als 0 behandelt, damit Altdaten keine NPE ausloesen.
+     * Computes profit/loss = oreSales - expenses - otherExpenses for the order.
+     * Null values are treated as 0 so that legacy data does not trigger an NPE.
      */
     default Double computeProfit(RefineryOrder entity) {
         if (entity == null) return 0d;

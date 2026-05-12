@@ -51,14 +51,14 @@ public class RefineryOrderPageController {
     private final RoleHierarchy roleHierarchy;
 
     /**
-     * Parsed den vom Formular uebermittelten Start-Zeitpunkt als UTC-{@link java.time.Instant}.
+     * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
      *
-     * Warum: Alle Zeitpunkte werden im System ausschliesslich in UTC persistiert und ueber
-     * die API transportiert (AGENTS.md "Consistent Date/Time/Zone Handling"). Das Frontend
-     * (datetime-splitter.js) liefert daher grundsaetzlich einen ISO-Instant-String mit 'Z'
-     * oder mit Offset. Es werden ausserdem Rueckwaerts-Kompatibilitaetsformen geparst
-     * (reines Datum, lokales DateTime ohne Zone – letzteres wird defensiv als UTC interpretiert,
-     * um eine implizite und DST-anfaellige Verwendung von {@code ZoneId.systemDefault()} zu vermeiden).
+     * Why: All timestamps in the system are persisted and transported solely in UTC
+     * (AGENTS.md "Consistent Date/Time/Zone Handling"). The frontend (datetime-splitter.js)
+     * therefore always sends an ISO-Instant string with 'Z' or with an offset. Backward
+     * compatible forms are additionally parsed (date only, local DateTime without zone -
+     * the latter is defensively interpreted as UTC to avoid an implicit and DST-prone use
+     * of {@code ZoneId.systemDefault()}).
      */
     static java.time.Instant parseStartedAt(String raw) {
         if (raw == null || raw.trim().isEmpty()) {
@@ -72,11 +72,11 @@ public class RefineryOrderPageController {
             return java.time.OffsetDateTime.parse(input).toInstant();
         } catch (Exception ignored) { /* not offset date time */ }
         if (input.length() == 10) {
-            // Nur Datum -> Tagesbeginn in UTC
+            // Date only -> start of day in UTC
             return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
         }
-        // LocalDateTime ohne Zone -> defensiv als UTC interpretieren, um doppelte
-        // DST-Umrechnung zu vermeiden. Korrekte Eingaben tragen immer 'Z' oder Offset.
+        // LocalDateTime without zone -> defensively interpret as UTC to avoid a double
+        // DST conversion. Correct inputs always carry 'Z' or an offset.
         return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
     }
 
@@ -530,10 +530,10 @@ public class RefineryOrderPageController {
     private UUID getCurrentUserId(OidcUser principal) {
         if (principal == null) return null;
         try {
-            // Versuche direkt das Subject (schnellster Weg)
+            // Try the subject directly (fastest path)
             return UUID.fromString(principal.getSubject());
         } catch (Exception e) {
-            // Fallback: Frage Backend nach meiner ID
+            // Fallback: ask the backend for our id
             try {
                 UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
                 return me != null ? me.id() : null;
@@ -545,10 +545,10 @@ public class RefineryOrderPageController {
     }
 
     /**
-     * Setzt einen Double-Wert auf {@code null}, falls er {@code null} oder {@code 0.0} ist.
-     * Wird beim Speichern eines Raffinerieauftrags fuer die optionalen Geldfelder
-     * ({@code expenses}, {@code otherExpenses}, {@code oreSales}) verwendet, da diese
-     * im Frontend mit 0 vorbelegt sind, semantisch aber als "nicht gesetzt" gelten sollen.
+     * Sets a Double value to {@code null} if it is {@code null} or {@code 0.0}.
+     * Used when saving a refinery order for the optional money fields
+     * ({@code expenses}, {@code otherExpenses}, {@code oreSales}) because these are
+     * pre-filled with 0 in the frontend but should semantically count as "not set".
      */
     private static Double zeroToNull(Double value) {
         if (value == null) return null;
@@ -570,7 +570,7 @@ public class RefineryOrderPageController {
                                a.getAuthority().equals("ROLE_OFFICER"));
         if (!result) {
             try {
-                // Fallback: Prüfe DB-Flag vom Backend
+                // Fallback: check the DB flag from the backend
                 de.greluc.krt.iri.basetool.frontend.model.dto.UserDto me = backendApiClient.get("/api/v1/users/me", de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
                 if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
                     log.info("Granting logistician by backend flag for user: {}", principal.getName());

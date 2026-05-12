@@ -160,11 +160,11 @@ public class MissionService {
     }
 
     /**
-     * Aktualisiert ausschliesslich die Stammdaten-Sektion (Core) eines Einsatzes. Sub-Collections
-     * (Teilnehmer, Units, Finanzen) werden nicht beruehrt und inkrementieren dank
-     * {@code @OptimisticLock(excluded = true)} die Parent-Version ebenfalls nicht — dadurch
-     * koennen mehrere Nutzer gleichzeitig an unterschiedlichen Sektionen arbeiten, ohne sich
-     * gegenseitig zu behindern oder Eingaben durch einen 409-Conflict zu verlieren.
+     * Updates only the core (master-data) section of a mission. Sub-collections
+     * (participants, units, finance) are not touched and, thanks to
+     * {@code @OptimisticLock(excluded = true)}, do not bump the parent version either — this
+     * allows multiple users to work on different sections concurrently without blocking each
+     * other or losing input due to a 409 conflict.
      */
     @Transactional
     public Mission updateCoreSection(@NotNull UUID missionId, @NotNull String name, String description,
@@ -182,9 +182,8 @@ public class MissionService {
     }
 
     /**
-     * Aktualisiert ausschliesslich die Zeitplan-Sektion (Schedule) eines Einsatzes. Alle
-     * Zeitstempel werden in UTC verarbeitet und gespeichert. Validierung gleich wie beim
-     * Gesamt-Update.
+     * Updates only the schedule section of a mission. All timestamps are processed and stored
+     * in UTC. Validation is identical to the full update.
      */
     @Transactional
     public Mission updateScheduleSection(@NotNull UUID missionId, Instant meetingTime,
@@ -215,7 +214,7 @@ public class MissionService {
     }
 
     /**
-     * Aktualisiert ausschliesslich die Flags-Sektion eines Einsatzes (z.B. {@code isInternal}).
+     * Updates only the flags section of a mission (e.g. {@code isInternal}).
      */
     @Transactional
     public Mission updateFlagsSection(@NotNull UUID missionId, @NotNull Boolean isInternal,
@@ -238,19 +237,19 @@ public class MissionService {
         Mission mission = missionRepository.findById(missionId)
                 .orElseThrow(() -> new NotFoundException("Mission not found"));
                 
-        // Entkoppeln von Inventareinträgen (damit diese nicht gelöscht werden, aber die FK-Verletzung vermieden wird)
+        // Detach inventory items (so they are not deleted while still avoiding the FK violation)
         if (mission.getInventoryEntries() != null) {
             mission.getInventoryEntries().forEach(entry -> entry.setMission(null));
             mission.getInventoryEntries().clear();
         }
 
-        // Entkoppeln von Raffinerie-Aufträgen
+        // Detach refinery orders
         if (mission.getRefineryOrders() != null) {
             mission.getRefineryOrders().forEach(order -> order.setMission(null));
             mission.getRefineryOrders().clear();
         }
 
-        // Entkoppeln von Sub-Missionen
+        // Detach sub-missions
         if (mission.getSubMissions() != null) {
             mission.getSubMissions().forEach(sub -> sub.setParent(null));
             mission.getSubMissions().clear();

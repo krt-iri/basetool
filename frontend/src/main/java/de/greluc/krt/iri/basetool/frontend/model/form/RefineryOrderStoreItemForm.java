@@ -11,12 +11,11 @@ import lombok.Data;
 import java.util.UUID;
 
 /**
- * Form-Backing-Object fuer eine einzelne Materialzeile des Einlagern-Dialogs
- * eines Raffinerieauftrags.
+ * Form-backing object for a single material row in the store dialog of a refinery order.
  *
- * <p>Die Mengenvalidierung folgt der projektweiten Konvention fuer Mengen-Eingabefelder:
- * Dezimalzahl, &gt;= 0, max. 3 Nachkommastellen. Die Notiz ist optional und wird beim
- * Einlagern am erzeugten {@code InventoryItem} hinterlegt.
+ * <p>Amount validation follows the project-wide convention for amount input fields:
+ * decimal number, &gt;= 0, max. 3 decimal places. The note is optional and is attached
+ * to the created {@code InventoryItem} on storage.
  */
 @Data
 public class RefineryOrderStoreItemForm {
