@@ -38,16 +38,7 @@ public class SpringObjectMapperTest {
         orderDto.put("goods", goodsDto);
 
         String json = mapper.writeValueAsString(orderDto);
-        System.out.println("[DEBUG_LOG] JSON: " + json);
 
-        try {
-            RefineryOrderDto dto = mapper.readValue(json, RefineryOrderDto.class);
-            System.out.println("[DEBUG_LOG] Success!");
-            System.out.println("[DEBUG_LOG] Parsed: " + dto);
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("[DEBUG_LOG] Exception: " + e.getMessage());
-            throw e;
-        }
+        RefineryOrderDto dto = mapper.readValue(json, RefineryOrderDto.class);
     }
 }

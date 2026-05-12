@@ -11,6 +11,6 @@ public class RefineryLocationTest {
     @Test
     public void testTypeReference() {
         ParameterizedTypeReference<List<LocationDto>> typeRef = new ParameterizedTypeReference<>() {};
-        System.out.println("[DEBUG_LOG] Type: " + typeRef.getType());
+        typeRef.getType();
     }
 }
