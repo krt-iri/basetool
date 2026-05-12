@@ -23,8 +23,12 @@ java {
   toolchain {
     languageVersion = JavaLanguageVersion.of(25)
   }
+  withSourcesJar()
 }
 
+// Lombok + the MapStruct annotation processor expose APIs we use at compile
+// time as well. Extending compileOnly from annotationProcessor lets `javac`
+// see them without dragging them onto the runtime classpath.
 configurations {
   compileOnly {
     extendsFrom(configurations.annotationProcessor.get())
@@ -86,15 +90,6 @@ dependencies {
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-java {
-  toolchain {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
-    withSourcesJar()
-  }
-}
-
 idea {
   module {
     inheritOutputDirs = true
@@ -102,13 +97,6 @@ idea {
     isDownloadSources = true
   }
 }
-
-configurations {
-  compileOnly {
-    extendsFrom(configurations.annotationProcessor.get())
-  }
-}
-
 
 extra["snippetsDir"] = file("build/generated-snippets")
 
