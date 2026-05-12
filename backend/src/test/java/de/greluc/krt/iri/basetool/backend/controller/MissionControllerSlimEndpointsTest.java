@@ -371,4 +371,183 @@ class MissionControllerSlimEndpointsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(participantId.toString()));
     }
+
+    // ===================================================================
+    // RSVP security branches — anonymous spoof / name-resolution paths
+    // that the existing 4 cases above don't reach. The CLAUDE.md
+    // "Multi-user data isolation (CRITICAL)" rule lives or dies in these.
+    // ===================================================================
+
+    @Test
+    void addParticipantSlim_anonymousSubmittingUserId_isForbidden() throws Exception {
+        // SECURITY: an anonymous caller cannot manufacture a "User" RSVP. The
+        // controller throws AccessDeniedException -> 403 BEFORE any service
+        // call.
+        UUID missionId = UUID.randomUUID();
+        UUID spoofUserId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + spoofUserId + "\"}"))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+                .addParticipant(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void addParticipantSlim_guestNameMatchesMultipleUsers_isConflict() throws Exception {
+        // Ambiguous free-text name -> 409 BusinessConflictException, regardless
+        // of authenticated-vs-anonymous.
+        UUID missionId = UUID.randomUUID();
+
+        User a = new User(); a.setId(UUID.randomUUID()); a.setUsername("alex");
+        User b = new User(); b.setId(UUID.randomUUID()); b.setUsername("alex");
+        when(userService.findMatchesByExactName("alex"))
+                .thenReturn(java.util.List.of(a, b));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"alex\"}"))
+                .andExpect(status().isConflict());
+
+        org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+                .addParticipant(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void addParticipantSlim_authenticatedTypesOwnNameAsGuest_transparentlyLinked() throws Exception {
+        // Bug fix lock-in: authenticated user types their own name without
+        // hitting autocomplete -> name resolves to a single registered user
+        // -> link transparently (finalUserId set, finalGuestName cleared).
+        UUID missionId = UUID.randomUUID();
+        UUID callerId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        User registered = new User();
+        registered.setId(callerId);
+        registered.setUsername("alice");
+        when(userService.findMatchesByExactName("alice"))
+                .thenReturn(java.util.List.of(registered));
+        when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+        when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+                .thenReturn(missionWithParticipant(participantId, callerId));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"alice\"}")
+                        .with(jwt().jwt(j -> j.subject(callerId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(participantId.toString()));
+
+        // Verify the service was called with userId=callerId and guestName=null
+        // (the transparent-link transformation).
+        org.mockito.ArgumentCaptor<UUID> userIdCaptor =
+                org.mockito.ArgumentCaptor.forClass(UUID.class);
+        org.mockito.ArgumentCaptor<String> guestNameCaptor =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(missionService).addParticipant(
+                any(), userIdCaptor.capture(), guestNameCaptor.capture(),
+                any(), any(), any());
+        org.junit.jupiter.api.Assertions.assertEquals(callerId, userIdCaptor.getValue(),
+                "guestName matching one registered user must transparently set finalUserId");
+        org.junit.jupiter.api.Assertions.assertNull(guestNameCaptor.getValue(),
+                "guestName must be cleared once it resolves to a registered userId");
+    }
+
+    @Test
+    void addParticipantSlim_anonymousUsingRegisteredName_isBadRequest() throws Exception {
+        // SECURITY: anonymous user types a free-text name that resolves to a
+        // registered member -> reject (cannot impersonate a member as a guest).
+        UUID missionId = UUID.randomUUID();
+        User registered = new User();
+        registered.setId(UUID.randomUUID());
+        registered.setUsername("alice");
+        when(userService.findMatchesByExactName("alice"))
+                .thenReturn(java.util.List.of(registered));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"alice\"}"))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+                .addParticipant(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void addParticipantSlim_authenticatedEmptyForm_selfEnrolls() throws Exception {
+        // Existing memberSelfEnroll_isAllowed test covers part of this, but
+        // here we explicitly assert the controller calls addParticipant with
+        // finalUserId == caller's id (NOT null, NOT spoofed).
+        UUID missionId = UUID.randomUUID();
+        UUID callerId = UUID.randomUUID();
+        UUID participantId = UUID.randomUUID();
+
+        when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+        when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
+        when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+                .thenReturn(missionWithParticipant(participantId, callerId));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/slim", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(jwt().jwt(j -> j.subject(callerId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<UUID> userIdCaptor =
+                org.mockito.ArgumentCaptor.forClass(UUID.class);
+        org.mockito.Mockito.verify(missionService).addParticipant(
+                any(), userIdCaptor.capture(), any(), any(), any(), any());
+        org.junit.jupiter.api.Assertions.assertEquals(callerId, userIdCaptor.getValue(),
+                "empty form + authenticated caller -> self-enroll with caller's id");
+    }
+
+    // ===================================================================
+    // addParticipantPublic — public RSVP endpoint with the same branching
+    // (no slim wrapping). The legacy endpoint is permitAll() and used by
+    // anonymous / unauthenticated mission RSVPs.
+    // ===================================================================
+
+    @Test
+    void addParticipantPublic_anonymousSubmittingUserId_isForbidden() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        UUID spoofUserId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/add", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + spoofUserId + "\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void addParticipantPublic_anonymousUsingRegisteredName_isBadRequest() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        User registered = new User();
+        registered.setId(UUID.randomUUID());
+        registered.setUsername("alice");
+        when(userService.findMatchesByExactName("alice"))
+                .thenReturn(java.util.List.of(registered));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/add", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"alice\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void addParticipantPublic_anonymousAmbiguousName_isConflict() throws Exception {
+        UUID missionId = UUID.randomUUID();
+        User a = new User(); a.setId(UUID.randomUUID()); a.setUsername("alex");
+        User b = new User(); b.setId(UUID.randomUUID()); b.setUsername("alex");
+        when(userService.findMatchesByExactName("alex"))
+                .thenReturn(java.util.List.of(a, b));
+
+        mockMvc.perform(post("/api/v1/missions/{id}/participants/add", missionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"guestName\":\"alex\"}"))
+                .andExpect(status().isConflict());
+    }
 }
