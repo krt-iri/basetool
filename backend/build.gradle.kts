@@ -82,7 +82,7 @@ dependencies {
   // Pin the architectural rules from CLAUDE.md (Controllers do not return JPA
   // entities, service-layer code does not touch SecurityContextHolder, REST
   // endpoints are authorisation-annotated, ...). See ArchitectureTest.
-  testImplementation("com.tngtech.archunit:archunit:1.3.2")
+  testImplementation(libs.archunit.core)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

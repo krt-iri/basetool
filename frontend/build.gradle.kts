@@ -57,7 +57,7 @@ dependencies {
   // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform
   // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
   // frontend's "no JpaRepository / no direct JDBC" rule.
-  testImplementation("com.tngtech.archunit:archunit:1.3.2")
+  testImplementation(libs.archunit.core)
 }
 
 // Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module
