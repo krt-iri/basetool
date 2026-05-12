@@ -12,6 +12,19 @@ x-db-backend: &db-backend-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
+  # Resource budget: targets a 4 vCPU / 8 GB host. Total of all `prod` services
+  # is ~5.6 GB RAM (leaves ~2 GB headroom for the kernel, the Docker daemon and
+  # short-lived bursts). CPU limits are intentionally overcommitted relative to
+  # the four physical vCPUs because they are per-container burst ceilings, not
+  # reserved shares — the CFS scheduler arbitrates contention at run time.
+  # Without these limits an in-container memory leak would let one service
+  # monopolise the host and OOM-kill its neighbours (Postgres in particular
+  # has historically been the casualty when the JVM heap runs away).
+  deploy:
+    resources:
+      limits:
+        memory: 768M
+        cpus: '1.5'
   volumes:
     - /var/iri/db-backend:/var/lib/postgresql/data
 
@@ -29,6 +42,14 @@ x-db-keycloak: &db-keycloak-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
+  # Smaller than db-backend: Keycloak's schema is fixed and the working set
+  # (users, sessions, realm config) easily fits in 512 MB shared_buffers + page
+  # cache for our member count. Bump if user count grows past O(thousands).
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+        cpus: '1.0'
   volumes:
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
@@ -36,6 +57,14 @@ x-keycloak: &keycloak-template
   image: quay.io/keycloak/keycloak:26.6
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   stop_grace_period: 30s
+  # Quarkus-based Keycloak with local cache + JWT signing + the realm import is
+  # the second-biggest RAM consumer behind the backend. 1.5 GB matches the
+  # upstream recommendation for a small production realm with our member count.
+  deploy:
+    resources:
+      limits:
+        memory: 1536M
+        cpus: '2.0'
   environment:
     KC_HOSTNAME: keycloak.iri-base.org
     KC_HOSTNAME_STRICT: "true"
@@ -65,6 +94,17 @@ x-backend: &backend-template
     dockerfile: backend/Dockerfile
   restart: always
   stop_grace_period: 30s
+  # Biggest workload on the host: every API call goes through this JVM, Flyway
+  # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
+  # MaxRAMPercentage=75 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
+  # 1.1 GB heap inside the 1536M limit, the remaining ~400 MB cover Metaspace,
+  # the JIT code cache, native libs (openpdf, postgres jdbc) and a working
+  # buffer for the Tomcat thread pool.
+  deploy:
+    resources:
+      limits:
+        memory: 1536M
+        cpus: '2.0'
   environment:
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11261
@@ -83,6 +123,14 @@ x-redis: &redis-template
   command: redis-server --save 1 1 --appendonly yes --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: always
   stop_grace_period: 30s
+  # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
+  # attributes). 256 MB is generous for our active-user count and leaves room
+  # for the AOF append buffer.
+  deploy:
+    resources:
+      limits:
+        memory: 256M
+        cpus: '0.5'
   healthcheck:
     test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?}", "--no-auth-warning", "ping"]
     interval: 5s
@@ -97,6 +145,15 @@ x-frontend: &frontend-template
     dockerfile: frontend/Dockerfile
   restart: always
   stop_grace_period: 30s
+  # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
+  # so the working set is well below the backend's. 768 MB → ~576 MB heap with
+  # MaxRAMPercentage=75 is enough for Tomcat, the Spring Session client cache
+  # and the Caffeine-backed reference-data cache.
+  deploy:
+    resources:
+      limits:
+        memory: 768M
+        cpus: '1.0'
   environment:
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
@@ -275,6 +332,13 @@ services:
       - "127.0.0.1:10081:81"     # NGINX Proxy Manager Admin Web UI (loopback-only)
     environment:
       DB_SQLITE_FILE: "/data/database.sqlite"
+    # Nginx + the SQLite-backed admin UI is feather-light; 256 MB / 0.5 vCPU is
+    # ample for HTTP/HTTPS proxying at our request volume.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
     volumes:
       - /var/iri/npm/data:/data
       - /var/iri/npm/letsencrypt:/etc/letsencrypt
