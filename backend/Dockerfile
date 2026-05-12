@@ -1,4 +1,4 @@
-FROM eclipse-temurin:25-jdk-jammy AS build
+FROM eclipse-temurin:25-jdk-alpine AS build
 WORKDIR /app
 
 # Gradle-Wrapper und Konfigurationsdateien für Dependency-Caching kopieren
@@ -35,21 +35,27 @@ RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
 WORKDIR /app/extracted
 
-# Finales Image
-FROM eclipse-temurin:25-jre-jammy
+# Finales Image — Alpine variant of Temurin's JRE (~80 MB compressed, ~170 MB
+# smaller than the jammy base). musl libc instead of glibc; safe here because
+# every native bit we ship is pure Java: openpdf renders with its 14 embedded
+# Type-1 fonts (BaseFont.HELVETICA et al.) so there is no fontconfig / freetype
+# / system-font dependency, no Tomcat APR/Native connector is wired in, and the
+# Postgres / Redis clients are pure-Java drivers. If we ever pull in a native
+# library that depends on glibc, revisit and switch back to `25-jre-jammy`.
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 # Non-root runtime user. Fixed UID/GID so host bind mounts (e.g. the log
 # directory mounted in docker-compose) can be pre-chowned consistently:
 #   chown -R 10001:10001 /var/iri/backend/log
 # `curl` is installed for the HEALTHCHECK directive at the bottom of this file.
-RUN groupadd --system --gid 10001 app \
-    && useradd  --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app \
+# BusyBox addgroup/adduser (-S = system account, no password, no UID/GID range
+# check) replace the Debian groupadd/useradd; apk replaces apt-get.
+RUN addgroup -S -g 10001 app \
+    && adduser  -S -u 10001 -G app -H -h /nonexistent -s /sbin/nologin app \
     && mkdir -p /app/logs \
     && chown -R 10001:10001 /app \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && apk add --no-cache curl ca-certificates
 
 # Extrahierte Layer einzeln kopieren (owned by the runtime user)
 COPY --from=build --chown=10001:10001 /app/extracted/dependencies/ ./
