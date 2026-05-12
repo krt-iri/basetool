@@ -77,8 +77,8 @@ public class ProfitCalculationService {
 
             if (minBuy != null && maxSell != null) {
                 BigDecimal profitPerScu = maxSell.subtract(minBuy);
-                BigDecimal marginPercent = minBuy.compareTo(BigDecimal.ZERO) > 0 
-                        ? profitPerScu.divide(minBuy, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                BigDecimal marginPercent = minBuy.compareTo(BigDecimal.ZERO) > 0
+                        ? profitPerScu.multiply(BigDecimal.valueOf(100)).divide(minBuy, 4, RoundingMode.HALF_UP)
                         : BigDecimal.ZERO;
                 BigDecimal fullLoadCost = minBuy.multiply(BigDecimal.valueOf(shipScu));
                 BigDecimal maxProfitFullLoad = profitPerScu.multiply(BigDecimal.valueOf(shipScu));

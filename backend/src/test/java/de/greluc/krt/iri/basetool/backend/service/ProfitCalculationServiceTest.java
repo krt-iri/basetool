@@ -92,4 +92,72 @@ class ProfitCalculationServiceTest {
         assertEquals("Laranite", result.get(1).materialName());
         assertEquals("Zeyneh", result.get(2).materialName());
     }
+
+    @Test
+    void smallMargin_isRoundedHalfUpAtFourDecimals() {
+        // Given: profit=1, minBuy=3 → margin = 1/3 * 100 = 33.3333…
+        UUID shipId = UUID.randomUUID();
+        ShipType ship = new ShipType();
+        ship.setId(shipId);
+        ship.setName("Freelancer");
+        ship.setScu(66);
+
+        Material material = new Material();
+        material.setId(UUID.randomUUID());
+        material.setName("Aluminum");
+
+        Terminal terminal = new Terminal();
+        terminal.setIsAutoLoad(true);
+        terminal.setStarSystemName("Stanton");
+
+        MaterialPrice price = new MaterialPrice();
+        price.setMaterial(material);
+        price.setTerminal(terminal);
+        price.setPriceBuy(BigDecimal.valueOf(3));
+        price.setPriceSell(BigDecimal.valueOf(4));
+
+        when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(ship));
+        when(materialPriceRepository.findAllAutoLoadPrices()).thenReturn(List.of(price));
+
+        // When
+        List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
+
+        // Then
+        assertEquals(1, result.size());
+        assertEquals(new BigDecimal("33.3333"), result.get(0).marginPercent());
+    }
+
+    @Test
+    void marginPercent_isComputedAsBuyPercentage() {
+        // Given: profit=20, minBuy=10 → margin = 20/10 * 100 = 200
+        UUID shipId = UUID.randomUUID();
+        ShipType ship = new ShipType();
+        ship.setId(shipId);
+        ship.setName("Freelancer");
+        ship.setScu(66);
+
+        Material material = new Material();
+        material.setId(UUID.randomUUID());
+        material.setName("Tungsten");
+
+        Terminal terminal = new Terminal();
+        terminal.setIsAutoLoad(true);
+        terminal.setStarSystemName("Stanton");
+
+        MaterialPrice price = new MaterialPrice();
+        price.setMaterial(material);
+        price.setTerminal(terminal);
+        price.setPriceBuy(BigDecimal.valueOf(10));
+        price.setPriceSell(BigDecimal.valueOf(30));
+
+        when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(ship));
+        when(materialPriceRepository.findAllAutoLoadPrices()).thenReturn(List.of(price));
+
+        // When
+        List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
+
+        // Then
+        assertEquals(1, result.size());
+        assertEquals(new BigDecimal("200.0000"), result.get(0).marginPercent());
+    }
 }
