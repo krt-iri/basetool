@@ -295,6 +295,82 @@ class GlobalExceptionHandlerTest {
         assertCommon(resp, HttpStatus.NOT_FOUND, GlobalExceptionHandler.CODE_NOT_FOUND);
     }
 
+    // --- §3.9: GlobalExceptionHandler#resolveDetail i18n key resolution -------------------
+
+    @Test
+    void handleBadRequest_passesLiteralEnglishMessageThrough() {
+        // Backwards-compat: existing throw sites that pass a literal English string keep
+        // working byte-identically on the wire. The resolver only translates when the
+        // message looks up as a key in the bundle.
+        ResponseEntity<ProblemDetail> resp = handler.handleBadRequest(
+                new BadRequestException("Some literal message that is not a key"), request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        assertEquals("Some literal message that is not a key", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleBadRequest_resolvesI18nKeyToEnglish() {
+        // setUp() forces Locale.ENGLISH so the key resolves against messages_en.properties.
+        ResponseEntity<ProblemDetail> resp = handler.handleBadRequest(
+                new BadRequestException("error.refinery_order.location_required"), request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        assertEquals("A refinery order requires a location.", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleBadRequest_resolvesI18nKeyToGermanWhenLocaleIsGerman() {
+        LocaleContextHolder.setLocale(Locale.GERMAN);
+        ResponseEntity<ProblemDetail> resp = handler.handleBadRequest(
+                new BadRequestException("error.refinery_order.location_required"), request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        // Equivalent to the messages_de.properties entry "Für einen Raffinerieauftrag ...".
+        assertEquals("Für einen Raffinerieauftrag muss ein Lagerort angegeben werden.",
+                resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleBadRequest_blankMessageFallsBackToGenericLocalized() {
+        ResponseEntity<ProblemDetail> resp = handler.handleBadRequest(
+                new BadRequestException(""), request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        assertEquals("The request could not be processed because it contains invalid data.",
+                resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleNotFound_resolvesI18nKeyToEnglish() {
+        ResponseEntity<ProblemDetail> resp = handler.handleNotFound(
+                new NotFoundException("error.user.not_found"), request);
+
+        assertCommon(resp, HttpStatus.NOT_FOUND, GlobalExceptionHandler.CODE_NOT_FOUND);
+        assertEquals("User not found.", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleNotFound_passesLiteralEnglishMessageThrough() {
+        ResponseEntity<ProblemDetail> resp = handler.handleNotFound(
+                new NotFoundException("Mission 42 not found"), request);
+
+        assertCommon(resp, HttpStatus.NOT_FOUND, GlobalExceptionHandler.CODE_NOT_FOUND);
+        assertEquals("Mission 42 not found", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleDuplicateEntity_resolvesI18nKey() {
+        // Even though no dedicated key for duplicate scenarios exists yet, the same
+        // resolveDetail() seam is wired up - a future key would Just Work without
+        // touching the handler.
+        ResponseEntity<ProblemDetail> resp = handler.handleDuplicateEntity(
+                new DuplicateEntityException("error.user.not_found"), request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DUPLICATE_ENTITY);
+        assertEquals("User not found.", resp.getBody().getDetail());
+    }
+
     @Test
     void handleAllExceptions_returns500WithCorrelationIdAndGenericDetail() {
         ResponseEntity<ProblemDetail> resp = handler.handleAllExceptions(
