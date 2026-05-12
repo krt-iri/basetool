@@ -39,7 +39,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,11 +56,13 @@ import static org.mockito.Mockito.when;
  *         / {@code missionIds} can be null / empty / populated, and the
  *         corresponding {@code hasX} boolean must flip accordingly while
  *         the original list is or isn't passed through;</li>
- *     <li>{@code aggregateInventoryItems}: empty input → empty result;
+ *     <li>{@code aggregateInventoryItems}: empty input -&gt; empty result;
  *         weighted-average quality math; max-quality tracking; null amount
- *         / null quality coerced to 0; total-zero div-by-zero guard;
- *         intra-material sort (quality DESC, location name ASC, amount DESC);
- *         inter-material sort (alphabetic by name).</li>
+ *         / null quality / null location tolerated in both sort and aggregation
+ *         (regression — see {@code nullQuality_coercedToZeroInSortAndLoop});
+ *         total-zero div-by-zero guard; intra-material sort (quality DESC,
+ *         location name ASC, amount DESC); inter-material sort (alphabetic
+ *         by name).</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -277,26 +278,65 @@ class InventoryItemServiceAggregateTest {
         }
 
         @Test
-        void nullQuality_currentlyThrowsBeforeCoercionRuns() {
-            // PRODUCTION BUG (spun off as a follow-up): the loop body coerces null
-            // quality to 0, but the primary sort key for `matItems.sort(...)` is
-            // `Comparator.comparing(InventoryItemDto::quality).reversed()`, which
-            // NPEs in `Integer.compareTo(null)` BEFORE the loop runs. So a stored
-            // inventory item with null quality (rare but possible via legacy data)
-            // currently crashes the aggregation. The coercion lines (item.quality()
-            // != null ? ... : 0) are therefore dead code today.
-            //
-            // This test locks in the *current* behaviour; the production fix is
-            // either Comparator.nullsLast() around the primary key, or coercing
-            // null-quality to 0 before sorting.
+        void nullQuality_coercedToZeroInSortAndLoop() {
+            // Regression: the sort comparator used to dereference
+            // InventoryItemDto::quality unconditionally and NPE before the
+            // loop's defensive null-coercion could run. After the fix the
+            // sort key coerces null -> 0 just like the loop does, so a
+            // legacy row with null quality aggregates cleanly.
             MaterialReferenceDto mat = newMat("Quantanium");
             InventoryItemDto solid = newItem(mat, "ARC-L1", 500, 100.0);
             InventoryItemDto nullQ = newItem(mat, "ARC-L2", null, 100.0);
 
             stubGlobalQuery(solid, nullQ);
 
-            org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
-                    () -> service.getAllAggregatedInventory(null, null));
+            GroupedInventoryDto grouped = service.getAllAggregatedInventory(null, null).get(0);
+            // total = 100 + 100 = 200; weighted = 100*500 + 100*0 = 50000; avg = 250
+            assertEquals(200.0, grouped.totalAmount());
+            assertEquals(250.0, grouped.averageQuality());
+            assertEquals(500, grouped.maxQuality(),
+                    "max quality must come from the non-null sibling, null treated as 0");
+        }
+
+        @Test
+        void nullAmount_inSort_whenQualityAndLocationTie() {
+            // Regression companion to nullQuality_coercedToZeroInSortAndLoop:
+            // two items with the SAME quality and SAME location so the
+            // comparator chain falls through to the tertiary amount key.
+            // Pre-fix, that key NPE'd on a null amount because it called
+            // Double.compareTo(null).
+            MaterialReferenceDto mat = newMat("Quantanium");
+            InventoryItemDto withAmt = newItem(mat, "ARC-L1", 200, 100.0);
+            InventoryItemDto nullAmt = newItem(mat, "ARC-L1", 200, null);
+
+            stubGlobalQuery(withAmt, nullAmt);
+
+            GroupedInventoryDto grouped = service.getAllAggregatedInventory(null, null).get(0);
+            // total = 100 + 0 = 100; weighted = 100*200 + 0*200 = 20000; avg = 200
+            assertEquals(100.0, grouped.totalAmount());
+            assertEquals(200.0, grouped.averageQuality());
+            assertEquals(200, grouped.maxQuality());
+        }
+
+        @Test
+        void nullLocation_inSort_doesNotNpe() {
+            // Regression: the secondary sort key was i -> i.location().name(),
+            // which NPE'd on a null LocationReferenceDto. The fix falls back
+            // to "" when either the location or its name is null.
+            MaterialReferenceDto mat = newMat("Quantanium");
+            InventoryItemDto nullLoc = new InventoryItemDto(
+                    UUID.randomUUID(), null, mat, null,
+                    400, 50.0, false, null, null, null, null, null, 1L);
+            InventoryItemDto withLoc = newItem(mat, "ARC-L2", 200, 100.0);
+
+            stubGlobalQuery(nullLoc, withLoc);
+
+            GroupedInventoryDto grouped = service.getAllAggregatedInventory(null, null).get(0);
+            // total = 50 + 100 = 150; weighted = 50*400 + 100*200 = 40000; avg = 40000/150
+            // = 266.666... rounded HALF_UP to 266.67
+            assertEquals(150.0, grouped.totalAmount());
+            assertEquals(266.67, grouped.averageQuality());
+            assertEquals(400, grouped.maxQuality());
         }
 
         @Test

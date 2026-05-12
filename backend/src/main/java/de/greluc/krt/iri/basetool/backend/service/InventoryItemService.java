@@ -141,9 +141,11 @@ public class InventoryItemService {
                 de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto mat = entry.getKey();
                 List<InventoryItemDto> matItems = entry.getValue();
                 
-                matItems.sort(java.util.Comparator.comparing(InventoryItemDto::quality).reversed()
-                        .thenComparing(i -> i.location().name())
-                        .thenComparing(java.util.Comparator.comparing(InventoryItemDto::amount).reversed()));
+                matItems.sort(java.util.Comparator
+                        .<InventoryItemDto, Integer>comparing(i -> i.quality() != null ? i.quality() : 0).reversed()
+                        .thenComparing(i -> i.location() != null && i.location().name() != null ? i.location().name() : "")
+                        .thenComparing(java.util.Comparator.<InventoryItemDto, Double>comparing(
+                                i -> i.amount() != null ? i.amount() : 0.0).reversed()));
 
                 double totalAmount = 0.0;
                 double qualitySum = 0.0;
