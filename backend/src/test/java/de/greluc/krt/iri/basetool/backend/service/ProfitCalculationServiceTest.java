@@ -48,15 +48,15 @@ class ProfitCalculationServiceTest {
         ship.setId(shipId);
         ship.setName("C2 Hercules");
         ship.setScu(696);
-        
+
         Material m1 = new Material();
         m1.setId(UUID.randomUUID());
         m1.setName("Laranite");
-        
+
         Material m2 = new Material();
         m2.setId(UUID.randomUUID());
         m2.setName("Agricium");
-        
+
         Material m3 = new Material();
         m3.setId(UUID.randomUUID());
         m3.setName("Zeyneh");
@@ -64,13 +64,13 @@ class ProfitCalculationServiceTest {
         Terminal t = new Terminal();
         t.setIsAutoLoad(true);
         t.setStarSystemName("Stanton");
-        
+
         MaterialPrice p1 = new MaterialPrice();
         p1.setMaterial(m1);
         p1.setTerminal(t);
         p1.setPriceBuy(BigDecimal.valueOf(20));
         p1.setPriceSell(BigDecimal.valueOf(30));
-        
+
         MaterialPrice p2 = new MaterialPrice();
         p2.setMaterial(m2);
         p2.setTerminal(t);
@@ -92,7 +92,7 @@ class ProfitCalculationServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(3, result.size());
-        
+
         // Sollte alphabetisch sortiert sein: Agricium, Laranite, Zeyneh
         assertEquals("Agricium", result.get(0).materialName());
         assertEquals("Laranite", result.get(1).materialName());
@@ -358,17 +358,18 @@ class ProfitCalculationServiceTest {
         List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
         BigDecimal margin = result.get(0).marginPercent();
-        // 200.0000 with scale 4 (DivisionScale = 4 + multiply by 100 -> stays 4 decimals)
+        // 200.0000 with scale 4 (multiply by 100 first, then divide-with-scale-4 keeps the 4 decimals).
         assertEquals(0, new BigDecimal("200.0000").compareTo(margin),
                 "margin must be 200% with the HALF_UP rounding at 4 decimal places");
     }
 
     @Test
     void smallMargin_isRoundedHalfUpAtFourDecimals() {
-        // The implementation does: profitPerScu.divide(minBuy, 4, HALF_UP).multiply(100).
-        // For profit=1, minBuy=3: 1.divide(3, 4, HALF_UP) = 0.3333; * 100 = 33.3300 (scale 4).
-        // The "33.3333% percentage" we naively expect is NOT what BigDecimal produces here
-        // because the division rounds at 4 decimal places BEFORE the multiply.
+        // The implementation does: profitPerScu.multiply(100).divide(minBuy, 4, HALF_UP).
+        // For profit=1, minBuy=3: 100.divide(3, 4, HALF_UP) = 33.3333. The multiply-first
+        // ordering preserves four meaningful fractional digits in the percent value, so we
+        // get 33.3333% (and not the precision-collapsed 33.3300% that divide-then-multiply
+        // would yield).
         UUID shipId = UUID.randomUUID();
         ShipType ship = newShip(shipId, "Cutlass", 1);
 
@@ -381,11 +382,8 @@ class ProfitCalculationServiceTest {
         BigDecimal margin = profitCalculationService.calculateProfit(shipId, null)
                 .get(0).marginPercent();
 
-        // 33.3300 == 33.33 by value comparison; locking this in documents that
-        // the result is 33.33 % rather than the more-precise 33.3333 %.
-        assertEquals(0, new BigDecimal("33.3300").compareTo(margin),
-                "margin must be 33.3300% — the divide-then-multiply order rounds at "
-                        + "0.3333 before scaling to percent, so we lose precision past 2 decimals");
+        assertEquals(0, new BigDecimal("33.3333").compareTo(margin),
+                "margin must be 33.3333% — multiply-before-divide preserves 4 fractional digits");
     }
 
     // ----------------------------------------------------------------
