@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -25,19 +26,24 @@ import java.util.UUID;
 public class MissionFinancePageController {
 
     private final BackendApiClient backendApiClient;
+    // The mission-detail view (and its model) lives in MissionPageController; we
+    // delegate to it instead of forwarding/redirecting so a finance-form validation
+    // error keeps the BindingResult request-scoped (no Redis FlashMap round-trip).
+    // The injected reference is a Spring proxy, so @PreAuthorize on missionDetail is
+    // still enforced.
+    private final MissionPageController missionPageController;
 
     @PostMapping
     @PreAuthorize("permitAll()")
     public String addFinanceEntry(@PathVariable @NotNull UUID id,
                                   @Valid @ModelAttribute("financeForm") MissionFinanceEntryForm form,
                                   BindingResult bindingResult,
+                                  Model model,
                                   RedirectAttributes redirectAttributes,
                                   @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.financeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("financeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "finance-entry-modal");
-            return "redirect:/missions/" + id;
+            model.addAttribute("openModal", "finance-entry-modal");
+            return missionPageController.missionDetail(id, model, principal);
         }
         try {
             Map<String, Object> body = new HashMap<>();
@@ -62,14 +68,13 @@ public class MissionFinancePageController {
                                      @PathVariable @NotNull UUID entryId,
                                      @Valid @ModelAttribute("financeForm") MissionFinanceEntryForm form,
                                      BindingResult bindingResult,
+                                     Model model,
                                      RedirectAttributes redirectAttributes,
                                      @AuthenticationPrincipal OidcUser principal) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.financeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("financeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "edit-finance-entry-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/missions/" + id + "/finance-entries/" + entryId + "/update");
-            return "redirect:/missions/" + id;
+            model.addAttribute("openModal", "edit-finance-entry-modal");
+            model.addAttribute("modalAction", "/missions/" + id + "/finance-entries/" + entryId + "/update");
+            return missionPageController.missionDetail(id, model, principal);
         }
         try {
             Map<String, Object> body = new HashMap<>();

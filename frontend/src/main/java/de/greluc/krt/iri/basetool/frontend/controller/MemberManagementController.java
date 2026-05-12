@@ -92,14 +92,15 @@ public class MemberManagementController {
     }
 
     @PostMapping("/{id}/edit")
-    public String updateMember(@PathVariable @NotNull UUID id, 
-                               @Valid @ModelAttribute("memberEditForm") MemberEditForm form, 
-                               BindingResult bindingResult, 
+    public String updateMember(@PathVariable @NotNull UUID id,
+                               @Valid @ModelAttribute("memberEditForm") MemberEditForm form,
+                               BindingResult bindingResult,
+                               Model model,
                                RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.memberEditForm", bindingResult);
-            redirectAttributes.addFlashAttribute("memberEditForm", form);
-            return "redirect:/members/" + id + "/edit" + (form.source() != null ? "?source=" + form.source() : "");
+            // Re-render the edit view directly; the BindingResult stays request-scoped so
+            // it never goes through a Redis-serialised FlashMap (see RedisSessionConfig).
+            return editMember(id, form.source(), model, redirectAttributes);
         }
         try {
             UserAttributesUpdateDto body = new UserAttributesUpdateDto(form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());

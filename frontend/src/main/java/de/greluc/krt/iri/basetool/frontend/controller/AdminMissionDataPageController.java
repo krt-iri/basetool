@@ -118,13 +118,16 @@ public class AdminMissionDataPageController {
 
     // JobTypes
     @PostMapping("/job-types")
-    public String createJobType(@Valid @ModelAttribute("jobTypeForm") JobTypeForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String createJobType(@Valid @ModelAttribute("jobTypeForm") JobTypeForm form,
+                                BindingResult bindingResult,
+                                Model model,
+                                RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.jobTypeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("jobTypeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "jobtype-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/job-types");
-            return "redirect:/admin/mission-data";
+            // Render directly; the BindingResult stays request-scoped so it never goes
+            // through a Redis-serialised FlashMap (see RedisSessionConfig).
+            model.addAttribute("openModal", "jobtype-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/job-types");
+            return listData(false, false, false, model);
         }
         try {
             JobTypeDto body = new JobTypeDto(null, form.name(), form.description(), form.archetype(), null, true, form.isLeadershipRole(), 0L);
@@ -146,13 +149,15 @@ public class AdminMissionDataPageController {
     }
 
     @PostMapping("/job-types/{id}/update")
-    public String updateJobType(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("jobTypeForm") JobTypeForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String updateJobType(@PathVariable @NotNull UUID id,
+                                @Valid @ModelAttribute("jobTypeForm") JobTypeForm form,
+                                BindingResult bindingResult,
+                                Model model,
+                                RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.jobTypeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("jobTypeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "jobtype-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/job-types/" + id + "/update");
-            return "redirect:/admin/mission-data";
+            model.addAttribute("openModal", "jobtype-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/job-types/" + id + "/update");
+            return listData(false, false, false, model);
         }
         try {
             JobTypeDto body = new JobTypeDto(id, form.name(), form.description(), form.archetype(), null, true, form.isLeadershipRole(), form.version());
@@ -216,13 +221,14 @@ public class AdminMissionDataPageController {
 
     // Squadrons
     @PostMapping("/squadrons")
-    public String createSquadron(@Valid @ModelAttribute("squadronForm") SquadronForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String createSquadron(@Valid @ModelAttribute("squadronForm") SquadronForm form,
+                                 BindingResult bindingResult,
+                                 Model model,
+                                 RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.squadronForm", bindingResult);
-            redirectAttributes.addFlashAttribute("squadronForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "squadron-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/squadrons");
-            return "redirect:/admin/mission-data";
+            model.addAttribute("openModal", "squadron-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/squadrons");
+            return listData(false, false, false, model);
         }
         try {
             SquadronDto body = new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, 0L);
@@ -244,13 +250,15 @@ public class AdminMissionDataPageController {
     }
 
     @PostMapping("/squadrons/{id}/update")
-    public String updateSquadron(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("squadronForm") SquadronForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String updateSquadron(@PathVariable @NotNull UUID id,
+                                 @Valid @ModelAttribute("squadronForm") SquadronForm form,
+                                 BindingResult bindingResult,
+                                 Model model,
+                                 RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.squadronForm", bindingResult);
-            redirectAttributes.addFlashAttribute("squadronForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "squadron-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/squadrons/" + id + "/update");
-            return "redirect:/admin/mission-data";
+            model.addAttribute("openModal", "squadron-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/squadrons/" + id + "/update");
+            return listData(false, false, false, model);
         }
         try {
             SquadronDto body = new SquadronDto(id, form.name(), form.shorthand(), form.description(), true, form.version());
@@ -311,13 +319,14 @@ public class AdminMissionDataPageController {
 
     // FrequencyTypes
     @PostMapping("/frequency-types")
-    public String createFrequencyType(@Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String createFrequencyType(@Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
+                                      BindingResult bindingResult,
+                                      Model model,
+                                      RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.frequencyTypeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("frequencyTypeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "frequency-type-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/frequency-types");
-            return "redirect:/admin/mission-data";
+            model.addAttribute("openModal", "frequency-type-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/frequency-types");
+            return listData(false, false, false, model);
         }
         try {
             Map<String, Object> body = new HashMap<>();
@@ -335,13 +344,16 @@ public class AdminMissionDataPageController {
     }
 
     @PostMapping("/frequency-types/{id}/update")
-    public String updateFrequencyType(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form, @RequestParam(required = false) Boolean active, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String updateFrequencyType(@PathVariable @NotNull UUID id,
+                                      @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
+                                      @RequestParam(required = false) Boolean active,
+                                      BindingResult bindingResult,
+                                      Model model,
+                                      RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.frequencyTypeForm", bindingResult);
-            redirectAttributes.addFlashAttribute("frequencyTypeForm", form);
-            redirectAttributes.addFlashAttribute("openModal", "frequency-type-modal");
-            redirectAttributes.addFlashAttribute("modalAction", "/admin/mission-data/frequency-types/" + id + "/update");
-            return "redirect:/admin/mission-data";
+            model.addAttribute("openModal", "frequency-type-modal");
+            model.addAttribute("modalAction", "/admin/mission-data/frequency-types/" + id + "/update");
+            return listData(false, false, false, model);
         }
         try {
             Map<String, Object> body = new HashMap<>();

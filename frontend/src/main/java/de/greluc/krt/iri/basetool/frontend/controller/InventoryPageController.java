@@ -243,15 +243,17 @@ public class InventoryPageController {
     }
 
     @PostMapping("/input")
-    public String addInventoryItem(@Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String addInventoryItem(@Valid @ModelAttribute("inventoryForm") InventoryForm form,
+                                   BindingResult bindingResult,
+                                   Model model,
+                                   RedirectAttributes redirectAttributes) {
         if (Boolean.TRUE.equals(form.getPersonal()) && (form.getJobOrderId() != null || form.getMissionId() != null)) {
             bindingResult.rejectValue("personal", "error.inventory.personal.assignment", "Ein persönlicher Eintrag darf keinem Auftrag oder Einsatz zugeordnet sein.");
         }
 
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.inventoryForm", bindingResult);
-            redirectAttributes.addFlashAttribute("inventoryForm", form);
-            return "redirect:/inventory/input";
+            // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
+            return viewInputPage(form.getSource(), model);
         }
 
         try {
@@ -286,16 +288,27 @@ public class InventoryPageController {
     }
 
     @PostMapping("/{id}/book-out")
-    public String bookOutInventoryItem(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("inventoryBookOutForm") de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes, @RequestHeader(value = "Referer", required = false) String referer) {
-        String basePath = (referer != null && referer.contains("/inventory/all")) ? "/inventory/all" : "/inventory/my";
+    public String bookOutInventoryItem(@PathVariable @NotNull UUID id,
+                                       @Valid @ModelAttribute("inventoryBookOutForm") de.greluc.krt.iri.basetool.frontend.model.form.InventoryBookOutForm form,
+                                       BindingResult bindingResult,
+                                       Model model,
+                                       RedirectAttributes redirectAttributes,
+                                       @RequestHeader(value = "Referer", required = false) String referer) {
+        boolean fromAdminListing = referer != null && referer.contains("/inventory/all");
+        String basePath = fromAdminListing ? "/inventory/all" : "/inventory/my";
         String redirectPath = buildInventoryRedirectFromReferer(basePath, referer);
 
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("errorToast", "error.validation.failed");
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.inventoryBookOutForm", bindingResult);
-            redirectAttributes.addFlashAttribute("inventoryBookOutForm", form);
-            redirectAttributes.addFlashAttribute("showBookOutModal", id);
-            return "redirect:" + redirectPath;
+            // Render the originating listing directly so the BindingResult stays
+            // request-scoped (see RedisSessionConfig). The user-side trade-off is that
+            // the filter state from the referer URL is dropped — acceptable for a rare
+            // validation error path; the modal re-opens with the input + field errors.
+            model.addAttribute("errorToast", "error.validation.failed");
+            model.addAttribute("showBookOutModal", id);
+            if (fromAdminListing) {
+                return viewAllInventory(null, null, null, null, false, model);
+            }
+            return viewMyInventory(null, null, null, null, false, model);
         }
 
         try {

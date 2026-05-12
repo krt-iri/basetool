@@ -139,13 +139,16 @@ public class HangarPageController {
     }
 
     @PostMapping("/add")
-    public String addShip(@Valid @ModelAttribute("shipForm") ShipForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String addShip(@Valid @ModelAttribute("shipForm") ShipForm form,
+                          BindingResult bindingResult,
+                          Model model,
+                          RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.shipForm", bindingResult);
-            redirectAttributes.addFlashAttribute("shipForm", form);
-            redirectAttributes.addFlashAttribute("showShipModal", true);
-            redirectAttributes.addFlashAttribute("modalAction", "/hangar/add");
-            return "redirect:/hangar";
+            // Render directly; the BindingResult stays request-scoped so it never goes
+            // through a Redis-serialised FlashMap (see RedisSessionConfig).
+            model.addAttribute("showShipModal", true);
+            model.addAttribute("modalAction", "/hangar/add");
+            return viewHangar(model);
         }
 
         try {
@@ -169,15 +172,17 @@ public class HangarPageController {
     }
 
     @PostMapping("/{id}/update")
-    public String updateShip(@PathVariable @NotNull UUID id, @Valid @ModelAttribute("shipForm") ShipForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+    public String updateShip(@PathVariable @NotNull UUID id,
+                             @Valid @ModelAttribute("shipForm") ShipForm form,
+                             BindingResult bindingResult,
+                             Model model,
+                             RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            log.error("Validation failed");
-            redirectAttributes.addFlashAttribute("errorToast", "error.validation.failed");
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.shipForm", bindingResult);
-            redirectAttributes.addFlashAttribute("shipForm", form);
-            redirectAttributes.addFlashAttribute("showShipModal", true);
-            redirectAttributes.addFlashAttribute("modalAction", "/hangar/" + id + "/update");
-            return "redirect:/hangar";
+            log.warn("Validation failed for ship update {}", id);
+            model.addAttribute("errorToast", "error.validation.failed");
+            model.addAttribute("showShipModal", true);
+            model.addAttribute("modalAction", "/hangar/" + id + "/update");
+            return viewHangar(model);
         }
 
         try {

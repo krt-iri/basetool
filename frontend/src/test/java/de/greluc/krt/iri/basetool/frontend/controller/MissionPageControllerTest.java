@@ -65,7 +65,7 @@ class MissionPageControllerTest {
         when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
         // Act
-        String view = controller.addParticipant(id, new ParticipantForm(null, "Guest", null, null, "Comment", null, null, null, null, null), mock(BindingResult.class), mock(RedirectAttributes.class), null);
+        String view = controller.addParticipant(id, new ParticipantForm(null, "Guest", null, null, "Comment", null, null, null, null, null), mock(BindingResult.class), new ConcurrentModel(), mock(RedirectAttributes.class), null);
 
         // Assert
         assertEquals("redirect:/missions/" + id, view);
@@ -88,7 +88,7 @@ class MissionPageControllerTest {
 
         String view = controller.addParticipant(id,
                 new ParticipantForm(null, "Shared Alias", null, null, "Comment", null, null, null, null, null),
-                mock(BindingResult.class), redirectAttributes, null);
+                mock(BindingResult.class), new ConcurrentModel(), redirectAttributes, null);
 
         assertEquals("redirect:/missions/" + id, view);
         verify(redirectAttributes).addFlashAttribute("errorToast", "error.mission.participant.ambiguous");
@@ -107,7 +107,7 @@ class MissionPageControllerTest {
         when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
 
         // Act
-        String view = controller.addParticipant(id, new ParticipantForm(userId, null, null, null, "Comment", null, null, null, null, null), mock(BindingResult.class), mock(RedirectAttributes.class), user);
+        String view = controller.addParticipant(id, new ParticipantForm(userId, null, null, null, "Comment", null, null, null, null, null), mock(BindingResult.class), new ConcurrentModel(), mock(RedirectAttributes.class), user);
 
         // Assert
         assertEquals("redirect:/missions/" + id, view);
@@ -162,7 +162,7 @@ class MissionPageControllerTest {
         when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
 
         // Act
-        String view = controller.updateParticipant(id, participantId, new ParticipantForm(null, null, UUID.randomUUID(), null, "New Comment", null, null, null, null, null), mock(BindingResult.class), mock(RedirectAttributes.class), user);
+        String view = controller.updateParticipant(id, participantId, new ParticipantForm(null, null, UUID.randomUUID(), null, "New Comment", null, null, null, null, null), mock(BindingResult.class), new ConcurrentModel(), mock(RedirectAttributes.class), user);
 
         // Assert
         assertEquals("redirect:/missions/" + id, view);
@@ -180,7 +180,7 @@ class MissionPageControllerTest {
         when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
         // Act
-        String view = controller.updateParticipant(id, participantId, new ParticipantForm(null, null, UUID.randomUUID(), null, "New Comment", null, null, null, null, null), mock(BindingResult.class), mock(RedirectAttributes.class), null);
+        String view = controller.updateParticipant(id, participantId, new ParticipantForm(null, null, UUID.randomUUID(), null, "New Comment", null, null, null, null, null), mock(BindingResult.class), new ConcurrentModel(), mock(RedirectAttributes.class), null);
 
         // Assert
         assertEquals("redirect:/missions/" + id, view);
