@@ -298,7 +298,7 @@ public class RefineryOrderService {
             String incomingNote = normalizeNote(itemDto.note());
 
             if (existingItemOpt.isPresent()) {
-                InventoryItem existingItem = existingItemOpt.get();
+                InventoryItem existingItem = existingItemOpt.orElseThrow();
                 existingItem.setAmount(existingItem.getAmount() + itemDto.amount());
                 if (incomingNote != null) {
                     String existingNote = existingItem.getNote();

@@ -36,7 +36,9 @@ public class ValidQuantityAmountValidator implements ConstraintValidator<ValidQu
             return true; // Let other validations handle missing material
         }
 
-        Material material = materialOpt.get();
+        // The isEmpty()/early-return guard above already excludes the empty case;
+        // orElseThrow makes that contract explicit (and silences SpotBugs).
+        Material material = materialOpt.orElseThrow();
         if (material.getQuantityType() == QuantityType.PIECE) {
             if (dto.amount() % 1 != 0) {
                 context.disableDefaultConstraintViolation();

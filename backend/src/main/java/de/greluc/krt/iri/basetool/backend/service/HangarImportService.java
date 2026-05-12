@@ -115,7 +115,10 @@ public class HangarImportService {
                 continue;
             }
 
-            ShipType shipType = shipTypeOpt.get();
+            // The isEmpty()/continue guard above already excludes the empty case, but
+            // orElseThrow makes that contract explicit to the reader (and silences the
+            // "Optional.get() without isPresent" warning from SpotBugs / SonarLint).
+            ShipType shipType = shipTypeOpt.orElseThrow();
             jsonCountByType.merge(shipType, 1, Integer::sum);
             firstEntryByTypeId.putIfAbsent(shipType.getId(), entry);
         }

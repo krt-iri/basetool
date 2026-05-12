@@ -127,13 +127,9 @@ public class MissionSecurityService {
             return true;
         }
 
-        Optional<Mission> missionOpt = missionRepository.findById(missionId);
-        if (missionOpt.isEmpty()) {
-            return false;
-        }
-
-        Mission mission = missionOpt.get();
-        return isOwnerOrManager(mission, authentication);
+        return missionRepository.findById(missionId)
+                .map(mission -> isOwnerOrManager(mission, authentication))
+                .orElse(false);
     }
 
     @Transactional(readOnly = true)
@@ -159,15 +155,17 @@ public class MissionSecurityService {
             return true;
         }
 
-        Optional<Mission> missionOpt = missionRepository.findById(missionId);
-        if (missionOpt.isEmpty()) {
-            log.warn("[DEBUG_LOG] Mission {} not found for canManageManagers check", missionId);
-            return false;
-        }
-
-        boolean result = isOwnerOrManager(missionOpt.get(), authentication);
-        log.info("[DEBUG_LOG] Access check for user {} on mission {} (owner/manager): {}", authentication.getName(), missionId, result);
-        return result;
+        return missionRepository.findById(missionId)
+                .map(mission -> {
+                    boolean result = isOwnerOrManager(mission, authentication);
+                    log.info("[DEBUG_LOG] Access check for user {} on mission {} (owner/manager): {}",
+                            authentication.getName(), missionId, result);
+                    return result;
+                })
+                .orElseGet(() -> {
+                    log.warn("[DEBUG_LOG] Mission {} not found for canManageManagers check", missionId);
+                    return false;
+                });
     }
 
     /**
@@ -197,17 +195,14 @@ public class MissionSecurityService {
             return true;
         }
 
-        Optional<Mission> missionOpt = missionRepository.findById(missionId);
-        if (missionOpt.isEmpty()) {
-            return false;
-        }
-        Mission mission = missionOpt.get();
-        if (mission.getOwner() == null) {
-            return false;
-        }
-
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
-        return userId != null && mission.getOwner().getId().equals(userId);
+        if (userId == null) {
+            return false;
+        }
+        return missionRepository.findById(missionId)
+                .map(Mission::getOwner)
+                .map(owner -> owner.getId().equals(userId))
+                .orElse(false);
     }
 
     public boolean isOwnerOrManager(Mission mission, Authentication authentication) {

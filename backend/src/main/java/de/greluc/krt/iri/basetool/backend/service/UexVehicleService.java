@@ -59,7 +59,7 @@ public class UexVehicleService {
         if (StringUtils.hasText(dto.companyName())) {
             Optional<Manufacturer> manOpt = manufacturerRepository.findByNameIgnoreCase(dto.companyName());
             if (manOpt.isPresent()) {
-                manufacturer = manOpt.get();
+                manufacturer = manOpt.orElseThrow();
             } else {
                 log.debug("Manufacturer '{}' not found for vehicle '{}'", dto.companyName(), dto.name());
             }
@@ -68,7 +68,7 @@ public class UexVehicleService {
         Optional<ShipType> existingOpt = shipTypeRepository.findByNameIgnoreCase(dto.name());
 
         if (existingOpt.isPresent()) {
-            ShipType existing = existingOpt.get();
+            ShipType existing = existingOpt.orElseThrow();
             updateShipType(existing, dto, manufacturer);
             shipTypeRepository.save(existing);
             return false;

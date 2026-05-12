@@ -232,7 +232,7 @@ public class InventoryItemService {
         java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
 
         if (existingItemOpt.isPresent()) {
-            InventoryItem existingItem = existingItemOpt.get();
+            InventoryItem existingItem = existingItemOpt.orElseThrow();
             existingItem.setAmount(roundAmount(existingItem.getAmount() + dto.amount()));
             return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
         }
@@ -314,7 +314,7 @@ public class InventoryItemService {
                 .findFirst();
 
         if (existingItemOpt.isPresent()) {
-            InventoryItem existingItem = existingItemOpt.get();
+            InventoryItem existingItem = existingItemOpt.orElseThrow();
             existingItem.setAmount(roundAmount(existingItem.getAmount() + item.getAmount()));
             inventoryItemRepository.delete(item);
             return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
