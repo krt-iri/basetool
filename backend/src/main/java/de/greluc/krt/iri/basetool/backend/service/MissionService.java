@@ -293,7 +293,7 @@ public class MissionService {
         if (effectiveUserId == null && effectiveGuestName != null && !effectiveGuestName.isBlank()) {
             Optional<User> matchedUser = userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(effectiveGuestName.trim(), effectiveGuestName.trim());
             if (matchedUser.isPresent()) {
-                effectiveUserId = matchedUser.get().getId();
+                effectiveUserId = matchedUser.orElseThrow().getId();
                 effectiveGuestName = null;
             }
         }
@@ -763,7 +763,7 @@ public class MissionService {
             .findFirst();
 
         if (existingOpt.isPresent()) {
-            MissionFrequency existing = existingOpt.get();
+            MissionFrequency existing = existingOpt.orElseThrow();
             existing.setValue(value);
             missionFrequencyRepository.save(existing);
         } else {

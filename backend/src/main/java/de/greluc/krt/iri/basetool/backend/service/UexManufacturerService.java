@@ -57,7 +57,7 @@ public class UexManufacturerService {
         Optional<Manufacturer> existingOpt = manufacturerRepository.findByNameIgnoreCase(dto.name());
 
         if (existingOpt.isPresent()) {
-            Manufacturer existing = existingOpt.get();
+            Manufacturer existing = existingOpt.orElseThrow();
             updateManufacturer(existing, dto);
             manufacturerRepository.save(existing);
             return false;

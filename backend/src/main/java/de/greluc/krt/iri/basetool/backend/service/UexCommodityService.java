@@ -124,7 +124,7 @@ public class UexCommodityService {
         if (terminalOpt.isEmpty()) {
             return;
         }
-        Terminal terminal = terminalOpt.get();
+        Terminal terminal = terminalOpt.orElseThrow();
 
         Optional<MaterialPrice> priceOpt = materialPriceRepository.findByMaterialIdAndTerminalId(material.getId(), terminal.getId());
         MaterialPrice price = priceOpt.orElseGet(() -> {

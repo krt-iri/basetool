@@ -26,16 +26,13 @@ public class AnnouncementService {
     }
 
     public Announcement getAdminAnnouncement() {
-        // Try to find the latest active one first to avoid creating duplicates or editing old hidden ones if a newer one exists
-        Optional<Announcement> active = getPublicAnnouncement();
-        if (active.isPresent()) {
-            return active.get();
-        }
-
-        // If no active one, try to find ANY latest entry to reuse (even if content is empty/null)
-        return announcementRepository.findAll().stream()
-                .max(Comparator.comparing(Announcement::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
-                .orElseGet(() -> announcementRepository.save(new Announcement()));
+        // Try the latest active announcement first; fall back to the latest entry
+        // overall (even if its content is empty/null) so admins reuse the existing
+        // row instead of accumulating duplicates. As a last resort create one.
+        return getPublicAnnouncement()
+                .orElseGet(() -> announcementRepository.findAll().stream()
+                        .max(Comparator.comparing(Announcement::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                        .orElseGet(() -> announcementRepository.save(new Announcement())));
     }
 
     @Transactional
