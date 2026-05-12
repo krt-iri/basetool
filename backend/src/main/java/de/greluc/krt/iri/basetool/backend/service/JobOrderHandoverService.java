@@ -29,6 +29,15 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Slf4j
 public class JobOrderHandoverService {
 
+    /**
+     * Tolerance used when comparing handover / inventory quantities that are stored as
+     * {@code double}. Quantities are user-edited and rounded to the displayed precision
+     * (three decimals) on the way in, so any residual below 1e-4 is floating-point noise
+     * rather than a real surplus / deficit. Picked an order of magnitude below the smallest
+     * representable user quantity to keep the rounding-safe comparison cheap.
+     */
+    private static final double QUANTITY_EPSILON = 1e-4;
+
     private final JobOrderRepository jobOrderRepository;
     private final JobOrderHandoverRepository jobOrderHandoverRepository;
     private final InventoryItemRepository inventoryItemRepository;
@@ -101,7 +110,7 @@ public class JobOrderHandoverService {
                 throw new BadRequestException("Inventory item does not belong to this JobOrder");
             }
 
-            if (itemDto.amount() > inventoryItem.getAmount() + 0.0001) {
+            if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
                 throw new BadRequestException("Cannot hand over more than the available amount");
             }
             QuantityType quantityType = inventoryItem.getMaterial() != null
@@ -121,7 +130,7 @@ public class JobOrderHandoverService {
 
             handover.addItem(handoverItem);
 
-            if (remainingAmount <= 0.0001) {
+            if (remainingAmount <= QUANTITY_EPSILON) {
                 inventoryItemRepository.delete(inventoryItem);
             } else {
                 inventoryItem.setAmount(remainingAmount);
@@ -139,7 +148,7 @@ public class JobOrderHandoverService {
                     .ifPresent(mat -> {
                         double newAmount = mat.getAmount() - itemDto.amount();
                         mat.setAmount(Math.max(0.0, newAmount));
-                        if (mat.getAmount() <= 0.0001) {
+                        if (mat.getAmount() <= QUANTITY_EPSILON) {
                             materialsToUnlink.add(mat.getMaterial().getId());
                         }
                     });
@@ -169,7 +178,7 @@ public class JobOrderHandoverService {
                 .orElseThrow(() -> new NotFoundException("JobOrder not found"));
 
         boolean allFulfilled = managedJobOrder.getMaterials().stream()
-                .allMatch(mat -> mat.getAmount() <= 0.0001);
+                .allMatch(mat -> mat.getAmount() <= QUANTITY_EPSILON);
 
         if (allFulfilled) {
             // Use the dedicated WithinTransaction method that works on the already-managed entity

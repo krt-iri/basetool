@@ -33,6 +33,16 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Slf4j
 public class JobOrderService {
 
+    /**
+     * Default minimum quality assigned to every {@link de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial}
+     * when a job order is created or updated without an explicit minimum on the wire.
+     * 750 is the conventional refining-grade floor used across the squadron's existing
+     * orders; it is hard-coded for now so the value lives in code review rather than in
+     * a database row that can drift silently. If the squadron starts adjusting this per
+     * order, promote it to a {@code SystemSetting} entry.
+     */
+    private static final int MIN_QUALITY_DEFAULT = 750;
+
     private final JobOrderRepository jobOrderRepository;
     private final MaterialRepository materialRepository;
     private final InventoryItemRepository inventoryItemRepository;
@@ -57,7 +67,7 @@ public class JobOrderService {
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
-                    .minQuality(750)
+                    .minQuality(MIN_QUALITY_DEFAULT)
                     .amount(matDto.amount())
                     .build();
 
@@ -241,7 +251,7 @@ public class JobOrderService {
 
             JobOrderMaterial jobOrderMaterial = JobOrderMaterial.builder()
                     .material(material)
-                    .minQuality(750)
+                    .minQuality(MIN_QUALITY_DEFAULT)
                     .amount(matDto.amount())
                     .build();
 

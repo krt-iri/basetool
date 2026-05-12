@@ -39,6 +39,15 @@ import org.springframework.security.access.AccessDeniedException;
 @RequiredArgsConstructor
 public class InventoryItemService {
 
+    /**
+     * Tolerance used when comparing inventory amounts that are stored as {@code double}.
+     * Mirrors {@code JobOrderHandoverService.QUANTITY_EPSILON} — both services compare the
+     * same quantity column on {@link de.greluc.krt.iri.basetool.backend.model.InventoryItem}
+     * so they need the same rounding-safe threshold. Anything below 1e-4 is floating-point
+     * noise (quantities are user-edited at three decimals max), not a real residual.
+     */
+    private static final double QUANTITY_EPSILON = 1e-4;
+
     private final InventoryItemRepository inventoryItemRepository;
     private final UserRepository userRepository;
     private final MaterialRepository materialRepository;
@@ -413,7 +422,7 @@ public class InventoryItemService {
             newItem.setJobOrder(item.getJobOrder());
             newItem.setMission(item.getMission());
             InventoryItem savedNew = inventoryItemRepository.save(newItem);
-            if (remainingAmount <= 0.0001) {
+            if (remainingAmount <= QUANTITY_EPSILON) {
                 inventoryItemRepository.delete(item);
             } else {
                 item.setAmount(remainingAmount);
@@ -433,7 +442,7 @@ public class InventoryItemService {
             missionFinanceEntryRepository.save(entry);
         }
 
-        if (remainingAmount <= 0.0001) { // Floating point precision safety
+        if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
             inventoryItemRepository.delete(item);
             return null;
         } else {
