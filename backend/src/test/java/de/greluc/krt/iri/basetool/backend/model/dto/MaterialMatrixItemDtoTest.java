@@ -15,6 +15,6 @@ public class MaterialMatrixItemDtoTest {
             true, true, true
         );
         ObjectMapper mapper = new ObjectMapper();
-        System.out.println("[DEBUG_LOG] " + mapper.writeValueAsString(dto));
+        mapper.writeValueAsString(dto);
     }
 }

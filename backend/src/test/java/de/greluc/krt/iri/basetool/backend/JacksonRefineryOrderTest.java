@@ -31,14 +31,7 @@ public class JacksonRefineryOrderTest {
         orderDto.put("goods", goodsDto);
         
         String json = mapper.writeValueAsString(orderDto);
-        System.out.println("[DEBUG_LOG] JSON: " + json);
-        
-        try {
-            RefineryOrder order = mapper.readValue(json, RefineryOrder.class);
-            System.out.println("[DEBUG_LOG] Success!");
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
+
+        RefineryOrder order = mapper.readValue(json, RefineryOrder.class);
     }
 }

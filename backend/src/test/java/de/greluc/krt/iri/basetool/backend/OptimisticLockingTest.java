@@ -32,8 +32,7 @@ public class OptimisticLockingTest {
             UUID shipId = ship.getId();
             UUID userId = ship.getOwner().getId();
             Long version = ship.getVersion();
-            System.out.println("[DEBUG_LOG] Ship version from DB: " + version);
-            
+
             ShipRequestDto dto = new ShipRequestDto(
                 "New Name",
                 ship.getShipType().getId(),
@@ -45,8 +44,6 @@ public class OptimisticLockingTest {
             
             Ship updated = hangarService.updateShip(userId, shipId, dto);
             assertNotNull(updated);
-        } else {
-            System.out.println("[DEBUG_LOG] No ships found in DB to test");
         }
     }
 }

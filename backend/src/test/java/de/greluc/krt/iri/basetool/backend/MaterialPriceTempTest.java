@@ -17,12 +17,6 @@ public class MaterialPriceTempTest {
 
     @Test
     public void testFindPrices() {
-        try {
-            repository.findPricesByMaterialId(UUID.randomUUID(), PageRequest.of(0, 1000, Sort.by("terminal.name").and(Sort.by("id"))));
-            System.out.println("TEST SUCCESS: No exception thrown");
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
+        repository.findPricesByMaterialId(UUID.randomUUID(), PageRequest.of(0, 1000, Sort.by("terminal.name").and(Sort.by("id"))));
     }
 }

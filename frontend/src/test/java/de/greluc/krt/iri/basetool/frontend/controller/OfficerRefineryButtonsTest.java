@@ -76,8 +76,6 @@ class OfficerRefineryButtonsTest {
         org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser = new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OFFICER")), idToken);
         org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken authToken = new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
 
-        System.out.println("[DEBUG_LOG] Officer Authorities: " + authToken.getAuthorities());
-
         mockMvc.perform(get("/refinery-orders/" + orderId).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authToken)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Einlagern"))); // Should be visible for LOGISTICIAN (Officer)

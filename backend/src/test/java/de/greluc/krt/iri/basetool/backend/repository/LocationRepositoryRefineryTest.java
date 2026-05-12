@@ -62,19 +62,8 @@ public class LocationRepositoryRefineryTest {
 
         locationRepository.flush();
 
-        List<Location> allLocations = locationRepository.findAll();
-        System.out.println("[DEBUG_LOG] All locations count: " + allLocations.size());
-        for (Location l : allLocations) {
-            System.out.println("[DEBUG_LOG] Loc: " + l.getName() + ", city: " + (l.getCity() != null ? l.getCity().getHasRefinery() : "null") + ", ss: " + (l.getSpaceStation() != null ? l.getSpaceStation().getHasRefinery() : "null"));
-        }
-
         List<Location> refineries = locationRepository.findLocationsWithRefinery();
-        
-        System.out.println("[DEBUG_LOG] Refineries found: " + refineries.size());
-        for(Location l : refineries) {
-            System.out.println("[DEBUG_LOG] Refinery: " + l.getName());
-        }
-        
+
         assertTrue(refineries.contains(loc1));
         assertTrue(refineries.contains(loc2));
         assertFalse(refineries.contains(loc3));

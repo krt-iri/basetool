@@ -3,6 +3,8 @@ package de.greluc.krt.iri.basetool.backend;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -24,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @ActiveProfiles("test")
 class OpenApiGeneratorTest {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenApiGeneratorTest.class);
 
     @Autowired
     private WebApplicationContext context;
@@ -59,6 +63,6 @@ class OpenApiGeneratorTest {
         }
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), jsonObject);
         
-        System.out.println("OpenAPI documentation generated at: " + path.toAbsolutePath());
+        log.info("OpenAPI documentation generated at: {}", path.toAbsolutePath());
     }
 }

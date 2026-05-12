@@ -12,13 +12,10 @@ public class JacksonRecordTest {
         MaterialDto dto = new MaterialDto(null, "Test", "RAW", "SCU", "desc", null, null, true, true, true, false, false, 1L);
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writeValueAsString(dto);
-        System.out.println("[DEBUG_LOG] JSON: " + json);
-        
+
         ExpressionParser parser = new SpelExpressionParser();
         Boolean isVolatileQt = parser.parseExpression("isVolatileQt").getValue(dto, Boolean.class);
-        System.out.println("[DEBUG_LOG] SpEL isVolatileQt: " + isVolatileQt);
-        
+
         Boolean isIllegal = parser.parseExpression("isIllegal").getValue(dto, Boolean.class);
-        System.out.println("[DEBUG_LOG] SpEL isIllegal: " + isIllegal);
     }
 }

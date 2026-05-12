@@ -370,18 +370,14 @@ class RefineryOrderTest {
         orderDto.put("goods", goodsDto);
         
         String json = objectMapper.writeValueAsString(orderDto);
-        System.out.println("[DEBUG_LOG] Request JSON: " + json);
-        
+
         org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/refinery-orders")
                 .with(jwt().jwt(builder -> builder.subject(user1.getId().toString())).authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
                 .andReturn();
-                
-        System.out.println("[DEBUG_LOG] Response status: " + result.getResponse().getStatus());
-        System.out.println("[DEBUG_LOG] Response body: " + result.getResponse().getContentAsString());
+
         if (result.getResolvedException() != null) {
-            System.out.println("[DEBUG_LOG] Resolved Exception: " + result.getResolvedException().getMessage());
             result.getResolvedException().printStackTrace();
         }
     }
