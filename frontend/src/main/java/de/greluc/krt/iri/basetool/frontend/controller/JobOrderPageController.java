@@ -169,9 +169,9 @@ public class JobOrderPageController {
 
             if (!model.containsAttribute("handoverForm")) {
                 JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
-                // Vorbelegung der Uhrzeit erfolgt clientseitig im Browser des Nutzers
-                // (siehe orders-detail.html, openHandoverModal), damit die Browser-Zeitzone
-                // des Nutzers (nicht des Servers/Containers) verwendet wird.
+                // The time is pre-filled client-side in the user's browser
+                // (see orders-detail.html, openHandoverModal) so that the user's
+                // browser timezone (not the server/container) is used.
                 handoverForm.setRecipientSquadron(order.squadron());
                 model.addAttribute("handoverForm", handoverForm);
             }

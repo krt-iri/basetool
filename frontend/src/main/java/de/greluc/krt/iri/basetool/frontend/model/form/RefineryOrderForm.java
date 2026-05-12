@@ -21,10 +21,10 @@ public class RefineryOrderForm {
     private Integer durationMinutes = 0;
     @Min(0)
     private Double expenses = 0d;
-    /** Sonstige Kosten zusaetzlich zu expenses. Zahl >= 0, Default 0. Optional - leer/0 wird als null gespeichert. */
+    /** Other costs in addition to expenses. Number >= 0, default 0. Optional - empty/0 is stored as null. */
     @Min(0)
     private Double otherExpenses = 0d;
-    /** Einnahmen durch den Verkauf roher Erze (Ore Sales). Ganzzahl >= 0, Default 0. Optional - leer/0 wird als null gespeichert. */
+    /** Revenue from selling raw ores (Ore Sales). Integer >= 0, default 0. Optional - empty/0 is stored as null. */
     @Min(0)
     private Double oreSales = 0d;
     private UUID ownerId;

@@ -257,7 +257,7 @@ public class UserService {
         }
         if (description != null) user.setDescription(description);
         if (displayName != null) user.setDisplayName(displayName.isBlank() ? null : displayName);
-        // joinDate kann explizit auf null gesetzt werden (Datum löschen)
+        // joinDate can be explicitly set to null (clear the date)
         user.setJoinDate(joinDate);
         return userRepository.save(user);
     }

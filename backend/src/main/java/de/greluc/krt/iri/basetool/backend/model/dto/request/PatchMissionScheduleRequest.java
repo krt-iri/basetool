@@ -5,14 +5,14 @@ import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request DTO fuer ein partielles Update des Zeitplans (Schedule-Section) eines Einsatzes.
+ * Request DTO for a partial update of the schedule section of a mission.
  *
- * <p>Alle Zeitstempel werden in UTC ({@link Instant}) entgegengenommen und gespeichert. Die
- * Anzeige im Frontend erfolgt in der lokalen Zeitzone des Nutzers.
+ * <p>All timestamps are accepted and stored in UTC ({@link Instant}). Display in the
+ * frontend uses the user's local timezone.
  *
- * <p>Das optimistische Locking erfolgt ueber die Parent-Version der {@code Mission}; parallele
- * Aenderungen an Sub-Collections (Teilnehmer, Units, Finanzen) erhoehen die Parent-Version
- * dank {@code @OptimisticLock(excluded = true)} nicht mehr.
+ * <p>Optimistic locking is performed via the parent version of the {@code Mission};
+ * parallel changes to sub-collections (participants, units, finance) no longer bump
+ * the parent version thanks to {@code @OptimisticLock(excluded = true)}.
  */
 public record PatchMissionScheduleRequest(
         @Nullable Instant meetingTime,

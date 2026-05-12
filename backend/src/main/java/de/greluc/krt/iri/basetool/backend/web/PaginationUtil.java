@@ -20,7 +20,7 @@ public final class PaginationUtil {
         int size = sizeParam == null || sizeParam <= 0 ? 50 : Math.min(sizeParam, 100000);
 
         Sort sort = resolveSort(sortParam, allowedSortFields, defaultSortField);
-        // Stabilität sicherstellen: immer sekundär nach id sortieren, falls nicht bereits enthalten
+        // Ensure stability: always add a secondary sort by id if not already included
         if (!containsProperty(sort, "id") && allowedSortFields.contains("id")) {
             sort = sort.and(Sort.by("id"));
         }
@@ -41,7 +41,7 @@ public final class PaginationUtil {
             return Sort.by(defaultField).ascending();
         }
         List<Sort.Order> orders = new ArrayList<>();
-        // Unterstütze mehrere Felder durch Semikolon oder wiederholte Kommas: field,asc;other,desc
+        // Support multiple fields separated by semicolon or repeated commas: field,asc;other,desc
         String[] parts = sortParam.split("[;]");
         for (String part : parts) {
             String[] tokens = part.split(",");

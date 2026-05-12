@@ -134,11 +134,11 @@ public class RefineryOrderService {
             order.setStartedAt(java.time.Instant.now());
         }
 
-        // Geldfelder (expenses, otherExpenses, oreSales) sind optional. Sowohl null als auch 0
-        // werden semantisch als "nicht gesetzt" behandelt und persistiert als null. Damit muss
-        // das Frontend nicht zwischen "leer" und "0" unterscheiden, und die Spalten bleiben in
-        // der DB sauber leer, wenn der Nutzer keinen Wert eingegeben hat. Die Profit-Berechnung
-        // (siehe RefineryOrder#getProfit) behandelt null bereits als 0.
+        // Monetary fields (expenses, otherExpenses, oreSales) are optional. Both null and 0
+        // are treated semantically as "not set" and persisted as null, so the frontend never
+        // has to distinguish between "empty" and "0" and the columns stay cleanly empty in
+        // the DB when the user has not entered a value. The profit calculation
+        // (see RefineryOrder#getProfit) already treats null as 0.
         order.setExpenses(zeroToNull(order.getExpenses()));
         order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
         order.setOreSales(zeroToNull(order.getOreSales()));
@@ -185,7 +185,7 @@ public class RefineryOrderService {
 
         order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : java.time.Instant.now());
         order.setDurationMinutes(details.getDurationMinutes());
-        // Geldfelder: 0 wird wie "nicht gesetzt" behandelt und als null persistiert (siehe createRefineryOrder).
+        // Money fields: 0 is treated as "not set" and persisted as null (see createRefineryOrder).
         order.setExpenses(zeroToNull(details.getExpenses()));
         order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
         order.setOreSales(zeroToNull(details.getOreSales()));
@@ -290,11 +290,10 @@ public class RefineryOrderService {
 
             java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
 
-            // Warum: Die vom Nutzer im Einlagern-Dialog eingegebene Menge ist die
-            // autoritative Menge (sie ueberschreibt die urspruenglich berechnete
-            // Ausgangsmenge des Raffinerieauftrags). Die Notiz wird optional an das
-            // resultierende InventoryItem durchgereicht, damit der Nutzer Anmerkungen
-            // zur Einlagerung direkt an das Lagergut binden kann.
+            // Why: The amount the user enters in the store dialog is the authoritative
+            // amount (it overrides the originally calculated output amount of the refinery
+            // order). The note is optionally propagated to the resulting InventoryItem so
+            // the user can attach storage remarks directly to the inventory item.
             String incomingNote = normalizeNote(itemDto.note());
 
             if (existingItemOpt.isPresent()) {
@@ -305,8 +304,8 @@ public class RefineryOrderService {
                     if (existingNote == null || existingNote.isBlank()) {
                         existingItem.setNote(incomingNote);
                     } else if (!existingNote.contains(incomingNote)) {
-                        // Bestehende Notiz beibehalten und neue anhaengen, damit keine
-                        // Information verloren geht.
+                        // Keep the existing note and append the new one so that no
+                        // information is lost.
                         String combined = existingNote + "\n" + incomingNote;
                         if (combined.length() > 1000) {
                             combined = combined.substring(0, 1000);
@@ -329,10 +328,10 @@ public class RefineryOrderService {
                 inventoryItemRepository.save(item);
             }
 
-            // Angepasste Menge zurueck in den Raffinerieauftrag schreiben, damit die
-            // tatsaechlich eingelagerte Ausgangsmenge auch dort dokumentiert ist.
-            // Match ueber das Output-Material; bei mehreren gleichen Goods wird der
-            // erste noch nicht aktualisierte Eintrag genommen.
+            // Write the adjusted amount back into the refinery order so that the
+            // actually stored output amount is documented there as well.
+            // Match by output material; if multiple identical goods exist, the
+            // first not-yet-updated entry is taken.
             updateGoodOutputQuantity(order, itemDto);
         }
 
@@ -347,12 +346,12 @@ public class RefineryOrderService {
     }
 
     /**
-     * Schreibt die vom Nutzer final eingegebene Einlager-Menge zurueck in den
-     * zugehoerigen {@link de.greluc.krt.iri.basetool.backend.model.RefineryGood}.
-     * So wird die manuelle Korrektur der Ausgangsmenge im Raffinerieauftrag selbst
-     * persistiert (z. B. wenn der tatsaechliche Raffinerie-Output von der Prognose
-     * abweicht). Bei SCU-Materialien wird die SCU-Eingabe in Units (x100) zurueck-
-     * konvertiert, damit das Feld {@code outputQuantity} einheitlich in Units gefuehrt bleibt.
+     * Writes the user's final storage amount back into the associated
+     * {@link de.greluc.krt.iri.basetool.backend.model.RefineryGood}.
+     * This persists the manual correction of the output amount in the refinery order
+     * itself (e.g. when the actual refinery output deviates from the forecast). For
+     * SCU materials the SCU input is converted back into units (x100) so the
+     * {@code outputQuantity} field stays uniformly tracked in units.
      */
     private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
         if (order.getGoods() == null || itemDto == null || itemDto.materialId() == null || itemDto.amount() == null) {
@@ -372,7 +371,7 @@ public class RefineryOrderService {
             } else {
                 rawNew = Math.round(amount);
             }
-            // @Min(1) auf outputQuantity respektieren: 0 waere ein invalider Wert.
+            // Respect @Min(1) on outputQuantity: 0 would be an invalid value.
             int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
             good.setOutputQuantity(clamped);
             return;

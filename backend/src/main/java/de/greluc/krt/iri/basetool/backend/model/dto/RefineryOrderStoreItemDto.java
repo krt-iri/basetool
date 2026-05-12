@@ -10,16 +10,16 @@ import de.greluc.krt.iri.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.iri.basetool.backend.validation.ValidQuantityAmount;
 
 /**
- * Request-DTO fuer einen einzelnen Eintrag im Einlagern-Dialog eines Raffinerieauftrags.
+ * Request DTO for a single entry in the store dialog of a refinery order.
  *
- * <p>Die Menge ({@code amount}) wird beim Einlagern vom Nutzer final festgelegt und
- * ueberschreibt die vom Raffinerieauftrag urspruenglich berechnete Ausgangsmenge
- * (siehe {@code RefineryOrderService#storeRefineryOrder}). Die Validierung der Menge
- * (Dezimalzahl, &gt;= 0, max. 3 Nachkommastellen) ist projektweit einheitlich ueber
- * {@link ValidQuantityAmount} / {@link QuantityAware} abgebildet.
+ * <p>The amount ({@code amount}) is finally set by the user when storing and overrides
+ * the output amount originally calculated by the refinery order (see
+ * {@code RefineryOrderService#storeRefineryOrder}). Amount validation (decimal number,
+ * &gt;= 0, max. 3 decimal places) is uniformly applied across the project via
+ * {@link ValidQuantityAmount} / {@link QuantityAware}.
  *
- * <p>Die optionale {@code note} wird direkt an das resultierende {@code InventoryItem}
- * uebernommen und ermoeglicht dem Nutzer, schon beim Einlagern Anmerkungen zu hinterlegen.
+ * <p>The optional {@code note} is propagated directly to the resulting {@code InventoryItem}
+ * and lets the user attach remarks already at the time of storage.
  */
 @ValidQuantityAmount
 public record RefineryOrderStoreItemDto(

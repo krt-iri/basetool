@@ -501,14 +501,14 @@ public class MissionPageController {
     }
 
     /**
-     * Setzt die tatsächliche Start- oder Endzeit eines Einsatzes auf den übergebenen UTC-Zeitpunkt
-     * und speichert sofort. Der Client sendet die aktuelle {@code version} aus dem DOM; dadurch
-     * greift das Optimistic Locking im Backend und liefert bei parallelen Änderungen HTTP 409.
+     * Sets the actual start or end time of a mission to the supplied UTC instant and saves
+     * immediately. The client sends the current {@code version} from the DOM; this engages
+     * optimistic locking in the backend, which returns HTTP 409 on concurrent changes.
      *
-     * <p>Warum dieser dedizierte Endpoint? Der normale Mission-Update läuft über ein Form-Submit
-     * mit Full-Page-Reload, was beim Klick auf "Jetzt" unerwünscht ist. Der Endpoint lädt daher
-     * die Mission vom Backend, überschreibt gezielt das angeforderte Zeitfeld und leitet die
-     * Version des Clients weiter, damit Lost-Updates verhindert werden (siehe AGENTS.md:
+     * <p>Why this dedicated endpoint? The regular mission update goes through a form submit
+     * with full-page reload, which is undesired when clicking "Now". This endpoint therefore
+     * fetches the mission from the backend, overwrites only the requested time field and
+     * forwards the client's version so that lost updates are prevented (see AGENTS.md:
      * CRITICAL JUNIE RULE - CONCURRENCY AND OPTIMISTIC LOCKING).</p>
      */
     @PostMapping("/{id}/actual-time")
@@ -546,7 +546,7 @@ public class MissionPageController {
                     null, null, null, null, null, null,
                     current.operation(),
                     null, null, null, null,
-                    request.version(), // Optimistic-Lock-Version aus dem DOM
+                    request.version(), // Optimistic-lock version from the DOM
                     current.checkedInParticipants(),
                     current.registeredParticipants()
             );
