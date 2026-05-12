@@ -251,4 +251,143 @@ class MissionSecurityServiceTest {
 
         assertFalse(missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
     }
+
+    // ---------------------------------------------------------------------
+    // canChangeOwner — tighter than canManageManagers: only the current owner
+    // or ROLE_ADMIN / ROLE_OFFICER may transfer mission ownership. Regular
+    // co-managers and MISSION_MANAGER role holders MUST NOT be permitted to
+    // displace the owner. Each branch below maps to a documented invariant
+    // in the production Javadoc (MissionSecurityService.java:172-179).
+    // ---------------------------------------------------------------------
+
+    @Test
+    void canChangeOwner_NullAuthentication_ShouldReturnFalse() {
+        assertFalse(missionSecurityService.canChangeOwner(missionId, null));
+    }
+
+    @Test
+    void canChangeOwner_NotAuthenticated_ShouldReturnFalse() {
+        when(authentication.isAuthenticated()).thenReturn(false);
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_AnonymousPrincipal_ShouldReturnFalse() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("anonymousUser");
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_AdminRole_ShouldReturnTrue() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+        assertTrue(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_OfficerRole_ShouldReturnTrue() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
+
+        assertTrue(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_MissionManagerRole_ShouldReturnFalse() {
+        // CRITICAL invariant: MISSION_MANAGER must NOT be permitted to change
+        // ownership — that would let a co-manager grab any mission they
+        // already manage.
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+        // user is NOT the owner.
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_CoManagerWithoutOfficerRole_ShouldReturnFalse() {
+        // Same invariant from the other direction: a manager added to
+        // mission.managers but with only ROLE_SQUADRON_MEMBER cannot
+        // transfer ownership.
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+        mission.getManagers().add(user); // user is a co-manager
+        // user is NOT the owner
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication),
+                "co-manager status must not grant the right to change ownership");
+    }
+
+    @Test
+    void canChangeOwner_OwnerOnly_ShouldReturnTrue() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+        mission.setOwner(user);
+
+        assertTrue(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_OwnerButGetCurrentUserReturnsEmpty_ShouldReturnFalse() {
+        // Defensive: even with a valid Authentication, if the local user table
+        // doesn't have a matching row (e.g. a freshly-issued JWT before
+        // syncUser ran), refuse the operation rather than silently bypassing
+        // the owner check.
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(userService.getCurrentUser()).thenReturn(Optional.empty());
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
+
+    @Test
+    void canChangeOwner_MissionNotFound_ShouldReturnFalse() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication),
+                "a missing mission must NOT default to true (orElse(false))");
+    }
+
+    @Test
+    void canChangeOwner_NotOwner_ShouldReturnFalse() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
+        when(authentication.getAuthorities())
+                .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+        User differentOwner = new User();
+        differentOwner.setId(UUID.randomUUID());
+        mission.setOwner(differentOwner);
+
+        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+        assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+    }
 }

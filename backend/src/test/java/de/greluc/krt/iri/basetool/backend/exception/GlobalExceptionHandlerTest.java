@@ -383,4 +383,294 @@ class GlobalExceptionHandlerTest {
         assertTrue(!detail.contains("secret internal detail"),
                 "internal exception message must not leak to client");
     }
+
+    // ---------------------------------------------------------------------
+    // EntityInUseException — 409 with i18n-aware detail
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleEntityInUse_messageIsPassedThroughWhenPresent() {
+        ResponseEntity<ProblemDetail> resp = handler.handleEntityInUse(
+                new de.greluc.krt.iri.basetool.backend.exception.EntityInUseException(
+                        "Mission is referenced by 3 inventory items"),
+                request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_ENTITY_IN_USE);
+        assertEquals("Mission is referenced by 3 inventory items", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleEntityInUse_fallsBackToLocalizedDetailWhenMessageBlank() {
+        ResponseEntity<ProblemDetail> resp = handler.handleEntityInUse(
+                new de.greluc.krt.iri.basetool.backend.exception.EntityInUseException(""),
+                request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_ENTITY_IN_USE);
+        assertEquals("The entry cannot be deleted because it is still in use.",
+                resp.getBody().getDetail());
+    }
+
+    // ---------------------------------------------------------------------
+    // BusinessConflictException — 409 with i18n-aware detail
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleBusinessConflict_messageIsPassedThroughWhenPresent() {
+        ResponseEntity<ProblemDetail> resp = handler.handleBusinessConflict(
+                new de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException(
+                        "Mission already completed"),
+                request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_BUSINESS_CONFLICT);
+        assertEquals("Mission already completed", resp.getBody().getDetail());
+    }
+
+    @Test
+    void handleBusinessConflict_fallsBackToLocalizedDetailWhenMessageBlank() {
+        ResponseEntity<ProblemDetail> resp = handler.handleBusinessConflict(
+                new de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException(null),
+                request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_BUSINESS_CONFLICT);
+        assertNotNull(resp.getBody().getDetail());
+    }
+
+    // ---------------------------------------------------------------------
+    // ResponseStatusException — adapt status code, derive `code`
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleResponseStatus_400_mapsToBadRequestCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "missing field");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        assertEquals("missing field", resp.getBody().getTitle());
+    }
+
+    @Test
+    void handleResponseStatus_401_mapsToUnauthenticatedCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, null);
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.UNAUTHORIZED, GlobalExceptionHandler.CODE_UNAUTHENTICATED);
+        // Reason was null -> title falls back to the status reason phrase.
+        assertEquals(HttpStatus.UNAUTHORIZED.getReasonPhrase(), resp.getBody().getTitle());
+    }
+
+    @Test
+    void handleResponseStatus_404_mapsToNotFoundCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "no such mission");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.NOT_FOUND, GlobalExceptionHandler.CODE_NOT_FOUND);
+    }
+
+    @Test
+    void handleResponseStatus_409_mapsToDuplicateEntityCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.CONFLICT, "duplicate");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DUPLICATE_ENTITY);
+    }
+
+    @Test
+    void handleResponseStatus_500_mapsToInternalErrorCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR, "boom");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.INTERNAL_SERVER_ERROR, GlobalExceptionHandler.CODE_INTERNAL_ERROR);
+    }
+
+    @Test
+    void handleResponseStatus_405_mapsToMethodNotAllowedCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.METHOD_NOT_ALLOWED, "GET only");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.METHOD_NOT_ALLOWED, GlobalExceptionHandler.CODE_METHOD_NOT_ALLOWED);
+    }
+
+    @Test
+    void handleResponseStatus_403_mapsToAccessDeniedCode() {
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.FORBIDDEN, null);
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertCommon(resp, HttpStatus.FORBIDDEN, GlobalExceptionHandler.CODE_ACCESS_DENIED);
+    }
+
+    @Test
+    void handleResponseStatus_otherClientError_mapsToBadRequestCode() {
+        // codeForStatus default for 4xx that doesn't have a specific mapping falls
+        // through to BAD_REQUEST; verify with 418 I'm a teapot.
+        org.springframework.web.server.ResponseStatusException ex =
+                new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.I_AM_A_TEAPOT, "tea");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
+
+        assertEquals(HttpStatus.I_AM_A_TEAPOT.value(), resp.getStatusCode().value());
+        assertEquals(GlobalExceptionHandler.CODE_BAD_REQUEST,
+                resp.getBody().getProperties().get("code"));
+    }
+
+    // ---------------------------------------------------------------------
+    // ErrorResponseException — preserves provided body, fills in missing props
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleErrorResponseException_preservesProblemDetailBody() {
+        ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "preset detail");
+        body.setTitle("Preset Title");
+
+        org.springframework.web.ErrorResponseException ex = new org.springframework.web.ErrorResponseException(
+                HttpStatus.BAD_REQUEST, body, null);
+
+        ResponseEntity<ProblemDetail> resp = handler.handleErrorResponseException(ex, request);
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), resp.getStatusCode().value());
+        assertEquals("Preset Title", resp.getBody().getTitle());
+        assertEquals("preset detail", resp.getBody().getDetail());
+        // Handler must fill in code + correlationId if they weren't on the body already.
+        assertNotNull(resp.getBody().getProperties().get("code"));
+        assertNotNull(resp.getBody().getProperties().get("correlationId"));
+        // Instance must be overridden to the request URI.
+        assertEquals(request.getRequestURI(), resp.getBody().getInstance().toString());
+    }
+
+    @Test
+    void handleErrorResponseException_preservesPreExistingCodeAndCorrelationId() {
+        ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "x");
+        body.setProperty("code", "CUSTOM_CODE");
+        body.setProperty("correlationId", "preset-cid");
+
+        org.springframework.web.ErrorResponseException ex = new org.springframework.web.ErrorResponseException(
+                HttpStatus.NOT_FOUND, body, null);
+
+        ResponseEntity<ProblemDetail> resp = handler.handleErrorResponseException(ex, request);
+
+        assertEquals("CUSTOM_CODE", resp.getBody().getProperties().get("code"),
+                "pre-existing code must NOT be overwritten");
+        assertEquals("preset-cid", resp.getBody().getProperties().get("correlationId"),
+                "pre-existing correlationId must NOT be overwritten");
+    }
+
+    // ---------------------------------------------------------------------
+    // HttpMessageNotReadableException — unreadable body / JSON parse error
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleHttpMessageNotReadable_returns400WithGenericDetail() {
+        // The handler must NOT leak the raw exception message to the client.
+        org.springframework.http.converter.HttpMessageNotReadableException ex =
+                new org.springframework.http.converter.HttpMessageNotReadableException(
+                        "broken json with sensitive payload",
+                        new org.springframework.http.HttpInputMessage() {
+                            @Override
+                            public java.io.InputStream getBody() { return java.io.InputStream.nullInputStream(); }
+                            @Override
+                            public org.springframework.http.HttpHeaders getHeaders() {
+                                return new org.springframework.http.HttpHeaders();
+                            }
+                        });
+
+        ResponseEntity<ProblemDetail> resp = handler.handleHttpMessageNotReadable(ex, request);
+
+        assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
+        // The detail must come from the localized bundle, NOT contain the raw message.
+        assertTrue(!resp.getBody().getDetail().contains("sensitive payload"),
+                "raw exception message must NOT leak through the detail");
+    }
+
+    // ---------------------------------------------------------------------
+    // DataIntegrityViolationException — constraint-name regex extraction
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleDataIntegrityViolation_returns409WithGenericDetail() {
+        org.springframework.dao.DataIntegrityViolationException ex =
+                new org.springframework.dao.DataIntegrityViolationException(
+                        "could not execute statement",
+                        new RuntimeException(
+                                "ERROR: insert or update violates foreign key constraint \"fk_mission_owner\"\n  "
+                                        + "Detail: Key (owner_id)=(123) is not present in table \"users\""));
+
+        ResponseEntity<ProblemDetail> resp = handler.handleDataIntegrityViolation(ex, request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DATA_INTEGRITY);
+        // Generic detail; constraint-name extraction lives in the log only, NOT in the response.
+        assertTrue(!resp.getBody().getDetail().contains("fk_mission_owner"),
+                "constraint name must NOT leak through the detail");
+        assertTrue(!resp.getBody().getDetail().contains("(owner_id)=(123)"),
+                "row data from the cause message must NOT leak through the detail");
+    }
+
+    @Test
+    void handleDataIntegrityViolation_handlesNullCauseGracefully() {
+        org.springframework.dao.DataIntegrityViolationException ex =
+                new org.springframework.dao.DataIntegrityViolationException("statement failed");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleDataIntegrityViolation(ex, request);
+
+        assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DATA_INTEGRITY);
+    }
+
+    // ---------------------------------------------------------------------
+    // ExternalServiceException — 502 with generic localized detail
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleExternalService_returns502_andDoesNotLeakUpstreamMessage() {
+        de.greluc.krt.iri.basetool.backend.exception.ExternalServiceException ex =
+                new de.greluc.krt.iri.basetool.backend.exception.ExternalServiceException(
+                        "Keycloak returned 503: <html><body>realm offline</body></html>");
+
+        ResponseEntity<ProblemDetail> resp = handler.handleExternalService(ex, request);
+
+        assertCommon(resp, HttpStatus.BAD_GATEWAY, GlobalExceptionHandler.CODE_EXTERNAL_SERVICE_ERROR);
+        assertTrue(!resp.getBody().getDetail().contains("realm offline"),
+                "raw upstream response must NOT leak through the client-visible detail");
+        // The correlationId in the body must be a real UUID.
+        String cid = (String) resp.getBody().getProperties().get("correlationId");
+        assertNotNull(cid);
+        assertTrue(cid.length() > 0);
+    }
+
+    // ---------------------------------------------------------------------
+    // ReportGenerationException — 500 with generic localized detail
+    // ---------------------------------------------------------------------
+
+    @Test
+    void handleReportGeneration_returns500_andDoesNotLeakLibraryError() {
+        de.greluc.krt.iri.basetool.backend.exception.ReportGenerationException ex =
+                new de.greluc.krt.iri.basetool.backend.exception.ReportGenerationException(
+                        "openpdf: invalid font /usr/share/fonts/missing.ttf", new RuntimeException());
+
+        ResponseEntity<ProblemDetail> resp = handler.handleReportGeneration(ex, request);
+
+        assertCommon(resp, HttpStatus.INTERNAL_SERVER_ERROR,
+                GlobalExceptionHandler.CODE_REPORT_GENERATION_FAILED);
+        assertTrue(!resp.getBody().getDetail().contains("/usr/share/fonts"),
+                "internal file paths must NOT leak through the client-visible detail");
+    }
 }
