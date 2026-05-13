@@ -792,8 +792,8 @@ public class MissionPageController {
              Instant plannedStartTime = (form.plannedStartTime() != null && !form.plannedStartTime().isBlank()) ? parseToInstant(form.plannedStartTime()) : null;
              Instant plannedEndTime = (form.plannedEndTime() != null && !form.plannedEndTime().isBlank()) ? parseToInstant(form.plannedEndTime()) : null;
              
-             OperationDto operation = (form.operationId() != null && !form.operationId().isBlank()) ? 
-                     new OperationDto(UUID.fromString(form.operationId()), null, null, null, null, null, null) : null;
+             OperationDto operation = (form.operationId() != null && !form.operationId().isBlank()) ?
+                     new OperationDto(UUID.fromString(form.operationId()), null, null, null, null) : null;
 
              MissionDto missionDto = new MissionDto(
                      null, // id
@@ -852,8 +852,8 @@ public class MissionPageController {
              Instant actualStartTime = (form.actualStartTime() != null && !form.actualStartTime().isBlank()) ? parseToInstant(form.actualStartTime()) : null;
              Instant actualEndTime = (form.actualEndTime() != null && !form.actualEndTime().isBlank()) ? parseToInstant(form.actualEndTime()) : null;
 
-             OperationDto operation = (form.operationId() != null && !form.operationId().isBlank()) ? 
-                     new OperationDto(UUID.fromString(form.operationId()), null, null, null, null, null, null) : null;
+             OperationDto operation = (form.operationId() != null && !form.operationId().isBlank()) ?
+                     new OperationDto(UUID.fromString(form.operationId()), null, null, null, null) : null;
 
              MissionDto missionDto = new MissionDto(
                      id, // id

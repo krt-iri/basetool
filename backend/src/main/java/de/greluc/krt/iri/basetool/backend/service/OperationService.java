@@ -1,11 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
-import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -23,10 +21,6 @@ import java.util.UUID;
 public class OperationService {
 
     private final OperationRepository operationRepository;
-    private final InventoryItemRepository inventoryItemRepository;
-    private final RefineryOrderRepository refineryOrderRepository;
-    private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
@@ -45,17 +39,22 @@ public class OperationService {
     }
 
     @Transactional
-    public Operation updateOperation(@NotNull UUID id, @NotNull Operation operationDetails) {
+    public Operation updateOperation(@NotNull UUID id, @NotNull OperationUpdateDto updateDto, boolean canOverrideStatus) {
         Operation operation = operationRepository.findById(id)
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
-        if (operationDetails.getVersion() != null && !operation.getVersion().equals(operationDetails.getVersion())) {
+        if (updateDto.version() != null && !operation.getVersion().equals(updateDto.version())) {
             throw new ObjectOptimisticLockingFailureException(Operation.class, id);
         }
 
-        operation.setName(operationDetails.getName());
-        operation.setDescription(operationDetails.getDescription());
-        operation.setStatus(operationDetails.getStatus());
+        if (!canOverrideStatus && !operation.getStatus().canTransitionTo(updateDto.status())) {
+            throw new BadRequestException("Invalid operation status transition: "
+                    + operation.getStatus() + " -> " + updateDto.status());
+        }
+
+        operation.setName(updateDto.name());
+        operation.setDescription(updateDto.description());
+        operation.setStatus(updateDto.status());
 
         return operationRepository.save(operation);
     }
@@ -66,30 +65,26 @@ public class OperationService {
         Operation operation = operationRepository.findById(id)
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
-        java.util.List<UUID> missionIds = operation.getMissions().stream()
-                .map(de.greluc.krt.iri.basetool.backend.model.Mission::getId)
-                .toList();
-
-        if (!missionIds.isEmpty()) {
-            inventoryItemRepository.unlinkMissions(missionIds);
-            refineryOrderRepository.unlinkMissions(missionIds);
-            missionFinanceEntryRepository.deleteByMissionIdIn(missionIds);
-            
-            // Flush changes to avoid constraint violations when deleting missions/operation
-            entityManager.flush();
-            entityManager.clear();
+        // Unlink missions instead of cascading the delete. The mission itself,
+        // its participants, finance entries, inventory items and refinery orders
+        // all stay intact — only the operation_id back-reference is cleared so
+        // the rows can survive as operation-less missions.
+        for (de.greluc.krt.iri.basetool.backend.model.Mission mission : operation.getMissions()) {
+            mission.setOperation(null);
         }
+        operation.getMissions().clear();
 
-        // We must re-fetch the operation because we cleared the entity manager
-        Operation operationToDelete = operationRepository.findById(id)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found after cleanup"));
-        operationRepository.delete(operationToDelete);
+        operationRepository.delete(operation);
         log.info("Successfully deleted operation with ID: {}", id);
     }
 
     @Transactional(readOnly = true)
     public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
-        Operation operation = operationRepository.findById(id)
+        // Use the explicit fetch graph: the loop below touches missions,
+        // participants and the participants' user reference. Without the
+        // graph each level would trigger its own lazy SELECT, costing
+        // 1 + N + (N*M) round-trips for N missions / M participants each.
+        Operation operation = operationRepository.findWithMissionsAndParticipantsById(id)
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
 
         java.util.Map<String, String> participantNames = new java.util.HashMap<>();

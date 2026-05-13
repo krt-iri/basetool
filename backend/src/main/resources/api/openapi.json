@@ -25,6 +25,9 @@
     "name" : "UEX Locations",
     "description" : "Lookup UEX cities and space stations."
   }, {
+    "name" : "Operations",
+    "description" : "Operation aggregate: groups multiple missions under one umbrella and exposes aggregated finance and payout views."
+  }, {
     "name" : "Orders",
     "description" : "Operations related to job orders"
   }, {
@@ -2761,7 +2764,8 @@
     },
     "/api/v1/operations/{id}" : {
       "get" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Get operation by ID",
         "operationId" : "getOperationById",
         "parameters" : [ {
           "name" : "id",
@@ -2774,7 +2778,7 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Operation found.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -2797,6 +2801,26 @@
               }
             }
           },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
           },
@@ -2810,28 +2834,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "403" : {
             "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -2863,7 +2867,9 @@
         }
       },
       "put" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Update an existing operation",
+        "description" : "Requires the current `version` field in the body for optimistic locking. A stale version triggers a 409 Conflict. Status changes are validated against the state machine PLANNED -> {ACTIVE, CANCELED}, ACTIVE -> {COMPLETED, CANCELED}; COMPLETED and CANCELED are terminal. Callers with ROLE_ADMIN bypass that gate.",
         "operationId" : "updateOperation",
         "parameters" : [ {
           "name" : "id",
@@ -2886,7 +2892,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Operation updated.",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2958,7 +2964,9 @@
         }
       },
       "delete" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Delete an operation",
+        "description" : "Unlinks every mission that belongs to the operation (sets `mission.operation` to null) and then deletes the operation. Missions and all their references (participants, finance entries, inventory items, refinery orders) survive intact.",
         "operationId" : "deleteOperation",
         "parameters" : [ {
           "name" : "id",
@@ -2970,18 +2978,8 @@
           }
         } ],
         "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
+          "204" : {
+            "description" : "Operation deleted."
           },
           "401" : {
             "description" : "Unauthorized",
@@ -3005,6 +3003,16 @@
           },
           "404" : {
             "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9735,7 +9743,9 @@
     },
     "/api/v1/operations" : {
       "get" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "List all operations (paginated)",
+        "description" : "Returns operations ordered by `sort` (default `createdAt,desc`). Allowed sort fields: id, name, status, description, createdAt, updatedAt. `id` is appended automatically as a stable tiebreaker.",
         "operationId" : "getAllOperations",
         "parameters" : [ {
           "name" : "page",
@@ -9766,7 +9776,7 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Paginated list of operations.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -9789,9 +9799,6 @@
               }
             }
           },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
           "400" : {
             "description" : "Bad Request",
             "content" : {
@@ -9811,6 +9818,9 @@
                 }
               }
             }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "403" : {
             "description" : "Forbidden",
@@ -9855,7 +9865,8 @@
         }
       },
       "post" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Create a new operation",
         "operationId" : "createOperation",
         "requestBody" : {
           "content" : {
@@ -9869,7 +9880,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Operation created.",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -17349,7 +17360,9 @@
     },
     "/api/v1/operations/{id}/payouts" : {
       "get" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Get participation-time payout breakdown",
+        "description" : "For each participant across all missions of the operation, returns the share (in percent) of valid participation time. A participant who chose DONATE in any mission is treated as DONATE for the whole operation.",
         "operationId" : "getOperationPayouts",
         "parameters" : [ {
           "name" : "id",
@@ -17362,7 +17375,7 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Payout breakdown returned.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -17388,6 +17401,26 @@
               }
             }
           },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
           },
@@ -17401,28 +17434,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "403" : {
             "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17456,7 +17469,9 @@
     },
     "/api/v1/operations/{id}/finances" : {
       "get" : {
-        "tags" : [ "operation-controller" ],
+        "tags" : [ "Operations" ],
+        "summary" : "Get aggregated finances for an operation",
+        "description" : "Sums income, expenses and refinery profit/loss across all missions that belong to the operation. Refinery order profit is calculated as `oreSales - expenses - otherExpenses`; null values are treated as 0.",
         "operationId" : "getOperationFinances",
         "parameters" : [ {
           "name" : "id",
@@ -17469,7 +17484,7 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Finance summary returned.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -17492,6 +17507,26 @@
               }
             }
           },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
           },
@@ -17505,28 +17540,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "403" : {
             "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {

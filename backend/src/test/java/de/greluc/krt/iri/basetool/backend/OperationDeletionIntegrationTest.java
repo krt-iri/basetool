@@ -112,7 +112,7 @@ class OperationDeletionIntegrationTest {
     }
 
     @Test
-    void testDeleteOperationWithReferences() throws Exception {
+    void testDeleteOperationKeepsMissionAndAllItsReferences() throws Exception {
         // Given: InventoryItem linked to Mission
         Material material = new Material();
         material.setName("Test Ore");
@@ -141,12 +141,12 @@ class OperationDeletionIntegrationTest {
         order.setExpenses(100.0);
         order = refineryOrderRepository.save(order);
 
-        // Given: MissionFinanceEntry linked to Mission
+        // Given: MissionParticipant + MissionFinanceEntry linked to Mission
         MissionParticipant participant = new MissionParticipant();
         participant.setMission(mission);
         participant.setUser(adminUser);
         participant = missionParticipantRepository.save(participant);
-        
+
         MissionFinanceEntry financeEntry = new MissionFinanceEntry();
         financeEntry.setMission(mission);
         financeEntry.setParticipant(participant);
@@ -154,25 +154,45 @@ class OperationDeletionIntegrationTest {
         financeEntry.setAmount(new BigDecimal("50.00"));
         financeEntry = missionFinanceEntryRepository.save(financeEntry);
 
+        UUID missionId = mission.getId();
+        UUID itemId = item.getId();
+        UUID orderId = order.getId();
+        UUID financeEntryId = financeEntry.getId();
+        UUID participantId = participant.getId();
+
         // When: Deleting the operation as admin
         mockMvc.perform(delete("/api/v1/operations/" + operation.getId())
                 .with(jwt().jwt(builder -> builder.subject(adminUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isNoContent());
 
-        // Then: Operation and Mission are deleted
+        // Then: Operation is gone
         assertTrue(operationRepository.findById(operation.getId()).isEmpty());
-        assertTrue(missionRepository.findById(mission.getId()).isEmpty());
 
-        // Then: InventoryItem still exists but mission is unlinked
-        InventoryItem updatedItem = inventoryItemRepository.findById(item.getId()).orElseThrow();
-        assertNull(updatedItem.getMission());
+        // Then: Mission survives, only its back-reference to the operation is cleared
+        Mission survivedMission = missionRepository.findById(missionId).orElseThrow();
+        assertNull(survivedMission.getOperation(),
+                "mission must no longer reference the deleted operation");
 
-        // Then: RefineryOrder still exists but mission is unlinked
-        RefineryOrder updatedOrder = refineryOrderRepository.findById(order.getId()).orElseThrow();
-        assertNull(updatedOrder.getMission());
+        // Then: InventoryItem is still linked to the (now operation-less) mission
+        InventoryItem survivedItem = inventoryItemRepository.findById(itemId).orElseThrow();
+        assertNotNull(survivedItem.getMission(),
+                "inventory item must keep its mission link when the operation is deleted");
+        assertEquals(missionId, survivedItem.getMission().getId());
 
-        // Then: MissionFinanceEntry is deleted
-        assertTrue(missionFinanceEntryRepository.findById(financeEntry.getId()).isEmpty());
+        // Then: RefineryOrder is still linked to the mission
+        RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();
+        assertNotNull(survivedOrder.getMission(),
+                "refinery order must keep its mission link when the operation is deleted");
+        assertEquals(missionId, survivedOrder.getMission().getId());
+
+        // Then: MissionFinanceEntry survives and stays linked to the mission
+        MissionFinanceEntry survivedFinance = missionFinanceEntryRepository
+                .findById(financeEntryId).orElseThrow();
+        assertEquals(missionId, survivedFinance.getMission().getId());
+
+        // Then: MissionParticipant survives
+        assertTrue(missionParticipantRepository.findById(participantId).isPresent(),
+                "mission participant must survive the operation delete");
     }
 }
