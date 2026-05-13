@@ -50,7 +50,7 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/refresh-versions
-          base: master
+          base: main
           title: "chore(deps): refreshVersions proposals"
           commit-message: "chore(deps): refreshVersions proposals"
           body: |

@@ -13,7 +13,7 @@ something broke once.
 ## Hard rules
 
 1. **One file per change, `V<n>__<snake_case_description>.sql`.** Pick the next
-   integer; never reuse a number that's already in `master`. Two developers
+   integer; never reuse a number that's already in `main`. Two developers
    racing to `V73` should rebase, not double-pick. Flyway treats the version
    tuple as an immutable identifier — once `V73__foo.sql` has run anywhere
    (a teammate's laptop, CI, staging) the file content **must not** change.
