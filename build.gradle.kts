@@ -5,6 +5,10 @@ plugins {
   // root build script's classpath for the `subprojects { plugins.withId(...) }`
   // configuration block below. Each subproject still applies the plugin itself.
   id("info.solidsoft.pitest") version "1.19.0" apply false
+  // Same `apply false` pattern as pitest: declared here so SpotlessExtension is
+  // on the root build script's classpath for the strongly-typed configuration
+  // below. Each subproject applies the plugin itself.
+  id("com.diffplug.spotless") version "7.0.4" apply false
 }
 
 allprojects {
@@ -173,6 +177,28 @@ subprojects {
       maxWarnings = Int.MAX_VALUE
     }
     tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
+  }
+
+  // Spotless (com.diffplug.spotless). Auto-formats Java sources with
+  // google-java-format — same 2-space indent / 100-char width / Google import
+  // order that `config/checkstyle/google_checks.xml` enforces. Applying
+  // Spotless therefore resolves the bulk of Checkstyle's Indentation,
+  // LineLength, CustomImportOrder, AvoidStarImport, EmptyLineSeparator,
+  // OperatorWrap and WhitespaceAround warnings in a single pass.
+  //
+  // `enforceCheck = false` keeps `./gradlew check` green while the codebase is
+  // still in its pre-reformat state. Run `./gradlew spotlessApply` once to
+  // bulk-format, commit that as an isolated change, then flip `enforceCheck`
+  // back to its default `true` so future style drift is caught by CI.
+  plugins.withId("com.diffplug.spotless") {
+    extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
+      isEnforceCheck = false
+      java {
+        googleJavaFormat()
+        removeUnusedImports()
+        formatAnnotations()
+      }
+    }
   }
 }
 
