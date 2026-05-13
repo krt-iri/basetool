@@ -23,14 +23,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * without pulling the full User aggregate.
    */
   @Query(
-      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY u.displayName")
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username,"
+          + " u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN"
+          + " u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY u.displayName")
   List<UserReferenceDto> findAllReference();
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @NotNull @EntityGraph(attributePaths = {"roles", "roles.permissions"})
+  @NotNull
+  @EntityGraph(attributePaths = {"roles", "roles.permissions"})
   Optional<User> findById(@NotNull UUID id);
 
   /** Derived Spring-Data query - returns entities matching {@code Email}. */

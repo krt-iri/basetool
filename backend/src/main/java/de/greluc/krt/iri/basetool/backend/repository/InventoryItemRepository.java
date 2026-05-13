@@ -55,11 +55,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.personal = false "
-          + "AND (:hasMaterials = false OR i.material.id IN :materialIds) "
-          + "AND (:minQuality IS NULL OR i.quality >= :minQuality) "
-          + "AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds)) "
-          + "AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN :missionIds))")
+      "SELECT i FROM InventoryItem i WHERE i.personal = false AND (:hasMaterials = false OR"
+          + " i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)"
+          + " AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN"
+          + " :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id"
+          + " IN :missionIds))")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -77,11 +77,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.user = :user "
-          + "AND (:hasMaterials = false OR i.material.id IN :materialIds) "
-          + "AND (:minQuality IS NULL OR i.quality >= :minQuality) "
-          + "AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds)) "
-          + "AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN :missionIds))")
+      "SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR"
+          + " i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)"
+          + " AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN"
+          + " :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id"
+          + " IN :missionIds))")
   Page<InventoryItem> findUserByFilters(
       @Param("user") User user,
       @Param("hasMaterials") boolean hasMaterials,
@@ -100,10 +100,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * tuples - the service layer projects them into {@code AggregatedInventoryDto}.
    */
   @Query(
-      "SELECT i.material as material, "
-          + "CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, "
-          + "SUM(i.amount) as amount "
-          + "FROM InventoryItem i WHERE i.personal = false GROUP BY i.material")
+      "SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS"
+          + " double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount"
+          + " FROM InventoryItem i WHERE i.personal = false GROUP BY i.material")
   Page<Object[]> getAggregatedInventory(Pageable pageable);
 
   /**
@@ -116,7 +115,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /** Derived Spring-Data query - returns entities matching {@code JobOrderIdOrdered}. */
   @EntityGraph(attributePaths = {"user", "location", "material"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC")
+      "SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username"
+          + " ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC")
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
@@ -154,7 +154,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
-      "UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND i.material.id = :materialId")
+      "UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND"
+          + " i.material.id = :materialId")
   void unlinkJobOrderMaterial(
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 

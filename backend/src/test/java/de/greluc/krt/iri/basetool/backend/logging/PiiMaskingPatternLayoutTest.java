@@ -70,7 +70,8 @@ class PiiMaskingPatternLayoutTest {
     // Given
     ILoggingEvent event =
         createEvent(
-            "Received JWT eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
+            "Received JWT"
+                + " eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
 
     // When
     String result = layout.doLayout(event);

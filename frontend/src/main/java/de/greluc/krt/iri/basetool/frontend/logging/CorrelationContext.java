@@ -30,7 +30,8 @@ public final class CorrelationContext {
   }
 
   /** Returns the correlation id stored for the current thread, or {@code null} if none set. */
-  @Nullable public static String get() {
+  @Nullable
+  public static String get() {
     return HOLDER.get();
   }
 

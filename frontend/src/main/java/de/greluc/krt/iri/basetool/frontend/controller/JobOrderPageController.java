@@ -599,7 +599,8 @@ public class JobOrderPageController {
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
     log.info(
-        "[DEBUG_LOG] JobOrder: Checking logistician status for user {}. Original authorities: {}. Reachable authorities: {}",
+        "[DEBUG_LOG] JobOrder: Checking logistician status for user {}. Original authorities: {}."
+            + " Reachable authorities: {}",
         principal.getName(),
         authorities,
         reachableAuthorities);

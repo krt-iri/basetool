@@ -198,7 +198,9 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order status",
       description =
-          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all linked inventory items are unlinked atomically. Requires the current version for optimistic locking.")
+          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all"
+              + " linked inventory items are unlinked atomically. Requires the current version for"
+              + " optimistic locking.")
   @io.swagger.v3.oas.annotations.responses.ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
@@ -251,7 +253,8 @@ public class JobOrderController {
   @Operation(
       summary = "Unlink a material from a job order",
       description =
-          "Removes the link between a material and a job order, and unlinks all associated inventory items.")
+          "Removes the link between a material and a job order, and unlinks all associated"
+              + " inventory items.")
   @io.swagger.v3.oas.annotations.responses.ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "204",
@@ -273,7 +276,8 @@ public class JobOrderController {
   @Operation(
       summary = "Unlink a single inventory item from a job order",
       description =
-          "Removes the link between a single inventory item and a job order by setting jobOrderId to null. Uses Hibernate dirty-checking (no bulk update).")
+          "Removes the link between a single inventory item and a job order by setting jobOrderId"
+              + " to null. Uses Hibernate dirty-checking (no bulk update).")
   @io.swagger.v3.oas.annotations.responses.ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "204",

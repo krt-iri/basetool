@@ -20,10 +20,12 @@ public class RateLimitProperties {
   @NotEmpty private List<String> paths = java.util.List.of("/api/**");
 
   /** Bucket capacity (max tokens) */
-  @Min(1) private int capacity = 300;
+  @Min(1)
+  private int capacity = 300;
 
   /** Tokens refilled per period */
-  @Min(1) private int refillTokens = 300;
+  @Min(1)
+  private int refillTokens = 300;
 
   /** Refill period */
   @NotNull private Duration refillPeriod = Duration.ofMinutes(1);

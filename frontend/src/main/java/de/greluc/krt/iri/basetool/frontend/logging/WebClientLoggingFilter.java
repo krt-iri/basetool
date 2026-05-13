@@ -37,7 +37,8 @@ public class WebClientLoggingFilter {
   /**
    * @return filter that adds the correlation id header if one is bound to the current thread.
    */
-  @NotNull public ExchangeFilterFunction correlationIdPropagation() {
+  @NotNull
+  public ExchangeFilterFunction correlationIdPropagation() {
     return (request, next) -> {
       String correlationId = CorrelationContext.get();
       if (correlationId == null || correlationId.isBlank()) {
@@ -55,7 +56,8 @@ public class WebClientLoggingFilter {
    * @return filter that logs one line per call including method/host/path/status/duration. Slow
    *     calls are escalated to WARN.
    */
-  @NotNull public ExchangeFilterFunction callLogging() {
+  @NotNull
+  public ExchangeFilterFunction callLogging() {
     return (request, next) -> {
       final long start = System.nanoTime();
       final String method = request.method().name();

@@ -44,7 +44,9 @@ public class User extends AbstractEntity<UUID> {
   private String lastName;
   private String email;
 
-  @Min(1) @Max(20) @Column(name = "user_rank")
+  @Min(1)
+  @Max(20)
+  @Column(name = "user_rank")
   private Integer rank;
 
   @Column(columnDefinition = "TEXT")
@@ -62,7 +64,8 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "in_keycloak")
   private boolean inKeycloak = true;
 
-  @Nullable @Column(name = "join_date")
+  @Nullable
+  @Column(name = "join_date")
   private LocalDate joinDate;
 
   public String getEffectiveName() {

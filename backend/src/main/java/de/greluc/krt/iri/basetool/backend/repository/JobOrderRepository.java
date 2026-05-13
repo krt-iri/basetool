@@ -48,7 +48,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers.items.material"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId DESC")
+      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId"
+          + " DESC")
   List<JobOrder> findAllActiveWithMaterials();
 
   /**

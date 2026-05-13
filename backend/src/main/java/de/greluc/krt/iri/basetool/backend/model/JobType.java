@@ -38,7 +38,8 @@ public class JobType extends AbstractEntity<UUID> {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
-  @NotNull private JobTypeArchetype archetype;
+  @NotNull
+  private JobTypeArchetype archetype;
 
   @ManyToOne
   @JoinColumn(name = "parent_id")

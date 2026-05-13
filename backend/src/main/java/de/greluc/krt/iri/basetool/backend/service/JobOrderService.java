@@ -456,7 +456,8 @@ public class JobOrderService {
                       inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
                           matDto.material().id(), jobOrder.getId(), matDto.minQuality());
                   log.debug(
-                      "Stock for job order #{} (ID: {}), material {}: {} / required: {} (min quality: {})",
+                      "Stock for job order #{} (ID: {}), material {}: {} / required: {} (min"
+                          + " quality: {})",
                       jobOrder.getDisplayId(),
                       jobOrder.getId(),
                       matDto.material().name(),

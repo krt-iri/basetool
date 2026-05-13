@@ -126,7 +126,8 @@ public class PersonalInventoryController {
     service.deleteOwn(requireSub(auth), id);
   }
 
-  @NotNull private static String requireSub(JwtAuthenticationToken auth) {
+  @NotNull
+  private static String requireSub(JwtAuthenticationToken auth) {
     if (auth == null || auth.getToken() == null) {
       throw new AccessDeniedException("Missing JWT.");
     }
@@ -138,7 +139,8 @@ public class PersonalInventoryController {
     return sub;
   }
 
-  @NotNull static <T> PageResponse<T> toPageResponse(Page<T> page) {
+  @NotNull
+  static <T> PageResponse<T> toPageResponse(Page<T> page) {
     return new PageResponse<>(
         page.getContent(),
         page.getNumber(),

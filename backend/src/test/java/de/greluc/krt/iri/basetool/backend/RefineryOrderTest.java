@@ -547,7 +547,8 @@ class RefineryOrderTest {
     assertEquals(
         42,
         updated.getOutputQuantity().intValue(),
-        "Manuell eingegebene Menge muss zurueck in RefineryGood.outputQuantity geschrieben werden (Units, gerundet)");
+        "Manuell eingegebene Menge muss zurueck in RefineryGood.outputQuantity geschrieben werden"
+            + " (Units, gerundet)");
   }
 
   @Test

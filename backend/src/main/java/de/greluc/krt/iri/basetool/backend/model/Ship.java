@@ -34,7 +34,8 @@ public class Ship extends AbstractEntity<UUID> {
   @JoinColumn(name = "ship_type_id", nullable = false)
   private ShipType shipType;
 
-  @NotBlank(message = "{validation.insurance.required}") @Pattern(
+  @NotBlank(message = "{validation.insurance.required}")
+  @Pattern(
       regexp = "^(0|([1-9]|[1-9][0-9]|1[0-1][0-9]|120)|LTI)$",
       message = "{validation.insurance.pattern}")
   private String insurance;

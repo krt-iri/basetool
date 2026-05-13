@@ -75,7 +75,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * service projects it into the squadron-overview DTO.
    */
   @Query(
-      "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s GROUP BY s.shipType ORDER BY s.shipType.name ASC")
+      "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s"
+          + " GROUP BY s.shipType ORDER BY s.shipType.name ASC")
   Page<Object[]> countShipsByType(Pageable pageable);
 
   /**

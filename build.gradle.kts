@@ -194,9 +194,8 @@ subprojects {
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
       isEnforceCheck = false
       java {
-        googleJavaFormat()
+        googleJavaFormat().reflowLongStrings()
         removeUnusedImports()
-        formatAnnotations()
       }
     }
   }

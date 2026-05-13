@@ -19,9 +19,12 @@ public class MissionFinanceEntryForm {
 
   private String note;
 
-  @NotNull(message = "{finance.validation.type.null}") private FinanceType type;
+  @NotNull(message = "{finance.validation.type.null}")
+  private FinanceType type;
 
-  @NotNull(message = "{finance.validation.amount.null}") @DecimalMin(value = "0.0", message = "{finance.validation.amount.min}") private BigDecimal amount;
+  @NotNull(message = "{finance.validation.amount.null}")
+  @DecimalMin(value = "0.0", message = "{finance.validation.amount.min}")
+  private BigDecimal amount;
 
   private Long version;
 }

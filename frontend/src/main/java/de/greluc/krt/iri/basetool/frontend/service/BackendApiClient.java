@@ -258,7 +258,8 @@ public class BackendApiClient {
           parsed.getFieldErrors());
     } else {
       log.warn(
-          "Backend client error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
+          "Backend client error on {} {}: status={}, code={}, correlationId={}, detail={},"
+              + " fieldErrors={}",
           method,
           uri,
           parsed.getStatusCode(),

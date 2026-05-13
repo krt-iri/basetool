@@ -62,11 +62,11 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"135c","shipname":"","type":"ship"},
-                  {"name":"zeus mk ii mr","shipname":"My Zeus","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"135c","shipname":"","type":"ship"},
+          {"name":"zeus mk ii mr","shipname":"My Zeus","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -104,11 +104,11 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"135c","shipname":"","type":"ship"},
-                  {"name":"unknown alien ship","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"135c","shipname":"","type":"ship"},
+          {"name":"unknown alien ship","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -143,12 +143,12 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -180,12 +180,12 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -217,12 +217,12 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -253,12 +253,12 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -293,13 +293,13 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [
-                  {"name":"vulture","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"},
-                  {"name":"aurora mr","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"vulture","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -336,8 +336,8 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [{"name":"vulture","shipname":"","type":"ship"}]
-                """;
+        [{"name":"vulture","shipname":"","type":"ship"}]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -369,8 +369,8 @@ class HangarImportServiceTest {
 
     String json =
         """
-                [{"name":"890 jump","shipname":"Stella Aeterna","type":"ship"}]
-                """;
+        [{"name":"890 jump","shipname":"Stella Aeterna","type":"ship"}]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -431,8 +431,8 @@ class HangarImportServiceTest {
     UUID userId = UUID.randomUUID();
     String json =
         """
-                [{"name":"135c","shipname":"","type":"ship"}]
-                """;
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.empty());

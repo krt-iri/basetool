@@ -210,7 +210,10 @@ class MissionPageControllerMvcTest {
                 .string(
                     not(
                         containsString(
-                            ".mission-column .col-content .table-responsive {\n            width: 100%;\n            /* Intra-panel horizontal scroll is a last-resort fallback"))));
+                            ".mission-column .col-content .table-responsive {\n"
+                                + "            width: 100%;\n"
+                                + "            /* Intra-panel horizontal scroll is a last-resort"
+                                + " fallback"))));
   }
 
   @Test

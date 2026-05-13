@@ -49,10 +49,13 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @ToString.Exclude
   private Location location;
 
-  @Min(0) @Max(1000) @Column(nullable = false)
+  @Min(0)
+  @Max(1000)
+  @Column(nullable = false)
   private Integer quality;
 
-  @Min(0) @Column(nullable = false)
+  @Min(0)
+  @Column(nullable = false)
   private Double amount; // SCU
 
   @Column(nullable = false)

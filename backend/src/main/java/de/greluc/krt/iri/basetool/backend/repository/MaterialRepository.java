@@ -21,7 +21,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * ordered by name. Used to populate material pickers without pulling the full Material aggregate.
    */
   @Query(
-      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name, m.quantityType) FROM Material m ORDER BY m.name")
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name,"
+          + " m.quantityType) FROM Material m ORDER BY m.name")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
 
   /**
@@ -41,7 +42,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * useful to suppress materials with no buy/sell data in the trade UI.
    */
   @Query(
-      "SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))")
+      "SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m"
+          + " AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))")
   Page<Material> findAllWithPrices(Pageable pageable);
 
   /**
@@ -52,19 +54,19 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    */
   @Query(
       """
-        SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto(
-            m.id, m.name, c.id, c.name, c.version,
-            m.isIllegal, m.isVolatileQt, m.isVolatileTime,
-            MIN(CASE WHEN p.priceBuy > 0 THEN p.priceBuy ELSE null END),
-            MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END)
-        )
-        FROM Material m
-        LEFT JOIN m.category c
-        JOIN MaterialPrice p ON p.material = m
-        WHERE (cast(:name as string) IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')))
-        AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
-        GROUP BY m.id, m.name, c.id, c.name, c.version, m.isIllegal, m.isVolatileQt, m.isVolatileTime
-    """)
+    SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto(
+        m.id, m.name, c.id, c.name, c.version,
+        m.isIllegal, m.isVolatileQt, m.isVolatileTime,
+        MIN(CASE WHEN p.priceBuy > 0 THEN p.priceBuy ELSE null END),
+        MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END)
+    )
+    FROM Material m
+    LEFT JOIN m.category c
+    JOIN MaterialPrice p ON p.material = m
+    WHERE (cast(:name as string) IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')))
+    AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
+    GROUP BY m.id, m.name, c.id, c.name, c.version, m.isIllegal, m.isVolatileQt, m.isVolatileTime
+""")
   Page<MaterialPriceOverviewDto> getMaterialPriceOverview(
       @Param("name") String name, Pageable pageable);
 }

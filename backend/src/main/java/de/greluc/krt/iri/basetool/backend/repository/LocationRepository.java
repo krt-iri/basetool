@@ -19,7 +19,8 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
    * by name. Used to populate location pickers without pulling the full Location aggregate.
    */
   @Query(
-      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto(l.id, l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name")
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto(l.id, l.name)"
+          + " FROM Location l WHERE l.hidden = false ORDER BY l.name")
   List<de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto> findAllReference();
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
@@ -51,6 +52,7 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
    * picker source when the user creates a refinery order.
    */
   @Query(
-      "SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s WHERE c.hasRefinery = true OR s.hasRefinery = true")
+      "SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s WHERE c.hasRefinery ="
+          + " true OR s.hasRefinery = true")
   List<Location> findLocationsWithRefinery();
 }

@@ -71,14 +71,14 @@ class UexClientTest {
             .setHeader("Content-Type", "application/json")
             .setBody(
                 """
-                        {
-                          "status": "ok",
-                          "data": [
-                            {"id": 1, "name": "Gold", "is_illegal": 0},
-                            {"id": 2, "name": "Quantanium", "is_illegal": 1}
-                          ]
-                        }
-                        """));
+                {
+                  "status": "ok",
+                  "data": [
+                    {"id": 1, "name": "Gold", "is_illegal": 0},
+                    {"id": 2, "name": "Quantanium", "is_illegal": 1}
+                  ]
+                }
+                """));
 
     // When
     List<UexCommodityDto> commodities = client.getCommodities();
@@ -145,10 +145,10 @@ class UexClientTest {
     server.enqueue(
         jsonOk(
             """
-                {"status":"ok","data":[
-                  {"id_commodity": 1, "price_buy": 12.5, "price_sell": 15.0}
-                ]}
-                """));
+            {"status":"ok","data":[
+              {"id_commodity": 1, "price_buy": 12.5, "price_sell": 15.0}
+            ]}
+            """));
 
     List<UexCommodityPriceDto> prices = client.getCommoditiesPricesAll();
 
@@ -170,11 +170,11 @@ class UexClientTest {
     server.enqueue(
         jsonOk(
             """
-                {"status":"ok","data":[
-                  {"id": 1, "name": "Stanton"},
-                  {"id": 2, "name": "Pyro"}
-                ]}
-                """));
+            {"status":"ok","data":[
+              {"id": 1, "name": "Stanton"},
+              {"id": 2, "name": "Pyro"}
+            ]}
+            """));
 
     List<UexStarSystemDto> systems = client.getStarSystems();
 

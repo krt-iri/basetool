@@ -56,7 +56,8 @@ public class SmartOidcLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler
       oidcHandler.onLogoutSuccess(request, response, authentication);
     } else {
       log.info(
-          "[Logout] No active OIDC ID token found (session already expired) – skipping Keycloak logout endpoint, redirecting directly to login page.");
+          "[Logout] No active OIDC ID token found (session already expired) – skipping Keycloak"
+              + " logout endpoint, redirecting directly to login page.");
       super.onLogoutSuccess(request, response, authentication);
     }
   }

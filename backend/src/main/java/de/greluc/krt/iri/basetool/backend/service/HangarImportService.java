@@ -157,7 +157,8 @@ public class HangarImportService {
         }
 
         log.info(
-            "Fleetview import: created {} ship(s) of type '{}' for user {} (jsonCount={}, hangarCount={})",
+            "Fleetview import: created {} ship(s) of type '{}' for user {} (jsonCount={},"
+                + " hangarCount={})",
             toCreate,
             shipType.getName(),
             userId,
@@ -166,7 +167,8 @@ public class HangarImportService {
         importedCount += toCreate;
       } else {
         log.debug(
-            "Fleetview import: hangar already has {} ship(s) of type '{}', JSON requests {} — skipping (user {})",
+            "Fleetview import: hangar already has {} ship(s) of type '{}', JSON requests {} —"
+                + " skipping (user {})",
             hangarCount,
             shipType.getName(),
             jsonCount,

@@ -40,7 +40,8 @@ public class AuthHelperService {
    * AnonymousAuthenticationToken}. Callers that explicitly need to inspect the anonymous principal
    * should use {@link #rawAuthentication()}.
    */
-  @NotNull public Optional<Authentication> currentAuthentication() {
+  @NotNull
+  public Optional<Authentication> currentAuthentication() {
     Authentication auth = rawAuthentication();
     if (auth == null || auth instanceof AnonymousAuthenticationToken) {
       return Optional.empty();
@@ -52,7 +53,8 @@ public class AuthHelperService {
    * Returns the current authentication including anonymous tokens. Useful for filter/mapper code
    * that wants to distinguish "no authentication at all" from "anonymous principal".
    */
-  @Nullable public Authentication rawAuthentication() {
+  @Nullable
+  public Authentication rawAuthentication() {
     return SecurityContextHolder.getContext().getAuthentication();
   }
 

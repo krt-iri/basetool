@@ -22,6 +22,11 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
@@ -281,8 +286,7 @@ public class MissionController {
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Create a new mission")
-  public MissionDto createMission(
-      @RequestBody @jakarta.validation.Valid de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
+  public MissionDto createMission(@RequestBody @jakarta.validation.Valid MissionDto mission) {
     return missionMapper.toDto(missionService.createMission(missionMapper.toEntity(mission)));
   }
 
@@ -291,7 +295,7 @@ public class MissionController {
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid de.greluc.krt.iri.basetool.backend.model.dto.MissionDto subMission) {
+      @RequestBody @jakarta.validation.Valid MissionDto subMission) {
     return missionMapper.toDto(
         missionService.addSubMission(id, missionMapper.toEntity(subMission)));
   }
@@ -306,8 +310,7 @@ public class MissionController {
               + "(/core, /schedule, /flags) zu verwenden, damit parallele Aenderungen an "
               + "anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.")
   public MissionDto updateMission(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
+      @PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid MissionDto mission) {
     return missionMapper.toDto(missionService.updateMission(id, missionMapper.toEntity(mission)));
   }
 
@@ -316,12 +319,12 @@ public class MissionController {
   @Operation(
       summary = "Patch mission core section",
       description =
-          "Aktualisiert nur die Stammdaten-Sektion (Name, Beschreibung, Kalenderlink, "
-              + "Status) eines Einsatzes. Andere Sektionen und Sub-Aggregate bleiben unberuehrt. "
-              + "Bei einem Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.")
+          "Aktualisiert nur die Stammdaten-Sektion (Name, Beschreibung, Kalenderlink, Status) eines"
+              + " Einsatzes. Andere Sektionen und Sub-Aggregate bleiben unberuehrt. Bei einem"
+              + " Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.")
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionCoreRequest request) {
     return missionMapper.toDto(
         missionService.updateCoreSection(
             id,
@@ -342,8 +345,7 @@ public class MissionController {
               + "entkoppelter Sub-Collections nicht mehr zum Versionskonflikt. Zeitstempel in UTC.")
   public MissionDto patchMissionSchedule(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest
-              request) {
+      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionScheduleRequest request) {
     return missionMapper.toDto(
         missionService.updateScheduleSection(
             id,
@@ -362,7 +364,7 @@ public class MissionController {
       description = "Aktualisiert nur die Flags-Sektion (z.B. isInternal) eines Einsatzes.")
   public MissionDto patchMissionFlags(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionFlagsRequest request) {
     return missionMapper.toDto(
         missionService.updateFlagsSection(id, request.isInternal(), request.version()));
   }
@@ -392,7 +394,9 @@ public class MissionController {
   @Operation(
       summary = "Add a unit to a mission (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/slim which returns only the updated list of units and avoids parent-coupled payloads (Option A / multi-user concurrency).",
+          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/slim which returns"
+              + " only the updated list of units and avoids parent-coupled payloads (Option A /"
+              + " multi-user concurrency).",
       deprecated = true)
   public MissionDto addUnit(
       @PathVariable @NotNull UUID id,
@@ -416,7 +420,8 @@ public class MissionController {
   @Operation(
       summary = "Update a mission unit (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{unitId}/slim which returns only the updated unit.",
+          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{unitId}/slim which"
+              + " returns only the updated unit.",
       deprecated = true)
   public MissionDto updateUnit(
       @PathVariable @NotNull UUID id,
@@ -442,7 +447,8 @@ public class MissionController {
   @Operation(
       summary = "Delete a mission unit (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{unitId}/slim which returns 204 No Content.",
+          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{unitId}/slim"
+              + " which returns 204 No Content.",
       deprecated = true)
   public MissionDto deleteUnit(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     return missionMapper.toDto(missionService.removeMissionUnit(id, unitId));
@@ -457,7 +463,9 @@ public class MissionController {
   @Operation(
       summary = "Add crew to a mission unit (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/{missionUnitId}/crew/slim which returns only the crew list of the affected unit.",
+          "Returns the full MissionDto. Prefer POST"
+              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/slim which returns only the crew"
+              + " list of the affected unit.",
       deprecated = true)
   public MissionDto addCrew(
       @PathVariable @NotNull UUID id,
@@ -478,7 +486,9 @@ public class MissionController {
   @Operation(
       summary = "Update crew in a mission unit (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns only the updated crew entry.",
+          "Returns the full MissionDto. Prefer PUT"
+              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns only"
+              + " the updated crew entry.",
       deprecated = true)
   public MissionDto updateCrew(
       @PathVariable @NotNull UUID id,
@@ -500,7 +510,9 @@ public class MissionController {
   @Operation(
       summary = "Remove crew from a mission unit (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns 204 No Content.",
+          "Returns the full MissionDto. Prefer DELETE"
+              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns 204"
+              + " No Content.",
       deprecated = true)
   public MissionDto removeCrew(
       @PathVariable @NotNull UUID id,
@@ -518,7 +530,9 @@ public class MissionController {
   @Operation(
       summary = "Update a participant (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/participants/{participantId}/slim which returns only the updated participant.",
+          "Returns the full MissionDto. Prefer PUT"
+              + " /api/v1/missions/{id}/participants/{participantId}/slim which returns only the"
+              + " updated participant.",
       deprecated = true)
   public MissionDto updateParticipant(
       @PathVariable @NotNull UUID id,
@@ -549,7 +563,9 @@ public class MissionController {
   @Operation(
       summary = "Check in a participant (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/{participantId}/check-in/slim which returns only the updated participant.",
+          "Returns the full MissionDto. Prefer POST"
+              + " /api/v1/missions/{id}/participants/{participantId}/check-in/slim which returns"
+              + " only the updated participant.",
       deprecated = true)
   public MissionDto checkInParticipant(
       @PathVariable @NotNull UUID id,
@@ -567,7 +583,9 @@ public class MissionController {
   @Operation(
       summary = "Check out a participant (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/{participantId}/check-out/slim which returns only the updated participant.",
+          "Returns the full MissionDto. Prefer POST"
+              + " /api/v1/missions/{id}/participants/{participantId}/check-out/slim which returns"
+              + " only the updated participant.",
       deprecated = true)
   public MissionDto checkOutParticipant(
       @PathVariable @NotNull UUID id,
@@ -585,7 +603,9 @@ public class MissionController {
   @Operation(
       summary = "Update payout preference for a participant (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/participants/{participantId}/payout-preference/slim which returns only the updated participant.",
+          "Returns the full MissionDto. Prefer PUT"
+              + " /api/v1/missions/{id}/participants/{participantId}/payout-preference/slim which"
+              + " returns only the updated participant.",
       deprecated = true)
   public MissionDto updatePayoutPreference(
       @PathVariable @NotNull UUID id,
@@ -605,7 +625,8 @@ public class MissionController {
   @Operation(
       summary = "Add a participant (admin, legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/slim which returns only the updated participant list.",
+          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/slim which"
+              + " returns only the updated participant list.",
       deprecated = true)
   public MissionDto addParticipant(
       @PathVariable @NotNull UUID id,
@@ -622,7 +643,9 @@ public class MissionController {
   @Operation(
       summary = "Remove a participant (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/participants/{participantId}/slim which returns 204 No Content.",
+          "Returns the full MissionDto. Prefer DELETE"
+              + " /api/v1/missions/{id}/participants/{participantId}/slim which returns 204 No"
+              + " Content.",
       deprecated = true)
   public MissionDto removeParticipant(
       @PathVariable @NotNull UUID id,
@@ -635,9 +658,10 @@ public class MissionController {
   @Operation(
       summary = "Add a participant (public)",
       description =
-          "Adds a participant by explicit userId (from autocomplete) or by free-text guestName. "
-              + "Free-text names are resolved case-insensitively against existing users: a unique match links the participant as a registered member; "
-              + "no match falls back to the guest path; multiple matches return 409 (ambiguous name).")
+          "Adds a participant by explicit userId (from autocomplete) or by free-text guestName."
+              + " Free-text names are resolved case-insensitively against existing users: a unique"
+              + " match links the participant as a registered member; no match falls back to the"
+              + " guest path; multiple matches return 409 (ambiguous name).")
   @io.swagger.v3.oas.annotations.responses.ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
@@ -722,11 +746,12 @@ public class MissionController {
   @Operation(
       summary = "Add or update a frequency for a mission (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/frequencies/slim which returns only the updated frequency list.",
+          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/frequencies/slim which"
+              + " returns only the updated frequency list.",
       deprecated = true)
   public MissionDto addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest request) {
+      @RequestBody @jakarta.validation.Valid AddFrequencyRequest request) {
     return missionMapper.toDto(
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value()));
   }
@@ -740,7 +765,9 @@ public class MissionController {
   @Operation(
       summary = "Remove a frequency from a mission (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/frequencies/{frequencyId}/slim which returns 204 No Content.",
+          "Returns the full MissionDto. Prefer DELETE"
+              + " /api/v1/missions/{id}/frequencies/{frequencyId}/slim which returns 204 No"
+              + " Content.",
       deprecated = true)
   public MissionDto removeFrequency(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
@@ -756,7 +783,8 @@ public class MissionController {
   @Operation(
       summary = "Add a manager to a mission (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/managers/{userId}/slim which returns only the updated manager list.",
+          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/managers/{userId}/slim"
+              + " which returns only the updated manager list.",
       deprecated = true)
   public MissionDto addManager(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     log.info("[DEBUG_LOG] MissionController.addManager START - id: {}, userId: {}", id, userId);
@@ -784,7 +812,8 @@ public class MissionController {
   @Operation(
       summary = "Remove a manager from a mission (legacy, deprecated)",
       description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/managers/{userId}/slim which returns 204 No Content.",
+          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/managers/{userId}/slim"
+              + " which returns 204 No Content.",
       deprecated = true)
   public MissionDto removeManager(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
@@ -808,10 +837,10 @@ public class MissionController {
   @Operation(
       summary = "Change the owner of a mission (legacy, deprecated)",
       description =
-          "Legacy endpoint without optimistic lock on the ownership aggregate. "
-              + "Prefer PUT /api/v1/missions/{id}/owner with UpdateMissionOwnerRequest (includes version) "
-              + "to benefit from per-section optimistic locking that does not invalidate other users' "
-              + "open forms on the same mission.",
+          "Legacy endpoint without optimistic lock on the ownership aggregate. Prefer PUT"
+              + " /api/v1/missions/{id}/owner with UpdateMissionOwnerRequest (includes version) to"
+              + " benefit from per-section optimistic locking that does not invalidate other users'"
+              + " open forms on the same mission.",
       deprecated = true)
   public MissionDto setMissionOwnerLegacy(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
@@ -828,7 +857,8 @@ public class MissionController {
       return missionMapper.toDto(mission);
     } catch (Exception e) {
       log.error(
-          "[DEBUG_LOG] MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error: {}",
+          "[DEBUG_LOG] MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error:"
+              + " {}",
           id,
           userId,
           e.getMessage(),
@@ -866,7 +896,7 @@ public class MissionController {
   })
   public MissionDto updateMissionOwner(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull UpdateMissionOwnerRequest request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
     return missionMapper.toDto(mission);
   }
@@ -1088,11 +1118,11 @@ public class MissionController {
   @Operation(
       summary = "Add a participant (slim response)",
       description =
-          "Adds a participant and returns the updated participant list as slim DTOs. "
-              + "Mirrors the public add-participant logic: explicit userId (autocomplete) or free-text guestName "
-              + "(case-insensitive resolution against registered users). Authenticated users may always add "
-              + "themselves; adding other registered users is restricted to managers/officers/admins. "
-              + "Anonymous users may only add guest entries.")
+          "Adds a participant and returns the updated participant list as slim DTOs. Mirrors the"
+              + " public add-participant logic: explicit userId (autocomplete) or free-text"
+              + " guestName (case-insensitive resolution against registered users). Authenticated"
+              + " users may always add themselves; adding other registered users is restricted to"
+              + " managers/officers/admins. Anonymous users may only add guest entries.")
   @PreAuthorize("permitAll()")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
@@ -1187,7 +1217,7 @@ public class MissionController {
           "Adds or updates a frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addOrUpdateFrequencySlim(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest request) {
+      @RequestBody @jakarta.validation.Valid AddFrequencyRequest request) {
     var mission =
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value());
     return mission.getFrequencies().stream().map(missionMapper::toDto).toList();

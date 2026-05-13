@@ -79,12 +79,12 @@ class HangarImportIntegrationTest {
     // Given
     String json =
         """
-                [
-                  {"name":"135c","shipname":"","type":"ship"},
-                  {"name":"zeus mk ii mr","shipname":"My Zeus","type":"ship"},
-                  {"name":"unknown xz99","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"135c","shipname":"","type":"ship"},
+          {"name":"zeus mk ii mr","shipname":"My Zeus","type":"ship"},
+          {"name":"unknown xz99","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -122,8 +122,8 @@ class HangarImportIntegrationTest {
     // Given
     String json =
         """
-                [{"name":"135c","shipname":"","type":"ship"}]
-                """;
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -191,8 +191,8 @@ class HangarImportIntegrationTest {
 
     String json =
         """
-                [{"name":"135c","shipname":"","type":"ship"}]
-                """;
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -236,11 +236,11 @@ class HangarImportIntegrationTest {
     // JSON requests 2× 135c
     String json =
         """
-                [
-                  {"name":"135c","shipname":"","type":"ship"},
-                  {"name":"135c","shipname":"","type":"ship"}
-                ]
-                """;
+        [
+          {"name":"135c","shipname":"","type":"ship"},
+          {"name":"135c","shipname":"","type":"ship"}
+        ]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -276,8 +276,8 @@ class HangarImportIntegrationTest {
     // Given: fleetview.json uses uppercase "135C" but DB has "135c"
     String json =
         """
-                [{"name":"135C","shipname":"","type":"ship"}]
-                """;
+        [{"name":"135C","shipname":"","type":"ship"}]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -310,8 +310,8 @@ class HangarImportIntegrationTest {
     // Given
     String json =
         """
-                [{"name":"zeus mk ii mr","shipname":"Stella Aeterna","type":"ship"}]
-                """;
+        [{"name":"zeus mk ii mr","shipname":"Stella Aeterna","type":"ship"}]
+        """;
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));

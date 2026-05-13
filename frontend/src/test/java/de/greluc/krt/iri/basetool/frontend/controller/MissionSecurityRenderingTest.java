@@ -406,6 +406,7 @@ class MissionSecurityRenderingTest {
                         containsString(
                             "data-payout-url=\""
                                 + expectedUrl
-                                + "\" onchange=\"updatePayoutPreference(this)\" disabled=\"disabled\""))));
+                                + "\" onchange=\"updatePayoutPreference(this)\""
+                                + " disabled=\"disabled\""))));
   }
 }

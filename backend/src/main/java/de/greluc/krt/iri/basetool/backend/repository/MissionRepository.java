@@ -23,7 +23,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * pulling the full Mission aggregate.
    */
   @Query(
-      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name, m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE') ORDER BY m.plannedStartTime ASC")
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
+          + " m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE')"
+          + " ORDER BY m.plannedStartTime ASC")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference();
 
   /**
@@ -58,14 +60,13 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE "
-          + "(CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS string), '%')) "
-          + "AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >= :start) "
-          + "AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) "
-          + "AND (m.status IN (:status)) "
-          + "AND (:isInternal IS NULL OR m.isInternal = :isInternal) "
-          + "AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId) "
-          + "ORDER BY m.plannedStartTime ASC")
+      "SELECT m FROM Mission m WHERE (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%')) AND (CAST(:start AS timestamp) IS NULL OR"
+          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
+          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
+          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
+          + " = :operationId) ORDER BY m.plannedStartTime ASC")
   List<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
@@ -91,13 +92,13 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE "
-          + "(CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS string), '%')) "
-          + "AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >= :start) "
-          + "AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) "
-          + "AND (m.status IN (:status)) "
-          + "AND (:isInternal IS NULL OR m.isInternal = :isInternal) "
-          + "AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId)")
+      "SELECT m FROM Mission m WHERE (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%')) AND (CAST(:start AS timestamp) IS NULL OR"
+          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
+          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
+          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
+          + " = :operationId)")
   Page<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,

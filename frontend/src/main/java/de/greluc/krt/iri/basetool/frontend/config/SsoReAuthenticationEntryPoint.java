@@ -52,7 +52,8 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
     if (isSsoAlreadyAttempted(request)) {
       // Silent re-auth already tried and failed – fall back to interactive login
       log.info(
-          "[SSO] Silent re-auth already attempted and failed, falling back to interactive login. URI={} | remoteAddr={}",
+          "[SSO] Silent re-auth already attempted and failed, falling back to interactive login."
+              + " URI={} | remoteAddr={}",
           uri,
           request.getRemoteAddr());
       clearSsoAttemptedCookie(response);
@@ -61,7 +62,8 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 
     log.info(
-        "[SSO] No active session found, attempting silent Keycloak SSO re-authentication. URI={} | remoteAddr={} | sessionId={}",
+        "[SSO] No active session found, attempting silent Keycloak SSO re-authentication. URI={} |"
+            + " remoteAddr={} | sessionId={}",
         uri,
         request.getRemoteAddr(),
         request.getSession(false) != null ? request.getSession(false).getId() : "none");

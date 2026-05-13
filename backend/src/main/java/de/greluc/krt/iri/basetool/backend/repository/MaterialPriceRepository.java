@@ -25,14 +25,14 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-        SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto(
-            p.id, t.name, p.priceBuy, p.priceSell, p.scuBuy, p.scuSell, p.statusBuy, p.statusSell
-        )
-        FROM MaterialPrice p
-        JOIN p.terminal t
-        WHERE p.material.id = :materialId
-        AND (t.hidden = false OR t.hidden IS NULL)
-    """)
+          SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto(
+              p.id, t.name, p.priceBuy, p.priceSell, p.scuBuy, p.scuSell, p.statusBuy, p.statusSell
+          )
+          FROM MaterialPrice p
+          JOIN p.terminal t
+          WHERE p.material.id = :materialId
+          AND (t.hidden = false OR t.hidden IS NULL)
+      """)
   Page<MaterialPriceDto> findPricesByMaterialId(
       @Param("materialId") UUID materialId, Pageable pageable);
 
@@ -44,16 +44,16 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-        SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto(
-            t.id, t.name, p.priceSell
-        )
-        FROM MaterialPrice p
-        JOIN p.terminal t
-        WHERE p.material.id = :materialId
-        AND (p.statusSell = true OR p.priceSell > 0)
-        AND (t.hidden = false OR t.hidden IS NULL)
-        ORDER BY p.priceSell DESC NULLS LAST, t.name ASC
-    """)
+          SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto(
+              t.id, t.name, p.priceSell
+          )
+          FROM MaterialPrice p
+          JOIN p.terminal t
+          WHERE p.material.id = :materialId
+          AND (p.statusSell = true OR p.priceSell > 0)
+          AND (t.hidden = false OR t.hidden IS NULL)
+          ORDER BY p.priceSell DESC NULLS LAST, t.name ASC
+      """)
   java.util.List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(
       @Param("materialId") UUID materialId);
 
@@ -65,19 +65,19 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-        SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
-            m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END,
-            CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END,
-            CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
-            c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName, p.priceBuy, p.priceSell,
-            t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint, t.hasLoadingDock, t.isAutoLoad
-        )
-        FROM MaterialPrice p
-        JOIN p.material m
-        LEFT JOIN m.category c
-        JOIN p.terminal t
-        WHERE (t.hidden = false OR t.hidden IS NULL)
-    """)
+    SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
+        m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END,
+        CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END,
+        CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
+        c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName, p.priceBuy, p.priceSell,
+        t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint, t.hasLoadingDock, t.isAutoLoad
+    )
+    FROM MaterialPrice p
+    JOIN p.material m
+    LEFT JOIN m.category c
+    JOIN p.terminal t
+    WHERE (t.hidden = false OR t.hidden IS NULL)
+""")
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
   /**
@@ -87,13 +87,13 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-        SELECT p
-        FROM MaterialPrice p
-        JOIN FETCH p.material m
-        JOIN FETCH p.terminal t
-        WHERE (t.hidden = false OR t.hidden IS NULL)
-        AND t.isAutoLoad = true
-    """)
+          SELECT p
+          FROM MaterialPrice p
+          JOIN FETCH p.material m
+          JOIN FETCH p.terminal t
+          WHERE (t.hidden = false OR t.hidden IS NULL)
+          AND t.isAutoLoad = true
+      """)
   java.util.List<MaterialPrice> findAllAutoLoadPrices();
 
   /**
@@ -102,14 +102,14 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-        SELECT p
-        FROM MaterialPrice p
-        JOIN FETCH p.material m
-        JOIN FETCH p.terminal t
-        WHERE (t.hidden = false OR t.hidden IS NULL)
-        AND t.isAutoLoad = true
-        AND t.starSystemName IN :starSystems
-    """)
+          SELECT p
+          FROM MaterialPrice p
+          JOIN FETCH p.material m
+          JOIN FETCH p.terminal t
+          WHERE (t.hidden = false OR t.hidden IS NULL)
+          AND t.isAutoLoad = true
+          AND t.starSystemName IN :starSystems
+      """)
   java.util.List<MaterialPrice> findAllAutoLoadPricesInSystems(
       @Param("starSystems") java.util.Collection<String> starSystems);
 }

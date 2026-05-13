@@ -101,7 +101,8 @@ class MissionUnitCrewTest {
     Squadron sq = squadronRepository.findAll().iterator().next();
     String joinJson =
         String.format(
-            "{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\", \"desiredJobTypeId\": \"%s\", \"squadronId\": \"%s\"}",
+            "{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\", \"desiredJobTypeId\":"
+                + " \"%s\", \"squadronId\": \"%s\"}",
             crewJob.getId(), sq.getId());
     mockMvc
         .perform(

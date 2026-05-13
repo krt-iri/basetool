@@ -80,7 +80,8 @@ public class CustomJwtGrantedAuthoritiesConverter
     }
 
     log.error(
-        "Failed to sync user authorities after {} attempts due to repeated optimistic locking failures. Authentication denied.",
+        "Failed to sync user authorities after {} attempts due to repeated optimistic locking"
+            + " failures. Authentication denied.",
         MAX_SYNC_ATTEMPTS,
         lastLockingFailure);
     throw new AuthenticationServiceException(

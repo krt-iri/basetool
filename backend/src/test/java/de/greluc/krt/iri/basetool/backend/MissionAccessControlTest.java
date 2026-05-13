@@ -273,7 +273,8 @@ class MissionAccessControlTest {
 
     String updateJson =
         String.format(
-            "{\"desiredMissionJobTypeId\": \"%s\", \"plannedMissionJobTypeId\": \"%s\", \"comment\": \"Full Update\", \"version\": 0}",
+            "{\"desiredMissionJobTypeId\": \"%s\", \"plannedMissionJobTypeId\": \"%s\","
+                + " \"comment\": \"Full Update\", \"version\": 0}",
             testJobType.getId(), testJobType.getId());
 
     mockMvc
@@ -380,7 +381,8 @@ class MissionAccessControlTest {
 
     String jsonBody =
         String.format(
-            "{\"guestName\": \"John Doe\", \"comment\": \"I want to join\", \"desiredJobTypeId\": \"%s\", \"squadronId\": \"%s\"}",
+            "{\"guestName\": \"John Doe\", \"comment\": \"I want to join\", \"desiredJobTypeId\":"
+                + " \"%s\", \"squadronId\": \"%s\"}",
             testJobType.getId(), UUID.randomUUID());
 
     mockMvc

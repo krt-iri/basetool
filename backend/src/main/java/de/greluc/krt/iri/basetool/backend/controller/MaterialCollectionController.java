@@ -29,7 +29,8 @@ public class MaterialCollectionController {
   @Operation(
       summary = "Get material collection for a job order",
       description =
-          "Returns all inventory items linked to the given job order, sorted by owner name, location, material name, quality (desc), quantity (desc).")
+          "Returns all inventory items linked to the given job order, sorted by owner name,"
+              + " location, material name, quality (desc), quantity (desc).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Material collection returned successfully"),
     @ApiResponse(responseCode = "403", description = "Access denied – authentication required"),

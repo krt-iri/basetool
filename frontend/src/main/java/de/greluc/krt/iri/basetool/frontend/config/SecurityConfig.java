@@ -72,11 +72,11 @@ public class SecurityConfig {
   public static RoleHierarchy roleHierarchy() {
     return RoleHierarchyImpl.fromHierarchy(
         """
-                ROLE_ADMIN > ROLE_LOGISTICIAN
-                ROLE_OFFICER > ROLE_LOGISTICIAN
-                ROLE_ADMIN > ROLE_MISSION_MANAGER
-                ROLE_OFFICER > ROLE_MISSION_MANAGER
-                """);
+        ROLE_ADMIN > ROLE_LOGISTICIAN
+        ROLE_OFFICER > ROLE_LOGISTICIAN
+        ROLE_ADMIN > ROLE_MISSION_MANAGER
+        ROLE_OFFICER > ROLE_MISSION_MANAGER
+        """);
   }
 
   /**

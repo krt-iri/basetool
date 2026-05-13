@@ -13,9 +13,14 @@ public class InventoryForm {
 
   @NotNull private UUID locationId;
 
-  @NotNull @Min(0) @Max(1000) private Integer quality;
+  @NotNull
+  @Min(0)
+  @Max(1000)
+  private Integer quality;
 
-  @NotNull @Min(0) private Double amount;
+  @NotNull
+  @Min(0)
+  private Double amount;
 
   private UUID jobOrderId;
 

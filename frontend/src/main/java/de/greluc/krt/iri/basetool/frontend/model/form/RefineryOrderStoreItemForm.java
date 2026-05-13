@@ -27,9 +27,15 @@ public class RefineryOrderStoreItemForm {
 
   @NotNull private UUID locationId;
 
-  @NotNull @Min(0) @Max(1000) private Integer quality;
+  @NotNull
+  @Min(0)
+  @Max(1000)
+  private Integer quality;
 
-  @NotNull @DecimalMin(value = "0.0", inclusive = true) @Digits(integer = 15, fraction = 3) private Double amount;
+  @NotNull
+  @DecimalMin(value = "0.0", inclusive = true)
+  @Digits(integer = 15, fraction = 3)
+  private Double amount;
 
   private Boolean amountFixed;
 
@@ -37,5 +43,6 @@ public class RefineryOrderStoreItemForm {
 
   private UUID jobOrderId;
 
-  @Size(max = 1000) private String note;
+  @Size(max = 1000)
+  private String note;
 }

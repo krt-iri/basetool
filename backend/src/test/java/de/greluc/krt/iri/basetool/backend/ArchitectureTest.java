@@ -230,7 +230,8 @@ class ArchitectureTest {
         .should()
         .haveRawReturnType(annotatedWith(JPA_ENTITY))
         .because(
-            "Controllers must return DTOs (or Page<Dto>/ResponseEntity<Dto>), never raw JPA entities.")
+            "Controllers must return DTOs (or Page<Dto>/ResponseEntity<Dto>), never raw JPA"
+                + " entities.")
         .check(CLASSES);
   }
 
@@ -252,9 +253,9 @@ class ArchitectureTest {
         .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
         .should(haveAtLeastOnePreAuthorizeAnnotation())
         .because(
-            "Every REST controller class must declare at least one @PreAuthorize "
-                + "annotation (either on the class or on any method) so it cannot silently "
-                + "bypass authorisation. Public endpoints should use @PreAuthorize(\"permitAll()\").")
+            "Every REST controller class must declare at least one @PreAuthorize annotation (either"
+                + " on the class or on any method) so it cannot silently bypass authorisation."
+                + " Public endpoints should use @PreAuthorize(\"permitAll()\").")
         .check(CLASSES);
   }
 
@@ -449,7 +450,8 @@ class ArchitectureTest {
   private static ArchCondition<JavaClass>
       declareTransactionalForMutatingMethodsWhenClassIsReadOnly() {
     return new ArchCondition<JavaClass>(
-        "declare method-level @Transactional on mutating methods when the class is @Transactional(readOnly = true)") {
+        "declare method-level @Transactional on mutating methods when the class is"
+            + " @Transactional(readOnly = true)") {
       @Override
       public void check(JavaClass clazz, ConditionEvents events) {
         if (!isClassReadOnlyTransactional(clazz)) {

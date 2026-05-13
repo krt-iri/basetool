@@ -207,7 +207,8 @@ public class PersonalInventoryItemService {
   // Internal helpers
   // ---------------------------------------------------------------------------------
 
-  @NotNull private PersonalInventoryItem loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  @NotNull
+  private PersonalInventoryItem loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
     return repository
         .findByIdAndOwnerSub(id, ownerSub)
         .orElseThrow(
@@ -217,7 +218,8 @@ public class PersonalInventoryItemService {
             });
   }
 
-  @NotNull private PersonalInventoryItemResponse applyUpdate(
+  @NotNull
+  private PersonalInventoryItemResponse applyUpdate(
       @NotNull PersonalInventoryItem entity, @NotNull PersonalInventoryItemUpdateRequest request) {
     // Manual optimistic-lock check; mirrored from AnnouncementService convention.
     if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
@@ -246,7 +248,8 @@ public class PersonalInventoryItemService {
    * EntityNotFoundException} (→ HTTP 404 via the global handler) if the referenced location does
    * not exist – this prevents creating dangling references.
    */
-  @NotNull private String resolveLocationName(
+  @NotNull
+  private String resolveLocationName(
       @NotNull PersonalInventoryLocationType type, @NotNull Integer uexId) {
     return switch (type) {
       case CITY ->

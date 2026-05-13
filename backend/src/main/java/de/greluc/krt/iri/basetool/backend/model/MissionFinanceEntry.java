@@ -47,9 +47,12 @@ public class MissionFinanceEntry extends AbstractEntity<UUID> {
   @Column(columnDefinition = "TEXT")
   private String note;
 
-  @NotNull @Enumerated(EnumType.STRING)
+  @NotNull
+  @Enumerated(EnumType.STRING)
   private FinanceType type;
 
-  @NotNull @DecimalMin("0.0") @Column(precision = 19, scale = 4, nullable = false)
+  @NotNull
+  @DecimalMin("0.0")
+  @Column(precision = 19, scale = 4, nullable = false)
   private BigDecimal amount;
 }

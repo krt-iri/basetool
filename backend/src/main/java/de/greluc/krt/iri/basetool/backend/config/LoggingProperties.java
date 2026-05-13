@@ -45,7 +45,8 @@ public class LoggingProperties {
    * Requests taking longer than this threshold (in milliseconds) are logged at {@code WARN} instead
    * of {@code INFO} by {@code RequestLoggingFilter}. Set to a large value to disable.
    */
-  @Min(0) private long slowRequestThresholdMs = 2000L;
+  @Min(0)
+  private long slowRequestThresholdMs = 2000L;
 
   /**
    * Feature flag for structured (JSON) logging. The {@code logback-spring.xml} activates the JSON

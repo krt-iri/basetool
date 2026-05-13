@@ -81,7 +81,8 @@ class MissionUnitManagementTest {
   void testUpdateUnit_Officer_Allowed() throws Exception {
     String updateJson =
         String.format(
-            "{\"name\": \"Updated Unit\", \"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"highValueUnit\": true, \"frequency\": 111.11}",
+            "{\"name\": \"Updated Unit\", \"shipTypeId\": \"%s\", \"shipId\": \"%s\","
+                + " \"highValueUnit\": true, \"frequency\": 111.11}",
             unit.getShipType().getId(), ship.getId());
 
     mockMvc

@@ -1148,7 +1148,8 @@ public class MissionPageController {
         return org.springframework.http.ResponseEntity.ok().build();
       } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
         log.error(
-            "[DEBUG_LOG] BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={}, Readable={}",
+            "[DEBUG_LOG] BACKEND ERROR adding manager for mission {} and user {}: Status={},"
+                + " Message={}, Readable={}",
             missionUuid,
             userUuid,
             e.getStatusCode(),

@@ -85,7 +85,8 @@ class MissionUnitAttributeTest {
   void testAddShipWithHighValueUnit() throws Exception {
     String requestJson =
         String.format(
-            "{\"name\": \"Test Unit\", \"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"highValueUnit\": true}",
+            "{\"name\": \"Test Unit\", \"shipTypeId\": \"%s\", \"shipId\": \"%s\","
+                + " \"highValueUnit\": true}",
             shipType.getId(), ship.getId());
 
     mockMvc

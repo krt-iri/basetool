@@ -42,11 +42,11 @@ public class SecurityConfig {
   public static RoleHierarchy roleHierarchy() {
     return RoleHierarchyImpl.fromHierarchy(
         """
-                ROLE_ADMIN > ROLE_LOGISTICIAN
-                ROLE_OFFICER > ROLE_LOGISTICIAN
-                ROLE_ADMIN > ROLE_MISSION_MANAGER
-                ROLE_OFFICER > ROLE_MISSION_MANAGER
-                """);
+        ROLE_ADMIN > ROLE_LOGISTICIAN
+        ROLE_OFFICER > ROLE_LOGISTICIAN
+        ROLE_ADMIN > ROLE_MISSION_MANAGER
+        ROLE_OFFICER > ROLE_MISSION_MANAGER
+        """);
   }
 
   @Bean
@@ -88,7 +88,9 @@ public class SecurityConfig {
               headers.contentSecurityPolicy(
                   csp ->
                       csp.policyDirectives(
-                          "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"));
+                          "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors"
+                              + " 'none'; connect-src 'self'; img-src 'self' data:; font-src 'self'"
+                              + " data:; style-src 'self' 'unsafe-inline'; script-src 'self'"));
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));

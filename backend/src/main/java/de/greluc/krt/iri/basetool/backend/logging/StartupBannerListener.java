@@ -64,7 +64,8 @@ public class StartupBannerListener {
    * jdbc:postgresql://host:port/db?user=x&password=y} and the occasional {@code
    * jdbc:postgresql://user:pw@host/db}.
    */
-  @NotNull static String sanitiseJdbcUrl(@Nullable String url) {
+  @NotNull
+  static String sanitiseJdbcUrl(@Nullable String url) {
     if (url == null || url.isBlank()) {
       return "unknown";
     }

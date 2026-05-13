@@ -69,23 +69,23 @@ class BackendApiClientProblemJsonTest {
               case "/api/v1/optimistic-lock" ->
                   problemJson(
                       409,
-                      "{\"type\":\"urn:problem:optimistic-lock\",\"title\":\"Conflict\",\"status\":409,"
-                          + "\"detail\":\"Entity was updated concurrently\","
+                      "{\"type\":\"urn:problem:optimistic-lock\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"Entity"
+                          + " was updated concurrently\","
                           + "\"code\":\"OPTIMISTIC_LOCK\",\"correlationId\":\"corr-123\"}");
               case "/api/v1/forbidden" ->
                   problemJson(
                       403,
-                      "{\"type\":\"urn:problem:access-denied\",\"title\":\"Forbidden\",\"status\":403,"
-                          + "\"detail\":\"Missing privilege\","
+                      "{\"type\":\"urn:problem:access-denied\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Missing"
+                          + " privilege\","
                           + "\"code\":\"ACCESS_DENIED\",\"correlationId\":\"corr-403\"}");
               case "/api/v1/validation" ->
                   problemJson(
                       400,
-                      "{\"type\":\"urn:problem:validation\",\"title\":\"Bad Request\",\"status\":400,"
-                          + "\"detail\":\"Validation failed\","
-                          + "\"code\":\"VALIDATION_FAILED\",\"correlationId\":\"corr-400\","
-                          + "\"fieldErrors\":[{\"field\":\"name\",\"message\":\"must not be blank\"},"
-                          + "{\"field\":\"amount\",\"message\":\"must be positive\"}]}");
+                      "{\"type\":\"urn:problem:validation\",\"title\":\"Bad"
+                          + " Request\",\"status\":400,\"detail\":\"Validation failed\","
+                          + "\"code\":\"VALIDATION_FAILED\",\"correlationId\":\"corr-400\",\"fieldErrors\":[{\"field\":\"name\",\"message\":\"must"
+                          + " not be blank\"},{\"field\":\"amount\",\"message\":\"must be"
+                          + " positive\"}]}");
               case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
               default -> new MockResponse().setResponseCode(404);
             };

@@ -146,7 +146,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
             if (!newPrincipal.getName().equals(currentName)) {
               log.warn(
-                  "Principal name changed during sync! Old: {}, New: {}. This may break OAuth2 lookups.",
+                  "Principal name changed during sync! Old: {}, New: {}. This may break OAuth2"
+                      + " lookups.",
                   currentName,
                   newPrincipal.getName());
             }

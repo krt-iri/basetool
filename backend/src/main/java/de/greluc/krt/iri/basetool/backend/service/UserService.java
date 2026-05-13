@@ -62,7 +62,8 @@ public class UserService {
    * entry from the autocomplete dropdown) into a concrete user reference, so that a member is
    * correctly linked instead of being (wrongly) rejected as a duplicate guest name.
    */
-  @NotNull public List<User> findMatchesByExactName(@NotNull String name) {
+  @NotNull
+  public List<User> findMatchesByExactName(@NotNull String name) {
     String trimmed = name.trim();
     if (trimmed.isEmpty()) {
       return List.of();
@@ -70,7 +71,8 @@ public class UserService {
     return userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(trimmed, trimmed);
   }
 
-  @NotNull public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
+  @NotNull
+  public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
     String sub = jwt.getSubject();
     if (sub == null) {
       // The OIDC standard requires `sub` on every ID token. A missing subject
@@ -98,7 +100,8 @@ public class UserService {
   }
 
   @Transactional
-  @NotNull public User syncUser(@NotNull Jwt jwt) {
+  @NotNull
+  public User syncUser(@NotNull Jwt jwt) {
     final UUID finalUserId = getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
@@ -107,7 +110,8 @@ public class UserService {
       existingUser = userRepository.findByUsername(username);
       if (existingUser.isPresent()) {
         log.warn(
-            "User lookup by ID {} failed, but found by username {}. associating session with existing user.",
+            "User lookup by ID {} failed, but found by username {}. associating session with"
+                + " existing user.",
             finalUserId,
             username);
       }
@@ -240,7 +244,8 @@ public class UserService {
   }
 
   @SuppressWarnings("unchecked")
-  @NotNull public Set<String> extractRolesFromJwt(@NotNull Jwt jwt) {
+  @NotNull
+  public Set<String> extractRolesFromJwt(@NotNull Jwt jwt) {
     Set<String> roles = new HashSet<>();
     Map<String, Object> realmAccess = jwt.getClaim("realm_access");
     if (realmAccess != null && realmAccess.containsKey("roles")) {
@@ -251,7 +256,8 @@ public class UserService {
   }
 
   @Transactional
-  @NotNull public User updateUserAttributes(
+  @NotNull
+  public User updateUserAttributes(
       @NotNull UUID id,
       @Nullable Integer rank,
       @Nullable String description,

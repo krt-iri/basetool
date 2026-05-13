@@ -14,23 +14,31 @@ import lombok.Data;
 public class RefineryOrderForm {
   private String startedAt;
 
-  @NotNull @Min(0) private Integer durationHours = 0;
+  @NotNull
+  @Min(0)
+  private Integer durationHours = 0;
 
-  @NotNull @Min(0) @Max(59) private Integer durationMinutes = 0;
+  @NotNull
+  @Min(0)
+  @Max(59)
+  private Integer durationMinutes = 0;
 
-  @Min(0) private Double expenses = 0d;
+  @Min(0)
+  private Double expenses = 0d;
 
   /**
    * Other costs in addition to expenses. Number >= 0, default 0. Optional - empty/0 is stored as
    * null.
    */
-  @Min(0) private Double otherExpenses = 0d;
+  @Min(0)
+  private Double otherExpenses = 0d;
 
   /**
    * Revenue from selling raw ores (Ore Sales). Integer >= 0, default 0. Optional - empty/0 is
    * stored as null.
    */
-  @Min(0) private Double oreSales = 0d;
+  @Min(0)
+  private Double oreSales = 0d;
 
   private UUID ownerId;
   private UUID refiningMethodId;

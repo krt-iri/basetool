@@ -41,7 +41,8 @@ public class SessionDebugFilter extends OncePerRequestFilter {
    * SecurityContextHolder#getContext()} returns null/anonymous at that point. Reading directly from
    * the session attribute gives the correct persisted authentication state.
    */
-  @Nullable private Authentication getAuthFromSession(@Nullable HttpSession session) {
+  @Nullable
+  private Authentication getAuthFromSession(@Nullable HttpSession session) {
     if (session == null) {
       return null;
     }
@@ -75,7 +76,8 @@ public class SessionDebugFilter extends OncePerRequestFilter {
 
     if (sessionBefore != null) {
       log.debug(
-          "[SESSION] PRE  {} {} | sessionId={} | isNew={} | creationTime={} | lastAccessed={} | maxInactive={}s | authenticated={}",
+          "[SESSION] PRE  {} {} | sessionId={} | isNew={} | creationTime={} | lastAccessed={} |"
+              + " maxInactive={}s | authenticated={}",
           method,
           uri,
           sessionBefore.getId(),

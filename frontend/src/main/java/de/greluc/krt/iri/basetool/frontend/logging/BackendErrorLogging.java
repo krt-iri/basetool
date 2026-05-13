@@ -41,7 +41,8 @@ public final class BackendErrorLogging {
     }
     if (contextId != null) {
       logger.warn(
-          "Backend call failed [action={}, contextId={}]: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
+          "Backend call failed [action={}, contextId={}]: status={}, code={}, correlationId={},"
+              + " detail={}, fieldErrors={}",
           action,
           contextId,
           ex.getStatusCode(),
@@ -51,7 +52,8 @@ public final class BackendErrorLogging {
           ex.getFieldErrors());
     } else {
       logger.warn(
-          "Backend call failed [action={}]: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
+          "Backend call failed [action={}]: status={}, code={}, correlationId={}, detail={},"
+              + " fieldErrors={}",
           action,
           ex.getStatusCode(),
           ex.getProblemCode(),

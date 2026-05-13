@@ -72,7 +72,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     }
   }
 
-  @NotNull private String resolveCorrelationId(@NotNull HttpServletRequest request) {
+  @NotNull
+  private String resolveCorrelationId(@NotNull HttpServletRequest request) {
     String inbound = request.getHeader(loggingProperties.getCorrelationIdHeader());
     if (inbound != null && !inbound.isBlank() && isSafe(inbound)) {
       return inbound.length() > MAX_ID_LENGTH ? inbound.substring(0, MAX_ID_LENGTH) : inbound;
@@ -101,7 +102,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     return true;
   }
 
-  @NotNull private static String resolveUserId() {
+  @NotNull
+  private static String resolveUserId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth instanceof JwtAuthenticationToken jwtAuth) {
       Jwt jwt = jwtAuth.getToken();

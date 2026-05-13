@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Size;
 
 /** Form-binding object for Frequency Type input. */
 public record FrequencyTypeForm(
-    @NotBlank(message = "{error.validation.not_blank}") @Size(max = 255, message = "{error.validation.size}") String name,
+    @NotBlank(message = "{error.validation.not_blank}")
+        @Size(max = 255, message = "{error.validation.size}")
+        String name,
     String description,
     Long version) {}

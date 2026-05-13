@@ -206,7 +206,8 @@ public class InventoryItemController {
   @Operation(
       summary = "Bulk checkout",
       description =
-          "Removes all specified inventory items that belong to the authenticated user. Associations to job orders and missions are cleared before deletion.")
+          "Removes all specified inventory items that belong to the authenticated user."
+              + " Associations to job orders and missions are cleared before deletion.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Bulk checkout successful"),
     @ApiResponse(responseCode = "400", description = "Invalid request (empty list)"),
@@ -226,7 +227,8 @@ public class InventoryItemController {
   @Operation(
       summary = "Update delivered status",
       description =
-          "Updates the delivered flag of an inventory item. Applies optimistic locking via the version field.")
+          "Updates the delivered flag of an inventory item. Applies optimistic locking via the"
+              + " version field.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Delivered status updated successfully"),
     @ApiResponse(responseCode = "400", description = "Invalid request"),

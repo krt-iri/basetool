@@ -9,7 +9,10 @@ import java.util.UUID;
 /** Data transfer record carrying Create Job Order Material payload. */
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
-    @NotNull @Min(750) @Max(750) @Schema(
+    @NotNull
+        @Min(750)
+        @Max(750)
+        @Schema(
             description = "Minimale Qualit\u00e4t, wird serverseitig fest auf 750 gesetzt",
             example = "750")
         Integer minQuality,

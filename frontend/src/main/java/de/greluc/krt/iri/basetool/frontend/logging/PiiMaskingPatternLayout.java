@@ -13,7 +13,8 @@ public class PiiMaskingPatternLayout extends PatternLayout {
   private static final String EMAIL_PATTERN =
       "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})";
   private static final String KEYWORD_TOKEN_PATTERN =
-      "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.]+)";
+      "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*"
+          + "|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.]+)";
 
   private static final Pattern PII_PATTERN =
       Pattern.compile(JWT_PATTERN + "|" + EMAIL_PATTERN + "|" + KEYWORD_TOKEN_PATTERN);

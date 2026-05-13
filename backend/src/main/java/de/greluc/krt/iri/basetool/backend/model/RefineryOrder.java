@@ -93,5 +93,6 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
-  @Valid private Set<RefineryGood> goods = new HashSet<>();
+  @Valid
+  private Set<RefineryGood> goods = new HashSet<>();
 }

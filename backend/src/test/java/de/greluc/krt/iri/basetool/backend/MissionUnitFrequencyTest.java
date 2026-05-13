@@ -85,7 +85,8 @@ class MissionUnitFrequencyTest {
   void testAddUnitWithValidFrequency() throws Exception {
     String requestJson =
         String.format(
-            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 100.00, \"name\": \"Unit Alpha\"}",
+            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 100.00, \"name\": \"Unit"
+                + " Alpha\"}",
             shipType.getId(), ship.getId());
 
     mockMvc
@@ -110,7 +111,8 @@ class MissionUnitFrequencyTest {
   void testAddUnitWithInvalidFrequencyLow() throws Exception {
     String requestJson =
         String.format(
-            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 99.99, \"name\": \"Unit Beta\"}",
+            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 99.99, \"name\": \"Unit"
+                + " Beta\"}",
             shipType.getId(), ship.getId());
 
     mockMvc
@@ -134,7 +136,8 @@ class MissionUnitFrequencyTest {
   void testAddUnitWithInvalidFrequencyHigh() throws Exception {
     String requestJson =
         String.format(
-            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 1000.00, \"name\": \"Unit Gamma\"}",
+            "{\"shipTypeId\": \"%s\", \"shipId\": \"%s\", \"frequency\": 1000.00, \"name\": \"Unit"
+                + " Gamma\"}",
             shipType.getId(), ship.getId());
 
     mockMvc
@@ -159,7 +162,8 @@ class MissionUnitFrequencyTest {
     // shipId is null
     String requestJson =
         String.format(
-            "{\"shipTypeId\": \"%s\", \"shipId\": null, \"frequency\": 150.00, \"name\": \"Unit Delta\"}",
+            "{\"shipTypeId\": \"%s\", \"shipId\": null, \"frequency\": 150.00, \"name\": \"Unit"
+                + " Delta\"}",
             shipType.getId());
 
     mockMvc

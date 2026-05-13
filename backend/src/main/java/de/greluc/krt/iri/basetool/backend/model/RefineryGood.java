@@ -35,17 +35,21 @@ public class RefineryGood extends AbstractEntity<UUID> {
   private Material inputMaterial;
 
   @Column(nullable = false)
-  @Min(1) private Integer inputQuantity;
+  @Min(1)
+  private Integer inputQuantity;
 
   @ManyToOne
   @JoinColumn(name = "output_material_id", nullable = false)
   private Material outputMaterial;
 
   @Column(nullable = false)
-  @Min(1) private Integer outputQuantity;
+  @Min(1)
+  private Integer outputQuantity;
 
   @Column(nullable = false)
-  @Min(0) @Max(1000) private Integer quality;
+  @Min(0)
+  @Max(1000)
+  private Integer quality;
 
   @ManyToOne
   @JoinColumn(name = "refinery_order_id", nullable = false)

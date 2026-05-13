@@ -30,10 +30,12 @@ public class LoggingProperties {
   @NotBlank private String userIdMdcKey = "userId";
 
   /** Requests slower than this are logged at WARN by {@code RequestLoggingFilter}. */
-  @Min(0) private long slowRequestThresholdMs = 2000L;
+  @Min(0)
+  private long slowRequestThresholdMs = 2000L;
 
   /** WebClient calls slower than this are logged at WARN by {@code WebClientLoggingFilter}. */
-  @Min(0) private long slowBackendCallThresholdMs = 1500L;
+  @Min(0)
+  private long slowBackendCallThresholdMs = 1500L;
 
   /** Feature flag for structured (JSON) logging, activated in {@code logback-spring.xml}. */
   private boolean structuredEnabled = false;

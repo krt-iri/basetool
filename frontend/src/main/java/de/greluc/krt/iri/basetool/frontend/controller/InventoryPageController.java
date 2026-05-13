@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.iri.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
@@ -387,7 +388,8 @@ public class InventoryPageController {
    * returned. The {@code fragment} parameter is intentionally stripped since the redirect always
    * targets the full page view.
    */
-  @org.jetbrains.annotations.NotNull static String buildInventoryRedirectFromReferer(
+  @org.jetbrains.annotations.NotNull
+  static String buildInventoryRedirectFromReferer(
       @org.jetbrains.annotations.NotNull String basePath,
       @org.jetbrains.annotations.Nullable String referer) {
     if (referer == null || referer.isBlank()) {
@@ -514,8 +516,7 @@ public class InventoryPageController {
   @PatchMapping("/{id}/delivered")
   @ResponseBody
   public org.springframework.http.ResponseEntity<InventoryItemDto> updateDelivered(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid de.greluc.krt.iri.basetool.frontend.model.dto.UpdateDeliveredRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid UpdateDeliveredRequest request) {
     try {
       InventoryItemDto updated =
           backendApiClient.patch(

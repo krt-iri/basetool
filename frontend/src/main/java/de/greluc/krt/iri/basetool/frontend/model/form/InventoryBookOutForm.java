@@ -11,7 +11,9 @@ import lombok.Data;
 @Data
 public class InventoryBookOutForm {
 
-  @NotNull @Min(0) private Double amount;
+  @NotNull
+  @Min(0)
+  private Double amount;
 
   private Double targetAmount;
 
@@ -25,7 +27,8 @@ public class InventoryBookOutForm {
 
   private String terminal;
 
-  @Min(0) private BigDecimal sellAmount;
+  @Min(0)
+  private BigDecimal sellAmount;
 
   private Boolean isGlobal;
 
