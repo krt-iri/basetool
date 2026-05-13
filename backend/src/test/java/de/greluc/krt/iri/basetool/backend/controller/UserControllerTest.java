@@ -1,0 +1,283 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.service.UserService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+/**
+ * Pure-method unit tests for {@link UserController}. Coverage was 39% before
+ * this file. The key behaviours under test:
+ * <ul>
+ *   <li>{@code /me} endpoints derive the caller id from the JWT — never
+ *       from the URL — so callers cannot impersonate someone else.</li>
+ *   <li>Each admin endpoint forwards the path id and request DTO fields
+ *       verbatim to the service; the controller does not silently drop /
+ *       transform values.</li>
+ *   <li>The {@code lookup} endpoint returns reference DTOs directly from
+ *       the service — no mapper involvement, so the email/sensitive fields
+ *       cannot accidentally leak.</li>
+ * </ul>
+ */
+@ExtendWith(MockitoExtension.class)
+class UserControllerTest {
+
+    @Mock private UserService userService;
+    @Mock private UserMapper userMapper;
+    @Mock private Jwt jwt;
+
+    @InjectMocks private UserController controller;
+
+    private static final UUID CALLER_ID = UUID.randomUUID();
+
+    // ── GET / (list) ────────────────────────────────────────────────────────
+
+    @Test
+    void getAllUsers_wrapsServicePageIntoPageResponse() {
+        User entity = new User();
+        UserDto dto = mockDto(UUID.randomUUID());
+        when(userService.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
+        when(userMapper.toDto(entity)).thenReturn(dto);
+
+        PageResponse<UserDto> resp = controller.getAllUsers(0, 50, null);
+
+        assertEquals(1, resp.totalElements());
+        assertSame(dto, resp.content().getFirst());
+    }
+
+    // ── GET /lookup ─────────────────────────────────────────────────────────
+
+    @Test
+    void lookupUsers_returnsReferenceListDirectlyFromService() {
+        // The reference DTO intentionally hides email / rank / description so
+        // a regression that routed through userMapper would leak fields.
+        List<UserReferenceDto> refs = List.of(
+                new UserReferenceDto(UUID.randomUUID(), "alice", "Alice", "Alice", 5),
+                new UserReferenceDto(UUID.randomUUID(), "bob", "Bob", "Bob", 4));
+        when(userService.findAllReference()).thenReturn(refs);
+
+        List<UserReferenceDto> result = controller.lookupUsers();
+
+        assertSame(refs, result);
+        verifyNoInteractions(userMapper);
+    }
+
+    // ── GET /search ─────────────────────────────────────────────────────────
+
+    @Test
+    void searchUsers_forwardsQueryToService() {
+        when(userService.searchByUsername(eq("ali"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        controller.searchUsers("ali", null, null, null);
+
+        verify(userService).searchByUsername(eq("ali"), any(Pageable.class));
+    }
+
+    @Test
+    void searchUsers_wrapsServicePageIntoPageResponse() {
+        User entity = new User();
+        UserDto dto = mockDto(UUID.randomUUID());
+        when(userService.searchByUsername(any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entity)));
+        when(userMapper.toDto(entity)).thenReturn(dto);
+
+        PageResponse<UserDto> resp = controller.searchUsers("x", 0, 50, null);
+
+        assertEquals(1, resp.content().size());
+    }
+
+    // ── GET /{id} ───────────────────────────────────────────────────────────
+
+    @Test
+    void getUserById_delegatesAndMaps() {
+        UUID id = UUID.randomUUID();
+        User entity = new User();
+        UserDto dto = mockDto(id);
+        when(userService.findById(id)).thenReturn(entity);
+        when(userMapper.toDto(entity)).thenReturn(dto);
+
+        UserDto result = controller.getUserById(id);
+
+        assertSame(dto, result);
+    }
+
+    // ── GET /me ─────────────────────────────────────────────────────────────
+
+    @Test
+    void getCurrentUser_resolvesIdFromJwt_neverFromURL() {
+        // SECURITY: the /me endpoint must derive its target id from the JWT,
+        // never from a request parameter. A regression here lets any caller
+        // request another user's profile.
+        User entity = new User();
+        UserDto dto = mockDto(CALLER_ID);
+        when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+        when(userService.findById(CALLER_ID)).thenReturn(entity);
+        when(userMapper.toDto(entity)).thenReturn(dto);
+
+        UserDto result = controller.getCurrentUser(jwt);
+
+        assertSame(dto, result);
+        verify(userService).getUserIdFromJwt(jwt);
+        verify(userService).findById(CALLER_ID);
+    }
+
+    // ── PUT /me/description ─────────────────────────────────────────────────
+
+    @Test
+    void updateMyDescription_resolvesIdFromJwt_andForwardsAllFields() {
+        when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+
+        UserController.UserDescriptionRequest req = new UserController.UserDescriptionRequest();
+        req.setDescription("Pilot extraordinaire");
+        req.setDisplayName("Ace");
+        req.setVersion(2L);
+
+        User updated = new User();
+        UserDto dto = mockDto(CALLER_ID);
+        when(userService.updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L))
+                .thenReturn(updated);
+        when(userMapper.toDto(updated)).thenReturn(dto);
+
+        UserDto result = controller.updateMyDescription(jwt, req);
+
+        assertSame(dto, result);
+        verify(userService).updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L);
+    }
+
+    // ── PUT /me/read-announcement/{id} ──────────────────────────────────────
+
+    @Test
+    void updateReadAnnouncement_resolvesIdFromJwt_andForwardsAnnouncementId() {
+        UUID announcementId = UUID.randomUUID();
+        when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+        User updated = new User();
+        when(userService.updateReadAnnouncement(CALLER_ID, announcementId)).thenReturn(updated);
+        UserDto dto = mockDto(CALLER_ID);
+        when(userMapper.toDto(updated)).thenReturn(dto);
+
+        UserDto result = controller.updateReadAnnouncement(jwt, announcementId);
+
+        assertSame(dto, result);
+        verify(userService).updateReadAnnouncement(CALLER_ID, announcementId);
+    }
+
+    // ── PUT /{id}/attributes ────────────────────────────────────────────────
+
+    @Test
+    void updateUserAttributes_forwardsAllFieldsToService() {
+        UUID id = UUID.randomUUID();
+
+        UserController.UserAttributesRequest req = new UserController.UserAttributesRequest();
+        req.setRank(7);
+        req.setDescription("desc");
+        req.setDisplayName("name");
+        req.setVersion(3L);
+        req.setJoinDate(LocalDate.of(2024, 1, 15));
+
+        User updated = new User();
+        UserDto dto = mockDto(id);
+        when(userService.updateUserAttributes(id, 7, "desc", "name", 3L, LocalDate.of(2024, 1, 15)))
+                .thenReturn(updated);
+        when(userMapper.toDto(updated)).thenReturn(dto);
+
+        UserDto result = controller.updateUserAttributes(id, req);
+
+        assertSame(dto, result);
+        verify(userService).updateUserAttributes(id, 7, "desc", "name", 3L, LocalDate.of(2024, 1, 15));
+    }
+
+    @Test
+    void updateUserAttributes_withNullJoinDate_forwardsNull() {
+        UUID id = UUID.randomUUID();
+        UserController.UserAttributesRequest req = new UserController.UserAttributesRequest();
+        req.setRank(3);
+        req.setVersion(1L);
+        req.setJoinDate(null);
+
+        when(userService.updateUserAttributes(eq(id), eq(3), any(), any(), eq(1L), eq(null)))
+                .thenReturn(new User());
+        when(userMapper.toDto(any())).thenReturn(mockDto(id));
+
+        controller.updateUserAttributes(id, req);
+
+        verify(userService).updateUserAttributes(id, 3, null, null, 1L, null);
+    }
+
+    // ── PATCH /{id}/logistician ─────────────────────────────────────────────
+
+    @Test
+    void updateLogisticianStatus_truePathForwardsTrue() {
+        UUID id = UUID.randomUUID();
+        when(userService.updateLogisticianStatus(id, true)).thenReturn(new User());
+        when(userMapper.toDto(any())).thenReturn(mockDto(id));
+
+        controller.updateLogisticianStatus(id, true);
+
+        verify(userService).updateLogisticianStatus(id, true);
+    }
+
+    @Test
+    void updateLogisticianStatus_falsePathForwardsFalse() {
+        UUID id = UUID.randomUUID();
+        when(userService.updateLogisticianStatus(id, false)).thenReturn(new User());
+        when(userMapper.toDto(any())).thenReturn(mockDto(id));
+
+        controller.updateLogisticianStatus(id, false);
+
+        verify(userService).updateLogisticianStatus(id, false);
+    }
+
+    // ── PATCH /{id}/mission-manager ─────────────────────────────────────────
+
+    @Test
+    void updateMissionManagerStatus_passesBooleanFlagVerbatim() {
+        UUID id = UUID.randomUUID();
+        when(userService.updateMissionManagerStatus(id, true)).thenReturn(new User());
+        when(userMapper.toDto(any())).thenReturn(mockDto(id));
+
+        controller.updateMissionManagerStatus(id, true);
+
+        verify(userService).updateMissionManagerStatus(id, true);
+    }
+
+    // ── DELETE /{id} ────────────────────────────────────────────────────────
+
+    @Test
+    void deleteUser_delegatesIdToService() {
+        UUID id = UUID.randomUUID();
+
+        controller.deleteUser(id);
+
+        verify(userService).deleteUser(id);
+        verifyNoMoreInteractions(userService, userMapper);
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private static UserDto mockDto(UUID id) {
+        return new UserDto(
+                id, "u", "U", "U", "First", "Last", "u@example.com", 5, "desc",
+                java.util.Set.of(), java.util.Set.of(), null, false, false, true, 1L, null);
+    }
+}

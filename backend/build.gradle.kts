@@ -87,6 +87,9 @@ dependencies {
   // entities, service-layer code does not touch SecurityContextHolder, REST
   // endpoints are authorisation-annotated, ...). See ArchitectureTest.
   testImplementation(libs.archunit.core)
+  // MockWebServer for UexClient WebClient testing (already in version catalog
+  // and used by the frontend module; backend gets the same shared version).
+  testImplementation(libs.okhttp3.mockwebserver)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
