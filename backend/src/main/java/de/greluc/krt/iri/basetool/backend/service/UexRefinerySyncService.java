@@ -54,7 +54,7 @@ public class UexRefinerySyncService {
                     return n;
                   });
 
-      boolean isNew = entity.getId() == null;
+      final boolean isNew = entity.getId() == null;
 
       entity.setCode(dto.code());
       entity.setRatingYield(dto.ratingYield());

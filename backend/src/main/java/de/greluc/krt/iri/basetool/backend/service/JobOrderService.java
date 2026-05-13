@@ -318,7 +318,7 @@ public class JobOrderService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
-    Integer priority = jobOrder.getPriority();
+    final Integer priority = jobOrder.getPriority();
     inventoryItemRepository.unlinkJobOrder(id);
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();

@@ -187,7 +187,7 @@ public class InventoryItemService {
         .stream()
         .map(
             entry -> {
-              de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto mat =
+              final de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto mat =
                   entry.getKey();
               List<InventoryItemDto> matItems = entry.getValue();
 
@@ -267,15 +267,15 @@ public class InventoryItemService {
           "You are not allowed to create inventory items for other users");
     }
 
-    User user =
+    final User user =
         userRepository
             .findById(targetUserId)
             .orElseThrow(() -> new NotFoundException("User not found"));
-    Material material =
+    final Material material =
         materialRepository
             .findById(dto.materialId())
             .orElseThrow(() -> new NotFoundException("Material not found"));
-    Location location =
+    final Location location =
         locationRepository
             .findById(dto.locationId())
             .orElseThrow(() -> new NotFoundException("Location not found"));

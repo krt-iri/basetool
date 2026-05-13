@@ -127,7 +127,7 @@ public class JobOrderHandoverService {
         throw new BadRequestException("Amount must be a whole number for PIECE materials");
       }
 
-      double remainingAmount = inventoryItem.getAmount() - itemDto.amount();
+      final double remainingAmount = inventoryItem.getAmount() - itemDto.amount();
 
       JobOrderHandoverItem handoverItem = new JobOrderHandoverItem();
       handoverItem.setMaterial(inventoryItem.getMaterial());
