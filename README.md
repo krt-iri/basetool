@@ -201,6 +201,110 @@ To run the whole stack with exposed host ports for development:
     *   **Swagger UI**: `http://localhost:11261/swagger-ui.html`
     *   **Keycloak**: `http://localhost:18080`
 
+### Running the Local Test Stack
+
+For quick UI verification of an in-progress change in a worktree, or for any scenario where you want to spin up the full stack **without exposing the production `.env`, the production `keystore.p12`, or the shared `realm-export.json`** to a transient workspace. This setup uses an isolated set of throwaway credentials so a forgotten `docker volume prune`, a stray screenshot, or a CI artifact upload cannot leak real secrets. The rule is enforced by `CLAUDE.md` → *Testing*; the worktree's `.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json` so the test artifacts never land in commits.
+
+The procedure assumes you are working in the repository root (or in a worktree; the commands are identical).
+
+1.  **Create `.env.test`** with throwaway credentials. The strings below are placeholders — pick anything that is _not_ a value you use anywhere else.
+    ```env
+    # Backend DB (Postgres)
+    POSTGRES_DB=krt_basetool_test
+    POSTGRES_USER=basetool_test
+    POSTGRES_PASSWORD=basetool-test-pw-do-not-use-in-prod
+
+    # Keycloak DB (Postgres)
+    KC_POSTGRES_DB=keycloak_test
+    KC_POSTGRES_USER=keycloak_test
+    KC_POSTGRES_PASSWORD=keycloak-test-pw-do-not-use-in-prod
+
+    # Keycloak bootstrap admin
+    KC_BOOTSTRAP_ADMIN_USERNAME=admin
+    KC_BOOTSTRAP_ADMIN_PASSWORD=admin-test-pw-do-not-use-in-prod
+
+    # Keycloak admin-API client secret (must match realm-export.json — see below)
+    KEYCLOAK_ADMIN_CLIENT_SECRET=test-client-secret-do-not-use-in-prod
+
+    # Redis
+    REDIS_PASSWORD=redis-test-pw-do-not-use-in-prod
+
+    # PKCS12 keystore password (must match the test keystore — see below)
+    SERVER_SSL_KEY_STORE_PASSWORD=keystore-test-pw-do-not-use-in-prod
+    ```
+
+2.  **Generate a test keystore** with the password from step 1. Do _not_ copy a `keystore.p12` from any other checkout — the password would not match and `keytool` errors are hard to debug.
+    ```bash
+    keytool -genkeypair -alias backend -storetype PKCS12 \
+      -keystore backend/src/main/resources/keystore.p12 \
+      -storepass "keystore-test-pw-do-not-use-in-prod" \
+      -keypass  "keystore-test-pw-do-not-use-in-prod" \
+      -keyalg RSA -keysize 2048 -validity 365 \
+      -dname "CN=localhost, OU=Test, O=KRT Basetool Test, L=Test, ST=Test, C=DE" \
+      -ext "san=dns:localhost,ip:127.0.0.1,dns:backend"
+    ```
+
+3.  **Provide a test `realm-export.json`** at the repo root containing a Keycloak realm named `iri` with a `basetool-frontend` public client, a `backend-service` confidential client whose `secret` matches `KEYCLOAK_ADMIN_CLIENT_SECRET` from `.env.test`, and at least one test user. The minimal recipe: copy the production export, replace the `backend-service` secret, clear the SMTP block, drop the password policy, and replace the `users` array with a single test admin:
+    ```python
+    # build-test-realm.py — run once, never commit the output
+    import json
+    r = json.load(open('realm-export.json', encoding='utf-8'))   # production source (separate checkout)
+    r['smtpServer'] = {}
+    r.pop('passwordPolicy', None)
+    for c in r['clients']:
+        if c['clientId'] == 'backend-service':
+            c['secret'] = 'test-client-secret-do-not-use-in-prod'
+            c.setdefault('attributes', {}).pop('client.secret.creation.time', None)
+        if c['clientId'] == 'basetool-frontend':
+            c['redirectUris'] = ['http://frontend:18081/*', 'http://localhost:18081/*']
+            c['webOrigins']   = ['http://frontend:18081', 'http://localhost:18081']
+    r['users'] = [{
+        'username': 'test-admin',
+        'enabled': True, 'emailVerified': True,
+        'email': 'test-admin@example.test',
+        'firstName': 'Test', 'lastName': 'Admin',
+        'credentials': [{'type': 'password', 'value': 'test-admin-pw', 'temporary': False}],
+        'realmRoles': ['Admin', 'Officer', 'Squadron Member', 'default-roles-iri',
+                       'offline_access', 'uma_authorization'],
+    }]
+    json.dump(r, open('realm-export.json', 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+    ```
+
+4.  **Use the `docker-compose.test.yml` override.** This file lives in the repo root and overrides three things in the base `docker-compose.yml`:
+    *   the hardcoded production `KEYCLOAK_ISSUER_URI` in the backend/frontend templates,
+    *   `KC_HOSTNAME=host.docker.internal` on Keycloak so the OIDC issuer URL resolves identically from the host browser (Docker Desktop magic) and from inside containers (extra\_hosts: host-gateway),
+    *   the matching `KEYCLOAK_ADMIN_URL`, `KEYCLOAK_REALM` and `KEYCLOAK_ADMIN_CLIENT_ID` on the backend.
+
+5.  **One-time cleanup** if a previous Postgres init left stale credentials in the bind-mount data dirs (you'll see `FATAL: password authentication failed` in the logs):
+    ```bash
+    docker compose --env-file .env.test \
+      -f docker-compose.yml -f docker-compose.test.yml --profile dev down
+    MSYS_NO_PATHCONV=1 docker run --rm -v /var/iri/db-backend:/data alpine \
+      sh -c "rm -rf /data/* /data/.[!.]*"
+    MSYS_NO_PATHCONV=1 docker run --rm -v /var/iri/db-keycloak:/data alpine \
+      sh -c "rm -rf /data/* /data/.[!.]*"
+    ```
+    The `MSYS_NO_PATHCONV=1` prefix is only needed on Git Bash for Windows; it prevents the shell from translating the `/var/iri/...` Linux path into a Windows path inside the Docker CLI.
+
+6.  **Start the stack**:
+    ```bash
+    docker compose --env-file .env.test \
+      -f docker-compose.yml -f docker-compose.test.yml --profile dev up -d
+    ```
+
+7.  **Access** (same ports as the regular dev stack):
+    *   **Frontend**: `http://localhost:18081`
+    *   **Backend API**: `https://localhost:11261` (self-signed cert from the test keystore)
+    *   **Swagger UI**: `https://localhost:11261/swagger-ui.html`
+    *   **Keycloak**: `http://localhost:18080` — log in with the bootstrap admin from `.env.test`
+    *   **Realm `iri` test user**: username `test-admin`, password `test-admin-pw`
+
+8.  **Tear down** after the verification — leaving a test stack running consumes 2+ GB of RAM and the named anonymous volumes will collide with the next spin-up:
+    ```bash
+    docker compose --env-file .env.test \
+      -f docker-compose.yml -f docker-compose.test.yml --profile dev down --volumes
+    ```
+
 ### Local Development Setup
 
 To run the Java applications locally (outside Docker) for development:

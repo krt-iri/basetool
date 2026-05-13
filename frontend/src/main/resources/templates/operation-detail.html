@@ -246,7 +246,7 @@
 
     <div class="mission-columns-container">
 
-        <!-- Column 1: Operation Details -->
+        <!-- Column 1: Operation Details (inline editable, mirrors mission-detail) -->
         <div class="mission-column" id="col-details" data-panel-key="details" th:attr="data-operation-id=${operation.id}">
             <button type="button" class="col-header" aria-expanded="true" aria-controls="col-details-content"
                     data-panel-toggle="col-details"
@@ -256,33 +256,38 @@
             </button>
             <div class="col-content" id="col-details-content">
                 <div class="hud-box">
-                    <div class="flex-between-mb">
-                        <h2 style="margin:0; font-family: var(--font-headline); color: var(--color-primary);" th:text="${operation.name}">Name</h2>
-                        <div class="flex-gap-xs">
-                            <div sec:authorize="hasRole('MISSION_MANAGER')">
-                                <button type="button" class="btn" style="padding:0.4rem 0.8rem; font-size:0.8rem;" th:text="#{general.edit}"
-                                        th:data-id="${operation.id}"
-                                        th:data-name="${operation.name}"
-                                        th:data-description="${operation.description}"
-                                        th:data-status="${operation.status}"
-                                        th:data-version="${operation.version}"
-                                        onclick="openEditModal(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-description'), this.getAttribute('data-status'), this.getAttribute('data-version'))">Edit</button>
-                            </div>
-                            <div sec:authorize="hasRole('ADMIN')">
-                                <button type="button" class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.8rem;" th:text="#{general.delete}"
-                                        th:data-id="${operation.id}"
-                                        onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
-                            </div>
+                    <form id="operation-form" th:action="@{/operations/{id}/update(id=${operation.id})}" method="post">
+                        <input type="hidden" name="version" th:value="${operation.version}">
+
+                        <div class="form-group">
+                            <label for="op-name" th:text="#{operation.name}">Name</label>
+                            <input type="text" id="op-name" name="name" th:value="${operation.name}" required
+                                   th:disabled="${!canEdit}">
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{operation.status}">Status</label>
-                        <span style="display:block; padding:0.5rem; background:var(--color-gray-4); border:1px solid var(--color-gray-3);" th:text="${operation.status}"></span>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{operation.description}">Description</label>
-                        <p style="padding: 1rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); margin:0; white-space: pre-wrap;" th:text="${operation.description}"></p>
-                    </div>
+
+                        <div class="form-group">
+                            <label for="op-status" th:text="#{operation.status}">Status</label>
+                            <select id="op-status" name="status" required th:disabled="${!canEdit}">
+                                <option value="PLANNED" th:selected="${operation.status == 'PLANNED'}" th:text="#{operation.status.planned}">PLANNED</option>
+                                <option value="ACTIVE" th:selected="${operation.status == 'ACTIVE'}" th:text="#{operation.status.active}">ACTIVE</option>
+                                <option value="COMPLETED" th:selected="${operation.status == 'COMPLETED'}" th:text="#{operation.status.completed}">COMPLETED</option>
+                                <option value="CANCELED" th:selected="${operation.status == 'CANCELED'}" th:text="#{operation.status.canceled}">CANCELED</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="op-desc" th:text="#{operation.description}">Description</label>
+                            <textarea id="op-desc" name="description" rows="6" th:disabled="${!canEdit}" th:text="${operation.description}"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <!-- Buttons box at the bottom of the Details column, same pattern as mission-detail. -->
+                <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
+                    <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" style="margin-right: auto;" th:text="#{general.delete}"
+                            th:data-id="${operation.id}"
+                            onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
+                    <button th:if="${canEdit}" type="submit" form="operation-form" class="btn" th:text="#{general.save}">Save</button>
+                    <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Back</a>
                 </div>
             </div>
         </div>
@@ -309,7 +314,7 @@
                             <tbody>
                                 <tr th:each="msn : ${missions}">
                                     <td th:text="${msn.name}">Name</td>
-                                    <td th:text="${msn.status}">Status</td>
+                                    <td th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</td>
                                     <td>
                                         <a class="btn" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
                                     </td>
@@ -435,37 +440,6 @@
     </div>
 </div>
 
-<!-- Edit Modal -->
-<div id="edit-operation-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
-    <div class="modal-content hud-box" style="background:#141414; padding:2rem; max-width:500px; width:100%; margin: 10% auto; border: 1px solid var(--color-primary);">
-        <h2 th:text="#{operation.edit}">Edit Operation</h2>
-        <form id="edit-operation-form" method="post" th:action="@{/operations/update}">
-            <input type="hidden" id="edit-version" name="version">
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label for="edit-name" th:text="#{operation.name}">Name</label>
-                <input type="text" id="edit-name" name="name" required>
-            </div>
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label for="edit-desc" th:text="#{operation.description}">Description</label>
-                <textarea id="edit-desc" name="description"></textarea>
-            </div>
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label for="edit-status" th:text="#{operation.status}">Status</label>
-                <select id="edit-status" name="status" required>
-                    <option value="PLANNED" th:text="#{operation.status.planned}">PLANNED</option>
-                    <option value="ACTIVE" th:text="#{operation.status.active}">ACTIVE</option>
-                    <option value="COMPLETED" th:text="#{operation.status.completed}">COMPLETED</option>
-                    <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
-                </select>
-            </div>
-            <div class="mt-2-flex-gap">
-                <button type="submit" class="btn" th:text="#{general.save}">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- Delete Modal -->
 <div id="delete-operation-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
     <div class="modal-content hud-box" style="background:#141414; padding:2rem; max-width:500px; width:100%; margin: 10% auto; border: 1px solid var(--color-danger);">
@@ -523,15 +497,6 @@
         } catch (e) {
             // ignore
         }
-    }
-
-    function openEditModal(id, name, desc, status, version) {
-        document.getElementById('edit-operation-form').action = '/operations/' + id + '/update';
-        document.getElementById('edit-name').value = name;
-        document.getElementById('edit-desc').value = desc && desc !== 'null' ? desc : '';
-        document.getElementById('edit-status').value = status;
-        document.getElementById('edit-version').value = version;
-        document.getElementById('edit-operation-modal').style.display = 'block';
     }
 
     function openDeleteModal(id) {

@@ -4,7 +4,6 @@ import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -65,40 +64,6 @@ class OperationMapperTest {
         assertNull(entity.getUpdatedAt());
         assertNotNull(entity.getMissions(), "missions collection should be initialised by entity defaults");
         assertTrue(entity.getMissions().isEmpty());
-    }
-
-    @Test
-    void updateEntity_shouldOverwriteScalarFieldsButNotIdTimestampsOrMissions() {
-        // Given an existing managed entity
-        UUID existingId = UUID.randomUUID();
-        Instant originalCreated = Instant.parse("2026-01-01T10:00:00Z");
-        Instant originalUpdated = Instant.parse("2026-02-01T10:00:00Z");
-
-        Operation entity = new Operation();
-        entity.setId(existingId);
-        entity.setName("Old name");
-        entity.setDescription("Old desc");
-        entity.setStatus(OperationStatus.PLANNED);
-        entity.setCreatedAt(originalCreated);
-        entity.setUpdatedAt(originalUpdated);
-
-        OperationUpdateDto update = new OperationUpdateDto(
-                "New name", "New desc", OperationStatus.COMPLETED, 9L
-        );
-
-        // When
-        mapper.updateEntity(update, entity);
-
-        // Then — scalar fields overwritten
-        assertEquals("New name", entity.getName());
-        assertEquals("New desc", entity.getDescription());
-        assertEquals(OperationStatus.COMPLETED, entity.getStatus());
-        // Id and audit timestamps explicitly ignored (server-managed)
-        assertEquals(existingId, entity.getId());
-        assertEquals(originalCreated, entity.getCreatedAt());
-        assertEquals(originalUpdated, entity.getUpdatedAt());
-        // Missions collection ignored — keeps reference
-        assertNotNull(entity.getMissions());
     }
 
     @Test

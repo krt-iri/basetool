@@ -29,7 +29,7 @@ public class Operation extends AbstractEntity<UUID> {
     @Column(nullable = false)
     private OperationStatus status;
 
-    @OneToMany(mappedBy = "operation", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "operation")
     @OrderBy("plannedStartTime DESC")
     private Set<Mission> missions = new HashSet<>();
 }

@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
@@ -8,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -121,6 +124,41 @@ class OperationServiceTest {
     }
 
     @Test
+    void deleteOperation_unlinksMissions_butDoesNotDeleteThem() {
+        // The contract of deleteOperation is to clear the mission -> operation
+        // back-reference and clear the in-memory collection, then delete the
+        // operation itself. Missions and everything hanging off them (participants,
+        // finance entries, inventory items, refinery orders) MUST survive — only
+        // the operation aggregate root vanishes.
+        UUID id = UUID.randomUUID();
+        Operation operation = new Operation();
+        operation.setId(id);
+
+        Mission m1 = new Mission();
+        m1.setId(UUID.randomUUID());
+        m1.setOperation(operation);
+        Mission m2 = new Mission();
+        m2.setId(UUID.randomUUID());
+        m2.setOperation(operation);
+        Set<Mission> missions = new HashSet<>();
+        missions.add(m1);
+        missions.add(m2);
+        operation.setMissions(missions);
+
+        when(operationRepository.findById(id)).thenReturn(Optional.of(operation));
+
+        operationService.deleteOperation(id);
+
+        assertNull(m1.getOperation(),
+                "mission #1 back-reference to the operation must be cleared");
+        assertNull(m2.getOperation(),
+                "mission #2 back-reference to the operation must be cleared");
+        assertTrue(operation.getMissions().isEmpty(),
+                "in-memory missions collection must be cleared to keep state consistent");
+        verify(operationRepository, times(1)).delete(operation);
+    }
+
+    @Test
     void deleteOperation_throwsNotFoundException_whenMissing() {
         UUID missing = UUID.randomUUID();
         when(operationRepository.findById(missing)).thenReturn(Optional.empty());
@@ -134,29 +172,109 @@ class OperationServiceTest {
     class UpdateOperationTests {
 
         @Test
-        void updatesAllFields_whenVersionMatches() {
+        void updatesAllFields_whenVersionMatchesAndTransitionAllowed() {
             UUID id = UUID.randomUUID();
             Operation existing = new Operation();
             existing.setId(id);
             existing.setName("old");
             existing.setDescription("old-desc");
             existing.setStatus(OperationStatus.PLANNED);
+            existing.setVersion(2L);
 
-            Operation incoming = new Operation();
-            incoming.setName("new");
-            incoming.setDescription("new-desc");
-            incoming.setStatus(OperationStatus.COMPLETED);
-            // incoming.version stays null -> the optimistic check is bypassed,
-            // matching the existing controller-level guard used elsewhere.
+            // PLANNED -> ACTIVE is allowed by the state machine.
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "new", "new-desc", OperationStatus.ACTIVE, 2L);
 
             when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
             when(operationRepository.save(existing)).thenReturn(existing);
 
-            Operation result = operationService.updateOperation(id, incoming);
+            Operation result = operationService.updateOperation(id, incoming, false);
 
             assertEquals("new", result.getName());
             assertEquals("new-desc", result.getDescription());
+            assertEquals(OperationStatus.ACTIVE, result.getStatus());
+        }
+
+        @Test
+        void rejectsForbiddenStatusTransition_whenNotAdmin() {
+            // PLANNED -> COMPLETED skips the ACTIVE phase and is not a valid transition.
+            UUID id = UUID.randomUUID();
+            Operation existing = new Operation();
+            existing.setId(id);
+            existing.setStatus(OperationStatus.PLANNED);
+            existing.setVersion(1L);
+
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "n", "d", OperationStatus.COMPLETED, 1L);
+
+            when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
+
+            BadRequestException ex = assertThrows(BadRequestException.class,
+                    () -> operationService.updateOperation(id, incoming, false));
+            assertTrue(ex.getMessage().contains("PLANNED"));
+            assertTrue(ex.getMessage().contains("COMPLETED"));
+        }
+
+        @Test
+        void terminalStatusCannotBeChanged_whenNotAdmin() {
+            // COMPLETED has no outgoing transitions.
+            UUID id = UUID.randomUUID();
+            Operation existing = new Operation();
+            existing.setId(id);
+            existing.setStatus(OperationStatus.COMPLETED);
+            existing.setVersion(1L);
+
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "n", "d", OperationStatus.ACTIVE, 1L);
+
+            when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
+
+            assertThrows(BadRequestException.class,
+                    () -> operationService.updateOperation(id, incoming, false));
+        }
+
+        @Test
+        void sameStatusIsAlwaysAllowed_evenWithoutAdmin() {
+            // Updating only the name/description on a COMPLETED operation must NOT
+            // trip the state-machine guard. Same-status transitions are always fine.
+            UUID id = UUID.randomUUID();
+            Operation existing = new Operation();
+            existing.setId(id);
+            existing.setName("old");
+            existing.setStatus(OperationStatus.COMPLETED);
+            existing.setVersion(1L);
+
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "new", "post-mortem description", OperationStatus.COMPLETED, 1L);
+
+            when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
+            when(operationRepository.save(existing)).thenReturn(existing);
+
+            Operation result = operationService.updateOperation(id, incoming, false);
+
+            assertEquals("new", result.getName());
             assertEquals(OperationStatus.COMPLETED, result.getStatus());
+        }
+
+        @Test
+        void adminMayOverrideStatusMachine() {
+            // ADMIN reverses a CANCELED operation back to PLANNED — disallowed for
+            // regular MISSION_MANAGER callers, but the override flag opens the gate.
+            UUID id = UUID.randomUUID();
+            Operation existing = new Operation();
+            existing.setId(id);
+            existing.setStatus(OperationStatus.CANCELED);
+            existing.setVersion(1L);
+
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "n", "d", OperationStatus.PLANNED, 1L);
+
+            when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
+            when(operationRepository.save(existing)).thenReturn(existing);
+
+            Operation result = operationService.updateOperation(id, incoming, true);
+
+            assertEquals(OperationStatus.PLANNED, result.getStatus());
         }
 
         @Test
@@ -164,8 +282,10 @@ class OperationServiceTest {
             UUID missing = UUID.randomUUID();
             when(operationRepository.findById(missing)).thenReturn(Optional.empty());
 
+            OperationUpdateDto dto = new OperationUpdateDto(
+                    "n", "d", OperationStatus.PLANNED, 0L);
             assertThrows(NotFoundException.class,
-                    () -> operationService.updateOperation(missing, new Operation()));
+                    () -> operationService.updateOperation(missing, dto, false));
         }
 
         @Test
@@ -175,13 +295,13 @@ class OperationServiceTest {
             existing.setId(id);
             existing.setVersion(7L);
 
-            Operation incoming = new Operation();
-            incoming.setVersion(3L);
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "n", "d", OperationStatus.PLANNED, 3L);
 
             when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
 
             assertThrows(ObjectOptimisticLockingFailureException.class,
-                    () -> operationService.updateOperation(id, incoming));
+                    () -> operationService.updateOperation(id, incoming, false));
         }
 
         @Test
@@ -189,20 +309,27 @@ class OperationServiceTest {
             // Mirrors the bypass behavior used by other services: a null version on
             // the inbound DTO skips the explicit check (Hibernate still catches stale
             // writes via the UPDATE ... WHERE version=N fallback on commit).
+            // Note: in practice OperationUpdateDto declares @NotNull on version so
+            // this code path is guarded at the controller boundary; the service-
+            // level branch still has to remain forgiving so internal callers can
+            // bypass the check explicitly.
             UUID id = UUID.randomUUID();
             Operation existing = new Operation();
             existing.setId(id);
             existing.setVersion(5L);
             existing.setName("old");
+            existing.setStatus(OperationStatus.PLANNED);
 
-            Operation incoming = new Operation();
-            incoming.setName("new");
-            // incoming.version == null
+            // Same-status update with a null version on the DTO. The status gate
+            // is a no-op (PLANNED -> PLANNED is always fine), and the manual
+            // optimistic-lock check is skipped due to the null version.
+            OperationUpdateDto incoming = new OperationUpdateDto(
+                    "new", null, OperationStatus.PLANNED, null);
 
             when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
             when(operationRepository.save(existing)).thenReturn(existing);
 
-            Operation result = operationService.updateOperation(id, incoming);
+            Operation result = operationService.updateOperation(id, incoming, false);
             assertEquals("new", result.getName());
         }
     }
@@ -238,7 +365,8 @@ class OperationServiceTest {
         @Test
         void throwsNotFound_whenOperationDoesNotExist() {
             UUID missing = UUID.randomUUID();
-            when(operationRepository.findById(missing)).thenReturn(Optional.empty());
+            when(operationRepository.findWithMissionsAndParticipantsById(missing))
+                    .thenReturn(Optional.empty());
 
             assertThrows(NotFoundException.class,
                     () -> operationService.getOperationPayouts(missing));
@@ -575,7 +703,8 @@ class OperationServiceTest {
             Operation op = new Operation();
             op.setId(OPERATION_ID);
             op.setMissions(missions);
-            when(operationRepository.findById(OPERATION_ID)).thenReturn(Optional.of(op));
+            when(operationRepository.findWithMissionsAndParticipantsById(OPERATION_ID))
+                    .thenReturn(Optional.of(op));
         }
 
         private Mission newMission(Instant actualStart, Instant actualEnd) {

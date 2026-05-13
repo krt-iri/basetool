@@ -1,6 +1,9 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -9,12 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 @Controller
@@ -32,9 +37,9 @@ public class OperationPageController {
             @RequestParam(required = false, defaultValue = "20") Integer size,
             Model model) {
         try {
-            PageResponse<Map<String, Object>> operationsPage = backendApiClient.get(
+            PageResponse<OperationDto> operationsPage = backendApiClient.get(
                     "/api/v1/operations?page=" + page + "&size=" + size + "&sort=createdAt,desc",
-                    new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
+                    new ParameterizedTypeReference<PageResponse<OperationDto>>() {},
                     false
             );
             model.addAttribute("operations", operationsPage.content());
@@ -52,15 +57,15 @@ public class OperationPageController {
             @PathVariable @NotNull UUID id,
             @RequestParam(required = false, defaultValue = "0") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size,
+            Authentication authentication,
             Model model) {
         try {
-            Map<String, Object> operation = backendApiClient.get("/api/v1/operations/" + id, new ParameterizedTypeReference<Map<String, Object>>() {}, false);
+            OperationDto operation = backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false);
             model.addAttribute("operation", operation);
 
-            // Fetch missions for this operation
-            PageResponse<Map<String, Object>> missionsPage = backendApiClient.get(
+            PageResponse<MissionListDto> missionsPage = backendApiClient.get(
                     "/api/v1/missions/search?operationId=" + id + "&page=" + page + "&size=" + size + "&sort=plannedStartTime,asc",
-                    new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
+                    new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
                     false
             );
             model.addAttribute("missions", missionsPage.content());
@@ -69,12 +74,20 @@ public class OperationPageController {
             OperationFinanceDto operationFinance = backendApiClient.get("/api/v1/operations/" + id + "/finances", OperationFinanceDto.class, false);
             model.addAttribute("operationFinance", operationFinance);
 
-            java.util.List<de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto> payouts = backendApiClient.get(
+            List<OperationPayoutDto> payouts = backendApiClient.get(
                     "/api/v1/operations/" + id + "/payouts",
-                    new ParameterizedTypeReference<java.util.List<de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto>>() {},
+                    new ParameterizedTypeReference<List<OperationPayoutDto>>() {},
                     false
             );
             model.addAttribute("operationPayouts", payouts);
+
+            // Resolved at the HTTP boundary so the template stays free of inline
+            // role-expression checks. The backend's PUT /api/v1/operations/{id}
+            // requires ROLE_MISSION_MANAGER (or any role that reaches it via the
+            // hierarchy — ADMIN, OFFICER) AND the same role is granted by the
+            // app_user.is_mission_manager flag through the JWT-converter, so the
+            // role check here matches what the backend enforces.
+            model.addAttribute("canEdit", hasMissionManagerRole(authentication));
 
         } catch (Exception e) {
             log.error("Error loading operation details", e);
@@ -82,6 +95,17 @@ public class OperationPageController {
             return "redirect:/operations";
         }
         return "operation-detail";
+    }
+
+    private static boolean hasMissionManagerRole(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> "ROLE_ADMIN".equals(role)
+                        || "ROLE_OFFICER".equals(role)
+                        || "ROLE_MISSION_MANAGER".equals(role));
     }
 
     @PostMapping("/create")

@@ -32,9 +32,11 @@ Use Docker Compose profiles:
 docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev   # deps only, run apps locally
 docker compose --profile dev up -d                                                          # full dev stack with host port exposure
 docker compose --profile prod up -d                                                         # prod-equivalent stack behind nginx-proxy-manager
+docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
+    --profile dev up -d                                                                     # isolated test stack with throwaway credentials
 ```
 
-Host ports (dev profile only): backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`. A `.env` at repo root is required (see README for keys).
+Host ports (dev profile only): backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` plus a locally generated `keystore.p12` and a stripped `realm-export.json` — see the README's `Running the Local Test Stack` section for setup, and never substitute production artifacts for those.
 
 The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `changeit`); the frontend talks to `https://backend:11261` in prod and `http://localhost:11261` (overridable via `BACKEND_URL`) in dev. Swagger UI is at `https://localhost:11261/swagger-ui.html`.
 
@@ -126,6 +128,7 @@ Every layout change and new component must work across **four** device classes:
 - Structure: Given/When/Then (or Arrange/Act/Assert).
 - Mock external/complex dependencies with Mockito (`@Mock`, `@InjectMocks`).
 - **Every new feature ships with tests.** No exceptions.
+- **Never use production / real credentials in tests or local test stacks.** This is a hard rule. It applies to every kind of test (Mockito unit tests, MockMvc, `@SpringBootTest`, TestContainers integration tests) and to every manually-started local stack used to verify a change. Forbidden inputs include — non-exhaustively — the production `.env` at the repo root, the shared `keystore.p12` at `backend/src/main/resources/keystore.p12`, the shared `realm-export.json` Keycloak dump, real OIDC client secrets, real database passwords, real SMTP credentials, real Keycloak admin passwords, real JWT signing keys. Use dedicated test artifacts instead: `.env.test` (gitignored via `.env.*`), a `keystore.p12` generated locally with a throwaway password, a stripped `realm-export.json` with rotated client secrets and a synthetic test user, the `docker-compose.test.yml` override. The README has a `Running the Local Test Stack` section with the exact `keytool` / Python-rewrite commands. Reason: anything that enters a worktree, a CI log, a container volume, a screenshot artifact, an MCP-preview snapshot or an editor backup has to be assumed leaked and rotated — and the recovery is cheaper if it never had to happen in the first place. When you spin a local stack up to verify a UI change, always source `.env.test` (never `.env`), point Docker Compose at `--env-file .env.test`, and tear the stack down with `down --volumes` after the verification.
 
 Minimal example:
 
