@@ -346,12 +346,12 @@ public class UserService {
     return userRepository.findAll(Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
 
-  public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
-    return userRepository.findAllReference();
-  }
-
   public Page<User> findAll(@NotNull Pageable pageable) {
     return userRepository.findAll(pageable);
+  }
+
+  public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
+    return userRepository.findAllReference();
   }
 
   public List<User> searchByUsername(@NotNull String query) {

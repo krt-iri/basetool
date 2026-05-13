@@ -75,17 +75,6 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("isInternal") Boolean isInternal,
       @Param("operationId") UUID operationId);
 
-  @Override
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
-  List<Mission> findAll();
-
-  /**
-   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
-   */
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
-  Page<Mission> findAll(Pageable pageable);
-
   /**
    * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID)} - same
    * filter contract; sorting is delegated to {@link Pageable} so the caller can pick the column.
@@ -107,6 +96,17 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("isInternal") Boolean isInternal,
       @Param("operationId") UUID operationId,
       Pageable pageable);
+
+  @Override
+  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  List<Mission> findAll();
+
+  /**
+   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
+  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  Page<Mission> findAll(Pageable pageable);
 
   /**
    * Bulk-reassigns every mission owned by {@code oldUser} to {@code newUser}; used by the

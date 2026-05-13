@@ -65,6 +65,36 @@ public abstract class MissionMapper {
       expression = "java(resolveRegisteredParticipants(mission))")
   public abstract MissionDto toDto(Mission mission);
 
+  /** Maps a {@link MissionParticipant} entity to its outbound DTO. */
+  public abstract MissionParticipantDto toDto(MissionParticipant participant);
+
+  /** Maps a {@link MissionUnit} to its DTO with a deterministic leader-first crew ordering. */
+  @Mapping(target = "crew", expression = "java(resolveCrew(unit))")
+  public abstract MissionUnitDto toDto(MissionUnit unit);
+
+  /** Maps a {@link MissionCrew} entity to its DTO, flattening the participant id / display name. */
+  @Mapping(target = "participantId", source = "participant.id")
+  @Mapping(target = "participantName", expression = "java(resolveParticipantName(crew))")
+  public abstract MissionCrewDto toDto(MissionCrew crew);
+
+  /** Maps a {@link MissionFinanceEntry} to its DTO, flattening the parent mission id. */
+  @Mapping(target = "missionId", source = "mission.id")
+  public abstract MissionFinanceEntryDto toDto(MissionFinanceEntry entry);
+
+  /** Maps a {@link FrequencyType} entity nested inside a mission to its outbound DTO. */
+  public abstract FrequencyTypeDto toDto(FrequencyType frequencyType);
+
+  /** Maps a {@link MissionFrequency} entity to its outbound DTO. */
+  public abstract MissionFrequencyDto toDto(MissionFrequency missionFrequency);
+
+  /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
+  @Mapping(target = "parentId", source = "parent.id")
+  @Mapping(target = "isLeadershipRole", source = "leadershipRole")
+  public abstract JobTypeDto toDto(JobType jobType);
+
+  /** Maps a {@link Squadron} entity nested inside a mission to its outbound DTO. */
+  public abstract SquadronDto toDto(Squadron squadron);
+
   /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */
   public abstract MissionReferenceDto toReferenceDto(Mission mission);
 
@@ -146,18 +176,6 @@ public abstract class MissionMapper {
     return mission.getParticipants().size();
   }
 
-  /** Maps a {@link MissionParticipant} entity to its outbound DTO. */
-  public abstract MissionParticipantDto toDto(MissionParticipant participant);
-
-  /** Maps a {@link MissionUnit} to its DTO with a deterministic leader-first crew ordering. */
-  @Mapping(target = "crew", expression = "java(resolveCrew(unit))")
-  public abstract MissionUnitDto toDto(MissionUnit unit);
-
-  /** Maps a {@link MissionCrew} entity to its DTO, flattening the participant id / display name. */
-  @Mapping(target = "participantId", source = "participant.id")
-  @Mapping(target = "participantName", expression = "java(resolveParticipantName(crew))")
-  public abstract MissionCrewDto toDto(MissionCrew crew);
-
   /**
    * Sorts crew members of a mission unit so that leadership roles appear first. A crew member is
    * considered a leader if at least one of its assigned JobTypes is flagged as leadership role
@@ -190,24 +208,6 @@ public abstract class MissionMapper {
     }
     return false;
   }
-
-  /** Maps a {@link MissionFinanceEntry} to its DTO, flattening the parent mission id. */
-  @Mapping(target = "missionId", source = "mission.id")
-  public abstract MissionFinanceEntryDto toDto(MissionFinanceEntry entry);
-
-  /** Maps a {@link FrequencyType} entity nested inside a mission to its outbound DTO. */
-  public abstract FrequencyTypeDto toDto(FrequencyType frequencyType);
-
-  /** Maps a {@link MissionFrequency} entity to its outbound DTO. */
-  public abstract MissionFrequencyDto toDto(MissionFrequency missionFrequency);
-
-  /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
-  @Mapping(target = "parentId", source = "parent.id")
-  @Mapping(target = "isLeadershipRole", source = "leadershipRole")
-  public abstract JobTypeDto toDto(JobType jobType);
-
-  /** Maps a {@link Squadron} entity nested inside a mission to its outbound DTO. */
-  public abstract SquadronDto toDto(Squadron squadron);
 
   /**
    * Resolves a participant's display name: the linked user's effective name if known, otherwise the
