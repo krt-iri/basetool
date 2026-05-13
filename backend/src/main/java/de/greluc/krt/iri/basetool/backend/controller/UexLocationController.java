@@ -34,6 +34,14 @@ public class UexLocationController {
 
   private final PersonalInventoryItemService service;
 
+  /**
+   * Combined typeahead over UEX cities and space stations. {@code limit} is clamped to {@code [1,
+   * 2000]}; missing limit falls back to {@link #DEFAULT_LIMIT}.
+   *
+   * @param q optional case-insensitive substring filter
+   * @param limit optional result cap
+   * @return matching locations alphabetically sorted
+   */
   @GetMapping("/search")
   @Operation(summary = "Search UEX cities and space stations by name (case insensitive).")
   @ApiResponses({

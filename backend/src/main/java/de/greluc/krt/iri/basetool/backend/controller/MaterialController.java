@@ -25,6 +25,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for materials. Public reads cover the full catalog, the per-material price list, the
+ * price-overview projection, the full material × terminal matrix, the job-order sub-catalog, and
+ * the lightweight reference projection. Mutations are ADMIN/OFFICER and only touch the
+ * admin-maintained fields (UEX-imported flags stay untouched).
+ */
 @RestController
 @RequestMapping("/api/v1/materials")
 @RequiredArgsConstructor
@@ -35,6 +41,12 @@ public class MaterialController {
   private final MaterialMapper materialMapper;
   private final TerminalMapper terminalMapper;
 
+  /**
+   * Paged material list. {@code hasTerminals=true} returns the heavier projection with terminal
+   * prices eagerly loaded — used by views that show prices inline.
+   *
+   * @return paged material DTOs
+   */
   @GetMapping
   public PageResponse<MaterialDto> getAllMaterials(
       @RequestParam(required = false, defaultValue = "false") Boolean hasTerminals,
@@ -57,6 +69,12 @@ public class MaterialController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Returns only the materials with {@code isJobOrder=true} (sorted alphabetically). Drives the
+   * job-order create form's material picker.
+   *
+   * @return job-order materials
+   */
   @Operation(
       summary = "Get all job-order materials",
       description = "Returns all materials marked as isJobOrder=true, sorted by name.")
@@ -70,11 +88,22 @@ public class MaterialController {
     return materialService.getAllJobOrderMaterials().stream().map(materialMapper::toDto).toList();
   }
 
+  /**
+   * Lightweight projection for typeaheads — only id and name.
+   *
+   * @return all materials as reference DTOs
+   */
   @GetMapping("/lookup")
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> lookupMaterials() {
     return materialService.findAllReference();
   }
 
+  /**
+   * Per-material best buy / best sell summary used by the materials-overview page.
+   *
+   * @param name optional substring filter
+   * @return paged price-overview DTOs
+   */
   @GetMapping("/prices-overview")
   public PageResponse<MaterialPriceOverviewDto> getMaterialPriceOverview(
       @RequestParam(required = false) String name,
@@ -94,6 +123,12 @@ public class MaterialController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Full material × terminal price matrix used by the matrix overview page. The frontend pulls
+   * everything in one request (sized for {@code size=100000}) and filters in memory.
+   *
+   * @return paged matrix items
+   */
   @GetMapping("/matrix")
   public PageResponse<MaterialMatrixItemDto> getMaterialMatrixItems(
       @RequestParam(required = false) Integer page,
@@ -112,11 +147,21 @@ public class MaterialController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id material id
+   * @return the material DTO
+   */
   @GetMapping("/{id}")
   public MaterialDto getMaterial(@PathVariable @NotNull UUID id) {
     return materialMapper.toDto(materialService.getMaterial(id));
   }
 
+  /**
+   * Per-material price list across terminals.
+   *
+   * @param id material id
+   * @return paged price DTOs
+   */
   @GetMapping("/{id}/prices")
   public PageResponse<MaterialPriceDto> getMaterialPrices(
       @PathVariable @NotNull UUID id,
@@ -140,12 +185,26 @@ public class MaterialController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Terminals that trade this material, with their sell-side prices. Used by the inventory page to
+   * suggest sale destinations.
+   *
+   * @param id material id
+   * @return selling-terminal DTOs
+   */
   @GetMapping("/{id}/terminals")
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto>
       getMaterialTerminals(@PathVariable @NotNull UUID id) {
     return materialService.getMaterialTerminals(id);
   }
 
+  /**
+   * Creates a material manually. {@link MaterialMapper#stripServerManaged} clears client-supplied
+   * id/version/category/refinedMaterial so the create path cannot mass-assign relationships.
+   *
+   * @param material create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialDto material) {
@@ -156,6 +215,14 @@ public class MaterialController {
     return materialMapper.toDto(materialService.createMaterial(entity));
   }
 
+  /**
+   * Updates the admin-mutable subset of a material (name, type, description, category,
+   * refined-material link, manual flags). UEX-imported numeric fields stay untouched.
+   *
+   * @param id material id
+   * @param material update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public MaterialDto updateMaterial(
@@ -164,6 +231,11 @@ public class MaterialController {
         materialService.updateMaterial(id, materialMapper.toEntity(material)));
   }
 
+  /**
+   * Deletes a material. Rejected when any inventory item or price row references it.
+   *
+   * @param id material id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public void deleteMaterial(@PathVariable @NotNull UUID id) {

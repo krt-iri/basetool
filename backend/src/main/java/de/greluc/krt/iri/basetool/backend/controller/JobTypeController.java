@@ -19,6 +19,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for the job-type reference table. Read is public; mutations are OFFICER/ADMIN;
+ * activate is ADMIN-only.
+ */
 @RestController
 @RequestMapping("/api/v1/job-types")
 @RequiredArgsConstructor
@@ -30,6 +34,11 @@ public class JobTypeController {
   private final JobTypeService jobTypeService;
   private final JobTypeMapper jobTypeMapper;
 
+  /**
+   * Paged list with optional archetype filter and {@code includeInactive} for the admin view.
+   *
+   * @return paged job-type DTOs
+   */
   @GetMapping
   @Transactional(readOnly = true)
   public PageResponse<JobTypeDto> getAllJobTypes(
@@ -50,6 +59,12 @@ public class JobTypeController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Creates a new job type. Duplicate name → 409 with code {@code DUPLICATE_ENTITY}.
+   *
+   * @param jobTypeDto create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
@@ -57,6 +72,13 @@ public class JobTypeController {
     return jobTypeMapper.toDto(jobTypeService.createJobType(toCreate));
   }
 
+  /**
+   * Updates an existing job type. Carries optimistic-lock version in the DTO body.
+   *
+   * @param id job type id
+   * @param jobTypeDto update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public JobTypeDto updateJobType(
@@ -64,12 +86,23 @@ public class JobTypeController {
     return jobTypeMapper.toDto(jobTypeService.updateJobType(id, jobTypeDto));
   }
 
+  /**
+   * Soft-deletes a job type (sets {@code active=false}). Existing missions referencing the type
+   * continue to work.
+   *
+   * @param id job type id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.deleteJobType(id);
   }
 
+  /**
+   * Reverses a soft-delete. ADMIN-only.
+   *
+   * @param id job type id
+   */
   @PostMapping("/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
   public void activateJobType(@PathVariable @NotNull UUID id) {

@@ -23,6 +23,15 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for inventory items — covers the aggregated/grouped read variants used by the
+ * inventory page, the user-scoped {@code /my-inventory} subset, the admin-wide {@code /all}, the
+ * create / update / note-only update endpoints, the book-out flow and the bulk-checkout.
+ *
+ * <p>Owner-vs-logistician decisions happen at the HTTP boundary via {@link
+ * AuthHelperService#isLogisticianOrAbove()} and are passed as a boolean to the service — the
+ * service stays free of {@code SecurityContextHolder} reads (ArchUnit rule).
+ */
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
@@ -31,6 +40,12 @@ public class InventoryItemController {
   private final UserService userService;
   private final AuthHelperService authHelperService;
 
+  /**
+   * Aggregated per-material inventory view. Default sort favors material name, then quality
+   * descending, then amount — the order operators actually want.
+   *
+   * @return paged aggregated DTOs
+   */
   @GetMapping("/aggregated")
   @Transactional(readOnly = true)
   public PageResponse<AggregatedInventoryDto> getAggregatedInventory(
@@ -51,6 +66,12 @@ public class InventoryItemController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Per-material drilldown — every individual inventory row for the given material.
+   *
+   * @param materialId material to drill into
+   * @return paged inventory items
+   */
   @GetMapping("/material/{materialId}")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getInventoryByMaterial(
@@ -72,6 +93,11 @@ public class InventoryItemController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Calling user's own inventory items. Owner id derived from the JWT — no impersonation.
+   *
+   * @return paged inventory items
+   */
   @GetMapping("/my-inventory")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getMyInventory(
@@ -94,6 +120,12 @@ public class InventoryItemController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Calling user's inventory grouped by material with totals/average-quality — drives the "personal
+   * inventory" page's outer rows.
+   *
+   * @return grouped DTOs
+   */
   @GetMapping("/my-inventory/grouped")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
@@ -107,6 +139,11 @@ public class InventoryItemController {
         userService.getUserIdFromJwt(jwt), materialIds, minQuality, jobOrderIds, missionIds);
   }
 
+  /**
+   * Squadron-wide flat inventory list (admin/logistician view).
+   *
+   * @return paged inventory items
+   */
   @GetMapping("/all")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllInventory(
@@ -133,6 +170,12 @@ public class InventoryItemController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Squadron-wide grouped variant — same shape as {@link #getMyGroupedInventory} but scoped to all
+   * users.
+   *
+   * @return grouped DTOs
+   */
   @GetMapping("/all/grouped")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
@@ -145,6 +188,12 @@ public class InventoryItemController {
         materialIds, minQuality, jobOrderIds, missionIds);
   }
 
+  /**
+   * Creates an inventory item. Logistician role lets the caller set an arbitrary owner; everyone
+   * else gets the calling user as owner.
+   *
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   public InventoryItemDto createInventoryItem(
@@ -154,6 +203,13 @@ public class InventoryItemController {
         dto, userService.getUserIdFromJwt(jwt), isLogistician);
   }
 
+  /**
+   * Books out an item (consume / transfer / sell). Returns 204 No Content when the post-decrement
+   * quantity drops below the epsilon and the row is removed entirely; 200 OK with the persisted
+   * item otherwise.
+   *
+   * @return the persisted DTO or 204
+   */
   @PostMapping("/{id}/book-out")
   @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<InventoryItemDto> bookOutInventoryItem(
@@ -186,6 +242,11 @@ public class InventoryItemController {
         id, request, userService.getUserIdFromJwt(jwt), isLogistician);
   }
 
+  /**
+   * Removes a list of inventory items in one transaction. Same concurrency pattern as {@link
+   * #bookOutInventoryItem} — collected ids run through a single bulk-update after the loop instead
+   * of one bulk-update per loop iteration.
+   */
   @Operation(
       summary = "Bulk checkout",
       description =
@@ -206,6 +267,12 @@ public class InventoryItemController {
     inventoryItemService.bulkCheckout(request, userService.getUserIdFromJwt(jwt));
   }
 
+  /**
+   * Admin/logistician shortcut to flip the {@code delivered} flag without going through the full
+   * book-out machinery.
+   *
+   * @return the persisted DTO
+   */
   @Operation(
       summary = "Update delivered status",
       description =
@@ -228,6 +295,12 @@ public class InventoryItemController {
         id, request, userService.getUserIdFromJwt(jwt), isLogistician);
   }
 
+  /**
+   * Updates the soft associations of an inventory item (mission, job order, owner). Quantity and
+   * material identity go through {@link #bookOutInventoryItem} instead.
+   *
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public InventoryItemDto updateInventoryItem(

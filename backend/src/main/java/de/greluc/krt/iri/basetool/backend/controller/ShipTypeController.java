@@ -17,6 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Read-mostly REST surface over the ship-type catalog plus the admin-only visibility toggle. The
+ * catalog is owned by {@code UexVehicleService}.
+ */
 @RestController
 @RequestMapping("/api/v1/ship-types")
 @RequiredArgsConstructor
@@ -26,6 +30,12 @@ public class ShipTypeController {
   private final ShipTypeService shipTypeService;
   private final ShipMapper shipMapper;
 
+  /**
+   * Paged list with whitelist-enforced sort. Uses the slim {@code shipTypeToDto} projection to
+   * avoid exposing the heavy fields needed elsewhere.
+   *
+   * @return paged ship-type DTOs
+   */
   @GetMapping
   public PageResponse<ShipTypeDto> getAllShipTypes(
       @RequestParam(required = false) Integer page,
@@ -45,11 +55,22 @@ public class ShipTypeController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id ship type id
+   * @return the ship type DTO
+   */
   @GetMapping("/{id}")
   public ShipTypeDto getShipType(@PathVariable @NotNull UUID id) {
     return shipMapper.shipTypeToDto(shipTypeService.getShipType(id));
   }
 
+  /**
+   * Toggles the hidden flag. ADMIN-only.
+   *
+   * @param id ship type id
+   * @param hidden new flag value
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/visibility")
   @PreAuthorize("hasRole('ADMIN')")
   public ShipTypeDto updateShipTypeVisibility(

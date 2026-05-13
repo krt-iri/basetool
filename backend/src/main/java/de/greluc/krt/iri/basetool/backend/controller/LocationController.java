@@ -18,6 +18,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for the location reference table. Public endpoint set; mutations are OFFICER/ADMIN.
+ * Provides a lightweight {@code /lookup} projection for typeaheads and a dedicated {@code
+ * /refineries} list used by the refinery-order create form.
+ */
 @RestController
 @RequestMapping("/api/v1/locations")
 @RequiredArgsConstructor
@@ -27,6 +32,11 @@ public class LocationController {
   private final LocationService locationService;
   private final LocationMapper locationMapper;
 
+  /**
+   * Paged list with {@code includeHidden} for the admin view.
+   *
+   * @return paged location DTOs
+   */
   @GetMapping
   public PageResponse<LocationDto> getAllLocations(
       @RequestParam(required = false) Integer page,
@@ -46,22 +56,45 @@ public class LocationController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Lightweight projection for typeaheads — only id and name.
+   *
+   * @return all locations as reference DTOs
+   */
   @GetMapping("/lookup")
   public List<de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto> lookupLocations() {
     return locationService.findAllReference();
   }
 
+  /**
+   * @param id location id
+   * @return the location DTO
+   */
   @GetMapping("/{id}")
   public LocationDto getLocation(@PathVariable @NotNull UUID id) {
     return locationMapper.toDto(locationService.getLocation(id));
   }
 
+  /**
+   * Only the locations that host a refinery — used by the refinery-order create form.
+   *
+   * @return refinery-hosting locations
+   */
   @GetMapping("/refineries")
   @PreAuthorize("isAuthenticated()")
   public List<LocationDto> getRefineryLocations() {
     return locationService.getRefineryLocations().stream().map(locationMapper::toDto).toList();
   }
 
+  /**
+   * Creates a new location. {@link
+   * de.greluc.krt.iri.basetool.backend.mapper.LocationMapper#stripServerManaged} removes
+   * client-supplied {@code id}/{@code version} so the client cannot mass-assign onto an existing
+   * row.
+   *
+   * @param location create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public LocationDto createLocation(@RequestBody @Valid @NotNull LocationDto location) {
@@ -71,6 +104,13 @@ public class LocationController {
     return locationMapper.toDto(locationService.createLocation(entity));
   }
 
+  /**
+   * Updates an existing location.
+   *
+   * @param id location id
+   * @param location update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public LocationDto updateLocation(
@@ -78,6 +118,13 @@ public class LocationController {
     return locationMapper.toDto(locationService.updateLocation(id, location));
   }
 
+  /**
+   * Deletes a location. Rejected with {@link
+   * de.greluc.krt.iri.basetool.backend.exception.EntityInUseException} when any ship or refinery
+   * order still references it.
+   *
+   * @param id location id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteLocation(@PathVariable @NotNull UUID id) {

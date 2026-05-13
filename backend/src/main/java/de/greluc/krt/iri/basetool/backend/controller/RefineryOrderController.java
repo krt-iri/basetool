@@ -25,6 +25,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for refinery orders. Two endpoint families: user endpoints under {@code /} that
+ * derive the caller from the JWT, and admin/officer endpoints under {@code /all} and {@code
+ * /users/{userId}} that take the target user from the URL. Logistician role lifts the owner
+ * constraint on the user endpoints (a logistician can edit anyone's order via the user endpoint as
+ * well — convenient for the in-app order screen).
+ */
 @RestController
 @RequestMapping("/api/v1/refinery-orders")
 @RequiredArgsConstructor
@@ -35,8 +42,11 @@ public class RefineryOrderController {
   private final RefineryOrderMapper mapper;
   private final AuthHelperService authHelperService;
 
-  // User endpoints
-
+  /**
+   * Lists the calling user's own refinery orders. Optional status filter.
+   *
+   * @return paged refinery-order list DTOs
+   */
   @GetMapping("/my-orders")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -67,6 +77,12 @@ public class RefineryOrderController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Fetches a single refinery order. Currently anyone authenticated may read; the
+   * isLogistician-vs-owner branch is a future-proofing seam in case the rule tightens.
+   *
+   * @return the refinery-order DTO
+   */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -84,6 +100,12 @@ public class RefineryOrderController {
     return mapper.toDto(order);
   }
 
+  /**
+   * Lists refinery orders linked to a mission. Logisticians see all; regular users see only their
+   * own (the mission detail page is rendered for both roles).
+   *
+   * @return list of refinery-order list DTOs
+   */
   @GetMapping("/mission/{missionId}")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -102,6 +124,12 @@ public class RefineryOrderController {
         .toList();
   }
 
+  /**
+   * Creates a refinery order. Logisticians can specify any owner via {@code orderDto.owner()};
+   * regular users always own their orders themselves (any owner override is ignored).
+   *
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   public RefineryOrderDto createMyRefineryOrder(
@@ -116,6 +144,14 @@ public class RefineryOrderController {
         refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
   }
 
+  /**
+   * Updates a refinery order. Non-logistician callers must be the owner (HTTP-boundary check
+   * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner).
+   * Logisticians may edit any order; in that case the {@code owner} can also be reassigned via the
+   * DTO.
+   *
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public RefineryOrderDto updateMyRefineryOrder(
@@ -146,6 +182,10 @@ public class RefineryOrderController {
             targetUserId, id, mapper.toEntity(orderDto), isLogistician));
   }
 
+  /**
+   * Cancels (soft-deletes) a refinery order. Same owner-vs-logistician rule as {@link
+   * #updateMyRefineryOrder}.
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public void deleteMyRefineryOrder(
@@ -154,6 +194,10 @@ public class RefineryOrderController {
         userService.getUserIdFromJwt(jwt), id, authHelperService.isLogisticianOrAbove());
   }
 
+  /**
+   * Completes a refinery order by storing the refined output as inventory items at the chosen
+   * target location.
+   */
   @PostMapping("/{id}/store")
   @PreAuthorize("isAuthenticated()")
   public void storeMyRefineryOrder(
@@ -166,6 +210,11 @@ public class RefineryOrderController {
 
   // Admin/Officer endpoints
 
+  /**
+   * Squadron-wide refinery-order list. Open to all authenticated callers (read-only).
+   *
+   * @return paged refinery-order list DTOs
+   */
   @GetMapping("/all")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -193,6 +242,12 @@ public class RefineryOrderController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Lists a specific user's refinery orders. Logistician-only.
+   *
+   * @param userId target user id
+   * @return paged refinery-order list DTOs
+   */
   @GetMapping("/users/{userId}")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   @Transactional(readOnly = true)
@@ -219,6 +274,11 @@ public class RefineryOrderController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Logistician-only: creates a refinery order on behalf of a target user.
+   *
+   * @return the persisted DTO
+   */
   @PostMapping("/users/{userId}")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public RefineryOrderDto createUserRefineryOrder(
@@ -227,6 +287,11 @@ public class RefineryOrderController {
         refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
   }
 
+  /**
+   * Logistician-only: updates a target user's refinery order.
+   *
+   * @return the persisted DTO
+   */
   @PutMapping("/users/{userId}/{orderId}")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public RefineryOrderDto updateUserRefineryOrder(
@@ -237,6 +302,7 @@ public class RefineryOrderController {
         refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true));
   }
 
+  /** Logistician-only: cancels a target user's refinery order. */
   @DeleteMapping("/users/{userId}/{orderId}")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public void deleteUserRefineryOrder(

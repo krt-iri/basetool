@@ -17,6 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for the star-system reference table. UEX owns the bulk of the data; this controller
+ * adds the admin-mutable CRUD for systems UEX doesn't know about yet.
+ */
 @RestController
 @RequestMapping("/api/v1/star-systems")
 @RequiredArgsConstructor
@@ -26,6 +30,9 @@ public class StarSystemController {
   private final StarSystemService starSystemService;
   private final StarSystemMapper starSystemMapper;
 
+  /**
+   * @return paged star-system DTOs
+   */
   @GetMapping
   public PageResponse<StarSystemDto> getAllStarSystems(
       @RequestParam(required = false) Integer page,
@@ -44,11 +51,21 @@ public class StarSystemController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id star system id
+   * @return the star-system DTO
+   */
   @GetMapping("/{id}")
   public StarSystemDto getStarSystem(@PathVariable @NotNull UUID id) {
     return starSystemMapper.toDto(starSystemService.getStarSystem(id));
   }
 
+  /**
+   * Creates a star system manually. Duplicate name (case-insensitive) → 409.
+   *
+   * @param starSystem create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
@@ -56,6 +73,13 @@ public class StarSystemController {
         starSystemService.createStarSystem(starSystemMapper.toEntity(starSystem)));
   }
 
+  /**
+   * Updates name + description of a star system. UEX-imported metadata is untouched.
+   *
+   * @param id star system id
+   * @param starSystem update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public StarSystemDto updateStarSystem(
@@ -64,6 +88,11 @@ public class StarSystemController {
         starSystemService.updateStarSystem(id, starSystemMapper.toEntity(starSystem)));
   }
 
+  /**
+   * Deletes a star system. Rejected when any location still references the system.
+   *
+   * @param id star system id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteStarSystem(@PathVariable @NotNull UUID id) {

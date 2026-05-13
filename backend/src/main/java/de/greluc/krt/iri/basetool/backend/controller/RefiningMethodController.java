@@ -17,6 +17,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for the refining-method reference table. The data is owned by {@code
+ * UexRefinerySyncService}; this controller adds the admin-mutable CRUD subset (name + description),
+ * with read open to everyone.
+ */
 @RestController
 @RequestMapping("/api/v1/refining-methods")
 @RequiredArgsConstructor
@@ -26,6 +31,11 @@ public class RefiningMethodController {
   private final RefiningMethodService refiningMethodService;
   private final RefiningMethodMapper refiningMethodMapper;
 
+  /**
+   * Paged refining-method list.
+   *
+   * @return paged refining-method DTOs
+   */
   @GetMapping
   public PageResponse<RefiningMethodDto> getAllRefiningMethods(
       @RequestParam(required = false) Integer page,
@@ -45,11 +55,21 @@ public class RefiningMethodController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id refining method id
+   * @return the refining method DTO
+   */
   @GetMapping("/{id}")
   public RefiningMethodDto getRefiningMethod(@PathVariable @NotNull UUID id) {
     return refiningMethodMapper.toDto(refiningMethodService.getRefiningMethod(id));
   }
 
+  /**
+   * Creates a refining method manually (rare — UEX sync owns the catalog).
+   *
+   * @param refiningMethod create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public RefiningMethodDto createRefiningMethod(
@@ -58,6 +78,14 @@ public class RefiningMethodController {
         refiningMethodService.createRefiningMethod(refiningMethodMapper.toEntity(refiningMethod)));
   }
 
+  /**
+   * Updates an admin-mutable subset (name + description). UEX-imported numeric ratings are not
+   * touched.
+   *
+   * @param id refining method id
+   * @param refiningMethod update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public RefiningMethodDto updateRefiningMethod(
@@ -67,6 +95,11 @@ public class RefiningMethodController {
             id, refiningMethodMapper.toEntity(refiningMethod)));
   }
 
+  /**
+   * Deletes a refining method. Rejected when any refinery order references it.
+   *
+   * @param id refining method id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteRefiningMethod(@PathVariable @NotNull UUID id) {

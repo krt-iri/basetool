@@ -26,6 +26,12 @@ public class MaterialCollectionController {
 
   private final InventoryItemService inventoryItemService;
 
+  /**
+   * Returns the inventory contributions linked to the given job order.
+   *
+   * @param jobOrderId job order id
+   * @return inventory entries sorted by owner / location / material / quality / quantity
+   */
   @Operation(
       summary = "Get material collection for a job order",
       description =

@@ -17,6 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface for the frequency-type reference table. Supports drag-and-drop reorder via the
+ * dedicated {@code /reorder} endpoint; mutations are OFFICER/ADMIN.
+ */
 @RestController
 @RequestMapping("/api/v1/frequency-types")
 @RequiredArgsConstructor
@@ -26,6 +30,12 @@ public class FrequencyTypeController {
   private final FrequencyTypeService frequencyTypeService;
   private final FrequencyTypeMapper frequencyTypeMapper;
 
+  /**
+   * Paged list with optional {@code active} filter. Default sort is {@code sortIndex} so the UI
+   * dropdown reflects the admin-curated order.
+   *
+   * @return paged frequency-type DTOs
+   */
   @GetMapping
   public PageResponse<FrequencyTypeDto> getAllFrequencyTypes(
       @RequestParam(required = false) Integer page,
@@ -47,11 +57,21 @@ public class FrequencyTypeController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id frequency type id
+   * @return the DTO
+   */
   @GetMapping("/{id}")
   public FrequencyTypeDto getFrequencyType(@PathVariable @NotNull UUID id) {
     return frequencyTypeMapper.toDto(frequencyTypeService.getFrequencyType(id));
   }
 
+  /**
+   * Creates a frequency type; the service assigns the next sort index.
+   *
+   * @param frequencyType create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public FrequencyTypeDto createFrequencyType(
@@ -60,6 +80,14 @@ public class FrequencyTypeController {
         frequencyTypeService.createFrequencyType(frequencyTypeMapper.toEntity(frequencyType)));
   }
 
+  /**
+   * Updates a frequency type. Sort index is preserved — use {@link #reorderFrequencyTypes} to
+   * change the order.
+   *
+   * @param id frequency type id
+   * @param frequencyType update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public FrequencyTypeDto updateFrequencyType(
@@ -68,18 +96,34 @@ public class FrequencyTypeController {
         frequencyTypeService.updateFrequencyType(id, frequencyTypeMapper.toEntity(frequencyType)));
   }
 
+  /**
+   * Soft-deletes a frequency type.
+   *
+   * @param id frequency type id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.deleteFrequencyType(id);
   }
 
+  /**
+   * Reverses a soft-delete. ADMIN-only.
+   *
+   * @param id frequency type id
+   */
   @PostMapping("/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
   public void activateFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.activateFrequencyType(id);
   }
 
+  /**
+   * Drag-and-drop reorder. Position of each id in the supplied list becomes the row's new sort
+   * index. ADMIN-only.
+   *
+   * @param ids ids in the desired new order
+   */
   @PostMapping("/reorder")
   @PreAuthorize("hasRole('ADMIN')")
   public void reorderFrequencyTypes(@RequestBody @NotNull List<UUID> ids) {

@@ -41,6 +41,12 @@ public class PersonalInventoryController {
 
   private final PersonalInventoryItemService service;
 
+  /**
+   * Lists the caller's own personal-inventory items. Owner is taken from the JWT {@code sub} —
+   * never from the request body — so a caller cannot view another user's items.
+   *
+   * @return paged response DTOs
+   */
   @GetMapping
   @Operation(
       summary = "List own personal inventory entries (paginated, sortable, optional name filter).")
@@ -66,6 +72,13 @@ public class PersonalInventoryController {
     return toPageResponse(result);
   }
 
+  /**
+   * Fetches one of the caller's own items. 404 for unknown id OR cross-owner attempt (the two cases
+   * are intentionally indistinguishable on the wire).
+   *
+   * @param id item id
+   * @return the item DTO
+   */
   @GetMapping("/{id}")
   @Operation(summary = "Fetch a single personal inventory entry owned by the caller.")
   @ApiResponses({
@@ -76,6 +89,12 @@ public class PersonalInventoryController {
     return service.getOwn(requireSub(auth), id);
   }
 
+  /**
+   * Creates a new personal-inventory item owned by the caller.
+   *
+   * @param request create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new personal inventory entry for the caller.")
@@ -89,6 +108,13 @@ public class PersonalInventoryController {
     return service.createOwn(requireSub(auth), request);
   }
 
+  /**
+   * Updates one of the caller's own items.
+   *
+   * @param id item id
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @Operation(summary = "Update an existing personal inventory entry owned by the caller.")
   @ApiResponses({
@@ -106,6 +132,11 @@ public class PersonalInventoryController {
     return service.updateOwn(requireSub(auth), id, request);
   }
 
+  /**
+   * Deletes one of the caller's own items.
+   *
+   * @param id item id
+   */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete one of the caller's personal inventory entries.")

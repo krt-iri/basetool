@@ -34,6 +34,20 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface over the job-order aggregate (the squadron's request-and-fulfill queue). Reads are
+ * open to any authenticated user; mutations require LOGISTICIAN or above; delete is ADMIN-only.
+ * Job-order creation is {@code permitAll()} so unauthenticated squadron members can file requests
+ * via a public form.
+ *
+ * <p>Heavy concurrency lives in the service layer: {@code updateJobOrderPriority} acquires a
+ * pessimistic write lock for the reorder shift; {@code updateJobOrderStatus} atomically unlinks
+ * every inventory item on transition to a terminal state; handover creation follows the
+ * bulk-update-after-loop pattern from CLAUDE.md to avoid the
+ * {@code @Modifying(clearAutomatically=true)} trap. {@link #addAssignee}/{@link #removeAssignee}
+ * resolve self-vs-logistician at the HTTP boundary so the service stays free of {@code
+ * SecurityContextHolder} reads.
+ */
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -45,6 +59,15 @@ public class JobOrderController {
   private final UserService userService;
   private final AuthHelperService authHelperService;
 
+  /**
+   * Records a materials handover for the job order. Multi-item flows use the bulk-update-after-loop
+   * pattern: per-item mutations rely on Hibernate dirty-checking inside the loop, then a single
+   * bulk unlink runs after persistence to avoid clearing the persistence context mid-iteration.
+   *
+   * @param id job-order id
+   * @param dto handover create payload (per-item quantities)
+   * @return the persisted handover DTO
+   */
   @PostMapping("/{id}/handovers")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
@@ -56,6 +79,16 @@ public class JobOrderController {
     return jobOrderHandoverService.createHandover(id, dto);
   }
 
+  /**
+   * Renders a persisted handover as a downloadable PDF. The optional {@code X-User-Time-Zone}
+   * header overrides UTC for the timestamps in the document; an invalid IANA zone is silently
+   * dropped (the service falls back to UTC) rather than failing the request.
+   *
+   * @param jobOrderId job-order id
+   * @param handoverId handover id
+   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
   @GetMapping("/{jobOrderId}/handovers/{handoverId}/report")
   @Operation(
       summary = "Download handover report PDF",
@@ -93,6 +126,14 @@ public class JobOrderController {
     return ResponseEntity.ok().headers(headers).body(pdf);
   }
 
+  /**
+   * Renders a preview PDF from unsaved handover data — used by the create-handover form to show the
+   * document before commit. Nothing is persisted.
+   *
+   * @param jobOrderId job-order id
+   * @param dto unsaved handover data
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
   @PostMapping("/{jobOrderId}/handovers/report/preview")
   @Operation(
       summary = "Preview handover report PDF",
@@ -119,6 +160,13 @@ public class JobOrderController {
     return ResponseEntity.ok().headers(headers).body(pdf);
   }
 
+  /**
+   * Creates a new job order. {@code permitAll()} so any squadron member — including unauthenticated
+   * guests using the public request form — can file a request.
+   *
+   * @param dto create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
@@ -129,6 +177,13 @@ public class JobOrderController {
     return jobOrderService.createJobOrder(dto);
   }
 
+  /**
+   * Paged job-order list. Default sort is by {@code priority,asc} (lowest priority = top of queue),
+   * filterable by one or more statuses.
+   *
+   * @param status optional status filter (logical OR across values)
+   * @return paged job-order DTOs
+   */
   @GetMapping
   @Operation(
       summary = "Get all job orders",
@@ -153,6 +208,12 @@ public class JobOrderController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Lightweight projection (id + label) of active job orders for typeaheads. Excludes terminal
+   * states.
+   *
+   * @return active job orders as reference DTOs
+   */
   @GetMapping("/lookup")
   @Operation(
       summary = "Lookup active job orders",
@@ -163,6 +224,13 @@ public class JobOrderController {
     return jobOrderService.findAllActiveReference();
   }
 
+  /**
+   * Returns a single job order with its per-material stock totals (linked inventory items summed
+   * server-side, so the frontend doesn't have to re-aggregate).
+   *
+   * @param id job-order id
+   * @return the job-order DTO
+   */
   @GetMapping("/{id}")
   @Operation(
       summary = "Get job order by ID",
@@ -173,6 +241,14 @@ public class JobOrderController {
     return jobOrderService.getJobOrderById(id);
   }
 
+  /**
+   * Returns every inventory item linked to a specific material of a job order. Drives the
+   * per-material drill-down in the order detail view.
+   *
+   * @param id job-order id
+   * @param matId material id
+   * @return inventory-item DTOs
+   */
   @GetMapping("/{id}/materials/{matId}/inventory")
   @Operation(
       summary = "Get inventory items for a job order material",
@@ -184,6 +260,17 @@ public class JobOrderController {
     return jobOrderService.getInventoryItemsForJobOrderMaterial(id, matId);
   }
 
+  /**
+   * Updates the status. Transitions to a terminal state (COMPLETED, REJECTED) cascade an atomic
+   * unlink of every inventory item that pointed at the order, run after the dirty-check phase
+   * (canonical {@code completeJobOrderWithinTransaction} pattern — the inner method is {@code
+   * MANDATORY} and relies on dirty-checking instead of issuing its own {@code save}/{@code flush},
+   * which would otherwise collide with the already-incremented {@code @Version}).
+   *
+   * @param id job-order id
+   * @param dto status payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/status")
   @Operation(
       summary = "Update job order status",
@@ -209,6 +296,15 @@ public class JobOrderController {
     return jobOrderService.updateJobOrderStatus(id, dto);
   }
 
+  /**
+   * Sets the priority and shifts every other order to keep the queue contiguous. The service
+   * acquires a pessimistic write lock for the reorder to keep concurrent priority changes
+   * consistent.
+   *
+   * @param id job-order id
+   * @param priority new priority slot (lower = earlier in queue)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/priority")
   @Operation(
       summary = "Update job order priority",
@@ -218,6 +314,13 @@ public class JobOrderController {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
 
+  /**
+   * Bulk update — replaces details + the material list in one call.
+   *
+   * @param id job-order id
+   * @param dto update payload (same shape as create)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
   @PreAuthorize("hasRole('LOGISTICIAN')")
@@ -226,6 +329,11 @@ public class JobOrderController {
     return jobOrderService.updateJobOrder(id, dto);
   }
 
+  /**
+   * ADMIN-only delete. Surviving orders' priorities shift up to keep the queue contiguous.
+   *
+   * @param id job-order id
+   */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
@@ -236,6 +344,13 @@ public class JobOrderController {
     jobOrderService.deleteJobOrder(id);
   }
 
+  /**
+   * Removes a material from the order and atomically unlinks every inventory item that pointed at
+   * it.
+   *
+   * @param jobOrderId job-order id
+   * @param materialId material id
+   */
   @DeleteMapping("/{jobOrderId}/materials/{materialId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
@@ -258,6 +373,13 @@ public class JobOrderController {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
 
+  /**
+   * Removes a single inventory item from the order — sets {@code jobOrderId=null} via Hibernate
+   * dirty-checking (no bulk update, so the surrounding aggregate stays managed).
+   *
+   * @param jobOrderId job-order id
+   * @param inventoryItemId inventory-item id
+   */
   @DeleteMapping("/{jobOrderId}/inventory/{inventoryItemId}/unlink")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
@@ -281,6 +403,16 @@ public class JobOrderController {
     jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);
   }
 
+  /**
+   * Adds a user as assignee. Self-assignment works for everyone; assigning someone else requires
+   * LOGISTICIAN or above (enforced by {@link #verifyAssigneeAccess} at the HTTP boundary so the
+   * service stays free of {@code SecurityContextHolder} reads).
+   *
+   * @param id job-order id
+   * @param userId target user id
+   * @param jwt caller's JWT
+   * @return the persisted DTO
+   */
   @PostMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Add an assignee", description = "Adds a user to the job order.")
   @PreAuthorize("isAuthenticated()")
@@ -290,6 +422,14 @@ public class JobOrderController {
     return jobOrderService.addAssignee(id, userId);
   }
 
+  /**
+   * Removes a user as assignee. Same self-or-logistician rule as {@link #addAssignee}.
+   *
+   * @param id job-order id
+   * @param userId target user id
+   * @param jwt caller's JWT
+   * @return the persisted DTO
+   */
   @DeleteMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Remove an assignee", description = "Removes a user from the job order.")
   @PreAuthorize("isAuthenticated()")
@@ -299,6 +439,13 @@ public class JobOrderController {
     return jobOrderService.removeAssignee(id, userId);
   }
 
+  /**
+   * Enforces the self-or-logistician rule for assignee mutations. Throws {@link
+   * AccessDeniedException} when a non-LOGISTICIAN caller tries to modify someone else's assignment.
+   *
+   * @param jwt caller's JWT
+   * @param targetUserId user id being added/removed
+   */
   private void verifyAssigneeAccess(Jwt jwt, UUID targetUserId) {
     UUID currentUserId = userService.getUserIdFromJwt(jwt);
     if (!currentUserId.equals(targetUserId) && !authHelperService.isLogisticianOrAbove()) {

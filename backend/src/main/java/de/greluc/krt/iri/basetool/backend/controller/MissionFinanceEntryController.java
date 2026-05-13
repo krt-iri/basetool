@@ -16,6 +16,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST surface over mission finance entries. Reads are mission-scoped (via {@code
+ * /missions/{missionId}/finance-entries}); writes are entry-scoped (via {@code
+ * /finance-entries/{entryId}}). Creation is intentionally {@code permitAll()} so guest participants
+ * can record their own payouts; update/delete are gated by {@code
+ * MissionSecurityService.canEditFinanceEntry} on the service layer.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
@@ -24,6 +31,11 @@ public class MissionFinanceEntryController {
 
   private final MissionFinanceEntryService financeEntryService;
 
+  /**
+   * Paged finance entries for a mission.
+   *
+   * @return paged finance-entry DTOs
+   */
   @GetMapping("/missions/{missionId}/finance-entries")
   @PreAuthorize("isAuthenticated()")
   public PageResponse<MissionFinanceEntryDto> getFinanceEntries(
@@ -31,12 +43,22 @@ public class MissionFinanceEntryController {
     return toPageResponse(financeEntryService.getEntriesByMission(missionId, pageable));
   }
 
+  /**
+   * @param missionId mission id
+   * @return the signed bottom-line of the mission (entries + refinery profit)
+   */
   @GetMapping("/missions/{missionId}/finance-entries/sum")
   @PreAuthorize("isAuthenticated()")
   public BigDecimal getFinanceEntriesSum(@PathVariable UUID missionId) {
     return financeEntryService.calculateTotalSum(missionId);
   }
 
+  /**
+   * Creates a finance entry. Public — guests record their own line.
+   *
+   * @param dto create payload
+   * @return the persisted entry
+   */
   @PostMapping("/finance-entries")
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("permitAll()")
@@ -45,6 +67,13 @@ public class MissionFinanceEntryController {
     return financeEntryService.createEntry(dto);
   }
 
+  /**
+   * Updates an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin.
+   *
+   * @param entryId entry id
+   * @param dto update payload (carries the expected version)
+   * @return the persisted entry
+   */
   @PutMapping("/finance-entries/{entryId}")
   @PreAuthorize("isAuthenticated()")
   public MissionFinanceEntryDto updateFinanceEntry(
@@ -52,6 +81,11 @@ public class MissionFinanceEntryController {
     return financeEntryService.updateEntry(entryId, dto);
   }
 
+  /**
+   * Deletes an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin.
+   *
+   * @param entryId entry id
+   */
   @DeleteMapping("/finance-entries/{entryId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("isAuthenticated()")

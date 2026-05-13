@@ -17,6 +17,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Read-mostly REST surface over the manufacturer catalog plus the admin-only visibility toggle. The
+ * catalog itself is owned by {@code UexManufacturerService}; this controller only reads and flips
+ * the {@code hidden} flag.
+ */
 @RestController
 @RequestMapping("/api/v1/manufacturers")
 @RequiredArgsConstructor
@@ -26,6 +31,12 @@ public class ManufacturerController {
   private final ManufacturerService manufacturerService;
   private final ManufacturerMapper manufacturerMapper;
 
+  /**
+   * Paged list with whitelist-enforced sort. {@code includeHidden=true} returns hidden entries
+   * (admin view).
+   *
+   * @return paged manufacturer DTOs
+   */
   @GetMapping
   public PageResponse<ManufacturerDto> getAllManufacturers(
       @RequestParam(required = false) Integer page,
@@ -46,11 +57,22 @@ public class ManufacturerController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * @param id manufacturer id
+   * @return the manufacturer DTO
+   */
   @GetMapping("/{id}")
   public ManufacturerDto getManufacturer(@PathVariable @NotNull UUID id) {
     return manufacturerMapper.toDto(manufacturerService.getManufacturer(id));
   }
 
+  /**
+   * Toggles the hidden flag. ADMIN-only.
+   *
+   * @param id manufacturer id
+   * @param hidden new flag value
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/visibility")
   @PreAuthorize("hasRole('ADMIN')")
   public ManufacturerDto updateManufacturerVisibility(
