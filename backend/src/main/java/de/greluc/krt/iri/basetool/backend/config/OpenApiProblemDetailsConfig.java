@@ -20,12 +20,12 @@ public class OpenApiProblemDetailsConfig {
     return this::customizeOpenApi;
   }
 
-  private void customizeOpenApi(OpenAPI openAPI) {
-    ensureProblemDetailSchema(openAPI);
-    if (openAPI.getPaths() == null) {
+  private void customizeOpenApi(OpenAPI openApi) {
+    ensureProblemDetailSchema(openApi);
+    if (openApi.getPaths() == null) {
       return;
     }
-    openAPI
+    openApi
         .getPaths()
         .values()
         .forEach(
@@ -57,11 +57,11 @@ public class OpenApiProblemDetailsConfig {
     responses.addApiResponse(code, new ApiResponse().description(description).content(content));
   }
 
-  private void ensureProblemDetailSchema(OpenAPI openAPI) {
-    Components components = openAPI.getComponents();
+  private void ensureProblemDetailSchema(OpenAPI openApi) {
+    Components components = openApi.getComponents();
     if (components == null) {
       components = new Components();
-      openAPI.setComponents(components);
+      openApi.setComponents(components);
     }
     Map<String, Schema> schemas = components.getSchemas();
     if (schemas == null || !schemas.containsKey("ProblemDetail")) {

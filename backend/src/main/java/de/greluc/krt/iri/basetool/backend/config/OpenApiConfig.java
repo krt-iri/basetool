@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   @Bean
-  public OpenAPI krtOpenAPI() {
+  public OpenAPI krtOpenApi() {
     return new OpenAPI()
         .openapi("3.1.1")
         .info(
