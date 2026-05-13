@@ -21,6 +21,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexSpaceStationDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexTerminalDto;
 
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,7 @@ import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class UexClient {
 
     private final WebClient.Builder webClientBuilder;
@@ -44,11 +46,6 @@ public class UexClient {
      * carries the connect / read / write timeouts configured in WebClientConfig.
      */
     private WebClient client;
-
-    public UexClient(WebClient.Builder webClientBuilder, UexProperties uexProperties) {
-        this.webClientBuilder = webClientBuilder;
-        this.uexProperties = uexProperties;
-    }
 
     @PostConstruct
     void initClient() {
