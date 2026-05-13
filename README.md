@@ -93,7 +93,7 @@ volume mount has to be in place and the container has to bounce.
 *   **Database**: PostgreSQL 18
 *   **Security**: Spring Security with OAuth2 (Keycloak)
 *   **Frontend**: Thymeleaf, Spring Security OAuth2 Client
-*   **Build Tool**: Gradle 9.4.1 (Kotlin DSL)
+*   **Build Tool**: Gradle 9.5.1 (Kotlin DSL)
 *   **Containerization**: Docker & Docker Compose
 
 ## Prerequisites

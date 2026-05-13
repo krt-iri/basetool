@@ -7,7 +7,7 @@ These guidelines are meant to assist advanced developers contributing to the IRI
 The project consists of two Spring Boot modules: `backend` and `frontend`.
 - **Java Version:** 25
 - **Spring Boot Version:** 4.0.5
-- **Build Tool:** Gradle 9.4.0 (Kotlin DSL)
+- **Build Tool:** Gradle 9.5.1 (Kotlin DSL)
 - **Dependency Management:** Managed via `refreshVersions`. Do not manually edit dependency versions in `build.gradle.kts`; instead, update them in the `versions.properties` file.
 
 ### Local Development Setup
