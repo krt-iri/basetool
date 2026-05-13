@@ -15,6 +15,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Read service plus visibility toggle for the ship-type catalog. Parallels {@link
+ * ManufacturerService} — the underlying records are owned by {@link UexVehicleService}; this
+ * exposes the cached read surface and the admin-only visibility flip.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -24,6 +29,11 @@ public class ShipTypeService {
   private final ManufacturerRepository manufacturerRepository;
   private final ShipRepository shipRepository;
 
+  /**
+   * @param pageable page request
+   * @param includeHidden true to include ship types marked hidden
+   * @return cached page result
+   */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
   public Page<ShipType> getAllShipTypes(@NotNull Pageable pageable, boolean includeHidden) {
     if (includeHidden) {
@@ -32,6 +42,12 @@ public class ShipTypeService {
     return shipTypeRepository.findByHiddenFalse(pageable);
   }
 
+  /**
+   * @param id ship type primary key
+   * @return the ship type
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no ship type
+   *     matches
+   */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
   public ShipType getShipType(@NotNull UUID id) {
     return shipTypeRepository
@@ -42,6 +58,14 @@ public class ShipTypeService {
                     "ShipType not found"));
   }
 
+  /**
+   * Flips the {@code hidden} flag on a ship type. Evicts the full ship-type cache so the next read
+   * sees the new state immediately.
+   *
+   * @param id ship type primary key
+   * @param hidden new flag value
+   * @return the persisted ship type
+   */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SHIP_TYPES_CACHE, allEntries = true)
   public ShipType updateShipTypeVisibility(@NotNull UUID id, boolean hidden) {

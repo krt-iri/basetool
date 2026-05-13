@@ -21,6 +21,14 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Cached CRUD service for the {@code job_type} reference table.
+ *
+ * <p>Job types form a tree (each row may have a parent); the {@code archetype} enum classifies the
+ * top-level family. Soft-delete via {@code active=false} rather than row removal so missions that
+ * reference a retired job type keep working. Case-insensitive uniqueness on name is enforced
+ * explicitly (with a localized 409 message) instead of relying on the DB unique index.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,6 +38,12 @@ public class JobTypeService {
   private final MissionCrewRepository missionCrewRepository;
   private final MissionParticipantRepository missionParticipantRepository;
 
+  /**
+   * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
+   *
+   * @param archetype optional filter; null means "all active types"
+   * @return cached list
+   */
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
   public List<JobType> getJobTypes(@Nullable JobTypeArchetype archetype) {
     if (archetype == null) {
@@ -38,6 +52,14 @@ public class JobTypeService {
     return jobTypeRepository.findByArchetypeAndActiveTrue(archetype);
   }
 
+  /**
+   * Paged variant for the admin list with an {@code includeInactive} flag for soft-deleted entries.
+   *
+   * @param archetype optional archetype filter
+   * @param pageable page request
+   * @param includeInactive true to include soft-deleted rows
+   * @return cached page
+   */
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
   public Page<JobType> getJobTypes(
       @Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
@@ -51,6 +73,16 @@ public class JobTypeService {
         : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
   }
 
+  /**
+   * Persists a new job type. Resolves the parent reference via id so the caller can pass a shallow
+   * parent (id-only stub from a DTO). Duplicate name throws {@link DuplicateEntityException} → 409.
+   *
+   * @param jobType transient entity
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the name collides with an existing row
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the supplied parent
+   *     id does not resolve
+   */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public JobType createJobType(@NotNull JobType jobType) {
@@ -73,6 +105,16 @@ public class JobTypeService {
     return jobTypeRepository.save(jobType);
   }
 
+  /**
+   * Updates an existing job type. Optimistic-lock check is explicit (the DTO carries the expected
+   * version), duplicate-name check excludes the row being edited so a self-rename is a no-op.
+   *
+   * @param id job type primary key
+   * @param jobTypeDto update payload
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the new name collides with a different row
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public JobType updateJobType(@NotNull UUID id, @NotNull JobTypeDto jobTypeDto) {
@@ -113,6 +155,12 @@ public class JobTypeService {
     return jobTypeRepository.save(jobType);
   }
 
+  /**
+   * Soft-deletes a job type by flipping {@code active=false}. Hard delete would orphan every
+   * mission participant that still references the job type — the soft-delete keeps history usable.
+   *
+   * @param id job type primary key
+   */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public void deleteJobType(@NotNull UUID id) {
@@ -128,6 +176,11 @@ public class JobTypeService {
     jobTypeRepository.save(jobTypeToDeactivate);
   }
 
+  /**
+   * Reverses a soft-delete by flipping {@code active=true}. ADMIN-only at the controller layer.
+   *
+   * @param id job type primary key
+   */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public void activateJobType(@NotNull UUID id) {

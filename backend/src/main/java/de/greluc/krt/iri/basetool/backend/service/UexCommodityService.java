@@ -17,6 +17,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Imports the UEX commodity catalog and the full commodity-price matrix.
+ *
+ * <p>Two-phase sync: first the commodity catalog ({@link UexClient#getCommodities()}) is upserted
+ * into {@code material} (matched by UEX {@code id_commodity}, falling back to name — legacy
+ * migrations may have a record without an id), then the price matrix ({@link
+ * UexClient#getCommoditiesPricesAll()}) is upserted into {@code material_price} per (material,
+ * terminal) pair. Unknown terminals are silently skipped (the universe sync owns the terminal
+ * table); unknown materials get auto-created with a fallback name so the price-matrix sync stays
+ * self-healing if UEX adds a commodity between two of our runs.
+ *
+ * <p>An empty response on either call short-circuits without wiping local data — the sync is
+ * idempotent and resilient to transient UEX outages.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,6 +41,11 @@ public class UexCommodityService {
   private final MaterialPriceRepository materialPriceRepository;
   private final TerminalRepository terminalRepository;
 
+  /**
+   * Runs the full commodity + price sync (see class Javadoc). Both phases run in the same
+   * transaction so a single failed price update never leaves the catalog half-updated relative to
+   * the price matrix.
+   */
   @Transactional
   public void fetchAndProcessCommoditiesPrices() {
     log.info("Starting synchronization of UEX commodities...");

@@ -25,6 +25,16 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages the personal hangar (ship inventory per user) plus the squadron-wide ship overview.
+ *
+ * <p>The owner check on update/delete is enforced here rather than via {@code @PreAuthorize}
+ * because the rule is "must be the owner of the ship" — not expressible as a role check on the
+ * authentication alone. Mission-unit references to a deleted ship are first nulled (the unit keeps
+ * its name but loses the ship binding) before the ship itself is removed; an explicit {@code
+ * entityManager.flush()} forces those updates to run before the delete so the FK constraint never
+ * fires.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -39,10 +49,23 @@ public class HangarService {
   private final ShipMapper shipMapper;
   private final EntityManager entityManager;
 
+  /**
+   * @param pageable page request
+   * @return paged list of all ships across all users (admin-level read)
+   */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
     return shipRepository.findAll(pageable);
   }
 
+  /**
+   * Adds a ship to a user's hangar.
+   *
+   * @param userId owning user's id
+   * @param dto ship payload (name, type, insurance, fitted, location)
+   * @return the persisted ship
+   * @throws NotFoundException when the user id does not resolve
+   * @throws BadRequestException when the ship type or location id is missing/invalid
+   */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
     User user =
@@ -65,6 +88,11 @@ public class HangarService {
     return shipRepository.save(ship);
   }
 
+  /**
+   * @param userId owner id
+   * @param pageable page request
+   * @return paged ship list owned by the user
+   */
   public Page<Ship> getMyShips(@NotNull UUID userId, @NotNull Pageable pageable) {
     return shipRepository.findByOwnerId(userId, pageable);
   }
@@ -121,6 +149,20 @@ public class HangarService {
         });
   }
 
+  /**
+   * Updates a ship owned by {@code userId}. Enforces "must be the owner" explicitly because the
+   * rule is per-resource. Optimistic-lock check is explicit when {@code dto.version()} is non-null.
+   *
+   * @param userId calling user's id
+   * @param shipId ship primary key
+   * @param dto update payload
+   * @return the persisted ship
+   * @throws NotFoundException when the ship does not exist
+   * @throws AccessDeniedException when the calling user is not the owner
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale
+   * @throws BadRequestException when the ship type or location id is missing/invalid
+   */
   @Transactional
   public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
     Ship ship =
@@ -159,6 +201,16 @@ public class HangarService {
     return shipRepository.save(ship);
   }
 
+  /**
+   * Deletes a ship after detaching any mission-unit references. Owner check identical to {@link
+   * #updateShip}. The explicit {@code flush()} guarantees the unit detach SQL runs before the ship
+   * DELETE so the FK constraint never fires.
+   *
+   * @param userId calling user's id
+   * @param shipId ship primary key
+   * @throws NotFoundException when the ship does not exist
+   * @throws AccessDeniedException when the calling user is not the owner
+   */
   @Transactional
   public void deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
     Ship ship =
@@ -182,6 +234,12 @@ public class HangarService {
     shipRepository.delete(ship);
   }
 
+  /**
+   * Removes every ship owned by a user — used when an admin deletes the user account so no orphan
+   * ship rows remain. Same unit-detach-then-delete sequence as {@link #deleteShip}.
+   *
+   * @param userId owning user's id
+   */
   @Transactional
   public void deleteAllShipsForUser(@NotNull UUID userId) {
     List<Ship> ships = shipRepository.findByOwnerId(userId);
@@ -204,6 +262,10 @@ public class HangarService {
     log.info("deleteAllShipsForUser: deleted {} ships for user {}", ships.size(), userId);
   }
 
+  /**
+   * Squadron-wide bulk reset of the {@code fitted} flag on every ship. Used by admins after a major
+   * event (patch wipe etc.) so members re-fit their ships instead of carrying stale state.
+   */
   @Transactional
   public void resetAllFittedStatus() {
     shipRepository.resetAllFitted();

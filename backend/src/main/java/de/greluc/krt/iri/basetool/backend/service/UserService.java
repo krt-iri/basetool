@@ -18,6 +18,23 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages the local {@code app_user} mirror of Keycloak users plus everything around them (roles,
+ * logistician/mission-manager flags, rank, description, displayName, joinDate, read announcement
+ * state).
+ *
+ * <p>JWT-driven sync ({@link #syncUser(Jwt)}) runs on every authentication so the local record is
+ * always in sync with Keycloak; periodic scheduled sync ({@link #syncUser(KeycloakUserDto)} +
+ * {@link #markMissingUsers}) is driven by {@link UserSyncTask} and reconciles deletions. The
+ * service is the architectural seam where the project's "every read filters by JWT sub" rule
+ * (CLAUDE.md) is enforced — {@link #getCurrentUser()} is the canonical source for the calling
+ * user's id and most other services delegate here rather than reaching for {@code
+ * SecurityContextHolder} (which is forbidden outside this seam by the ArchUnit rule).
+ *
+ * <p>JWT subject parsing is fail-closed: a missing {@code sub} or a non-UUID subject is rejected
+ * rather than falling back to a derived identifier — silently mapping different Keycloak realms
+ * onto the same local id is a worse failure mode than refusing the request.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,6 +51,14 @@ public class UserService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final AuthHelperService authHelperService;
 
+  /**
+   * Convenience predicate: does any user have this exact name (case-insensitive) as either username
+   * or displayName? Used by participant-add flows to detect "this guest name is actually a known
+   * member".
+   *
+   * @param name candidate name
+   * @return true when at least one match exists
+   */
   public boolean isUsernameOrDisplayNameTaken(@NotNull String name) {
     return !findMatchesByExactName(name).isEmpty();
   }
@@ -55,6 +80,20 @@ public class UserService {
     return userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(trimmed, trimmed);
   }
 
+  /**
+   * Extracts the user id from the JWT's {@code sub} claim.
+   *
+   * <p>Fail-closed validation: a missing {@code sub} or a non-UUID value throws {@link
+   * org.springframework.security.authentication.AuthenticationServiceException} rather than falling
+   * back to a derived id. Silently mapping different Keycloak realms (or two realms with similar
+   * usernames) onto the same local id is a worse failure mode than refusing the request — see the
+   * explicit AGENTS.md / CLAUDE.md guidance on stable identity.
+   *
+   * @param jwt validated JWT
+   * @return the {@code sub} parsed as UUID
+   * @throws org.springframework.security.authentication.AuthenticationServiceException when sub is
+   *     missing or not a UUID
+   */
   @NotNull public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
     String sub = jwt.getSubject();
     if (sub == null) {
@@ -82,6 +121,19 @@ public class UserService {
     }
   }
 
+  /**
+   * Reconciles the local user record with the supplied JWT — creates the row on first login,
+   * updates username / email / displayName / roles when they have changed. Called by {@link
+   * CustomJwtGrantedAuthoritiesConverter} on every authentication.
+   *
+   * <p>Two-step lookup: first by id (the UUID-shaped subject), then by {@code preferred_username} —
+   * handles legacy rows where the local id pre-dated the Keycloak migration to UUID subjects. Roles
+   * default to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone
+   * out.
+   *
+   * @param jwt validated JWT from the resource server
+   * @return the managed (created or updated) user
+   */
   @Transactional
   @NotNull public User syncUser(@NotNull Jwt jwt) {
     final UUID finalUserId = getUserIdFromJwt(jwt);
@@ -147,6 +199,13 @@ public class UserService {
     return user;
   }
 
+  /**
+   * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path).
+   * Mirrors {@link #syncUser(Jwt)} but reads the data from a {@code KeycloakUserDto} instead of a
+   * decoded JWT. Used by {@link UserSyncTask}.
+   *
+   * @param dto Keycloak admin DTO
+   */
   @Transactional
   public void syncUser(@NotNull KeycloakUserDto dto) {
     if (dto.id() == null) return;
@@ -200,6 +259,14 @@ public class UserService {
     }
   }
 
+  /**
+   * Flags every local user whose id is NOT in {@code currentIds} as missing (soft-delete: kept as a
+   * row for FK integrity, but excluded from active lists). Called by {@link UserSyncTask} after the
+   * full Keycloak sync run; an empty {@code currentIds} short-circuits without marking anyone so a
+   * Keycloak outage doesn't soft-delete the entire user base.
+   *
+   * @param currentIds the set of user ids currently present in Keycloak
+   */
   @Transactional
   public void markMissingUsers(Collection<UUID> currentIds) {
     if (currentIds.isEmpty()) return;
@@ -220,6 +287,14 @@ public class UserService {
     return localRoles;
   }
 
+  /**
+   * Extracts the set of realm-role names from a JWT. Reads the {@code realm_access.roles} claim —
+   * Keycloak's standard location. Resource-access roles are intentionally NOT included because this
+   * project's authorization model is realm-scoped.
+   *
+   * @param jwt validated JWT
+   * @return realm role names, possibly empty
+   */
   @SuppressWarnings("unchecked")
   @NotNull public Set<String> extractRolesFromJwt(@NotNull Jwt jwt) {
     Set<String> roles = new HashSet<>();
@@ -231,6 +306,20 @@ public class UserService {
     return roles;
   }
 
+  /**
+   * Updates a user's editable attributes (rank, description, displayName, joinDate). Optimistic-
+   * lock check is explicit when {@code version} is non-null; admins can override by passing {@code
+   * null}.
+   *
+   * <p>Rank validation enforces the role-based range: officers get 1–12, squadron members get
+   * 13–20. Out-of-range rank throws {@link IllegalArgumentException} → 400. {@code joinDate} can be
+   * explicitly set to {@code null} to clear the field; the other nullable fields are only updated
+   * when supplied.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the user is unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   * @throws IllegalArgumentException when the rank is outside the role-permitted range
+   */
   @Transactional
   @NotNull public User updateUserAttributes(
       @NotNull UUID id,
@@ -275,6 +364,14 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * Narrower update than {@link #updateUserAttributes}: covers only the profile-page editable
+   * subset (description + displayName). Used by the user's own profile-edit form so a regular user
+   * cannot bump their rank.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the user is unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
   @Transactional
   public User updateUserDescription(
       @NotNull UUID id,
@@ -296,6 +393,16 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * Records that the user has read the given announcement (clears the unread badge on the home
+   * page).
+   *
+   * @param id user id
+   * @param announcementId announcement they read
+   * @return the persisted user
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the user id is
+   *     unknown
+   */
   @Transactional
   public User updateReadAnnouncement(@NotNull UUID id, @NotNull UUID announcementId) {
     User user =
@@ -309,28 +416,56 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * @return all users sorted case-insensitively by username
+   */
   public List<User> findAll() {
     return userRepository.findAll(Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
 
+  /**
+   * @return lightweight reference projection used by typeaheads (id + username + displayName)
+   */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
     return userRepository.findAllReference();
   }
 
+  /**
+   * @param pageable page request
+   * @return paged user list
+   */
   public Page<User> findAll(@NotNull Pageable pageable) {
     return userRepository.findAll(pageable);
   }
 
+  /**
+   * Unpaged username/displayName substring search.
+   *
+   * @param query free-text filter
+   * @return matching users
+   */
   public List<User> searchByUsername(@NotNull String query) {
     return userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
         query, query);
   }
 
+  /**
+   * Paged username/displayName substring search.
+   *
+   * @param query free-text filter
+   * @param pageable page request
+   * @return matching users
+   */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
     return userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
         query, query, pageable);
   }
 
+  /**
+   * @param id user primary key
+   * @return the user
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   public User findById(@NotNull UUID id) {
     return userRepository
         .findById(id)
@@ -340,6 +475,14 @@ public class UserService {
                     "User not found"));
   }
 
+  /**
+   * Looks up the calling user via the JWT in the current {@link Authentication}. Returns empty for
+   * unauthenticated callers (guests). The single canonical accessor for "who is calling" — other
+   * services delegate here instead of reaching for {@code SecurityContextHolder} (the architectural
+   * seam enforced by ArchUnit).
+   *
+   * @return the calling user, or empty for unauthenticated requests
+   */
   public Optional<User> getCurrentUser() {
     Authentication auth = authHelperService.rawAuthentication();
     if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof Jwt jwt)) {
@@ -349,6 +492,16 @@ public class UserService {
     return userRepository.findById(userId);
   }
 
+  /**
+   * Flips the {@code is_logistician} flag on a user. The flag is independent of Keycloak realm
+   * roles — admins can grant the LOGISTICIAN role via this method without a Keycloak round-trip;
+   * the JWT-to-authorities converter promotes the flag to {@code ROLE_LOGISTICIAN} on the next
+   * authentication.
+   *
+   * @param userId user primary key
+   * @param isLogistician new flag value
+   * @return the persisted user
+   */
   @Transactional
   public User updateLogisticianStatus(UUID userId, boolean isLogistician) {
     User user =
@@ -359,6 +512,14 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * Flips the {@code is_mission_manager} flag on a user. Mirrors {@link #updateLogisticianStatus}
+   * but for the MISSION_MANAGER role.
+   *
+   * @param userId user primary key
+   * @param isMissionManager new flag value
+   * @return the persisted user
+   */
   @Transactional
   public User updateMissionManagerStatus(UUID userId, boolean isMissionManager) {
     User user =
@@ -369,6 +530,15 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * Deletes a user account along with all owned data (ships, inventory, refinery orders, mission
+   * memberships). Used by admins to remove ex-members. The cascade is explicit (per-table delete
+   * calls) so the order matches the FK constraints; auto-cascading would surface confusing FK
+   * errors when the table order changes.
+   *
+   * @param userId user to delete
+   * @throws NoSuchElementException when the user id is unknown
+   */
   @Transactional
   public void deleteUser(UUID userId) {
     User user =

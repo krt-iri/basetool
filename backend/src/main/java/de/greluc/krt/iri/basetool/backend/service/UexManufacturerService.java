@@ -12,6 +12,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+/**
+ * Imports the UEX company catalog filtered to vehicle manufacturers.
+ *
+ * <p>UEX's {@code /companies} endpoint covers every in-universe company; this service only persists
+ * rows where {@code isVehicleManufacturerFlag = true}, since the local {@code manufacturer} table
+ * is exclusively used for ship-type manufacturer references. Match is by case-insensitive name so
+ * the same manufacturer never gets duplicated even if UEX changes its canonical capitalization.
+ * Empty UEX response short-circuits without wiping local data.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,6 +29,10 @@ public class UexManufacturerService {
   private final UexClient uexClient;
   private final ManufacturerRepository manufacturerRepository;
 
+  /**
+   * Pulls the company catalog and upserts the vehicle-manufacturer subset. Single transaction for
+   * the entire sweep; counters are emitted as INFO-level summary at the end.
+   */
   @Transactional
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");

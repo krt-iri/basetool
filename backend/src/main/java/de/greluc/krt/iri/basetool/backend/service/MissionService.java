@@ -31,6 +31,23 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages the {@code mission} aggregate — the central operational entity of the squadron.
+ *
+ * <p>A mission groups a roster (participants), a structure (units + crews + ship assignments), a
+ * schedule (planned / actual start and end), and a set of frequencies (radio channels). The service
+ * covers the entire surface used by the mission detail page: full updates, section-scoped partial
+ * updates (core / schedule / flags), the manager + owner management, participant lifecycle (add as
+ * user, as guest, remove, check-in / check-out, payout preference), unit + crew structure, and the
+ * mission-frequency CRUD.
+ *
+ * <p>Concurrency-relevant: nearly every write here is paired with an optimistic-lock check against
+ * the mission's {@code @Version}. Methods that touch participants / units / crews work on the
+ * already-managed aggregate via dirty-checking — see CLAUDE.md's {@code …WithinTransaction} and
+ * bulk-update-after-loop patterns. The owner-version is tracked separately in {@code
+ * mission_ownership} so an admin's owner-change does not race with a concurrent participant edit
+ * and force a 409 on the unrelated path.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -52,15 +69,29 @@ public class MissionService {
   private final OperationRepository operationRepository;
   private final UserService userService;
 
+  /**
+   * @param pageable page request
+   * @return paged mission list
+   */
   public Page<Mission> getAllMissions(@NotNull Pageable pageable) {
     return missionRepository.findAll(pageable);
   }
 
+  /**
+   * @return lightweight reference projection of active missions (id + display name + status) used
+   *     by typeaheads
+   */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
     return missionRepository.findAllActiveReference();
   }
 
+  /**
+   * Free-text search over mission name, description, location and operation name. Optional filters
+   * narrow by status, time window and operation. Used by the mission list page.
+   *
+   * @return paged matching missions
+   */
   public Page<Mission> searchMissions(
       String query,
       Instant start,
@@ -76,12 +107,25 @@ public class MissionService {
         query, start, end, status, isInternal, operationId, pageable);
   }
 
+  /**
+   * @param id mission primary key
+   * @return the mission
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   public Mission getMissionById(@NotNull UUID id) {
     return missionRepository
         .findById(id)
         .orElseThrow(() -> new NotFoundException("Mission not found"));
   }
 
+  /**
+   * Returns the next upcoming mission by planned-start time. Drives the home-page "next mission"
+   * banner. {@code allowInternal=true} (for authenticated callers) includes internal missions;
+   * guests see only public missions.
+   *
+   * @param allowInternal whether internal missions should be included
+   * @return the next mission, or empty when none upcoming
+   */
   public Optional<Mission> getNextMission(boolean allowInternal) {
     if (allowInternal) {
       return missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(
@@ -93,6 +137,14 @@ public class MissionService {
     }
   }
 
+  /**
+   * Persists a new mission. Resolves shallow references (operation, location, frequencies) and
+   * creates the {@code mission_ownership} row that tracks owner-change versioning separately from
+   * the main mission version.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
+   *     is unknown
+   */
   @Transactional
   public Mission createMission(@NotNull Mission mission) {
     if (mission.getIsInternal() == null) {
@@ -116,6 +168,18 @@ public class MissionService {
     return missionRepository.save(mission);
   }
 
+  /**
+   * Full update of a mission's metadata + structural references. Validates optimistic lock,
+   * resolves shallow references (operation, location, frequencies). Participant / unit / crew lists
+   * are NOT touched here — they have their own dedicated mutators (see {@link #addParticipant},
+   * {@link #addUnitToMission}, etc.) so the per-row optimistic-lock checks on those flows do not
+   * collide with a mission-level edit.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the mission or any
+   *     referenced id is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale
+   */
   @Transactional
   public Mission updateMission(@NotNull UUID missionId, @NotNull Mission missionDetails) {
     Mission mission =
@@ -185,6 +249,14 @@ public class MissionService {
    * the parent version either — this allows multiple users to work on different sections
    * concurrently without blocking each other or losing input due to a 409 conflict.
    */
+  /**
+   * Section-scoped partial update: name, description, operation, location. Lets the frontend save
+   * just the "core" section of the edit modal without touching unrelated fields.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
+   *     is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
+   */
   @Transactional
   public Mission updateCoreSection(
       @NotNull UUID missionId,
@@ -210,6 +282,10 @@ public class MissionService {
   /**
    * Updates only the schedule section of a mission. All timestamps are processed and stored in UTC.
    * Validation is identical to the full update.
+   */
+  /**
+   * Section-scoped partial update: planned + actual start/end times. Same isolation benefits as
+   * {@link #updateCoreSection}.
    */
   @Transactional
   public Mission updateScheduleSection(
@@ -246,6 +322,10 @@ public class MissionService {
   }
 
   /** Updates only the flags section of a mission (e.g. {@code isInternal}). */
+  /**
+   * Section-scoped partial update: boolean flags (internal, status, briefing-required, etc.).
+   * Section-scoped to keep per-flag toggles from racing with unrelated edits.
+   */
   @Transactional
   public Mission updateFlagsSection(
       @NotNull UUID missionId, @NotNull Boolean isInternal, @NotNull Long expectedVersion) {
@@ -266,6 +346,15 @@ public class MissionService {
     }
   }
 
+  /**
+   * Deletes a mission. The cascade unlinks inventory items and refinery orders (rather than
+   * deleting them) so individual member contributions survive the mission delete. Mission
+   * participants, finance entries, units, crews and frequencies ARE deleted because they only exist
+   * in the context of this mission.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the mission is
+   *     unknown
+   */
   @Transactional
   public void deleteMission(@NotNull UUID missionId) {
     Mission mission =
@@ -308,11 +397,21 @@ public class MissionService {
     }
   }
 
+  /**
+   * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
+   * to the full-form {@link #addParticipant(UUID, ParticipantForm)} with default values for the
+   * optional fields.
+   */
   @Transactional
   public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
     return addParticipant(missionId, userId, null, null, null, null);
   }
 
+  /**
+   * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
+   * authenticated), an optional desired job type, and an optional comment. Convenience overload
+   * that delegates to the full form with {@code squadronId=null}.
+   */
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
@@ -323,6 +422,16 @@ public class MissionService {
     return addParticipant(missionId, userId, guestName, desiredJobTypeId, comment, null);
   }
 
+  /**
+   * Full-form participant add. Resolves the user reference from {@code userId} (or by
+   * case-insensitive {@code guestName} match against existing users — promotes a guest entry to a
+   * linked-user entry when the guest name turns out to be a real member). Optional {@code
+   * squadronId} pins the participant's squadron for the mission's roster line; null inherits the
+   * user's current squadron.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
+   *     is unknown
+   */
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
@@ -411,6 +520,14 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Look up a single participant on a mission. Verifies the participant actually belongs to the
+   * named mission — a participant id that exists but is attached to a different mission throws 404,
+   * matching what {@link MissionSecurityService#canAccessParticipant} expects.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the participant
+   *     does not exist on this mission
+   */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
     return missionParticipantRepository
         .findById(participantId)
@@ -421,6 +538,13 @@ public class MissionService {
   /**
    * Returns all participants of a mission that are not yet assigned to any unit (crew). Used to
    * filter the "Crew zuweisen" dropdown so only unassigned participants are selectable.
+   */
+  /**
+   * Lists participants who have not been assigned to a unit/crew yet. Used by the mission detail
+   * page to populate the "unassigned" bucket above the unit grid.
+   *
+   * @param missionId mission id
+   * @return list of unassigned participants
    */
   public List<MissionParticipant> getUnassignedParticipants(@NotNull UUID missionId) {
     Mission mission =
@@ -437,6 +561,11 @@ public class MissionService {
         .toList();
   }
 
+  /**
+   * Removes a participant from a mission and the participant's linked finance entries. The
+   * participant row itself is deleted (not soft-deleted); finance entries with FK to the
+   * participant cascade-delete to keep the FK constraint happy.
+   */
   @Transactional
   public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
     Mission mission =
@@ -464,6 +593,16 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Updates a participant's per-mission attributes (job type, ship, unit, crew, guest name, payout
+   * preference). Per-participant optimistic lock via the participant's own {@code @Version} field —
+   * the wider mission's version is NOT bumped, so concurrent participant edits don't collide with
+   * each other or with mission-level edits.
+   *
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the participant or
+   *     any referenced id is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
+   */
   @Transactional
   public Mission updateParticipantAttributes(
       @NotNull UUID missionId,
@@ -567,6 +706,11 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Marks a participant as checked in. Sets {@code startTime} to {@code now()} only if the
+   * participant has not been checked in before — repeated check-in is a no-op so the original
+   * arrival time is preserved.
+   */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
     Mission mission =
@@ -582,6 +726,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Marks a participant as checked out. Sets {@code endTime} to {@code now()}. Unlike check-in, a
+   * repeated check-out overrides the previous timestamp — late check-out corrections.
+   */
   @Transactional
   public Mission checkOut(UUID missionId, UUID participantId) {
     Mission mission =
@@ -603,6 +751,11 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Updates a participant's payout preference (PAYOUT or DONATE). Guests can change their own
+   * preference even without authentication — the security gate on the participant row keeps other
+   * users' preferences locked.
+   */
   @Transactional
   public Mission updatePayoutPreference(
       UUID missionId, UUID participantId, PayoutPreference preference) {
@@ -621,6 +774,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Adds a unit (team grouping) to a mission. Units are the top level of the participant hierarchy:
+   * each unit may contain several crews.
+   */
   @Transactional
   public Mission addUnitToMission(
       @NotNull UUID missionId,
@@ -679,6 +836,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Updates a unit's name and the assigned ship. Per-unit optimistic lock — concurrent unit edits
+   * across the mission don't collide.
+   */
   @Transactional
   public Mission updateMissionUnit(
       @NotNull UUID missionId,
@@ -744,6 +905,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Removes a unit. Participants that were assigned to the unit fall back to the unassigned bucket
+   * (their {@code unit}/{@code crew} references are cleared, the rows themselves stay).
+   */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
     Mission mission =
@@ -760,6 +925,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Adds a crew (ship-level grouping) under a unit. Crews are the second level of the participant
+   * hierarchy and pin participants to a specific ship's role.
+   */
   @Transactional
   public Mission addCrewToShip(
       @NotNull UUID missionId,
@@ -807,6 +976,7 @@ public class MissionService {
     return mission;
   }
 
+  /** Updates a crew's name, role, and assigned ship. */
   @Transactional
   public Mission updateCrewInShip(
       @NotNull UUID missionId,
@@ -837,6 +1007,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Removes a crew. Participants assigned to the crew fall back to the parent unit's unassigned
+   * slot.
+   */
   @Transactional
   public Mission removeCrewFromShip(
       @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
@@ -879,6 +1053,10 @@ public class MissionService {
     return jobTypes;
   }
 
+  /**
+   * Creates a sub-mission under a parent mission. Sub-missions are independent missions that roll
+   * up to their parent in the operation overview.
+   */
   @Transactional
   public Mission addSubMission(@NotNull UUID parentMissionId, @NotNull Mission subMission) {
     Mission parent =
@@ -900,6 +1078,10 @@ public class MissionService {
     return missionRepository.save(subMission);
   }
 
+  /**
+   * Creates or updates a radio frequency entry on a mission. Single endpoint for both because the
+   * form's id field discriminates (null = create, non-null = update).
+   */
   @Transactional
   public Mission addOrUpdateMissionFrequency(
       @NotNull UUID missionId, @NotNull UUID frequencyTypeId, @NotNull BigDecimal value) {
@@ -934,6 +1116,7 @@ public class MissionService {
     return mission;
   }
 
+  /** Removes a frequency entry from a mission. */
   @Transactional
   public Mission removeMissionFrequency(@NotNull UUID missionId, @NotNull UUID frequencyId) {
     Mission mission =
@@ -950,6 +1133,13 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Transfers mission ownership to another user. The previous owner is automatically added to the
+   * manager list so they don't lose all access in one click.
+   *
+   * <p>Versioning: bumps the dedicated {@code mission_ownership} version, NOT the mission's main
+   * version — so concurrent participant or finance edits don't race with the owner change.
+   */
   @Transactional
   public Mission setMissionOwner(@NotNull UUID missionId, @NotNull UUID userId) {
     Mission mission =
@@ -975,6 +1165,11 @@ public class MissionService {
    * excluded from parent optimistic locking), so concurrent edits on other sections of the same
    * mission remain unaffected.
    */
+  /**
+   * Versioned variant of {@link #setMissionOwner} — checks the supplied ownership-version against
+   * the persisted one and throws 409 on a stale value. Used by the admin owner-change flow where
+   * two admins might race.
+   */
   @Transactional
   public Mission updateMissionOwner(
       @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
@@ -991,6 +1186,12 @@ public class MissionService {
 
   /**
    * Returns the current optimistic-lock version of the mission ownership aggregate (0 if absent).
+   */
+  /**
+   * @param missionId mission id
+   * @return current value of the dedicated {@code mission_ownership.version} field — frontend
+   *     echoes this back on the next owner-change call so two admins editing the same mission
+   *     surface a 409 instead of silently overwriting
    */
   public long getMissionOwnershipVersion(@NotNull UUID missionId) {
     return missionOwnershipRepository
@@ -1020,6 +1221,10 @@ public class MissionService {
     missionOwnershipRepository.save(ownership);
   }
 
+  /**
+   * Adds a co-manager. Co-managers can edit the mission with the same privileges as the owner
+   * (except they cannot transfer ownership — see {@link MissionSecurityService#canChangeOwner}).
+   */
   @Transactional
   public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
     Mission mission =
@@ -1032,6 +1237,10 @@ public class MissionService {
     return mission;
   }
 
+  /**
+   * Removes a co-manager. The owner cannot be removed via this method — use {@link
+   * #setMissionOwner} to transfer ownership first.
+   */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     Mission mission =

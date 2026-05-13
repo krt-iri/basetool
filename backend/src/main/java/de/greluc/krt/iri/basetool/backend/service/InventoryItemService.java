@@ -34,6 +34,23 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages inventory items — the squadron's physical stock of refined and raw materials.
+ *
+ * <p>Each item links to a material (UEX commodity), optionally to a user (the owner, or null for
+ * shared/squadron stock), and optionally to a job order or mission. The service covers the read API
+ * (aggregated per material, per user, per mission, per job-order, plus the {@code /grouped}
+ * variants used by the inventory page), the create/update/delete cycle, the book-out flow (consume
+ * / transfer / sell), the bulk-checkout endpoint, and the material-collection roll-up used by the
+ * job-order detail page.
+ *
+ * <p>Concurrency-relevant: the {@link #bookOutInventoryItem} flow touches multiple {@code
+ * JobOrderMaterial} rows of the same aggregate. It follows the bulk-update-after-loop pattern
+ * (CLAUDE.md): the loop only mutates managed entities (Hibernate dirty-checking), material ids that
+ * need a {@code @Modifying(clearAutomatically=true)} bulk update are collected in a {@code
+ * Set<UUID>} and the bulk update runs ONCE after the loop. Doing the bulk update inside the loop
+ * would detach the entire persistence context and cause spurious 409s on the sibling rows.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -59,6 +76,12 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
 
+  /**
+   * Aggregated per-material inventory view — used by the squadron-wide inventory page.
+   *
+   * @param pageable page request
+   * @return paged aggregated DTOs (material + total amount + average quality)
+   */
   @Transactional(readOnly = true)
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
     return inventoryItemRepository
@@ -73,6 +96,15 @@ public class InventoryItemService {
                     obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0));
   }
 
+  /**
+   * Per-material drilldown — lists every individual inventory row for the given material. Used by
+   * the inventory drilldown page.
+   *
+   * @param materialId material to drill into
+   * @param pageable page request
+   * @return paged inventory items (excludes personal items)
+   * @throws NotFoundException when the material id is unknown
+   */
   @Transactional(readOnly = true)
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
     Material material =
@@ -84,6 +116,14 @@ public class InventoryItemService {
         .map(inventoryItemMapper::toDto);
   }
 
+  /**
+   * User-scoped inventory list. Excludes personal items because those have their own dedicated
+   * service.
+   *
+   * @param userId owner id
+   * @param pageable page request
+   * @return paged inventory items owned by the user
+   */
   @Transactional(readOnly = true)
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
     User user =
@@ -91,18 +131,46 @@ public class InventoryItemService {
     return inventoryItemRepository.findByUser(user, pageable).map(inventoryItemMapper::toDto);
   }
 
+  /**
+   * Unfiltered convenience overload for {@link #getMyAggregatedInventory(UUID, List, Integer, List,
+   * List)}.
+   *
+   * @param userId owner id
+   * @return aggregated items grouped by material
+   */
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId) {
     return getMyAggregatedInventory(userId, null, null, null, null);
   }
 
+  /**
+   * Job-order/mission-filtered convenience overload.
+   *
+   * @param userId owner id
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @return aggregated items
+   */
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
     return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
   }
 
+  /**
+   * Full-filter user-scoped aggregation. Loads the user's items via the parameterized repository
+   * query and groups them in memory — the {@code GroupedInventoryDto} shape is what the {@code
+   * /grouped} frontend endpoint returns directly.
+   *
+   * @param userId owner id
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @return aggregated items
+   * @throws NotFoundException when the user id is unknown
+   */
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(
@@ -136,12 +204,30 @@ public class InventoryItemService {
     return aggregateInventoryItems(items);
   }
 
+  /**
+   * Convenience overload of {@link #getAllAggregatedInventory(List, Integer, List, List)} without
+   * job-order/mission filters.
+   *
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @return aggregated squadron-wide items
+   */
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
     return getAllAggregatedInventory(materialIds, minQuality, null, null);
   }
 
+  /**
+   * Squadron-wide aggregated inventory with the full filter surface. Mirrors {@link
+   * #getMyAggregatedInventory} but scopes to all users (admin/logistician view).
+   *
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @return aggregated items grouped by material
+   */
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(
@@ -221,12 +307,31 @@ public class InventoryItemService {
         .toList();
   }
 
+  /**
+   * Convenience overload without job-order/mission filters.
+   *
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param pageable page request
+   * @return paged inventory items
+   */
   @Transactional(readOnly = true)
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds, Integer minQuality, Pageable pageable) {
     return getAllInventory(materialIds, minQuality, null, null, pageable);
   }
 
+  /**
+   * Flat paged squadron-wide inventory with optional filters. Not aggregated — one row per {@code
+   * InventoryItem}.
+   *
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @param pageable page request
+   * @return paged inventory items
+   */
   @Transactional(readOnly = true)
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds,
@@ -250,6 +355,15 @@ public class InventoryItemService {
         .map(inventoryItemMapper::toDto);
   }
 
+  /**
+   * Creates a new inventory item. Resolves every shallow id reference (material, location, owner,
+   * mission, job order) and rejects with 404 / 400 for unknown ids. Job-order link triggers an
+   * eligibility check (material must match the order's material list).
+   *
+   * @throws NotFoundException when any referenced id is unknown
+   * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the material does
+   *     not satisfy the job order's requirements
+   */
   @Transactional
   public InventoryItemDto createInventoryItem(
       InventoryItemCreateDto dto, UUID currentUserId, boolean isAdmin) {
@@ -319,6 +433,15 @@ public class InventoryItemService {
     return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
   }
 
+  /**
+   * Updates the soft associations of an inventory item (mission, job order, owner). Quantity and
+   * material identity are NOT mutable here — those go through {@link #bookOutInventoryItem} so the
+   * audit trail stays consistent.
+   *
+   * @throws NotFoundException when any referenced id is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale
+   */
   @Transactional
   public InventoryItemDto updateInventoryItem(
       UUID id, InventoryItemUpdateDto dto, UUID currentUserId, boolean isLogistician) {
@@ -420,6 +543,13 @@ public class InventoryItemService {
    * A blank or empty note is normalized to {@code null} and thus effectively removes the note.
    * Optimistic locking is enforced via the supplied {@code version}.
    */
+  /**
+   * Updates only the free-text note on an inventory item. Separated from {@link
+   * #updateInventoryItem} so a "fix typo in the note" call does not need to round-trip the entire
+   * association set.
+   *
+   * @throws NotFoundException when the item is unknown
+   */
   @Transactional
   public InventoryItemDto updateNote(
       UUID id, InventoryItemNoteUpdateRequest request, UUID currentUserId, boolean isLogistician) {
@@ -453,6 +583,26 @@ public class InventoryItemService {
     return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
   }
 
+  /**
+   * Consumes or transfers an inventory item.
+   *
+   * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
+   * create a new row at the target location/owner), SELL (decrement here, create a finance entry
+   * for the participant). When the post-decrement quantity is below {@link #QUANTITY_EPSILON} the
+   * row is removed entirely. Fulfills attached job-order materials when the amount delivered
+   * reaches the required quantity.
+   *
+   * <p>Follows the bulk-update-after-loop concurrency pattern: collects every {@code
+   * JobOrderMaterial} id that may be ready for a clearing bulk update in a {@code Set<UUID>},
+   * applies all mutations through dirty-checking inside the loop, then runs the bulk update exactly
+   * once after the loop. Re-fetches the aggregate root for the completion check so {@link
+   * de.greluc.krt.iri.basetool.backend.service.JobOrderService#completeJobOrderWithinTransaction}
+   * sees the freshly-incremented {@code @Version}.
+   *
+   * @throws NotFoundException when the item is unknown
+   * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the requested
+   *     amount exceeds the available quantity
+   */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
@@ -578,6 +728,13 @@ public class InventoryItemService {
    * @param request the bulk checkout request containing item IDs
    * @param currentUserId the UUID of the authenticated user (JWT sub)
    */
+  /**
+   * Bulk variant of {@link #bookOutInventoryItem} — books out multiple items in a single
+   * transaction. Same concurrency pattern: bulk updates run once after the loop, never inside.
+   *
+   * @param request multi-item book-out payload
+   * @param currentUserId user performing the book-out
+   */
   @Transactional
   public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
     log.info(
@@ -622,6 +779,14 @@ public class InventoryItemService {
    * @param jobOrderId the UUID of the job order
    * @return sorted list of {@link MaterialCollectionEntryDto}
    */
+  /**
+   * Material-collection roll-up used by the order-detail page: for each material on the order,
+   * aggregates how much has been collected so far and lists the contributing inventory items.
+   *
+   * @param jobOrderId target job order
+   * @return per-material collection summary
+   * @throws NotFoundException when the job order is unknown
+   */
   @Transactional(readOnly = true)
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
     jobOrderRepository
@@ -658,6 +823,12 @@ public class InventoryItemService {
    * @param currentUserId the UUID of the authenticated user
    * @param isLogistician whether the user has logistician or higher role
    * @return updated {@link InventoryItemDto}
+   */
+  /**
+   * Marks an inventory item as delivered to the target job order — admin/logistician shortcut that
+   * flips the delivered flag without going through the full book-out machinery.
+   *
+   * @throws NotFoundException when the item is unknown
    */
   @Transactional
   public InventoryItemDto updateDelivered(

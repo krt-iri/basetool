@@ -39,6 +39,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Imports the UEX universe topology — factions, jurisdictions, planets, moons, orbits, cities,
+ * outposts, points of interest, space stations and terminals.
+ *
+ * <p>The order in which {@link de.greluc.krt.iri.basetool.backend.service.UexScheduler} calls the
+ * sync methods matters: factions/jurisdictions first (no parent), then planets, then
+ * moons/orbits/POI (parented by planet), then cities (parented by planet/moon), then outposts /
+ * space stations / terminals (parented by city/station). Calling them out of order means a child
+ * row references a parent that does not yet exist in the local mirror, and the child is silently
+ * dropped (the scheduler retries the full sweep on the next tick so missed children eventually
+ * land).
+ *
+ * <p>Every sync method follows the same pattern: pull the full UEX catalog for that entity, upsert
+ * by UEX id (with name-based fallback for legacy rows missing the id), per-field dirty checking to
+ * minimize write traffic. Empty UEX responses short-circuit without wiping local data.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -57,6 +73,11 @@ public class UexUniverseSyncService {
   private final TerminalRepository terminalRepository;
   private final LocationRepository locationRepository;
 
+  /**
+   * Syncs UEX cities into {@code city}. Parents (planet, moon) are resolved against the local
+   * mirror; rows with an unresolved parent are still upserted but with the parent reference
+   * cleared.
+   */
   @Transactional
   public void syncCities() {
     log.info("Starting sync for Citys...");
@@ -144,6 +165,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Citys.");
   }
 
+  /**
+   * Syncs UEX factions. No parent table — factions stand alone, so this method can run first in the
+   * universe sweep.
+   */
   @Transactional
   public void syncFactions() {
     log.info("Starting sync for Factions...");
@@ -182,6 +207,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Factions.");
   }
 
+  /**
+   * Syncs UEX jurisdictions. Parent is faction; unresolved faction → jurisdiction's faction
+   * reference stays null.
+   */
   @Transactional
   public void syncJurisdictions() {
     log.info("Starting sync for Jurisdictions...");
@@ -220,6 +249,7 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Jurisdictions.");
   }
 
+  /** Syncs UEX moons. Parent is planet. */
   @Transactional
   public void syncMoons() {
     log.info("Starting sync for Moons...");
@@ -262,6 +292,7 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Moons.");
   }
 
+  /** Syncs UEX orbits (orbital positions / lagrange points around a planet). Parent is planet. */
   @Transactional
   public void syncOrbits() {
     log.info("Starting sync for Orbits...");
@@ -300,6 +331,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Orbits.");
   }
 
+  /**
+   * Syncs UEX outposts (surface settlements). Parent is planet or moon — UEX provides exactly one
+   * of the two ids.
+   */
   @Transactional
   public void syncOutposts() {
     log.info("Starting sync for Outposts...");
@@ -364,6 +399,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Outposts.");
   }
 
+  /**
+   * Syncs UEX planets. Parent is star system; this method must run AFTER the star-system sync
+   * (which lives in {@link UexStarSystemService}) so unresolved parents stay rare.
+   */
   @Transactional
   public void syncPlanets() {
     log.info("Starting sync for Planets...");
@@ -404,6 +443,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Planets.");
   }
 
+  /**
+   * Syncs UEX points of interest (derelicts, anomalies, lagrange POIs). Parent varies by POI type —
+   * star system, planet or moon.
+   */
   @Transactional
   public void syncPois() {
     log.info("Starting sync for Pois...");
@@ -471,6 +514,10 @@ public class UexUniverseSyncService {
     log.info("Finished sync for Pois.");
   }
 
+  /**
+   * Syncs UEX space stations. Parent is star system or orbit; carries the loading-dock / jump-point
+   * / auto-load flags used by the profit-calculation page.
+   */
   @Transactional
   public void syncSpaceStations() {
     log.info("Starting sync for SpaceStations...");
@@ -562,6 +609,12 @@ public class UexUniverseSyncService {
     log.info("Finished sync for SpaceStations.");
   }
 
+  /**
+   * Syncs UEX terminals (trade kiosks at any parent location type). Last in the universe sweep
+   * because every terminal references a parent (city, space station or outpost) that the earlier
+   * sync methods produce. Unknown-parent terminals are upserted with the parent reference cleared —
+   * the next sweep usually fixes the row.
+   */
   @Transactional
   public void syncTerminals() {
     log.info("Starting sync for Terminals...");

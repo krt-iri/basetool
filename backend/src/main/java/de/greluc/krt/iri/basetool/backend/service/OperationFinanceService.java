@@ -25,6 +25,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Aggregates finance data across all missions that belong to an operation.
+ *
+ * <p>The operation level is purely a roll-up of its missions: per-mission finance entries (income
+ * vs expense) plus the profit/loss contribution of refinery orders linked to those missions (ore
+ * sales minus expenses and other expenses). Returns a structured DTO that the frontend turns into a
+ * per-mission breakdown plus an operation-wide total.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,6 +44,19 @@ public class OperationFinanceService {
   private final MissionMapper missionMapper;
   private final RefineryOrderMapper refineryOrderMapper;
 
+  /**
+   * Builds the aggregated finance DTO for the operation.
+   *
+   * <p>Loads the operation and groups all its missions' finance entries and refinery orders in
+   * memory rather than firing one query per mission — for a typical 5-mission operation this cuts
+   * the number of round trips from 1+2N (one for entries, one for refinery orders per mission) to 3
+   * fixed.
+   *
+   * @param operationId operation primary key
+   * @return aggregated finance summary
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no operation
+   *     matches the id
+   */
   @Transactional(readOnly = true)
   public OperationFinanceDto getOperationFinances(UUID operationId) {
     Operation operation =
