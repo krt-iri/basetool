@@ -16,8 +16,10 @@ import org.springframework.stereotype.Repository;
 public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Flips the {@code fitted} flag back to {@code false} on every ship; used by the fleet-import
+   * flow as the first step before re-applying the freshly imported fitted set. {@code
+   * clearAutomatically = true} flushes the persistence context so subsequent saves in the same
+   * transaction do not collide with stale {@code @Version} state.
    */
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Ship s SET s.fitted = false")
@@ -68,8 +70,9 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findAll(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Aggregates ships by type for the squadron-overview page: tuple of {@code (shipType, totalCount,
+   * fittedCount)} ordered alphabetically by ship-type name. Returns raw {@code Object[]} - the
+   * service projects it into the squadron-overview DTO.
    */
   @Query(
       "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s GROUP BY s.shipType ORDER BY s.shipType.name ASC")
@@ -83,8 +86,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   List<Ship> findByShipTypeIn(List<de.greluc.krt.iri.basetool.backend.model.ShipType> shipTypes);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-reassigns every ship owned by {@code oldUser} to {@code newUser}; used by the user-merge
+   * flow so the fleet is preserved when two Keycloak accounts get consolidated.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(

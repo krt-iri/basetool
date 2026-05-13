@@ -20,8 +20,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns paginated buy/sell prices for one material across every non-hidden terminal, projected
+   * directly into {@link MaterialPriceDto} (no need to fetch the full {@link MaterialPrice} graph).
    */
   @Query(
       """
@@ -37,8 +37,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       @Param("materialId") UUID materialId, Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns every non-hidden terminal that currently buys the given material, ordered by sell price
+   * descending (best price first; {@code NULLS LAST} so terminals with unknown price land at the
+   * bottom). A terminal qualifies if {@code statusSell = true} or its {@code priceSell} is positive
+   * - the OR catches both UEX import paths.
    */
   @Query(
       """
@@ -56,8 +58,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       @Param("materialId") UUID materialId);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Fully flattened material/terminal/price tuple feeding the trade-matrix view. {@code
+   * isIllegal/isVolatileQt/isVolatileTime} are normalised from UEX-style {@code Integer} 0/1 flags
+   * into booleans inside the JPQL via {@code CASE}; the category is left-joined because not every
+   * material has one. Excludes hidden terminals.
    */
   @Query(
       """
@@ -77,8 +81,9 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns every price row whose terminal supports cargo auto-load (i.e. usable as a profit-run
+   * destination), eagerly joining material and terminal so the profit calculator can iterate
+   * without N+1 queries.
    */
   @Query(
       """
@@ -92,8 +97,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   java.util.List<MaterialPrice> findAllAutoLoadPrices();
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Same as {@link #findAllAutoLoadPrices} but restricted to terminals in the given star systems -
+   * used when the profit run is constrained to a subset of the universe.
    */
   @Query(
       """

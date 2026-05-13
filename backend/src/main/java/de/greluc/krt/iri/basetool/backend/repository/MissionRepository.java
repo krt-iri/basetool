@@ -18,8 +18,9 @@ import org.springframework.stereotype.Repository;
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns slim {@link MissionReferenceDto}s for every mission in {@code PLANNED} or {@code
+   * ACTIVE} status, sorted by planned start. Used to populate mission-picker dropdowns without
+   * pulling the full Mission aggregate.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name, m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE') ORDER BY m.plannedStartTime ASC")
@@ -49,8 +50,11 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       Instant date);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Full-text + date-range + status + scope search across missions. Each parameter is optional - a
+   * {@code null} cast removes the corresponding clause; the {@code status IN (:status)} list is
+   * always applied (pass the full enum set to disable status filtering). Result is sorted by
+   * planned start ascending; the {@code @EntityGraph} pre-loads participants and assigned units to
+   * avoid N+1 when the caller renders the result list.
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
@@ -82,8 +86,8 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
   Page<Mission> findAll(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID)} - same
+   * filter contract; sorting is delegated to {@link Pageable} so the caller can pick the column.
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
@@ -104,8 +108,8 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       Pageable pageable);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-reassigns every mission owned by {@code oldUser} to {@code newUser}; used by the
+   * user-merge flow so missions are preserved when two Keycloak accounts get consolidated.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
@@ -115,8 +119,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User newUser);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Removes the given user from every mission's manager set via direct delete on the join table.
+   * Native query because Hibernate cannot bulk-delete a {@code @ManyToMany} association directly -
+   * JPQL would require loading every mission first.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
