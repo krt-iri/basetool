@@ -12,7 +12,7 @@ body:
       description: >-
         Warum ist diese Aufgabe sinnvoll? Welcher Schmerz, welches Risiko
         oder welcher Nutzen ist damit verbunden? Falls vorhanden: Link auf
-        den ausloesenden Bug / Issue / PR.
+        den auslösenden Bug / Issue / PR.
     validations:
       required: true
 
@@ -49,8 +49,8 @@ body:
       description: Was muss zutreffen, damit die Aufgabe als abgeschlossen gilt?
       value: |
         - [ ]
-        - [ ] `./gradlew check` laeuft gruen (Checkstyle, SpotBugs, Tests)
-        - [ ] Keine neuen Lint-Warnungen im geaenderten Code
+        - [ ] `./gradlew check` läuft grün (Checkstyle, SpotBugs, Tests)
+        - [ ] Keine neuen Lint-Warnungen im geänderten Code
 
   - type: checkboxes
     id: confirm
