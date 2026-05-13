@@ -357,8 +357,7 @@ public class JobOrderHandoverReportService {
           float margin = 20f;
           logo.scaleAbsolute(logoWidth, logoHeight);
           // Position above the bottom orange bar
-          logo.setAbsolutePosition(
-              PageSize.A4.getWidth() - logoWidth - margin, margin + 4f);
+          logo.setAbsolutePosition(PageSize.A4.getWidth() - logoWidth - margin, margin + 4f);
           canvas.addImage(logo);
         } else {
           log.warn("staffel_iridium.png not found in classpath");

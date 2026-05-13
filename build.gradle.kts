@@ -162,9 +162,11 @@ subprojects {
   // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
   // 13.4.2 release tag) which enforces 2-space indents, 100-char lines,
   // Google-style imports, naming conventions, Javadoc on public API, etc.
-  // Initial introduction is non-blocking (`ignoreFailures = true`,
-  // `maxWarnings = Int.MAX_VALUE`) so the existing codebase doesn't gate
-  // the build before the team has a chance to triage. Reports land under
+  //
+  // Phase 4 (this configuration): the gate is now STRICT.
+  // `ignoreFailures = false` + `maxWarnings = 0` mean any new Checkstyle
+  // warning or error fails `./gradlew check` — regressions are caught at
+  // CI / PR time instead of accumulating silently. Reports land under
   // `<subproject>/build/reports/checkstyle/{main,test}.html`. The test
   // source set scan is disabled — test code intentionally uses different
   // conventions (long method names with underscores, longer lines for
@@ -173,8 +175,8 @@ subprojects {
     extensions.configure<CheckstyleExtension>("checkstyle") {
       toolVersion = "13.4.2"
       configFile = rootProject.file("config/checkstyle/google_checks.xml")
-      isIgnoreFailures = true
-      maxWarnings = Int.MAX_VALUE
+      isIgnoreFailures = false
+      maxWarnings = 0
     }
     tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
   }
@@ -186,13 +188,13 @@ subprojects {
   // LineLength, CustomImportOrder, AvoidStarImport, EmptyLineSeparator,
   // OperatorWrap and WhitespaceAround warnings in a single pass.
   //
-  // `enforceCheck = false` keeps `./gradlew check` green while the codebase is
-  // still in its pre-reformat state. Run `./gradlew spotlessApply` once to
-  // bulk-format, commit that as an isolated change, then flip `enforceCheck`
-  // back to its default `true` so future style drift is caught by CI.
+  // Phase 4 (this configuration): `enforceCheck = true` wires `spotlessCheck`
+  // into `./gradlew check` so any unformatted file fails the build. Run
+  // `./gradlew spotlessApply` locally before pushing to auto-fix; CI then
+  // re-runs `spotlessCheck` to verify the diff is clean.
   plugins.withId("com.diffplug.spotless") {
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
-      isEnforceCheck = false
+      isEnforceCheck = true
       java {
         googleJavaFormat().reflowLongStrings()
         removeUnusedImports()
