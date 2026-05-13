@@ -12,23 +12,42 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Material. */
 @Repository
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name, m.quantityType) FROM Material m ORDER BY m.name")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
 
+  /**
+   * Returns every entity matching the derived {@code findAllByIsJobOrderTrueOrderByNameAsc}
+   * criteria.
+   */
   List<Material> findAllByIsJobOrderTrueOrderByNameAsc();
 
+  /** Derived Spring-Data query - returns entities matching {@code IdCommodity}. */
   Optional<Material> findByIdCommodity(Integer idCommodity);
 
+  /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Material> findByName(String name);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       "SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))")
   Page<Material> findAllWithPrices(Pageable pageable);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto(

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Operation. */
 @Repository
 public interface OperationRepository extends JpaRepository<Operation, UUID> {
 

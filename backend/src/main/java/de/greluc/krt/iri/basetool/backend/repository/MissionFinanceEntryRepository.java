@@ -11,15 +11,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Mission Finance Entry. */
 @Repository
 public interface MissionFinanceEntryRepository extends JpaRepository<MissionFinanceEntry, UUID> {
 
+  /** Returns every entity matching the derived {@code findAllByMissionId} criteria. */
   Page<MissionFinanceEntry> findAllByMissionId(UUID missionId, Pageable pageable);
 
+  /** Returns every entity matching the derived {@code findAllByMissionId} criteria. */
   List<MissionFinanceEntry> findAllByMissionId(UUID missionId);
 
+  /** Returns every entity matching the derived {@code findAllByMissionIdIn} criteria. */
   List<MissionFinanceEntry> findAllByMissionIdIn(List<UUID> missionIds);
 
+  /** Derived Spring-Data delete - removes every row matching {@code MissionIdIn}. */
   @Modifying
   @Query("DELETE FROM MissionFinanceEntry m WHERE m.mission.id IN :missionIds")
   void deleteByMissionIdIn(@Param("missionIds") List<UUID> missionIds);
