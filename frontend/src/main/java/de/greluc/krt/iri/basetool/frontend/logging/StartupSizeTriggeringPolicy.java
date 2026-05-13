@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.logging;
 import ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy;
 import java.io.File;
 
+/** Policy implementation for Startup Size Triggering. */
 public class StartupSizeTriggeringPolicy<E> extends SizeBasedTriggeringPolicy<E> {
   private boolean started = false;
 

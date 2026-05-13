@@ -11,6 +11,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/** Servlet filter handling Static Cache Header. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 15)
 public class StaticCacheHeaderFilter extends OncePerRequestFilter {

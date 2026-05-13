@@ -28,6 +28,9 @@ public final class LogMasker {
     // utility class
   }
 
+  /**
+   * Masks an e-mail address keeping only its first character and full domain ({@code a***@x.com}).
+   */
   @Contract(pure = true)
   public static @NotNull String maskEmail(@Nullable String email) {
     if (isBlank(email)) {
@@ -41,6 +44,7 @@ public final class LogMasker {
     return first + "***" + email.substring(at);
   }
 
+  /** Masks an identifier keeping the first 2 and last 2 characters (short ids are fully masked). */
   @Contract(pure = true)
   public static @NotNull String maskId(@Nullable Object id) {
     if (id == null) {
@@ -56,6 +60,7 @@ public final class LogMasker {
     return value.substring(0, 2) + "***" + value.substring(value.length() - 2);
   }
 
+  /** Masks a token keeping only its first 4 characters; short tokens are fully masked. */
   @Contract(pure = true)
   public static @NotNull String maskToken(@Nullable String token) {
     if (isBlank(token)) {
@@ -67,6 +72,7 @@ public final class LogMasker {
     return token.substring(0, 4) + "***";
   }
 
+  /** Masks a phone number keeping only its last two digits ({@code ***42}). */
   @Contract(pure = true)
   public static @NotNull String maskPhone(@Nullable String phone) {
     if (isBlank(phone)) {
@@ -79,6 +85,7 @@ public final class LogMasker {
     return "***" + digits.substring(digits.length() - 2);
   }
 
+  /** Generic fallback - replaces the value entirely with {@code ***(len=N)}. */
   @Contract(pure = true)
   public static @NotNull String mask(@Nullable Object value) {
     if (value == null) {

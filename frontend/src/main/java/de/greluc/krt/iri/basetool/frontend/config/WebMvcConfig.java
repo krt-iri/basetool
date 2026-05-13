@@ -6,6 +6,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.CssLinkResourceTransformer;
 import org.springframework.web.servlet.resource.VersionResourceResolver;
 
+/** Spring configuration for Web Mvc. */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 

@@ -46,6 +46,10 @@ public class GlobalExceptionHandler {
 
   private final MessageSource messageSource;
 
+  /**
+   * Renders an i18n-resolved error page (or JSON toast snippet for XHR clients) from an RFC-7807
+   * problem returned by the backend, preserving the correlation id for cross-tier debugging.
+   */
   @ExceptionHandler(BackendServiceException.class)
   public Object handleBackendServiceException(
       @NotNull BackendServiceException ex,
@@ -93,6 +97,7 @@ public class GlobalExceptionHandler {
     return "error/error";
   }
 
+  /** Renders the 404 error page for unmapped static resource / page requests. */
   @ExceptionHandler(NoResourceFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleNoResourceFoundException(
@@ -106,6 +111,10 @@ public class GlobalExceptionHandler {
     return "error/error";
   }
 
+  /**
+   * Renders a 400 error page when an MVC path / query parameter cannot be coerced to its declared
+   * type. The rejected value is intentionally not logged because it may carry PII.
+   */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Object handleTypeMismatch(
@@ -175,6 +184,10 @@ public class GlobalExceptionHandler {
     return "error/error";
   }
 
+  /**
+   * Catch-all fallback. Renders a 500 error page; unwraps a {@link BackendServiceException} cause
+   * to propagate the backend's status code (e.g. 503 / 504) rather than masking it as 500.
+   */
   @ExceptionHandler(Exception.class)
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public String handleException(

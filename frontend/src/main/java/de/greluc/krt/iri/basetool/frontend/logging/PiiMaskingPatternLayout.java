@@ -5,6 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Logback layout customised for Pii Masking Pattern. */
 public class PiiMaskingPatternLayout extends PatternLayout {
 
   private static final String JWT_PATTERN =
