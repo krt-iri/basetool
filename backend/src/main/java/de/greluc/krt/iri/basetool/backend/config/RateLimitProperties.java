@@ -13,21 +13,21 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app.rate-limit")
 public class RateLimitProperties {
-  /** Enable/disable the rate limiter globally */
+  /** Enable/disable the rate limiter globally. */
   private boolean enabled = true;
 
-  /** Ant-style path patterns to protect (e.g. /api/**) */
+  /** Ant-style path patterns to protect (e.g. {@code /api/**}). */
   @NotEmpty private List<String> paths = java.util.List.of("/api/**");
 
-  /** Bucket capacity (max tokens) */
+  /** Bucket capacity (max tokens). */
   @Min(1)
   private int capacity = 300;
 
-  /** Tokens refilled per period */
+  /** Tokens refilled per period. */
   @Min(1)
   private int refillTokens = 300;
 
-  /** Refill period */
+  /** Refill period. */
   @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
 
   /**

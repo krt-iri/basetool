@@ -9,6 +9,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app.problems")
 public class AppProblemProperties {
-  /** Base URI for Problem Detail types */
+  /** Base URI for Problem Detail types. */
   @NotBlank private String baseUri = "https://iri-base.org/problems/";
 }

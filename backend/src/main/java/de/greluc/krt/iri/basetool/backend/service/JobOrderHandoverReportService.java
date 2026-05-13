@@ -172,18 +172,18 @@ public class JobOrderHandoverReportService {
 
       // Title
       Font titleFont = new Font(Font.HELVETICA, 20, Font.BOLD, COLOR_ORANGE);
-      Paragraph title = new Paragraph("\u00dcBERGABEPROTOKOLL", titleFont);
+      Paragraph title = new Paragraph("ÜBERGABEPROTOKOLL", titleFont);
       title.setAlignment(Element.ALIGN_LEFT);
       title.setSpacingAfter(4f);
       document.add(title);
 
       // Orange separator line
       PdfContentByte cb = writer.getDirectContent();
-      float yPos = writer.getVerticalPosition(false);
+      float verticalPos = writer.getVerticalPosition(false);
       cb.setColorStroke(COLOR_ORANGE);
       cb.setLineWidth(0.5f);
-      cb.moveTo(40, yPos);
-      cb.lineTo(PageSize.A4.getWidth() - 40, yPos);
+      cb.moveTo(40, verticalPos);
+      cb.lineTo(PageSize.A4.getWidth() - 40, verticalPos);
       cb.stroke();
 
       document.add(new Paragraph(" ", new Font(Font.HELVETICA, 6)));
@@ -195,15 +195,15 @@ public class JobOrderHandoverReportService {
       metaTable.setSpacingAfter(20f);
 
       addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
-      addMetaRow(metaTable, "DATUM DER \u00dcBERGABE", handoverDate);
-      addMetaRow(metaTable, "UHRZEIT DER \u00dcBERGABE", handoverTime + " (Lokalzeit)");
-      addMetaRow(metaTable, "EMPF\u00c4NGER (HANDLE)", recipientHandle);
+      addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
+      addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
+      addMetaRow(metaTable, "EMPFÄNGER (HANDLE)", recipientHandle);
 
       document.add(metaTable);
 
       // Section header: Materials
       Font sectionFont = new Font(Font.HELVETICA, 12, Font.BOLD, COLOR_ORANGE);
-      Paragraph matHeader = new Paragraph("\u00dcBERGEBENE MATERIALIEN", sectionFont);
+      Paragraph matHeader = new Paragraph("ÜBERGEBENE MATERIALIEN", sectionFont);
       matHeader.setSpacingAfter(8f);
       document.add(matHeader);
 
@@ -215,7 +215,7 @@ public class JobOrderHandoverReportService {
       addTableHeader(matTable, "MATERIAL");
       addTableHeader(matTable, "STANDORT");
       addTableHeader(matTable, "MENGE");
-      addTableHeader(matTable, "QUALIT\u00c4T");
+      addTableHeader(matTable, "QUALITÄT");
 
       boolean alt = false;
       for (ItemRow row : rows) {
@@ -358,8 +358,8 @@ public class JobOrderHandoverReportService {
           logo.scaleAbsolute(logoWidth, logoHeight);
           logo.setAbsolutePosition(
               PageSize.A4.getWidth() - logoWidth - margin,
-              margin + 4f // above the bottom orange bar
-              );
+              // above the bottom orange bar
+              margin + 4f);
           canvas.addImage(logo);
         } else {
           log.warn("staffel_iridium.png not found in classpath");

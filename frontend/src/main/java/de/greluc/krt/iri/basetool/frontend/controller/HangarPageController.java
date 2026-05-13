@@ -113,11 +113,11 @@ public class HangarPageController {
 
     List<LocationDto> locations = new ArrayList<>();
     try {
-      PageResponse<LocationDto> pLoc =
+      PageResponse<LocationDto> locationsPage =
           backendApiClient.getCached(
               "/api/v1/locations?size=1000", new ParameterizedTypeReference<>() {});
-      if (pLoc != null && pLoc.content() != null) {
-        locations = new ArrayList<>(pLoc.content());
+      if (locationsPage != null && locationsPage.content() != null) {
+        locations = new ArrayList<>(locationsPage.content());
       }
     } catch (Exception e) {
       log.error("Failed to fetch locations", e);
@@ -126,11 +126,11 @@ public class HangarPageController {
 
     List<ManufacturerDto> manufacturers = new ArrayList<>();
     try {
-      PageResponse<ManufacturerDto> pMan =
+      PageResponse<ManufacturerDto> manufacturersPage =
           backendApiClient.getCached(
               "/api/v1/manufacturers?size=1000", new ParameterizedTypeReference<>() {});
-      if (pMan != null && pMan.content() != null) {
-        manufacturers = new ArrayList<>(pMan.content());
+      if (manufacturersPage != null && manufacturersPage.content() != null) {
+        manufacturers = new ArrayList<>(manufacturersPage.content());
       }
     } catch (Exception e) {
       log.error("Failed to fetch manufacturers", e);

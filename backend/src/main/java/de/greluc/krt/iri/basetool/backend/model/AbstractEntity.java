@@ -18,7 +18,7 @@ import org.springframework.data.domain.Persistable;
 @MappedSuperclass
 @Getter
 @Setter
-public abstract class AbstractEntity<PK extends Serializable> implements Persistable<PK> {
+public abstract class AbstractEntity<K extends Serializable> implements Persistable<K> {
 
   @Version private Long version;
 
@@ -42,7 +42,7 @@ public abstract class AbstractEntity<PK extends Serializable> implements Persist
     if (o == null) {
       return false;
     }
-    Class<?> oEffectiveClass =
+    Class<?> otherEffectiveClass =
         o instanceof HibernateProxy
             ? ((HibernateProxy) o).getHibernateLazyInitializer().getPersistentClass()
             : o.getClass();
@@ -50,7 +50,7 @@ public abstract class AbstractEntity<PK extends Serializable> implements Persist
         this instanceof HibernateProxy
             ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass()
             : this.getClass();
-    if (thisEffectiveClass != oEffectiveClass) {
+    if (thisEffectiveClass != otherEffectiveClass) {
       return false;
     }
     AbstractEntity<?> that = (AbstractEntity<?>) o;

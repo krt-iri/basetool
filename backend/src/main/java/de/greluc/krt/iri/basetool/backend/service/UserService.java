@@ -232,8 +232,8 @@ public class UserService {
   private Set<Role> mapRoles(Collection<String> roleNames) {
     Set<Role> localRoles = new HashSet<>();
     if (roleNames != null) {
-      for (String rName : roleNames) {
-        roleRepository.findByNameIgnoreCase(rName).ifPresent(localRoles::add);
+      for (String roleName : roleNames) {
+        roleRepository.findByNameIgnoreCase(roleName).ifPresent(localRoles::add);
       }
     }
 

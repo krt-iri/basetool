@@ -503,12 +503,12 @@ public class RefineryOrderService {
       }
 
       double amount = itemDto.amount();
-      String qType =
+      String quantityType =
           good.getOutputMaterial().getQuantityType() != null
               ? good.getOutputMaterial().getQuantityType().name()
               : null;
       long rawNew;
-      if ("SCU".equals(qType)) {
+      if ("SCU".equals(quantityType)) {
         rawNew = Math.round(amount * 100.0d);
       } else {
         rawNew = Math.round(amount);

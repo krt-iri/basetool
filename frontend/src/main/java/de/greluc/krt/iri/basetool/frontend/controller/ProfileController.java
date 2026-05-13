@@ -75,6 +75,7 @@ public class ProfileController {
             model.addAttribute(
                 "monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
           } catch (Exception ignored) {
+            // Unparseable joinDate string - leave the model attribute unset.
           }
         }
       }

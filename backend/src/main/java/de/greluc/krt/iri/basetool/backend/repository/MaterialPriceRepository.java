@@ -65,19 +65,21 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-    SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
-        m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END,
-        CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END,
-        CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
-        c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName, p.priceBuy, p.priceSell,
-        t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint, t.hasLoadingDock, t.isAutoLoad
-    )
-    FROM MaterialPrice p
-    JOIN p.material m
-    LEFT JOIN m.category c
-    JOIN p.terminal t
-    WHERE (t.hidden = false OR t.hidden IS NULL)
-""")
+          SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
+              m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END,
+              CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END,
+              CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
+              c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName,
+              p.priceBuy, p.priceSell,
+              t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint,
+              t.hasLoadingDock, t.isAutoLoad
+          )
+          FROM MaterialPrice p
+          JOIN p.material m
+          LEFT JOIN m.category c
+          JOIN p.terminal t
+          WHERE (t.hidden = false OR t.hidden IS NULL)
+      """)
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
   /**

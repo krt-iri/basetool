@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -146,8 +147,7 @@ public class OperationPageController {
     try {
       backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
-    } catch (
-        org.springframework.web.reactive.function.client.WebClientResponseException.Conflict e) {
+    } catch (WebClientResponseException.Conflict e) {
       log.warn("Optimistic locking failure updating operation: {}", id);
       redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
     } catch (Exception e) {

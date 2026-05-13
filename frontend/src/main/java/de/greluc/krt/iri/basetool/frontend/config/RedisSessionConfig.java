@@ -173,9 +173,9 @@ public class RedisSessionConfig {
    *       and that pulls more internals into the serialised graph.
    * </ol>
    *
-   * Whitelisted (i.e. NOT ignored): {@code objectName}, {@code nestedPath}, {@code target}, {@code
-   * fieldErrors}, {@code globalErrors}, {@code allErrors}, {@code errorCount} — everything {@code
-   * th:errors} / {@code th:field} consume on the next render.
+   * <p>Whitelisted (i.e. NOT ignored): {@code objectName}, {@code nestedPath}, {@code target},
+   * {@code fieldErrors}, {@code globalErrors}, {@code allErrors}, {@code errorCount} — everything
+   * {@code th:errors} / {@code th:field} consume on the next render.
    */
   @JsonIgnoreProperties({
     "model",
@@ -204,7 +204,7 @@ public class RedisSessionConfig {
    *       IMMEDIATE}; sessions may not be written to Redis before a restart
    * </ul>
    *
-   * This customizer explicitly re-applies all three settings.
+   * <p>This customizer explicitly re-applies all three settings.
    *
    * @return a customizer that sets timeout, namespace, and flush mode on the repository
    */

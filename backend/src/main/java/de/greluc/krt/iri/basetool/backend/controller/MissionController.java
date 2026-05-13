@@ -903,13 +903,11 @@ public class MissionController {
 
   // =====================================================================================
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
-  //
   // These endpoints are additive replacements for the legacy MissionDto-returning
   // sub-endpoints above. They return only the affected slim sub-DTO (or a slim list,
   // or 204 No Content) instead of the full MissionDto. This lets the frontend run
   // per-sub-aggregate DOM `data-version` synchronisation without coupling the
   // Mission parent version into every AJAX round-trip.
-  //
   // Behaviour and service-level concurrency semantics are IDENTICAL to the legacy
   // endpoints; only the response shape is slim. See ApiDeprecation annotations on
   // the legacy endpoints for the sunset date.

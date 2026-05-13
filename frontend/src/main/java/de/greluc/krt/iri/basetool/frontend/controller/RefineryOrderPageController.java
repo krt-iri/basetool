@@ -332,17 +332,17 @@ public class RefineryOrderPageController {
             List<RefineryGoodForm> goodsForm = new ArrayList<>();
             for (de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto goodDto :
                 orderDto.goods()) {
-              RefineryGoodForm gForm = new RefineryGoodForm();
+              RefineryGoodForm goodForm = new RefineryGoodForm();
               if (goodDto.inputMaterial() != null) {
-                gForm.setInputMaterialId(goodDto.inputMaterial().id());
+                goodForm.setInputMaterialId(goodDto.inputMaterial().id());
               }
               if (goodDto.outputMaterial() != null) {
-                gForm.setOutputMaterialId(goodDto.outputMaterial().id());
+                goodForm.setOutputMaterialId(goodDto.outputMaterial().id());
               }
-              gForm.setInputQuantity(goodDto.inputQuantity());
-              gForm.setOutputQuantity(goodDto.outputQuantity());
-              gForm.setQuality(goodDto.quality());
-              goodsForm.add(gForm);
+              goodForm.setInputQuantity(goodDto.inputQuantity());
+              goodForm.setOutputQuantity(goodDto.outputQuantity());
+              goodForm.setQuality(goodDto.quality());
+              goodsForm.add(goodForm);
             }
             form.setGoods(goodsForm);
           }
@@ -357,9 +357,9 @@ public class RefineryOrderPageController {
             for (de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto good :
                 orderDto.goods()) {
               if (good.outputMaterial() != null) {
-                RefineryOrderStoreItemForm sItem = new RefineryOrderStoreItemForm();
-                sItem.setMaterialId(good.outputMaterial().id());
-                sItem.setMaterialName(good.outputMaterial().name());
+                RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
+                storeItem.setMaterialId(good.outputMaterial().id());
+                storeItem.setMaterialName(good.outputMaterial().name());
 
                 double amount = 0.0;
                 if (good.outputQuantity() != null) {
@@ -377,21 +377,21 @@ public class RefineryOrderPageController {
                   } else {
                     amount = good.outputQuantity();
                   }
-                  sItem.setAmountFixed(true);
+                  storeItem.setAmountFixed(true);
                 } else {
-                  sItem.setAmountFixed(false);
+                  storeItem.setAmountFixed(false);
                 }
-                sItem.setAmount(amount);
-                sItem.setQuantityType(good.outputMaterial().quantityType());
+                storeItem.setAmount(amount);
+                storeItem.setQuantityType(good.outputMaterial().quantityType());
 
-                sItem.setQuality(good.quality() != null ? good.quality() : 0);
+                storeItem.setQuality(good.quality() != null ? good.quality() : 0);
                 if (orderDto.location() != null) {
-                  sItem.setLocationId(orderDto.location().id());
+                  storeItem.setLocationId(orderDto.location().id());
                 }
                 if (currentUserId != null) {
-                  sItem.setUserId(currentUserId);
+                  storeItem.setUserId(currentUserId);
                 }
-                storeForm.getItems().add(sItem);
+                storeForm.getItems().add(storeItem);
               }
             }
           }

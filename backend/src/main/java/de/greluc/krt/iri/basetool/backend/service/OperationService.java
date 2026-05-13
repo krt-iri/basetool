@@ -125,40 +125,46 @@ public class OperationService {
 
       for (de.greluc.krt.iri.basetool.backend.model.MissionParticipant p :
           mission.getParticipants()) {
-        String pId =
+        String participantKey =
             p.getUser() != null
                 ? p.getUser().getId().toString()
                 : (p.getGuestName() != null ? "guest_" + p.getGuestName() : null);
-        if (pId == null) {
+        if (participantKey == null) {
           continue;
         }
 
-        String pName = p.getUser() != null ? p.getUser().getEffectiveName() : p.getGuestName();
-        participantNames.putIfAbsent(pId, pName);
+        String participantName =
+            p.getUser() != null ? p.getUser().getEffectiveName() : p.getGuestName();
+        participantNames.putIfAbsent(participantKey, participantName);
 
         de.greluc.krt.iri.basetool.backend.model.PayoutPreference currentPref =
             preferences.getOrDefault(
-                pId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.PAYOUT);
+                participantKey, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.PAYOUT);
         if (p.getPayoutPreference()
             == de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE) {
-          preferences.put(pId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE);
+          preferences.put(
+              participantKey, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE);
         } else {
-          preferences.putIfAbsent(pId, currentPref);
+          preferences.putIfAbsent(participantKey, currentPref);
         }
 
-        java.time.Instant pStart = p.getStartTime();
-        if (pStart == null) {
+        java.time.Instant participantStart = p.getStartTime();
+        if (participantStart == null) {
           continue;
         }
 
-        java.time.Instant pEnd = p.getEndTime() != null ? p.getEndTime() : java.time.Instant.now();
+        java.time.Instant participantEnd =
+            p.getEndTime() != null ? p.getEndTime() : java.time.Instant.now();
 
-        java.time.Instant effectiveStart = pStart.isBefore(actualStart) ? actualStart : pStart;
-        java.time.Instant effectiveEnd = pEnd.isAfter(actualEnd) ? actualEnd : pEnd;
+        java.time.Instant effectiveStart =
+            participantStart.isBefore(actualStart) ? actualStart : participantStart;
+        java.time.Instant effectiveEnd =
+            participantEnd.isAfter(actualEnd) ? actualEnd : participantEnd;
 
         if (effectiveEnd.isAfter(effectiveStart)) {
           long duration = java.time.Duration.between(effectiveStart, effectiveEnd).toMillis();
-          validDurations.put(pId, validDurations.getOrDefault(pId, 0L) + duration);
+          validDurations.put(
+              participantKey, validDurations.getOrDefault(participantKey, 0L) + duration);
           totalOperationValidDuration += duration;
         }
       }
@@ -166,8 +172,8 @@ public class OperationService {
 
     java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> result =
         new java.util.ArrayList<>();
-    for (String pId : participantNames.keySet()) {
-      long duration = validDurations.getOrDefault(pId, 0L);
+    for (String participantKey : participantNames.keySet()) {
+      long duration = validDurations.getOrDefault(participantKey, 0L);
       double percentage =
           totalOperationValidDuration > 0
               ? (double) duration / totalOperationValidDuration * 100.0
@@ -176,7 +182,10 @@ public class OperationService {
       percentage = Math.round(percentage * 100.0) / 100.0;
       result.add(
           new de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto(
-              pId, participantNames.get(pId), percentage, preferences.get(pId)));
+              participantKey,
+              participantNames.get(participantKey),
+              percentage,
+              preferences.get(participantKey)));
     }
 
     result.sort(

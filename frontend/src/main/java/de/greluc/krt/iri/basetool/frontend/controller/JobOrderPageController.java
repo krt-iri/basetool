@@ -415,13 +415,13 @@ public class JobOrderPageController {
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
         try {
           handoverTime = Instant.parse(rawHandoverTime);
-        } catch (Exception eIso) {
+        } catch (Exception isoEx) {
           try {
             handoverTime =
                 LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
-          } catch (Exception eLocal) {
+          } catch (Exception localEx) {
             log.warn("Could not parse handoverTime {}, using now()", rawHandoverTime);
           }
         }

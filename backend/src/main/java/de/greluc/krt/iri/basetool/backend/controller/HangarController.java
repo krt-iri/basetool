@@ -146,12 +146,12 @@ public class HangarController {
   }
 
   @Operation(
-      summary = "Alle eigenen Schiffe l\u00f6schen",
+      summary = "Alle eigenen Schiffe löschen",
       description =
-          "L\u00f6scht alle Schiffe des authentifizierten Nutzers. Verkn\u00fcpfungen mit"
-              + " Mission-Einheiten werden sicher aufgel\u00f6st.")
+          "Löscht alle Schiffe des authentifizierten Nutzers. Verknüpfungen mit"
+              + " Mission-Einheiten werden sicher aufgelöst.")
   @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "Alle Schiffe erfolgreich gel\u00f6scht"),
+    @ApiResponse(responseCode = "204", description = "Alle Schiffe erfolgreich gelöscht"),
     @ApiResponse(responseCode = "401", description = "Nicht authentifiziert"),
     @ApiResponse(responseCode = "403", description = "Keine Berechtigung")
   })

@@ -13,7 +13,7 @@ public record CreateJobOrderMaterialDto(
         @Min(750)
         @Max(750)
         @Schema(
-            description = "Minimale Qualit\u00e4t, wird serverseitig fest auf 750 gesetzt",
+            description = "Minimale Qualität, wird serverseitig fest auf 750 gesetzt",
             example = "750")
         Integer minQuality,
     @NotNull @Min(0) Double amount) {}

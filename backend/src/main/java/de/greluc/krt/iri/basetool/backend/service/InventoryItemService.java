@@ -425,7 +425,7 @@ public class InventoryItemService {
    *       ROLE_OFFICER}/{@code ROLE_ADMIN}).
    * </ul>
    *
-   * A blank or empty note is normalized to {@code null} and thus effectively removes the note.
+   * <p>A blank or empty note is normalized to {@code null} and thus effectively removes the note.
    * Optimistic locking is enforced via the supplied {@code version}.
    */
   @Transactional

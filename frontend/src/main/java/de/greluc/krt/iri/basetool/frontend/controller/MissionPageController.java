@@ -280,15 +280,18 @@ public class MissionPageController {
         Map<UUID, Long> participantDurations = new java.util.HashMap<>();
 
         for (MissionParticipantDto p : participants) {
-          java.time.Instant pStart = p.startTime();
-          java.time.Instant pEnd = p.endTime();
+          java.time.Instant participantStart = p.startTime();
+          java.time.Instant participantEnd = p.endTime();
 
-          if (pStart != null) {
+          if (participantStart != null) {
             java.time.Instant effectiveStart =
-                pStart.isBefore(missionStart) ? missionStart : pStart;
+                participantStart.isBefore(missionStart) ? missionStart : participantStart;
             java.time.Instant effectiveEnd;
-            if (pEnd != null) {
-              effectiveEnd = (missionEnd != null && pEnd.isAfter(missionEnd)) ? missionEnd : pEnd;
+            if (participantEnd != null) {
+              effectiveEnd =
+                  (missionEnd != null && participantEnd.isAfter(missionEnd))
+                      ? missionEnd
+                      : participantEnd;
             } else {
               effectiveEnd = (missionEnd != null) ? missionEnd : java.time.Instant.now();
             }
