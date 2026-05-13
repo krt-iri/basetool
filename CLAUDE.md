@@ -20,9 +20,19 @@ Always use the Gradle wrapper. **Never** use the IDE test runner or the harness 
 ./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
 ./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
 ./gradlew :frontend:cyclonedxBom                           # SBOM into frontend/docs/
+./gradlew check                                            # full static analysis: Checkstyle (Google Java Style) + SpotBugs + tests
+./gradlew :backend:checkstyleMain :backend:spotbugsMain    # backend lint only
+./gradlew :frontend:checkstyleMain :frontend:spotbugsMain  # frontend lint only
 ```
 
 Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED` and a Mockito agent JVM arg.
+
+## Linting / static analysis
+
+- **Checkstyle** (Google Java Style, `config/checkstyle/google_checks.xml`) and **SpotBugs** (`spotbugsMain`, wired into `check`) run against the `main` source set of both modules. Reports land under `<module>/build/reports/{checkstyle,spotbugs}/main.{html,xml}`.
+- **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
+- **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case leave a one-line comment explaining why.
+- Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
 
 ## Local stack
 
@@ -164,7 +174,7 @@ class GuidelinesExampleTest {
 
 - **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
 - Keep `README.md` current when architecture or env vars change.
-- **Javadoc** explains *why* (non-obvious choices, tricky invariants), not *what*. Skip Javadoc on trivial getters/setters.
+- **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
 
 ## Git
 
