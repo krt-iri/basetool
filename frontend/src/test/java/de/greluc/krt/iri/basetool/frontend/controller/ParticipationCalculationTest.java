@@ -92,8 +92,12 @@ class ParticipationCalculationTest {
 
     // Should use UUID keys now
     assertNotNull(percentages.get(participantId), "Map should contain UUID keys");
-    assertNull(
-        percentages.get(participantId.toString()), "Map should NOT contain String keys anymore");
+    // No follow-up `get(participantId.toString())` assertion: the declared type
+    // `Map<UUID, Double>` already prevents String keys at the put-site (erasure
+    // aside, the controller code is type-checked against the same UUID key type),
+    // and the runtime `get(Object)` lookup with a String would never match a UUID
+    // entry — CodeQL's "Type mismatch on container access" flagged the same call
+    // as a tautology.
   }
 
   @Test

@@ -79,50 +79,15 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
-    UUID unitId = UUID.randomUUID();
 
-    Map<String, Object> shipTypeData = new java.util.HashMap<>();
-    shipTypeData.put("id", UUID.randomUUID().toString());
-    shipTypeData.put("name", "Fighter");
-
-    Map<String, Object> unitData = new java.util.HashMap<>();
-    unitData.put("id", unitId.toString());
-    unitData.put("name", "Alpha Unit");
-    unitData.put("highValueUnit", false);
-    unitData.put("shipType", shipTypeData);
-    unitData.put("ship", null);
-    unitData.put("frequency", 123.45);
-    unitData.put("crew", new java.util.ArrayList<>());
-
-    Map<String, Object> userData = new java.util.HashMap<>();
-    userData.put("username", "TestUser");
-    userData.put("displayName", "Test User");
-
-    Map<String, Object> locationData = new java.util.HashMap<>();
-    locationData.put("name", "Test Location");
-
-    Map<String, Object> orderData = new java.util.HashMap<>();
-    orderData.put("id", UUID.randomUUID().toString());
-    orderData.put("startedAt", "2026-03-29T18:00:00Z");
-    orderData.put("status", "OPEN");
-    orderData.put("location", locationData);
-    orderData.put("owner", userData);
-    orderData.put("durationMinutes", 60);
-    orderData.put("goods", new java.util.ArrayList<>());
-
-    Map<String, Object> itemData = new java.util.HashMap<>();
-    itemData.put("id", UUID.randomUUID().toString());
-    itemData.put("user", userData);
-    itemData.put("location", locationData);
-
-    Map<String, Object> materialData = new java.util.HashMap<>();
-    materialData.put("name", "Quantanium");
-    itemData.put("material", materialData);
-
-    itemData.put("amount", 100);
-    itemData.put("quality", 50);
-    itemData.put("jobOrderDisplayId", 123);
-
+    // The MissionDto below intentionally carries empty sub-collections (units, participants,
+    // job orders, finance entries, ...). The test focuses on the mission-detail TEMPLATE
+    // contract — panel structure, accessible toggles, no horizontal-scroll markers — not on
+    // sub-aggregate rendering, so a minimal mission is sufficient. Earlier revisions built
+    // up nested Map fixtures here (shipType / unit / order / inventory item / material)
+    // that were never actually attached to the mission; they have been removed because
+    // unused container literals tripped CodeQL's "Container contents are never accessed"
+    // rule and added confusion to anyone reading this test.
     UUID managerId = UUID.randomUUID();
     de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto manager =
         new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(

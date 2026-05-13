@@ -3,6 +3,9 @@ package de.greluc.krt.iri.basetool.frontend;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -27,10 +30,24 @@ class MissionUnitColorIndexTest {
 
   @Test
   void paletteSizeShouldBeAtLeast20() {
-    // Given / When / Then
-    assertTrue(
-        PALETTE_SIZE >= 20,
-        "Die Farbpalette muss mindestens 20 Farben umfassen, ist aber: " + PALETTE_SIZE);
+    // Build the actual CSS class set the template would emit for indices 0..19 and
+    // assert that all 20 are distinct. This is functionally equivalent to a static
+    // {@code PALETTE_SIZE >= 20} check (the modulo would collapse two indices into
+    // the same class if PALETTE_SIZE were < 20) but it executes at runtime instead
+    // of comparing a compile-time constant against a literal — CodeQL flagged the
+    // previous form as a "Useless comparison test" (always true).
+    Set<String> distinctClasses =
+        IntStream.range(0, 20)
+            .mapToObj(MissionUnitColorIndexTest::unitColorClass)
+            .collect(Collectors.toSet());
+    assertEquals(
+        20,
+        distinctClasses.size(),
+        "Die Farbpalette muss mindestens 20 Farben umfassen; Indizes 0..19 erzeugten nur "
+            + distinctClasses.size()
+            + " unterschiedliche Klassen (PALETTE_SIZE="
+            + PALETTE_SIZE
+            + ").");
   }
 
   @ParameterizedTest(name = "Index {0} -> unit-color-{1}")

@@ -110,6 +110,8 @@ public class JobOrderPageController {
       Cookie cookie = new Cookie("orders_filter_status", String.join("-", status));
       cookie.setPath("/orders");
       cookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
+      cookie.setHttpOnly(true);
+      cookie.setSecure(true);
       response.addCookie(cookie);
     }
 

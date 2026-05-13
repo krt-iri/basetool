@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.filter;
 
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.iri.basetool.backend.config.AppProblemProperties;
@@ -175,6 +176,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfterSeconds));
 
+    // The {@code instance} field reflects the request URI, which is fully attacker-controlled.
+    // String concatenation directly into a JSON literal would let a crafted path like
+    // {@code /api/v1/x","fake":"injected} break out of the quoted value and append arbitrary
+    // top-level fields, polluting the RFC 7807 contract a client may rely on (JSON-injection,
+    // CodeQL: java/xss). Escape via Jackson's {@link JsonStringEncoder} so that {@code "},
+    // {@code \}, control chars and unicode separators land as proper JSON escapes.
+    JsonStringEncoder jsonEncoder = JsonStringEncoder.getInstance();
+    String instanceEscaped = new String(jsonEncoder.quoteAsString(request.getRequestURI()));
     String body =
         "{"
             + "\"type\":\""
@@ -188,7 +197,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             + retryAfterSeconds
             + " seconds.\","
             + "\"instance\":\""
-            + request.getRequestURI()
+            + instanceEscaped
             + "\""
             + "}";
     response.getWriter().write(body);
