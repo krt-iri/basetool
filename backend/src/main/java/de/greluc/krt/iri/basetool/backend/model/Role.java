@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import lombok.*;
 
+/** Role JPA entity. */
 @Entity
 @Getter
 @Setter

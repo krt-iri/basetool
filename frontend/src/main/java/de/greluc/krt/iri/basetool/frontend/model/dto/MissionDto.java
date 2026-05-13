@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/** Data transfer record carrying Mission payload. */
 public record MissionDto(
     UUID id,
     String name,

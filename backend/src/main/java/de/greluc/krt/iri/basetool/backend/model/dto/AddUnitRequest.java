@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import jakarta.validation.constraints.NotBlank;
 import java.util.UUID;
 
+/** Inbound request payload for the Add Unit operation. */
 public record AddUnitRequest(
     @NotBlank(message = "{validation.mission.unit.name.required}") String name,
     UUID shipTypeId,

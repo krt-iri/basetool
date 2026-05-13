@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/** Data transfer record carrying Material Price payload. */
 public record MaterialPriceDto(
     UUID id,
     String terminalName,

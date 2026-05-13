@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Data transfer record carrying Mission Participant payload. */
 public record MissionParticipantDto(
     UUID id,
     UserDto user,

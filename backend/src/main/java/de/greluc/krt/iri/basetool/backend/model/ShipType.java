@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.*;
 
+/** Ship Type JPA entity. */
 @Entity
 @Getter
 @Setter

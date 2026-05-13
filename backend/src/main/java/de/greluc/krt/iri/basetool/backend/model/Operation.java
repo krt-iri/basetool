@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.*;
 
+/** Operation JPA entity. */
 @Entity
 @Getter
 @Setter

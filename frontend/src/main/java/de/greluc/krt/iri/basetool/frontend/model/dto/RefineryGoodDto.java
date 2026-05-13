@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
 
+/** Data transfer record carrying Refinery Good payload. */
 public record RefineryGoodDto(
     UUID id,
     MaterialDto inputMaterial,

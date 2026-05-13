@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.*;
 
+/** System Setting JPA entity. */
 @Entity
 @Getter
 @Setter

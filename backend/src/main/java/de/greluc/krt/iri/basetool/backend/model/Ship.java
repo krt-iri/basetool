@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
 import lombok.*;
 
+/** Ship JPA entity. */
 @Entity
 @Getter
 @Setter

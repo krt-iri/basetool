@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import lombok.*;
 
+/** Inventory Item JPA entity. */
 @Entity
 @Getter
 @Setter

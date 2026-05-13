@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/** Announcement JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -21,6 +22,7 @@ public class Announcement extends AbstractEntity<UUID> {
 
   private Instant updatedAt;
 
+  /** JPA lifecycle hook that refreshes {@code updatedAt} on every insert and update. */
   @PrePersist
   @PreUpdate
   public void onUpdate() {

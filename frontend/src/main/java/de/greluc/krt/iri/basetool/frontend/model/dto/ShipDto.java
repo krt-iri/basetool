@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
+/** Data transfer record carrying Ship payload. */
 public record ShipDto(
     UUID id,
     String name,

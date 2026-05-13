@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
+/** Data transfer record carrying Create Job Order payload. */
 public record CreateJobOrderDto(
     @NotBlank String squadron,
     String handle,

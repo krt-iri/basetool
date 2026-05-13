@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.*;
 
+/** Mission Frequency JPA entity. */
 @Entity
 @Getter
 @Setter

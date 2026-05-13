@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
+/** Data transfer record carrying Material payload. */
 public record MaterialDto(
     UUID id,
     String name,

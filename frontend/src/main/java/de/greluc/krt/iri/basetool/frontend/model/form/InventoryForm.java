@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.Data;
 
+/** Form-binding object for Inventory input. */
 @Data
 public class InventoryForm {
   @NotNull private UUID materialId;

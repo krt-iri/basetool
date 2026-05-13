@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 
+/** Form-binding object for Member Edit input. */
 public record MemberEditForm(
     Integer rank,
     @Size(max = 2000, message = "{validation.description.max}") String description,

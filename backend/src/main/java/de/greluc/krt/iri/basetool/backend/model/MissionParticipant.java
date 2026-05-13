@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/** Mission Participant JPA entity. */
 @Entity
 @Getter
 @Setter

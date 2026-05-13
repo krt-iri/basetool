@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
 import lombok.Data;
 
+/** Form-binding object for Ship input. */
 @Data
 public class ShipForm {
   private String name;

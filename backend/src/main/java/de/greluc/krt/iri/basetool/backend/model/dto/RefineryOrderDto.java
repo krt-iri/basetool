@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/** Data transfer record carrying Refinery Order payload. */
 public record RefineryOrderDto(
     UUID id,
     UserReferenceDto owner,

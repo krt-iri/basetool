@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+/** Material Category JPA entity. */
 @Entity
 @Table(name = "material_category")
 @Getter

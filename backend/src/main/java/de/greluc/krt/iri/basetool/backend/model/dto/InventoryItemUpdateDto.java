@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
+/** Data transfer record carrying Inventory Item Update payload. */
 @ValidQuantityAmount
 public record InventoryItemUpdateDto(
     @NotNull UUID materialId,

@@ -3,6 +3,11 @@ package de.greluc.krt.iri.basetool.backend.dto.uex;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 
+/**
+ * Inbound JSON record for UEX Corp's <code>/star_systems</code> endpoint. Mapped to the project's
+ * own {@code StarSystem} entity by {@code UexUniverseSyncService}; downstream code consumes the
+ * entity, not this DTO.
+ */
 @Builder
 public record UexStarSystemDto(
     @JsonProperty("id") Integer id,
@@ -12,6 +17,7 @@ public record UexStarSystemDto(
     @JsonProperty("wiki") String wiki,
     @JsonProperty("jurisdiction_name") String jurisdictionName,
     @JsonProperty("faction_name") String factionName) {
+  /** Returns {@code true} iff UEX reports the star system as currently reachable in-game. */
   public Boolean checkIsAvailableLive() {
     return isAvailableLive != null && isAvailableLive == 1;
   }

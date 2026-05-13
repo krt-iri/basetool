@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
+/** Data transfer record carrying User payload. */
 public record UserDto(
     UUID id,
     String username,

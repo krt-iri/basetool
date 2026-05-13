@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.*;
 
+/** Mission Finance Entry JPA entity. */
 @Entity
 @Getter
 @Setter

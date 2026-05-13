@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.*;
 
+/** Refining Method JPA entity. */
 @Entity
 @Getter
 @Setter

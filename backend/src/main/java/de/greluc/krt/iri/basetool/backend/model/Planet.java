@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.*;
 
+/** Planet JPA entity. */
 @Entity
 @Getter
 @Setter

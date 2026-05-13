@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/** Data transfer record carrying Material Matrix Item payload. */
 public record MaterialMatrixItemDto(
     UUID materialId,
     String materialName,

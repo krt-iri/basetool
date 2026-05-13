@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/** Data transfer record carrying Material Price Overview payload. */
 public record MaterialPriceOverviewDto(
     UUID id,
     String name,
@@ -13,6 +14,11 @@ public record MaterialPriceOverviewDto(
     @JsonProperty("isVolatileTime") boolean isVolatileTime,
     BigDecimal minPriceBuy,
     BigDecimal maxPriceSell) {
+  /**
+   * Convenience constructor used by JPA tuple-mapping queries: flattened category columns get
+   * wrapped into a {@link MaterialCategoryDto}, and UEX-style {@code Integer} flag columns are
+   * normalised to {@code boolean}.
+   */
   public MaterialPriceOverviewDto(
       UUID id,
       String name,
@@ -37,7 +43,10 @@ public record MaterialPriceOverviewDto(
         maxPriceSell);
   }
 
-  // For tests
+  /**
+   * Test-only convenience constructor that accepts flattened category columns plus the boolean
+   * flags directly (no Integer normalisation needed).
+   */
   public MaterialPriceOverviewDto(
       UUID id,
       String name,

@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.*;
 
+/** Mission Crew JPA entity. */
 @Entity
 @Getter
 @Setter

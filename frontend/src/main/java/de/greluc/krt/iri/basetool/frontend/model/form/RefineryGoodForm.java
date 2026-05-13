@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import lombok.Data;
 
+/** Form-binding object for Refinery Good input. */
 @Data
 public class RefineryGoodForm {
   private UUID inputMaterialId;
