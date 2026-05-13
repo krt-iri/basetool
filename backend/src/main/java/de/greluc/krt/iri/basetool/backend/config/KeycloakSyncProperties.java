@@ -9,6 +9,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties under {@code app.keycloak.sync.*}.
+ *
+ * <p>Drives {@link de.greluc.krt.iri.basetool.backend.task.UserSyncTask}: the admin URL, realm and
+ * client credentials let the backend authenticate against the Keycloak Admin API; {@code interval}
+ * sets the fixed-delay cadence; {@code enabled} short-circuits the task in environments where the
+ * Admin API is unreachable (e.g. CI). All values are validated at startup so a missing secret fails
+ * the boot rather than producing 401s at the first scheduled run.
+ */
 @Data
 @Configuration
 @Validated

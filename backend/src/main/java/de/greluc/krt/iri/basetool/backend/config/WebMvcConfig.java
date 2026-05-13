@@ -6,6 +6,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Registers MVC interceptors. Currently only attaches {@link DeprecationInterceptor} so deprecated
+ * endpoints emit the {@code Deprecation}/{@code Sunset}/{@code Link} response headers documented in
+ * CLAUDE.md. Kept as a dedicated configuration class so future interceptor additions land here
+ * rather than scattered across feature configs.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {

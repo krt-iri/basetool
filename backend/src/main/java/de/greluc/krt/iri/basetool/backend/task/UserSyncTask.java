@@ -9,6 +9,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Scheduled task that mirrors the Keycloak user directory into the local {@code app_user} table.
+ *
+ * <p>Runs every {@code app.keycloak.sync.interval} (default {@code PT5M}). Pulls the full non-paged
+ * user list from Keycloak Admin API, upserts each user via {@link UserService#syncUser}, collects
+ * the set of Keycloak {@code id}s that were observed in this run, and then asks the service to mark
+ * every local user that is NOT in that set as missing — that is how deletions in Keycloak get
+ * reflected locally without ever issuing a hard {@code DELETE}.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -17,6 +26,13 @@ public class UserSyncTask {
   private final KeycloakService keycloakService;
   private final UserService userService;
 
+  /**
+   * Fetches the current Keycloak user list and reconciles it into the local table.
+   *
+   * <p>Failures on individual users are logged and swallowed so a single bad row does not abort the
+   * batch. After the loop, {@link UserService#markMissingUsers(java.util.Set)} flags every local
+   * user whose Keycloak id did not appear in this run.
+   */
   @Scheduled(fixedDelayString = "${app.keycloak.sync.interval:PT5M}")
   public void syncUsers() {
     log.info("Starting scheduled user sync from Keycloak...");

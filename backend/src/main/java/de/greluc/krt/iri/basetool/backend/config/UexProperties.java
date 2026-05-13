@@ -9,6 +9,21 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties under {@code krt.uex.*}.
+ *
+ * <p>Holds the UEX (uexcorp.space) base URL and every endpoint path used by {@link
+ * de.greluc.krt.iri.basetool.backend.integration.UexClient}. Endpoints are kept here, not hardcoded
+ * in the client, so a UEX schema rename (e.g. {@code /commodities_prices_all} to a new path) is a
+ * one-line config change.
+ *
+ * <p>{@code schedulerEnabled} toggles the periodic background sync; {@code schedulerDelay} is the
+ * fixed-delay between successive sync runs in milliseconds. Defaults run every hour, which keeps
+ * the catalog fresh without hammering the upstream API. Carries {@code @EnableScheduling} and
+ * {@code @EnableAsync} because it is the single owner of the sync timing — putting these in a
+ * standalone configuration class would have led to two unrelated {@code @Configuration} classes
+ * sharing the same purpose.
+ */
 @Data
 @Validated
 @Configuration

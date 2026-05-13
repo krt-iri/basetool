@@ -17,6 +17,25 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
+/**
+ * Translates an incoming Keycloak JWT into the authorities Spring Security will check against
+ * {@code @PreAuthorize}.
+ *
+ * <p>Three sources are merged: (1) Keycloak realm roles assigned to the user, mapped to {@code
+ * ROLE_<UPPER_SNAKE_CASE>} authorities; (2) every permission name attached to those roles in the
+ * local {@code role}/{@code permission} tables, used directly (no {@code ROLE_} prefix) for
+ * fine-grained {@code hasAuthority} checks; (3) the DB flags {@code is_logistician} and {@code
+ * is_mission_manager} on {@code app_user}, promoted to {@code ROLE_LOGISTICIAN} / {@code
+ * ROLE_MISSION_MANAGER} so an admin can grant these roles via the user-management UI without
+ * round-tripping through Keycloak's role management.
+ *
+ * <p>The converter calls {@link UserService#syncUser(Jwt)} on every authentication so the local row
+ * is created or updated lazily — this is where new Keycloak users acquire their {@code app_user}
+ * record. Optimistic-locking conflicts from concurrent first-time logins by the same user are
+ * retried up to {@value #MAX_SYNC_ATTEMPTS} times with a short fixed backoff; after that the
+ * authentication is rejected with {@link AuthenticationServiceException} to avoid a stuck client
+ * retry loop.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j

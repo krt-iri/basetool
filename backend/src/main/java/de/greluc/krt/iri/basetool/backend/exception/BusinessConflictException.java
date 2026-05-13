@@ -15,10 +15,23 @@ package de.greluc.krt.iri.basetool.backend.exception;
  */
 public class BusinessConflictException extends RuntimeException {
 
+  /**
+   * Creates a {@code BusinessConflictException} with a human-readable description of the conflict.
+   * The message is forwarded verbatim as the RFC&nbsp;7807 {@code detail}.
+   *
+   * @param message description of the conflicting state, suitable for the client response
+   */
   public BusinessConflictException(String message) {
     super(message);
   }
 
+  /**
+   * Creates a {@code BusinessConflictException} that wraps a lower-level cause. The {@code cause}
+   * is preserved for server-side logging; only {@code message} reaches the client.
+   *
+   * @param message description of the conflicting state, suitable for the client response
+   * @param cause underlying failure that surfaced the conflict
+   */
   public BusinessConflictException(String message, Throwable cause) {
     super(message, cause);
   }

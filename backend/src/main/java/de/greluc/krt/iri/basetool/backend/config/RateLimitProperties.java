@@ -9,6 +9,15 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties under {@code app.rate-limit.*}.
+ *
+ * <p>Consumed by {@link de.greluc.krt.iri.basetool.backend.filter.RateLimitingFilter}. Capacity +
+ * refill rate define the Bucket4j token bucket; {@code paths} narrows the filter to API endpoints
+ * only; {@code trustedProxies} controls whether the filter honors {@code X-Forwarded-For} from a
+ * reverse proxy. The defaults (300 tokens, refilled 300/min) are tuned for the project's typical
+ * mission-planning workload — adjust per environment, not via global wildcards.
+ */
 @Data
 @Validated
 @ConfigurationProperties(prefix = "app.rate-limit")

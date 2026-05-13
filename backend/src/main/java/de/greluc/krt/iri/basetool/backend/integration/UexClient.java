@@ -30,6 +30,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+/**
+ * Read-only HTTP client for the UEX (uexcorp.space) catalog API.
+ *
+ * <p>Every public {@code get…()} method follows the same pattern: a {@code GET} to the path
+ * declared in {@link UexProperties}, a 30-second per-call timeout, JSON-decode into the matching
+ * {@code UexResponseDto<UexXxxDto>}, and on ANY error return an empty list — the calling sync
+ * services treat an empty payload as "skip this run" and explicitly never wipe local tables based
+ * on it (see the UEX sync services for the rationale). This keeps a transient upstream outage from
+ * truncating the local catalog.
+ *
+ * <p>The reactive {@code Mono} chain is collapsed with {@code blockOptional()} because all callers
+ * are scheduled background tasks that have nothing else to do while waiting — synchronous code here
+ * is simpler than threading the reactive type through every service method.
+ *
+ * <p>The WebClient is built once in {@link #initClient()} after dependency injection so the
+ * underlying Reactor-Netty connection pool is actually shared across requests. {@code
+ * maxInMemorySize(16 MB)} raises Spring's default 256 KB ceiling because the {@code
+ * commodities_prices_all} response routinely exceeds 1 MB.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -46,6 +65,12 @@ public class UexClient {
    */
   private WebClient client;
 
+  /**
+   * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
+   * instead of lazily per call so the Reactor-Netty connection pool from {@link
+   * de.greluc.krt.iri.basetool.backend.config.WebClientConfig} is reused across all UEX requests
+   * for the lifetime of the application.
+   */
   @PostConstruct
   void initClient() {
     this.client =
@@ -55,6 +80,11 @@ public class UexClient {
             .build();
   }
 
+  /**
+   * Fetches the full UEX commodity catalog. See class Javadoc for the shared pattern.
+   *
+   * @return all commodities, or an empty list if the upstream call fails or times out
+   */
   public List<UexCommodityDto> getCommodities() {
     log.info("Fetching all commodities from UEX API");
 
@@ -75,6 +105,13 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * Fetches the full UEX commodity-price matrix (every commodity × every terminal). This is the
+   * largest UEX payload by far ({@literal >}1 MB) — see the {@code maxInMemorySize} in {@link
+   * #initClient()}.
+   *
+   * @return all commodity prices, or an empty list on error
+   */
   public List<UexCommodityPriceDto> getCommoditiesPricesAll() {
     log.info("Fetching all commodities prices from UEX API");
 
@@ -97,6 +134,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all star systems, or an empty list on error
+   */
   public List<UexStarSystemDto> getStarSystems() {
     log.info("Fetching all star systems from UEX API");
 
@@ -117,6 +157,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all companies (in-universe manufacturers), or an empty list on error
+   */
   public List<UexCompanyDto> getCompanies() {
     log.info("Fetching all companies from UEX API");
 
@@ -137,6 +180,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all vehicles (ships and ground vehicles), or an empty list on error
+   */
   public List<UexVehicleDto> getVehicles() {
     log.info("Fetching all vehicles from UEX API");
 
@@ -157,6 +203,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all cities, or an empty list on error
+   */
   public List<UexCityDto> getCities() {
     log.info("Fetching all citys from UEX API");
 
@@ -177,6 +226,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all in-universe factions, or an empty list on error
+   */
   public List<UexFactionDto> getFactions() {
     log.info("Fetching all factions from UEX API");
 
@@ -197,6 +249,10 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all jurisdictions (legal authorities covering a system or region), or an empty list on
+   *     error
+   */
   public List<UexJurisdictionDto> getJurisdictions() {
     log.info("Fetching all jurisdictions from UEX API");
 
@@ -219,6 +275,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all moons, or an empty list on error
+   */
   public List<UexMoonDto> getMoons() {
     log.info("Fetching all moons from UEX API");
 
@@ -239,6 +298,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all orbital locations, or an empty list on error
+   */
   public List<UexOrbitDto> getOrbits() {
     log.info("Fetching all orbits from UEX API");
 
@@ -259,6 +321,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all outposts, or an empty list on error
+   */
   public List<UexOutpostDto> getOutposts() {
     log.info("Fetching all outposts from UEX API");
 
@@ -279,6 +344,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all planets, or an empty list on error
+   */
   public List<UexPlanetDto> getPlanets() {
     log.info("Fetching all planets from UEX API");
 
@@ -299,6 +367,10 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all points of interest (Lagrange points, derelicts, anomalies), or an empty list on
+   *     error
+   */
   public List<UexPoiDto> getPoi() {
     log.info("Fetching all pois from UEX API");
 
@@ -319,6 +391,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all space stations, or an empty list on error
+   */
   public List<UexSpaceStationDto> getSpaceStations() {
     log.info("Fetching all spacestations from UEX API");
 
@@ -341,6 +416,9 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * @return all terminals (trade kiosks at any location type), or an empty list on error
+   */
   public List<UexTerminalDto> getTerminals() {
     log.info("Fetching all terminals from UEX API");
 
@@ -361,6 +439,12 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * Fetches all refining methods (e.g. {@code Cormack}, {@code Pyrometric}, …). Drives the local
+   * refining-method catalog used by the refinery-order pricing.
+   *
+   * @return all refining methods, or an empty list on error
+   */
   public List<UexRefiningMethodDto> getRefineriesMethods() {
     log.info("Fetching all refineries methods from UEX API");
 
@@ -383,6 +467,12 @@ public class UexClient {
         .orElse(Collections.emptyList());
   }
 
+  /**
+   * Fetches refinery yield ratios per (terminal, method, commodity). Used by the refinery sync to
+   * compute expected output quantities for a given input.
+   *
+   * @return all refinery yields, or an empty list on error
+   */
   public List<UexRefineryYieldDto> getRefineriesYields() {
     log.info("Fetching all refineries yields from UEX API");
 

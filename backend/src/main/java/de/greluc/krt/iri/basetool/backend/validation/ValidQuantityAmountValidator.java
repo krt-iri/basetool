@@ -10,6 +10,15 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Constraint validator for {@link ValidQuantityAmount}.
+ *
+ * <p>Resolves the material by id (one DB hit per validated DTO) and applies the
+ * quantity-type-specific rules listed on {@link ValidQuantityAmount}. If the material does not
+ * exist, validation silently passes — the surrounding {@code @NotNull}/foreign-key checks (or the
+ * service layer) report that case so the user gets the right error key, not a confusing "invalid
+ * quantity" message.
+ */
 @Component
 @RequiredArgsConstructor
 public class ValidQuantityAmountValidator

@@ -16,10 +16,23 @@ package de.greluc.krt.iri.basetool.backend.exception;
  */
 public class NotFoundException extends RuntimeException {
 
+  /**
+   * Creates a {@code NotFoundException} with a description of the missing entity.
+   *
+   * @param message human-readable description naming the entity type and identifier; surfaces as
+   *     the RFC&nbsp;7807 {@code detail}
+   */
   public NotFoundException(String message) {
     super(message);
   }
 
+  /**
+   * Creates a {@code NotFoundException} that wraps a lower-level cause (e.g. a downstream lookup
+   * that itself raised an exception). The {@code cause} is kept on the server for logging only.
+   *
+   * @param message human-readable description naming the entity type and identifier
+   * @param cause underlying failure
+   */
   public NotFoundException(String message, Throwable cause) {
     super(message, cause);
   }

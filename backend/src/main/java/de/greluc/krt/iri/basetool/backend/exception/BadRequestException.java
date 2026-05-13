@@ -15,10 +15,24 @@ package de.greluc.krt.iri.basetool.backend.exception;
  */
 public class BadRequestException extends RuntimeException {
 
+  /**
+   * Creates a {@code BadRequestException} with a developer-facing detail message that is also
+   * passed to the client as the RFC&nbsp;7807 {@code detail} field.
+   *
+   * @param message human-readable description of the rejected request
+   */
   public BadRequestException(String message) {
     super(message);
   }
 
+  /**
+   * Creates a {@code BadRequestException} that wraps a lower-level cause. The {@code cause} is kept
+   * on the server side for logging only; the response body still uses {@code message} as the {@code
+   * detail}.
+   *
+   * @param message human-readable description of the rejected request
+   * @param cause underlying failure that triggered this exception
+   */
   public BadRequestException(String message, Throwable cause) {
     super(message, cause);
   }
