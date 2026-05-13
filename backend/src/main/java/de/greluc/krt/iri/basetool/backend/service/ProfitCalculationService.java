@@ -19,12 +19,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ProfitCalculationService {
 
     private final MaterialPriceRepository materialPriceRepository;
     private final ShipTypeRepository shipTypeRepository;
 
-    @Transactional(readOnly = true)
     public List<ProfitCalculationDto> calculateProfit(UUID shipId, List<String> starSystemNames) {
         log.debug("Calculating profit for shipId: {} and starSystems: {}", shipId, starSystemNames);
 

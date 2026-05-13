@@ -31,6 +31,7 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class JobOrderService {
 
     /**
@@ -80,7 +81,6 @@ public class JobOrderService {
         return mapToDtoWithStock(jobOrder);
     }
 
-    @Transactional(readOnly = true)
     public Page<JobOrderDto> getAllJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
         if (statuses == null || statuses.isEmpty()) {
             return jobOrderRepository.findAll(pageable).map(this::mapToDtoWithStock);
@@ -102,14 +102,12 @@ public class JobOrderService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public JobOrderDto getJobOrderById(UUID id) {
         JobOrder jobOrder = jobOrderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
         return mapToDtoWithStock(jobOrder);
     }
 
-    @Transactional(readOnly = true)
     public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto> getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
         JobOrder jobOrder = jobOrderRepository.findById(jobOrderId)
                 .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));

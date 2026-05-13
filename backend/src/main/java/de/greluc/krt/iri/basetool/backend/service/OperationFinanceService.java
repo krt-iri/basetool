@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class OperationFinanceService {
 
     private final OperationRepository operationRepository;
@@ -37,7 +38,6 @@ public class OperationFinanceService {
     private final MissionMapper missionMapper;
     private final RefineryOrderMapper refineryOrderMapper;
 
-    @Transactional(readOnly = true)
     public OperationFinanceDto getOperationFinances(UUID operationId) {
         Operation operation = operationRepository.findById(operationId)
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));

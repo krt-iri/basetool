@@ -16,26 +16,24 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class SystemSettingService {
 
     private final SystemSettingRepository systemSettingRepository;
     private final SystemSettingMapper systemSettingMapper;
 
-    @Transactional(readOnly = true)
     public List<SystemSettingDto> getAllSettings() {
         return systemSettingRepository.findAll().stream()
                 .map(systemSettingMapper::toDto)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public SystemSettingDto getSetting(String key) {
         return systemSettingRepository.findById(key)
                 .map(systemSettingMapper::toDto)
                 .orElseThrow(() -> new NotFoundException("Setting not found: " + key));
     }
-    
-    @Transactional(readOnly = true)
+
     public Optional<String> getSettingValue(String key) {
         return systemSettingRepository.findById(key).map(SystemSetting::getValue);
     }

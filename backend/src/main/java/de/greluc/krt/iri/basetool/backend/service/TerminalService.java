@@ -12,6 +12,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class TerminalService {
 
     private final TerminalRepository terminalRepository;

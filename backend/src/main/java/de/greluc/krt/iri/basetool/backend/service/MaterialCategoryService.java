@@ -12,6 +12,7 @@ import java.util.UUID;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class MaterialCategoryService {
 
     private final MaterialCategoryRepository repository;
