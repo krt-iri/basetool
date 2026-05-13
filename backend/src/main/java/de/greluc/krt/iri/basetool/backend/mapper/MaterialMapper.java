@@ -5,8 +5,14 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/** MapStruct mapper between Material entities and DTOs. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface MaterialMapper {
+  /**
+   * Maps a {@link Material} entity to its DTO. UEX-style {@code Integer} 0/1 flags ({@code
+   * isIllegal}, {@code isVolatileQt}, {@code isVolatileTime}) are normalised to {@code Boolean} for
+   * the client.
+   */
   @Mapping(
       target = "isIllegal",
       expression = "java(entity.getIsIllegal() != null && entity.getIsIllegal() == 1)")
@@ -18,6 +24,10 @@ public interface MaterialMapper {
       expression = "java(entity.getIsVolatileTime() != null && entity.getIsVolatileTime() == 1)")
   MaterialDto toDto(Material entity);
 
+  /**
+   * Builds a new {@link Material} entity from the DTO. Boolean flags are converted back to
+   * UEX-style {@code Integer} 0/1 storage.
+   */
   @Mapping(
       target = "isIllegal",
       expression = "java(dto.isIllegal() != null && dto.isIllegal() ? 1 : 0)")
@@ -51,10 +61,12 @@ public interface MaterialMapper {
     return entity;
   }
 
+  /** MapStruct default - converts a UEX-style 0/1 {@code Integer} to a nullable {@code Boolean}. */
   default Boolean mapIsIllegal(Integer value) {
     return value != null && value == 1;
   }
 
+  /** MapStruct default - converts a {@code Boolean} back to a UEX-style 0/1 {@code Integer}. */
   default Integer mapIsIllegal(Boolean value) {
     return value != null && value ? 1 : 0;
   }

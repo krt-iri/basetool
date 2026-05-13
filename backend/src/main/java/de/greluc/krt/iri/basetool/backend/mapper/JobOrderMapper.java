@@ -10,6 +10,7 @@ import java.util.Set;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/** MapStruct mapper between Job Order entities and DTOs. */
 @Mapper(
     componentModel = "spring",
     uses = {
@@ -20,11 +21,21 @@ import org.mapstruct.Mapping;
     })
 public interface JobOrderMapper {
 
+  /** Maps a {@link JobOrder} entity to its outbound DTO. */
   JobOrderDto toDto(JobOrder jobOrder);
 
+  /**
+   * Maps a {@link JobOrderMaterial} child to its DTO. {@code currentStock} is owned by the service
+   * layer (it queries the inventory at request time) and stays unmapped here.
+   */
   @Mapping(target = "currentStock", ignore = true)
   JobOrderMaterialDto toDto(JobOrderMaterial material);
 
+  /**
+   * Maps a set of {@link JobOrderMaterial} children into a sorted DTO list: SCU-typed materials
+   * first, then alphabetical by material name (case-insensitive). The deterministic order keeps the
+   * materials table stable across reloads.
+   */
   default List<JobOrderMaterialDto> mapAndSortMaterials(Set<JobOrderMaterial> materials) {
     if (materials == null) {
       return null;

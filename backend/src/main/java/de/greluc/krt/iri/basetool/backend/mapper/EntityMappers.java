@@ -11,10 +11,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Hand-written {@code Entity -> DTO} converters for the cases where MapStruct cannot be used
+ * because the mapping crosses several aggregates or needs custom flattening (e.g. role names plus
+ * permission strings rolled up into a single set on {@link UserDto}).
+ */
 public final class EntityMappers {
 
   private EntityMappers() {}
 
+  /**
+   * Flattens a {@link User} entity into its full DTO, deriving the role-name set and the union of
+   * every role's permission strings.
+   */
   public static UserDto toDto(User u) {
     Set<String> roleNames = u.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
     Set<String> permissions =
@@ -39,6 +48,7 @@ public final class EntityMappers {
         u.getJoinDate());
   }
 
+  /** Flattens a {@link JobType} entity into its DTO, surfacing the {@code parent.id} as a UUID. */
   public static JobTypeDto toDto(JobType jt) {
     UUID parentId = jt.getParent() != null ? jt.getParent().getId() : null;
     return new JobTypeDto(
@@ -52,11 +62,16 @@ public final class EntityMappers {
         jt.getVersion());
   }
 
+  /** Maps a {@link Squadron} entity to its outbound DTO. */
   public static SquadronDto toDto(Squadron s) {
     return new SquadronDto(
         s.getId(), s.getName(), s.getShorthand(), s.getDescription(), s.isActive(), s.getVersion());
   }
 
+  /**
+   * Builds a {@link JobType} entity from the DTO. A non-null {@code parentId} is materialised as a
+   * stub parent (id only) - the persistence provider resolves the managed instance on persist.
+   */
   public static JobType toEntity(JobTypeDto dto) {
     JobType jt = new JobType();
     jt.setId(dto.id());
@@ -75,6 +90,10 @@ public final class EntityMappers {
     return jt;
   }
 
+  /**
+   * Builds a {@link Squadron} entity from the DTO. {@code active} and {@code version} are owned by
+   * the service.
+   */
   public static Squadron toEntity(SquadronDto dto) {
     Squadron s = new Squadron();
     s.setId(dto.id());
