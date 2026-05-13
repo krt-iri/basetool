@@ -1,7 +1,35 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{operations.title} + ' - ' + #{app.title}">Operations - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style>
+            html, body { overflow-x: hidden; }
+            /* Constrain long descriptions so the row never forces horizontal page scroll. */
+            .operations-table {
+                width: 100%;
+                table-layout: auto;
+            }
+            .operations-table td.op-desc,
+            .operations-table th.op-desc {
+                max-width: 40ch;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+            .operations-table td.op-action,
+            .operations-table th.op-action {
+                white-space: nowrap;
+                text-align: right;
+            }
+            .operations-table td.op-action .btn { margin-left: 0.25rem; }
+
+            /* Smartphone: hide the description column to keep the table on screen. */
+            @media (max-width: 768px) {
+                .operations-table td.op-desc,
+                .operations-table th.op-desc { display: none; }
+            }
+        </style>
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -25,46 +53,46 @@
         <p th:text="#{operations.description}">Manage and view operations.</p>
     </div>
 
-    <div th:if="${successMessage}" class="alert alert-success" th:text="#{${successMessage}}"></div>
-    <div th:if="${errorMessage}" class="alert alert-danger" th:text="#{${errorMessage}}"></div>
-    <div th:if="${error}" class="alert alert-danger" th:text="#{${error}}"></div>
+    <div th:if="${successMessage}" class="alert alert-success mt-2" th:text="#{${successMessage}}"></div>
+    <div th:if="${errorMessage}" class="alert alert-danger mt-2" th:text="#{${errorMessage}}"></div>
+    <div th:if="${error}" class="alert alert-danger mt-2" th:text="#{${error}}"></div>
 
     <div class="hud-box mt-2">
 
-        <div sec:authorize="hasRole('MISSION_MANAGER')" class="mb-1">
-             <button type="button" class="btn" th:text="#{operation.create}" onclick="document.getElementById('create-operation-modal').style.display='block'">Create New</button>
+        <div sec:authorize="hasRole('MISSION_MANAGER')" style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+            <button type="button" class="btn" th:text="#{operation.create}" onclick="document.getElementById('create-operation-modal').style.display='flex'">Create New</button>
         </div>
 
         <div class="table-responsive">
-        <table th:if="${operations != null and !operations.isEmpty()}">
-            <thead>
-                <tr>
-                    <th th:text="#{operation.name}">Name</th>
-                    <th th:text="#{operation.status}">Status</th>
-                    <th th:text="#{operation.description}">Description</th>
-                    <th th:text="#{general.action}">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="op : ${operations}">
-                    <td th:text="${op.name}">Name</td>
-                    <td th:text="${op.status}">Status</td>
-                    <td th:text="${op.description}">Description</td>
-                    <td>
-                        <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                        <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}" 
-                                th:data-id="${op.id}"
-                                onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+            <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{operation.name}">Name</th>
+                        <th th:text="#{operation.status}">Status</th>
+                        <th class="op-desc" th:text="#{operation.description}">Description</th>
+                        <th class="op-action" th:text="#{general.action}">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="op : ${operations}">
+                        <td th:text="${op.name}">Name</td>
+                        <td th:text="${op.status}">Status</td>
+                        <td class="op-desc" th:text="${op.description}">Description</td>
+                        <td class="op-action">
+                            <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
+                            <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
+                                    th:data-id="${op.id}"
+                                    onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-        
+
         <div th:if="${operationsPage != null}">
             <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
         </div>
-        
+
         <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
     </div>
 
@@ -98,37 +126,6 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="edit-operation-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
-        <div class="modal-content hud-box" style="background:#141414; padding:2rem; max-width:500px; width:100%; margin: 10% auto; border: 1px solid var(--color-primary);">
-            <h2 th:text="#{operation.edit}">Edit Operation</h2>
-            <form id="edit-operation-form" method="post" th:action="@{/operations/update}">
-                <input type="hidden" id="edit-version" name="version">
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="edit-name" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.name}">Name</label>
-                    <input type="text" id="edit-name" name="name" style="width: 100%;" required>
-                </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="edit-desc" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.description}">Description</label>
-                    <textarea id="edit-desc" name="description" style="width: 100%;"></textarea>
-                </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="edit-status" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.status}">Status</label>
-                    <select id="edit-status" name="status" style="width: 100%;" required>
-                        <option value="PLANNED" th:text="#{operation.status.planned}">PLANNED</option>
-                        <option value="ACTIVE" th:text="#{operation.status.active}">ACTIVE</option>
-                        <option value="COMPLETED" th:text="#{operation.status.completed}">COMPLETED</option>
-                        <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
-                    </select>
-                </div>
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn" th:text="#{general.save}">Save</button>
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Delete Modal -->
     <div id="delete-operation-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
         <div class="modal-content hud-box" style="background:#141414; padding:2rem; max-width:500px; width:100%; margin: 10% auto; border: 1px solid var(--color-danger);">
@@ -147,15 +144,6 @@
     function openDeleteModal(id) {
         document.getElementById('delete-operation-form').action = '/operations/' + id + '/delete';
         document.getElementById('delete-operation-modal').style.display = 'flex';
-    }
-
-    function openEditModal(id, name, desc, status, version) {
-        document.getElementById('edit-operation-form').action = '/operations/' + id + '/update';
-        document.getElementById('edit-name').value = name;
-        document.getElementById('edit-desc').value = desc !== 'null' ? desc : '';
-        document.getElementById('edit-status').value = status;
-        document.getElementById('edit-version').value = version;
-        document.getElementById('edit-operation-modal').style.display = 'block';
     }
 </script>
 </body>
