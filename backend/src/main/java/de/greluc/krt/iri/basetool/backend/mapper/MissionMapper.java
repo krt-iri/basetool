@@ -8,6 +8,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
 
+/** MapStruct mapper between Mission entities and DTOs. */
 @Mapper(
     componentModel = "spring",
     uses = {
@@ -30,6 +31,11 @@ public abstract class MissionMapper {
 
   @Autowired protected AuthHelperService authHelperService;
 
+  /**
+   * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
+   * top of the default field copy so the DTO carries the caller-aware projections ({@code canEdit},
+   * {@code canManageManagers}, description redaction for guests, participant counts).
+   */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(mission))")
   @Mapping(target = "canManageManagers", expression = "java(resolveCanManageManagers(mission))")
@@ -41,11 +47,19 @@ public abstract class MissionMapper {
       expression = "java(resolveRegisteredParticipants(mission))")
   public abstract MissionDto toDto(Mission mission);
 
+  /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */
   public abstract MissionReferenceDto toReferenceDto(Mission mission);
 
+  /** Slim list-row DTO of a mission; same description redaction as the full DTO. */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   public abstract MissionListDto toListDto(Mission mission);
 
+  /**
+   * Builds a new {@link Mission} entity from the DTO. All aggregate-owned collections and
+   * service-managed references ({@code participants}, {@code assignedUnits}, {@code
+   * inventoryEntries}, ...) are stripped here and rewired by the service after the entity is
+   * persisted.
+   */
   @Mapping(target = "subMissions", ignore = true)
   @Mapping(target = "participants", ignore = true)
   @Mapping(target = "assignedUnits", ignore = true)
@@ -56,6 +70,10 @@ public abstract class MissionMapper {
   @Mapping(target = "managers", ignore = true)
   public abstract Mission toEntity(MissionDto dto);
 
+  /**
+   * Returns the mission description only to authenticated callers; guests get {@code null} so the
+   * description is never exposed via the public detail endpoint.
+   */
   public String resolveDescription(Mission mission) {
     if (mission == null || mission.getDescription() == null) return null;
     if (authHelperService.isAuthenticated()) {
@@ -64,12 +82,17 @@ public abstract class MissionMapper {
     return null;
   }
 
+  /**
+   * Returns {@code true} iff the current caller may edit this mission (see {@link
+   * MissionSecurityService}).
+   */
   public boolean resolveCanEdit(Mission mission) {
     if (mission == null) return false;
     return missionSecurityService.canManageMission(
         mission.getId(), authHelperService.rawAuthentication());
   }
 
+  /** Returns {@code true} iff the current caller may add/remove mission managers. */
   public boolean resolveCanManageManagers(Mission mission) {
     if (mission == null) return false;
     return missionSecurityService.canManageManagers(
@@ -95,11 +118,14 @@ public abstract class MissionMapper {
     return mission.getParticipants().size();
   }
 
+  /** Maps a {@link MissionParticipant} entity to its outbound DTO. */
   public abstract MissionParticipantDto toDto(MissionParticipant participant);
 
+  /** Maps a {@link MissionUnit} to its DTO with a deterministic leader-first crew ordering. */
   @Mapping(target = "crew", expression = "java(resolveCrew(unit))")
   public abstract MissionUnitDto toDto(MissionUnit unit);
 
+  /** Maps a {@link MissionCrew} entity to its DTO, flattening the participant id / display name. */
   @Mapping(target = "participantId", source = "participant.id")
   @Mapping(target = "participantName", expression = "java(resolveParticipantName(crew))")
   public abstract MissionCrewDto toDto(MissionCrew crew);
@@ -131,19 +157,28 @@ public abstract class MissionMapper {
     return false;
   }
 
+  /** Maps a {@link MissionFinanceEntry} to its DTO, flattening the parent mission id. */
   @Mapping(target = "missionId", source = "mission.id")
   public abstract MissionFinanceEntryDto toDto(MissionFinanceEntry entry);
 
+  /** Maps a {@link FrequencyType} entity nested inside a mission to its outbound DTO. */
   public abstract FrequencyTypeDto toDto(FrequencyType frequencyType);
 
+  /** Maps a {@link MissionFrequency} entity to its outbound DTO. */
   public abstract MissionFrequencyDto toDto(MissionFrequency missionFrequency);
 
+  /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
   @Mapping(target = "parentId", source = "parent.id")
   @Mapping(target = "isLeadershipRole", source = "leadershipRole")
   public abstract JobTypeDto toDto(JobType jobType);
 
+  /** Maps a {@link Squadron} entity nested inside a mission to its outbound DTO. */
   public abstract SquadronDto toDto(Squadron squadron);
 
+  /**
+   * Resolves a participant's display name: the linked user's effective name if known, otherwise the
+   * guest name captured at sign-up.
+   */
   public String resolveParticipantName(MissionCrew crew) {
     if (crew.getParticipant() == null) return null;
     if (crew.getParticipant().getUser() != null) {

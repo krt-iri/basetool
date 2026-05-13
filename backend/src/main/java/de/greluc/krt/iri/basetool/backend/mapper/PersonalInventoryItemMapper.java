@@ -20,9 +20,19 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface PersonalInventoryItemMapper {
 
+  /**
+   * Maps a {@link PersonalInventoryItem} to its response DTO; the persisted {@code
+   * locationNameSnapshot} is surfaced as {@code locationName} so the client never sees the internal
+   * naming.
+   */
   @Mapping(target = "locationName", source = "locationNameSnapshot")
   PersonalInventoryItemResponse toResponse(PersonalInventoryItem entity);
 
+  /**
+   * Builds a new {@link PersonalInventoryItem} from the create-request. {@code ownerSub} is
+   * assigned by the service from the JWT sub claim; the location name snapshot is set by the
+   * service after a UEX lookup, never by the client.
+   */
   // Note: inherited fields from AbstractEntity (id, version, createdAt, updatedAt) are
   // not part of the Lombok @Builder generated for this class and are therefore covered
   // by the global unmappedTargetPolicy = IGNORE rather than by explicit @Mapping(ignore).

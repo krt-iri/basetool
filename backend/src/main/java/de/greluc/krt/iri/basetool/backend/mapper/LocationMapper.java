@@ -4,10 +4,13 @@ import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import org.mapstruct.Mapper;
 
+/** MapStruct mapper between Location entities and DTOs. */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface LocationMapper {
+  /** Maps a {@link Location} entity to its outbound DTO. */
   LocationDto toDto(Location entity);
 
+  /** Builds a new {@link Location} entity from the inbound DTO. */
   Location toEntity(LocationDto dto);
 
   /**
