@@ -1,6 +1,14 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
-import de.greluc.krt.iri.basetool.backend.model.dto.*;
+import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemBookOutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemCreateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
@@ -21,7 +29,16 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/inventory")

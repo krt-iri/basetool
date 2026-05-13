@@ -1,10 +1,19 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
-import de.greluc.krt.iri.basetool.frontend.model.dto.*;
+import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.GroupedInventoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemBookOutDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -13,7 +22,17 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller

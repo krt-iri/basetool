@@ -6,7 +6,10 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.ShipTypeForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +17,11 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller

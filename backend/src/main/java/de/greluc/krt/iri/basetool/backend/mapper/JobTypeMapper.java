@@ -3,7 +3,10 @@ package de.greluc.krt.iri.basetool.backend.mapper;
 import de.greluc.krt.iri.basetool.backend.model.JobType;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
 import java.util.UUID;
-import org.mapstruct.*;
+import org.mapstruct.AfterMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 /** MapStruct mapper between Job Type entities and DTOs. */
 @Mapper(componentModel = "spring")

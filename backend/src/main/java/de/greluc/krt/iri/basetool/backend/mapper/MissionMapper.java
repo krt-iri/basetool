@@ -1,7 +1,25 @@
 package de.greluc.krt.iri.basetool.backend.mapper;
 
-import de.greluc.krt.iri.basetool.backend.model.*;
-import de.greluc.krt.iri.basetool.backend.model.dto.*;
+import de.greluc.krt.iri.basetool.backend.model.FrequencyType;
+import de.greluc.krt.iri.basetool.backend.model.JobType;
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.MissionCrew;
+import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
+import de.greluc.krt.iri.basetool.backend.model.MissionFrequency;
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
+import de.greluc.krt.iri.basetool.backend.model.dto.FrequencyTypeDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionCrewDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionFrequencyDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionUnitDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import org.mapstruct.Mapper;
