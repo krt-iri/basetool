@@ -16,6 +16,19 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the inventory pages ({@code /inventory}, {@code /inventory/my}, {@code
+ * /inventory/all}, {@code /inventory/input}, plus AJAX book-out / transfer / update-associations
+ * endpoints).
+ *
+ * <p>Four read views: aggregated (sum per material across the squadron), per-material drilldown,
+ * personal ({@code /my}), and admin-all ({@code /all}). All four list endpoints accept the same
+ * filter dimensions (material ids, min quality, job order, mission) and support a {@code
+ * fragment=true} flag that returns just the table fragment so AJAX filter changes do not reload the
+ * page. Write paths cover create (input form), book-out (consume / transfer / sell), inline
+ * transfer (AJAX, used by the material-collection page), and association update (re-bind to a
+ * different mission/job-order).
+ */
 @Controller
 @RequestMapping("/inventory")
 @RequiredArgsConstructor
@@ -25,6 +38,16 @@ public class InventoryPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the squadron-wide aggregated inventory view ({@code /inventory}). Sort is fixed to
+   * material name asc, quality desc, amount desc — operators look for the highest-quality stock
+   * first.
+   *
+   * @param page zero-based page index
+   * @param size page size
+   * @param model Thymeleaf model populated with the page, aggregated items and material catalog
+   * @return the {@code inventory-index} view name
+   */
   @GetMapping
   public String viewAggregatedInventory(
       @RequestParam(required = false) Integer page,
@@ -58,6 +81,15 @@ public class InventoryPageController {
     return "inventory-index";
   }
 
+  /**
+   * Renders the per-material drilldown ({@code /inventory/material/{materialId}}) showing every
+   * individual inventory row for the given material (up to 1000 in one page). Loads the
+   * active-job-order list because the page offers inline re-assignment of items to job orders.
+   *
+   * @param materialId material id to drill into
+   * @param model Thymeleaf model populated with items, the material catalog and active job orders
+   * @return the {@code inventory-material} view name
+   */
   @GetMapping("/material/{materialId}")
   public String viewMaterialInventory(@PathVariable @NotNull UUID materialId, Model model) {
     List<InventoryItemDto> items = new ArrayList<>();
@@ -81,6 +113,19 @@ public class InventoryPageController {
     return "inventory-material";
   }
 
+  /**
+   * Per-material grouping wrapper for the {@code /my} and {@code /all} list views.
+   *
+   * <p>The backend's {@code /grouped} endpoint returns this shape directly so the page renders an
+   * outer "material" row with summary stats (total amount, average + max quality) and an inner list
+   * of the underlying inventory items for expansion.
+   *
+   * @param material the grouping material
+   * @param totalAmount sum across all items
+   * @param averageQuality weighted average quality across all items
+   * @param maxQuality the highest quality value seen in the group
+   * @param items the underlying individual inventory rows
+   */
   public record GroupedInventoryDto(
       de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto material,
       Double totalAmount,
@@ -88,6 +133,20 @@ public class InventoryPageController {
       Integer maxQuality,
       List<InventoryItemDto> items) {}
 
+  /**
+   * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user
+   * can share a filtered link. {@code fragment=true} returns just the table fragment for AJAX
+   * filter changes.
+   *
+   * @param materialIds optional material id filter (multi)
+   * @param minQuality optional minimum-quality filter
+   * @param jobOrderIds optional job-order id filter (multi)
+   * @param missionIds optional mission id filter (multi)
+   * @param fragment when true, return the {@code inventoryTableFragment} fragment
+   * @param model Thymeleaf model populated with grouped items, filter source catalogs and the
+   *     auth-derived UX flags
+   * @return either the full {@code inventory-my} view or its table fragment
+   */
   @GetMapping("/my")
   public String viewMyInventory(
       @RequestParam(required = false) List<UUID> materialIds,
@@ -160,6 +219,17 @@ public class InventoryPageController {
     return "inventory-my";
   }
 
+  /**
+   * Renders the squadron-wide inventory list ({@code /inventory/all}). Same shape as {@link
+   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend).
+   *
+   * @param materialIds optional material id filter (multi)
+   * @param minQuality optional minimum-quality filter
+   * @param jobOrderIds optional job-order id filter (multi)
+   * @param missionIds optional mission id filter (multi)
+   * @param fragment when true, return the table fragment
+   * @return either the full {@code inventory-admin} view or its fragment
+   */
   @GetMapping("/all")
   public String viewAllInventory(
       @RequestParam(required = false) List<UUID> materialIds,
@@ -231,6 +301,16 @@ public class InventoryPageController {
     return "inventory-admin";
   }
 
+  /**
+   * Renders the inventory create form ({@code /inventory/input}). The {@code source=admin} mode
+   * seeds {@code isGlobal=true} so the admin can pick a target user from the user dropdown;
+   * otherwise the form creates a personal entry owned by the caller.
+   *
+   * @param source optional origin marker ({@code admin}, {@code my}, {@code aggregated}) used to
+   *     pick the post-save redirect target
+   * @param model Thymeleaf model populated with the form and dropdown catalogs
+   * @return the {@code inventory-input} view name
+   */
   @GetMapping("/input")
   public String viewInputPage(@RequestParam(required = false) String source, Model model) {
     InventoryForm form;
@@ -258,6 +338,20 @@ public class InventoryPageController {
     return "inventory-input";
   }
 
+  /**
+   * Persists a new inventory item.
+   *
+   * <p>Enforces a cross-field invariant before the backend call: a personal entry cannot be
+   * assigned to a job order or mission. Validation failure re-renders the input page inline so the
+   * BindingResult stays request-scoped. On success, redirects to the page the user came from
+   * (encoded in {@code source}).
+   *
+   * @param form inventory form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline {@code inventory-input} view on failure, otherwise redirect to the source page
+   */
   @PostMapping("/input")
   public String addInventoryItem(
       @Valid @ModelAttribute("inventoryForm") InventoryForm form,
@@ -308,6 +402,25 @@ public class InventoryPageController {
     return "redirect:/inventory";
   }
 
+  /**
+   * Books out an inventory item (consume / transfer / sell). The {@code type} field on the form
+   * selects the operation; the backend computes the resulting state changes (decrement, transfer to
+   * another user/location, or sell with terminal + price).
+   *
+   * <p>The redirect target preserves filter query parameters from the {@code Referer} header (see
+   * {@link #buildInventoryRedirectFromReferer}) so the user does not lose their active filters
+   * after a successful book-out. Validation failures drop the filter state and re-render the
+   * originating listing inline — acceptable for a rare validation path.
+   *
+   * @param id inventory item id
+   * @param form book-out form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering on validation failure
+   * @param redirectAttributes flash attributes carrier
+   * @param referer browser-supplied origin URL, used to derive the redirect target and the
+   *     admin-vs-my detection
+   * @return inline rerendered listing on failure, otherwise redirect preserving filters
+   */
   @PostMapping("/{id}/book-out")
   public String bookOutInventoryItem(
       @PathVariable @NotNull UUID id,
@@ -422,6 +535,16 @@ public class InventoryPageController {
     }
   }
 
+  /**
+   * AJAX endpoint that updates the soft associations of an inventory item (mission, job order,
+   * note). Distinct from {@link #transferInventoryItem} — this is a metadata-only update, no
+   * quantity changes. Propagates the backend's status code verbatim so the AJAX layer can map a 409
+   * to a dedicated optimistic-lock toast.
+   *
+   * @param id inventory item id
+   * @param dto update payload
+   * @return the updated item on success, propagated backend status on failure
+   */
   @PutMapping("/{id}/update-associations")
   @ResponseBody
   public org.springframework.http.ResponseEntity<InventoryItemDto> updateAssociations(

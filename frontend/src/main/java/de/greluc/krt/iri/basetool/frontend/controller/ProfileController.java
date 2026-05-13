@@ -20,6 +20,16 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the user profile page ({@code /profile}).
+ *
+ * <p>Renders the current user's profile data and exposes a single editable field (description +
+ * display name). The page layers two data sources: the OIDC token claims (used as the immediate
+ * default) and the backend {@code /api/v1/users/me} payload (used to overwrite the token values
+ * with the authoritative DB state, including the optimistic-locking {@code version} needed for
+ * subsequent updates). When the backend is unreachable, the token-only view still renders so the
+ * user always sees something.
+ */
 @Controller
 @RequiredArgsConstructor
 @Slf4j
@@ -30,6 +40,17 @@ public class ProfileController {
   @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
   private String issuerUri;
 
+  /**
+   * Renders the profile page. Unauthenticated users are redirected to the home page. For
+   * authenticated users the controller seeds the model from token claims, then overlays the backend
+   * {@code /me} record where available and parses the {@code joinDate} into a {@code LocalDate}
+   * plus the derived months-in-squadron counter. A fresh {@link ProfileDescriptionForm} is added to
+   * the model unless one is already there (preserves user input across a failed submit).
+   *
+   * @param model Thymeleaf model populated with the layered profile data and the description form
+   * @param principal authenticated OIDC user
+   * @return the {@code profile} view name, or {@code redirect:/} for guests
+   */
   @GetMapping("/profile")
   public String profile(Model model, @AuthenticationPrincipal OidcUser principal) {
     if (principal == null) {
@@ -95,6 +116,25 @@ public class ProfileController {
     return "profile";
   }
 
+  /**
+   * Handles the description + display-name update form post.
+   *
+   * <p>Validation errors render the profile view inline (no redirect) so the {@link BindingResult}
+   * stays request-scoped and never serializes through a Redis FlashMap (see {@code
+   * RedisSessionConfig}). A 409 with problem type {@code concurrency-conflict} surfaces as a
+   * dedicated optimistic-lock toast so the user knows to refresh and retry; any other failure lands
+   * as a generic update-failed toast. {@code null} form fields are sent as the empty string — the
+   * backend's {@link de.greluc.krt.iri.basetool.backend.config.NormalizedStringDeserializer} maps
+   * that back to a blank, which is the intended "clear this field" semantics.
+   *
+   * @param form validated form payload
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used when re-rendering inline
+   * @param principal authenticated OIDC user
+   * @param redirectAttributes flash attributes carrier for the result toast
+   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   *     /profile}
+   */
   @PostMapping("/profile/description")
   public String updateDescription(
       @Valid @ModelAttribute("profileDescriptionForm") ProfileDescriptionForm form,

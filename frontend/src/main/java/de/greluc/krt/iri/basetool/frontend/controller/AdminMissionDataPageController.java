@@ -28,6 +28,15 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin mission-data page ({@code /admin/mission-data}).
+ *
+ * <p>Manages the three reference catalogs the mission editor depends on: job types, squadrons and
+ * frequency types. Each catalog gets CRUD + activate (soft re-enable after delete) endpoints;
+ * frequency types additionally support reordering via an AJAX endpoint because their order is
+ * surfaced in the UI dropdown. The {@code includeInactive*} query flags control whether
+ * soft-deleted entries are listed so admins can find them to re-activate.
+ */
 @Controller
 @RequestMapping("/admin/mission-data")
 @RequiredArgsConstructor
@@ -37,6 +46,17 @@ public class AdminMissionDataPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders all three reference catalogs side by side. Seeds empty forms when the model does not
+   * already carry one (a previous validation failure rerender). Each catalog is fetched
+   * independently so a single backend failure only blanks that catalog, not the entire page.
+   *
+   * @param includeInactiveJobTypes show soft-deleted job types
+   * @param includeInactiveSquadrons show soft-deleted squadrons
+   * @param includeInactiveFrequencyTypes show soft-deleted frequency types
+   * @param model Thymeleaf model populated with all three lists, all three forms and the toggles
+   * @return the {@code admin/mission-data} view name
+   */
   @GetMapping
   public String listData(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveJobTypes,
@@ -126,7 +146,17 @@ public class AdminMissionDataPageController {
     return "admin/mission-data";
   }
 
-  // JobTypes
+  /**
+   * Creates a new job type. Validation failure re-renders the list page inline with the modal
+   * re-opened (BindingResult stays request-scoped). A 409 surfaces as the dedicated duplicate-name
+   * toast; all other failures redirect with an error query param.
+   *
+   * @param form job-type form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/job-types")
   public String createJobType(
       @Valid @ModelAttribute("jobTypeForm") JobTypeForm form,
@@ -168,6 +198,18 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Updates an existing job type. Distinguishes optimistic-locking conflict ({@code
+   * concurrency-conflict} problem type) from a duplicate-name 409 so the user gets the right toast
+   * message.
+   *
+   * @param id job-type id
+   * @param form job-type form (carries the version)
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect
+   */
   @PostMapping("/job-types/{id}/update")
   public String updateJobType(
       @PathVariable @NotNull UUID id,
@@ -212,6 +254,15 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Soft-deletes a job type. A 409 indicates the type is still referenced by an existing mission;
+   * surfaces as the dedicated "in use" toast so the admin knows the delete is harmless to retry
+   * once the references are cleared.
+   *
+   * @param id job-type id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data} (optionally with error param)
+   */
   @PostMapping("/job-types/{id}/delete")
   public String deleteJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -233,6 +284,14 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Re-activates a soft-deleted job type. ADMIN-only because re-enabling reference data has wider
+   * effects than a typical OFFICER edit.
+   *
+   * @param id job-type id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/job-types/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
   public String activateJobType(
@@ -251,7 +310,15 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
-  // Squadrons
+  /**
+   * Creates a new squadron. Same validation + 409 handling pattern as {@link #createJobType}.
+   *
+   * @param form squadron form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect
+   */
   @PostMapping("/squadrons")
   public String createSquadron(
       @Valid @ModelAttribute("squadronForm") SquadronForm form,
@@ -283,6 +350,17 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Updates a squadron. Mirrors {@link #updateJobType} including the optimistic-lock vs
+   * duplicate-name distinction in the 409 handling.
+   *
+   * @param id squadron id
+   * @param form squadron form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect
+   */
   @PostMapping("/squadrons/{id}/update")
   public String updateSquadron(
       @PathVariable @NotNull UUID id,
@@ -320,6 +398,13 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Soft-deletes a squadron. Mirrors {@link #deleteJobType}'s in-use handling for 409.
+   *
+   * @param id squadron id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/squadrons/{id}/delete")
   public String deleteSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -341,6 +426,13 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Re-activates a soft-deleted squadron. ADMIN-only, mirrors {@link #activateJobType}.
+   *
+   * @param id squadron id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/squadrons/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
   public String activateSquadron(
@@ -356,7 +448,16 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
-  // FrequencyTypes
+  /**
+   * Creates a new frequency type. Same pattern as {@link #createJobType}; new types are appended to
+   * the order by the backend.
+   *
+   * @param form frequency-type form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect
+   */
   @PostMapping("/frequency-types")
   public String createFrequencyType(
       @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
@@ -383,6 +484,19 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Updates a frequency type. Optionally toggles {@code active} via the query parameter so the same
+   * endpoint serves both "save edit" and "toggle visibility" without a second mapping. 409
+   * concurrency-conflict surfaces as a dedicated toast.
+   *
+   * @param id frequency-type id
+   * @param form frequency-type form
+   * @param active optional active override; defaults to {@code true} when omitted
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline list page on failure, otherwise redirect
+   */
   @PostMapping("/frequency-types/{id}/update")
   public String updateFrequencyType(
       @PathVariable @NotNull UUID id,
@@ -419,6 +533,14 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Soft-deletes a frequency type. 409 surfaces as the dedicated "in use" toast (still referenced
+   * by an existing mission).
+   *
+   * @param id frequency-type id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/frequency-types/{id}/delete")
   public String deleteFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -440,6 +562,15 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * Re-activates a soft-deleted frequency type. No ADMIN gate here (officers may bring back a
+   * frequency type they previously hid) — diverges intentionally from {@link #activateJobType} and
+   * {@link #activateSquadron}.
+   *
+   * @param id frequency-type id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/mission-data}
+   */
   @PostMapping("/frequency-types/{id}/activate")
   public String activateFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -454,6 +585,13 @@ public class AdminMissionDataPageController {
     return "redirect:/admin/mission-data";
   }
 
+  /**
+   * AJAX endpoint that persists the new order of frequency types after a drag-and-drop in the admin
+   * UI. Backend uses pessimistic locking to serialize concurrent reorders.
+   *
+   * @param ids frequency-type ids in the desired new order
+   * @return 200 on success, 500 on backend failure
+   */
   @PostMapping("/frequency-types/reorder")
   @ResponseBody
   public ResponseEntity<Void> reorderFrequencyTypes(@RequestBody List<UUID> ids) {

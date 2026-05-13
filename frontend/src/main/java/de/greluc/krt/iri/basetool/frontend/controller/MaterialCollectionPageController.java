@@ -31,6 +31,21 @@ public class MaterialCollectionPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the material-collection page for a single job order ({@code
+   * /orders/{jobOrderId}/material-collection}).
+   *
+   * <p>Loads three independent datasets and tolerates partial failure: the entries list for the job
+   * order, the user-lookup list (sorted by effective name with a username fallback for users whose
+   * display name is blank), and the cached location lookup. A {@link BackendServiceException} on
+   * any of the three is logged and that section degrades to an empty list — partial-success
+   * rendering is much more useful here than a single full-page error.
+   *
+   * @param jobOrderId job order id passed through to the template
+   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, {@code users},
+   *     {@code locations}
+   * @return the {@code material-collection} view name
+   */
   @GetMapping("/{jobOrderId}/material-collection")
   @PreAuthorize("isAuthenticated()")
   public String viewMaterialCollection(@PathVariable UUID jobOrderId, Model model) {

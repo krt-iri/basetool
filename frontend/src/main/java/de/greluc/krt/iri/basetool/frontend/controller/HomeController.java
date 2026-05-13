@@ -14,6 +14,15 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+/**
+ * Spring MVC controller for the home page.
+ *
+ * <p>Renders {@code /} for both guests and authenticated users. The page always shows the next
+ * mission (a guest-visible endpoint) plus, for authenticated users, the current user record and the
+ * active announcement with an unread flag. The first authenticated render in a session also
+ * surfaces a transient login-notification toast (session attribute {@code welcomeMessageShown}
+ * prevents the toast from re-appearing on every refresh).
+ */
 @Controller
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +33,17 @@ public class HomeController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the home page. Pulls the next mission for everyone; for authenticated users also
+   * fetches the {@code /me} user record and the public announcement, computes the unread flag by
+   * comparing the announcement id to {@code lastReadAnnouncementId}, and arms the once-per-session
+   * welcome toast.
+   *
+   * @param model Thymeleaf model populated with mission, announcement, username and toast flags
+   * @param principal authenticated OIDC user, or {@code null} for guests
+   * @param session HTTP session used to gate the welcome toast to the first render after login
+   * @return the {@code index} view name
+   */
   @GetMapping("/")
   public String home(
       Model model, @AuthenticationPrincipal OidcUser principal, HttpSession session) {
@@ -83,6 +103,14 @@ public class HomeController {
     return "index";
   }
 
+  /**
+   * Marks the given announcement as read for the current user by delegating to {@code PUT
+   * /api/v1/users/me/read-announcement/{id}}. Backend failures are logged but swallowed — a failed
+   * mark-as-read must not block navigation back to the home page.
+   *
+   * @param id announcement id to mark as read
+   * @return redirect back to {@code /}
+   */
   @org.springframework.web.bind.annotation.PostMapping("/announcement/read")
   public String markAnnouncementAsRead(
       @org.springframework.web.bind.annotation.RequestParam String id) {

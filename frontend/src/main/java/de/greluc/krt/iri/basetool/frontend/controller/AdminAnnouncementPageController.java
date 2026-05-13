@@ -13,6 +13,15 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin announcement-management page ({@code /admin/announcement}).
+ *
+ * <p>The announcement is a single shared record across the squadron — the page reads it via the
+ * {@code /admin} endpoint (returns the record even when no public announcement is currently
+ * published) and exposes Create/Update/Delete actions. PUT carries an optimistic-lock version so a
+ * second admin editing the same announcement concurrently sees a 409 toast rather than silently
+ * overwriting the other person's text.
+ */
 @Controller
 @RequestMapping("/admin/announcement")
 @RequiredArgsConstructor
@@ -22,6 +31,13 @@ public class AdminAnnouncementPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Loads the current admin-view announcement record. A backend failure is logged but the page
+   * still renders so the admin can post a new announcement from the empty form.
+   *
+   * @param model Thymeleaf model populated with {@code adminAnnouncement} (raw JSON map)
+   * @return the {@code admin/announcement} view name
+   */
   @GetMapping
   public String showAnnouncementPage(Model model) {
     try {
@@ -36,6 +52,17 @@ public class AdminAnnouncementPageController {
     return "admin/announcement";
   }
 
+  /**
+   * Updates the shared announcement.
+   *
+   * <p>{@code version} is optional ({@code null} = first-time create); a 409 with problem type
+   * {@code concurrency-conflict} surfaces as a dedicated optimistic-lock toast.
+   *
+   * @param content new announcement text (raw)
+   * @param version optimistic-lock version, may be {@code null} on first creation
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/announcement}
+   */
   @PostMapping("/update")
   public String updateAnnouncement(
       @RequestParam String content,
@@ -63,6 +90,12 @@ public class AdminAnnouncementPageController {
     return "redirect:/admin/announcement";
   }
 
+  /**
+   * Removes the current announcement entirely. Failure redirects with an error query param.
+   *
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/announcement} (optionally with {@code ?error=...})
+   */
   @PostMapping("/delete")
   public String deleteAnnouncement(RedirectAttributes redirectAttributes) {
     try {

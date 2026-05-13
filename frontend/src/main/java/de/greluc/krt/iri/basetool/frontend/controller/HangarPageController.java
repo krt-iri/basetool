@@ -25,6 +25,16 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the personal hangar pages ({@code /hangar} and {@code
+ * /hangar/squadron}).
+ *
+ * <p>The personal hangar lists the current user's ships with a multi-key sort: manufacturer name,
+ * ship type, insurance tier (LTI &lt; numeric &lt; unset), insurance number desc, location and
+ * finally fitted-status + name. The order is deliberate — fleet members compare insurance state
+ * across ships of the same type, so insurance grouping has to win over location. The squadron
+ * overview aggregates the entire org's hangar into a count-per-type table.
+ */
 @Controller
 @RequestMapping("/hangar")
 @RequiredArgsConstructor
@@ -34,6 +44,15 @@ public class HangarPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the personal hangar page. Fetches my ships and the three cached reference catalogs
+   * (ship types, locations, manufacturers); each catalog call independently degrades to an empty
+   * list on backend failure so a single dead reference catalog never blanks the whole page. The
+   * ship list is sorted client-side with the multi-key comparator described in the class Javadoc.
+   *
+   * @param model Thymeleaf model populated with the ship form, ship list and reference catalogs
+   * @return the {@code hangar} view name
+   */
   @GetMapping
   public String viewHangar(Model model) {
     if (!model.containsAttribute("shipForm")) {
@@ -135,6 +154,15 @@ public class HangarPageController {
     return "hangar";
   }
 
+  /**
+   * Renders the squadron-wide hangar overview ({@code /hangar/squadron}). Backend aggregates counts
+   * per ship type; the page only sorts by ship-type name. Counts are always positive (the backend's
+   * GROUP BY drops zero rows by construction), so the {@code count >= 1} comment in the inline code
+   * is a reminder, not a runtime filter.
+   *
+   * @param model Thymeleaf model populated with the sorted overview list
+   * @return the {@code hangar-squadron} view name
+   */
   @GetMapping("/squadron")
   public String viewSquadron(Model model) {
     List<SquadronShipOverviewDto> overview = new ArrayList<>();
@@ -160,6 +188,17 @@ public class HangarPageController {
     return "hangar-squadron";
   }
 
+  /**
+   * Adds a new ship to the current user's hangar. Validation errors render the hangar view inline
+   * (no redirect) so the BindingResult stays request-scoped — pushing it through the Redis-backed
+   * FlashMap would crash on the self-referencing cycle.
+   *
+   * @param form ship form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline {@code hangar} view on validation failure, otherwise redirect
+   */
   @PostMapping("/add")
   public String addShip(
       @Valid @ModelAttribute("shipForm") ShipForm form,
@@ -194,6 +233,17 @@ public class HangarPageController {
     return "redirect:/hangar";
   }
 
+  /**
+   * Updates an existing ship. Optimistic-locking version travels through the form so the backend
+   * can reject concurrent edits.
+   *
+   * @param id ship id
+   * @param form ship form (carries the version field)
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @return inline {@code hangar} view on validation failure, otherwise redirect
+   */
   @PostMapping("/{id}/update")
   public String updateShip(
       @PathVariable @NotNull UUID id,
@@ -228,6 +278,13 @@ public class HangarPageController {
     return "redirect:/hangar";
   }
 
+  /**
+   * Deletes a ship from the user's hangar.
+   *
+   * @param id ship id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /hangar}
+   */
   @PostMapping("/{id}/delete")
   public String deleteShip(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {

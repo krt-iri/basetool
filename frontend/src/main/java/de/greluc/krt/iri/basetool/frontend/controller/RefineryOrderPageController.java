@@ -36,6 +36,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/** REST controller for RefineryOrderPageController endpoints. */
 @Controller
 @RequestMapping("/refinery-orders")
 @RequiredArgsConstructor
@@ -78,6 +79,19 @@ public class RefineryOrderPageController {
     return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
   }
 
+  /**
+   * Renders the refinery-order list ({@code /refinery-orders}). Default filter is {@code
+   * OPEN}+{@code IN_PROGRESS} so the operational view is uncluttered by completed/canceled orders.
+   * The {@code onlyMine} toggle switches between the all-orders endpoint and the per-user endpoint
+   * — both return at most 1000 rows in one page, sorted by {@code startedAt} desc.
+   *
+   * @param status optional list of statuses to include
+   * @param onlyMine if true, restrict to the caller's own orders
+   * @param model Thymeleaf model populated with {@code orders}, selected statuses and the full
+   *     status list for the filter UI
+   * @param principal authenticated OIDC user (used to derive the logistician hint)
+   * @return the {@code refinery-orders-index} view name
+   */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
@@ -117,6 +131,16 @@ public class RefineryOrderPageController {
     return "refinery-orders-index";
   }
 
+  /**
+   * Renders the create-order form ({@code /refinery-orders/create}). Seeds an empty form with the
+   * current user as the default owner; loads the materials, methods, locations, missions, user list
+   * and the refinery rounding mode for the form's dropdowns and computations.
+   *
+   * @param source optional origin marker for the return-to-page link after save
+   * @param model Thymeleaf model populated with the form and reference catalogs
+   * @param principal authenticated OIDC user (used to derive the default owner)
+   * @return the {@code refinery-orders-create} view name
+   */
   @GetMapping("/create")
   @PreAuthorize("isAuthenticated()")
   public String viewCreateForm(
@@ -149,6 +173,20 @@ public class RefineryOrderPageController {
     return "refinery-orders-create";
   }
 
+  /**
+   * Persists a new refinery order from the create form.
+   *
+   * <p>Translates each form-bound {@code RefineryGoodForm} into a {@code RefineryGoodDto} with
+   * minimal id-only Material/Location/User stubs (the backend re-hydrates the full records from the
+   * ids). Empty goods short-circuit with a localized error before reaching the backend. On failure
+   * the form is flashed back so the user keeps their input.
+   *
+   * @param form refinery-order create form
+   * @param bindingResult validation errors carrier
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /refinery-orders/create} on failure (preserves input), otherwise to
+   *     the source page or the list
+   */
   @PostMapping("/create")
   @PreAuthorize("isAuthenticated()")
   public String createOrder(
@@ -272,6 +310,18 @@ public class RefineryOrderPageController {
     }
   }
 
+  /**
+   * Renders the detail view of a single refinery order ({@code /refinery-orders/{id}}).
+   *
+   * <p>The {@code canEdit} flag is resolved here (not in the template): logisticians can edit every
+   * order; the order's owner can edit their own. Backend's PUT enforces the same rule so this is
+   * purely a UX gate.
+   *
+   * @param id refinery order id
+   * @param model Thymeleaf model populated with order, edit/role flags and the dropdown catalogs
+   * @param principal authenticated OIDC user (used to derive owner and logistician flags)
+   * @return the {@code refinery-orders-details} view name
+   */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
@@ -410,6 +460,17 @@ public class RefineryOrderPageController {
     return "refinery-orders-details";
   }
 
+  /**
+   * Persists an edit to an existing refinery order. Mirrors {@link #createOrder} for the
+   * stubs-by-id pattern; additionally carries the optimistic-lock {@code version} from the form.
+   * Empty goods list short-circuits with a localized error before the backend call.
+   *
+   * @param id refinery order id
+   * @param form refinery-order edit form
+   * @param bindingResult validation errors carrier
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /refinery-orders/{id}} on failure, otherwise to the list
+   */
   @PostMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String updateOrder(
@@ -525,6 +586,14 @@ public class RefineryOrderPageController {
     return "redirect:/refinery-orders";
   }
 
+  /**
+   * Cancels a refinery order. The backend treats this as a soft-cancel (status transition);
+   * fine-grained authorization is enforced backend-side, the frontend only authenticates.
+   *
+   * @param id refinery order id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /refinery-orders}
+   */
   @PostMapping("/{id}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
@@ -538,6 +607,19 @@ public class RefineryOrderPageController {
     return "redirect:/refinery-orders";
   }
 
+  /**
+   * Completes a refinery order by storing the refined output as inventory entries.
+   *
+   * <p>The store form picks the target location and (optionally) the receiving user/job-order; the
+   * backend computes the inventory rows from the order's goods and the chosen target. A validation
+   * failure flashes the form back and re-opens the store modal on the detail page.
+   *
+   * @param id refinery order id
+   * @param form store form
+   * @param bindingResult validation errors carrier
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the order detail on failure, otherwise to the list
+   */
   @PostMapping("/{id}/store")
   @PreAuthorize("isAuthenticated()")
   public String storeOrder(

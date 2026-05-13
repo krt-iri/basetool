@@ -17,6 +17,14 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the ship-data admin page ({@code /ship-data}).
+ *
+ * <p>Renders the manufacturer + ship-type catalogs side by side (both include hidden entries so
+ * admins can un-hide), with PUT actions to toggle visibility on individual entries and a global
+ * reset that clears the {@code fitted} flag on every ship in the squadron. The reset is a
+ * destructive bulk op gated to ADMIN/OFFICER.
+ */
 @Controller
 @RequestMapping("/ship-data")
 @RequiredArgsConstructor
@@ -25,6 +33,14 @@ public class ShipDataPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Loads the manufacturer and ship-type catalogs (size=1000, including hidden) and seeds empty
+   * forms when not already in the model. Both lists are sorted case-insensitively by name. A
+   * backend failure leaves an error key in the model rather than blanking the page.
+   *
+   * @param model Thymeleaf model populated with both forms, both lists and the optional error key
+   * @return the {@code ship-data} view name
+   */
   @GetMapping
   @SuppressWarnings("unchecked")
   public String listData(Model model) {
@@ -69,7 +85,16 @@ public class ShipDataPageController {
     return "ship-data";
   }
 
-  // Manufacturers
+  /**
+   * Toggles a manufacturer's hidden flag via the backend visibility endpoint. Failure redirects
+   * with an error query param so the page renders an explicit "update failed" banner instead of
+   * silently keeping the old state.
+   *
+   * @param id manufacturer id
+   * @param hidden desired new flag value
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
+   */
   @PostMapping("/manufacturers/{id}/visibility")
   @PreAuthorize("hasRole('ADMIN')")
   public String toggleManufacturerVisibility(
@@ -87,7 +112,15 @@ public class ShipDataPageController {
     return "redirect:/ship-data";
   }
 
-  // ShipTypes
+  /**
+   * Toggles a ship type's hidden flag. Same failure-redirect pattern as {@link
+   * #toggleManufacturerVisibility}.
+   *
+   * @param id ship type id
+   * @param hidden desired new flag value
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
+   */
   @PostMapping("/ship-types/{id}/visibility")
   @PreAuthorize("hasRole('ADMIN')")
   public String toggleShipTypeVisibility(
@@ -105,6 +138,16 @@ public class ShipDataPageController {
     return "redirect:/ship-data";
   }
 
+  /**
+   * Squadron-wide bulk reset of the {@code fitted} flag on every ship.
+   *
+   * <p>The flag tracks whether a ship is currently outfitted for a mission; admins reset it after a
+   * major event (e.g. patch wipe). Restricted to ADMIN/OFFICER because the operation cannot be
+   * undone — every fleet member would otherwise have to manually re-mark their ships.
+   *
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /ship-data}
+   */
   @PostMapping("/reset-fitted")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public String resetAllFitted(RedirectAttributes redirectAttributes) {

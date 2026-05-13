@@ -21,6 +21,17 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the operations pages ({@code /operations} list and {@code
+ * /operations/{id}} detail).
+ *
+ * <p>Operations are an umbrella over missions — the detail page renders the operation header,
+ * embedded missions paginated separately, and the operation-level finance and payout summaries. The
+ * {@code canEdit} flag computed in {@link #operationDetails} mirrors the backend's
+ * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} so the template can disable inputs for users
+ * who would just bounce off a 403 on submit — without leaking any role logic into the service
+ * layer.
+ */
 @Controller
 @RequestMapping("/operations")
 @RequiredArgsConstructor
@@ -29,6 +40,14 @@ public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the paginated operations list.
+   *
+   * @param page zero-based page index
+   * @param size page size (default 20)
+   * @param model Thymeleaf model populated with the page content and metadata
+   * @return the {@code operations-index} view name
+   */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String listOperations(
@@ -50,6 +69,20 @@ public class OperationPageController {
     return "operations-index";
   }
 
+  /**
+   * Renders the operation detail page. Pulls operation, embedded missions, finance and payouts in
+   * sequence; any backend failure aborts the render and redirects back to the list with a flash
+   * error. Computes {@code canEdit} at the HTTP boundary by reading the authorities off the {@link
+   * Authentication} object — keeps the template free of role-expression checks and mirrors what the
+   * backend's PUT endpoint will accept.
+   *
+   * @param id operation id
+   * @param page zero-based page index for the embedded missions table
+   * @param size page size for the embedded missions table (default 10)
+   * @param authentication current user's authentication (used for {@code canEdit})
+   * @param model Thymeleaf model populated with operation, missions, finance and payouts
+   * @return the {@code operation-detail} view name, or redirect on backend failure
+   */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String operationDetails(
@@ -118,6 +151,14 @@ public class OperationPageController {
                     || "ROLE_MISSION_MANAGER".equals(role));
   }
 
+  /**
+   * Creates a new operation. {@code MISSION_MANAGER} role is required (admin/officer satisfy it via
+   * the role hierarchy).
+   *
+   * @param form operation form
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /operations}
+   */
   @PostMapping("/create")
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   public String createOperation(
@@ -132,6 +173,15 @@ public class OperationPageController {
     return "redirect:/operations";
   }
 
+  /**
+   * Updates an operation. A {@code 409 Conflict} from the backend is mapped to the
+   * optimistic-locking flash message; any other failure to the generic update-error message.
+   *
+   * @param id operation id
+   * @param form operation form (carries the optimistic-lock version)
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /operations}
+   */
   @PostMapping("/{id}/update")
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   public String updateOperation(
@@ -152,6 +202,13 @@ public class OperationPageController {
     return "redirect:/operations";
   }
 
+  /**
+   * Deletes an operation. Admin-only — narrower than the class-level read access.
+   *
+   * @param id operation id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /operations}
+   */
   @PostMapping("/{id}/delete")
   @PreAuthorize("hasRole('ADMIN')")
   public String deleteOperation(

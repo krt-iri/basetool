@@ -15,6 +15,15 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin terminal-management page ({@code /admin/terminals}).
+ *
+ * <p>The terminal list is much larger than locations (every UEX terminal in every system); the page
+ * pulls up to 10 000 records in one shot, decodes raw JSON maps into the lightweight {@link
+ * TerminalDto} (only the fields actually shown), and sorts case-insensitively by name. The PUT
+ * endpoint only propagates the hidden flag — UEX-imported fields stay untouched so admins cannot
+ * accidentally rename terminals via this page.
+ */
 @Controller
 @RequestMapping("/admin/terminals")
 @RequiredArgsConstructor
@@ -24,6 +33,14 @@ public class AdminTerminalsPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Fetches up to 10 000 terminals (including hidden), decodes the slim projection and sorts
+   * case-insensitively by name. Backend failures land as a flash error rather than blanking the
+   * page.
+   *
+   * @param model Thymeleaf model populated with the sorted terminal list
+   * @return the {@code admin/terminals} view name
+   */
   @GetMapping
   public String listData(Model model) {
     try {
@@ -61,6 +78,18 @@ public class AdminTerminalsPageController {
     return "admin/terminals";
   }
 
+  /**
+   * Toggles a single terminal's hidden flag.
+   *
+   * <p>Pulls the current record so the PUT body contains the UEX-imported display fields verbatim —
+   * the backend's PUT endpoint only updates the hidden flag, but the body still has to be a full
+   * {@link TerminalDto}. Any failure redirects with an error query param.
+   *
+   * @param id terminal id
+   * @param hidden desired new hidden flag
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/terminals} (optionally with {@code ?error=...})
+   */
   @PostMapping("/{id}/toggle-visibility")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public String toggleTerminalVisibility(

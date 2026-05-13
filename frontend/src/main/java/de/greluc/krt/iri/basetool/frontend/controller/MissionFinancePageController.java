@@ -18,6 +18,16 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for mission finance-entry CRUD ({@code /missions/{id}/finance-entries/**}).
+ *
+ * <p>Carved out from {@link MissionPageController} so the file stays manageable. Validation
+ * failures re-render the mission-detail view inline by delegating to {@code
+ * missionPageController.missionDetail(...)} — that keeps the BindingResult request-scoped (avoiding
+ * the Redis-FlashMap self-reference crash) and preserves the modal-open flag so the user sees the
+ * form with errors instead of an empty page. The injected {@link MissionPageController} is a Spring
+ * proxy, so its method-level {@code @PreAuthorize} still fires when called via this delegation.
+ */
 @Slf4j
 @Controller
 @RequestMapping("/missions/{id}/finance-entries")
@@ -25,13 +35,20 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MissionFinancePageController {
 
   private final BackendApiClient backendApiClient;
-  // The mission-detail view (and its model) lives in MissionPageController; we
-  // delegate to it instead of forwarding/redirecting so a finance-form validation
-  // error keeps the BindingResult request-scoped (no Redis FlashMap round-trip).
-  // The injected reference is a Spring proxy, so @PreAuthorize on missionDetail is
-  // still enforced.
   private final MissionPageController missionPageController;
 
+  /**
+   * Creates a finance entry on a mission. {@code permitAll()} reflects the project's guest-mode for
+   * mission finances — the backend still gates write access at the JWT layer when needed.
+   *
+   * @param id mission id
+   * @param form finance-entry form
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering (modal stays open)
+   * @param redirectAttributes flash attributes carrier
+   * @param principal OIDC user, may be {@code null} for guests
+   * @return inline {@code mission-detail} view on validation failure, otherwise redirect
+   */
   @PostMapping
   @PreAuthorize("permitAll()")
   public String addFinanceEntry(
@@ -62,6 +79,19 @@ public class MissionFinancePageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Updates a finance entry. The form carries the optimistic-lock version. Authenticated-only —
+   * guest write is restricted to {@code POST} (create) above.
+   *
+   * @param id mission id (path)
+   * @param entryId finance entry id (path)
+   * @param form finance-entry form (carries the version field)
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering
+   * @param redirectAttributes flash attributes carrier
+   * @param principal OIDC user
+   * @return inline {@code mission-detail} view on validation failure, otherwise redirect
+   */
   @PostMapping("/{entryId}/update")
   @PreAuthorize("isAuthenticated()")
   public String updateFinanceEntry(
@@ -94,6 +124,15 @@ public class MissionFinancePageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Deletes a finance entry.
+   *
+   * @param id mission id (path)
+   * @param entryId finance entry id (path)
+   * @param principal OIDC user
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{entryId}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteFinanceEntry(

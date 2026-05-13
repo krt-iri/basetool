@@ -13,6 +13,14 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+/**
+ * Spring MVC controller for the profit-calculation page ({@code /materials/profit-calculation}).
+ *
+ * <p>Pulls the cached ship-type catalog (filtered to ships with non-zero SCU capacity — the only
+ * ones a profit calculation makes sense for) and the terminal list (to derive the unique set of
+ * star systems for the dropdown). The C2 Hercules Starlifter is the default ship choice when
+ * present, mirroring the gameplay convention that profit runs are usually planned around the C2.
+ */
 @Slf4j
 @Controller
 @RequestMapping("/materials/profit-calculation")
@@ -21,6 +29,15 @@ public class ProfitCalculationPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the profit-calculation page after loading the ship-type catalog (capacity-filtered) and
+   * the distinct set of star systems from the terminal list. A backend failure for either call
+   * surfaces as a generic page-level error and renders an empty form rather than aborting.
+   *
+   * @param model Thymeleaf model populated with {@code shipTypes}, {@code defaultShipId} and {@code
+   *     starSystems}
+   * @return the {@code materials-profit-calculation} view name
+   */
   @GetMapping
   @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
   public String showProfitCalculationPage(Model model) {
