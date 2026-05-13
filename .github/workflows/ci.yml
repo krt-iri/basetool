@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload JUnit test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload JaCoCo coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-reports
           path: '**/build/reports/jacoco/**'
@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload Checkstyle reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: checkstyle-reports
           path: '**/build/reports/checkstyle/**'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload SpotBugs reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: spotbugs-reports
           path: '**/build/reports/spotbugs/**'
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload CycloneDX SBOMs
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sboms
           path: |
