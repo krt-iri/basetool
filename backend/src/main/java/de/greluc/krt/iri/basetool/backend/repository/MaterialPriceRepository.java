@@ -13,10 +13,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Material Price. */
 @Repository
 public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UUID> {
+  /** Derived Spring-Data query - returns entities matching {@code MaterialIdAndTerminalId}. */
   Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto(
@@ -30,6 +36,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   Page<MaterialPriceDto> findPricesByMaterialId(
       @Param("materialId") UUID materialId, Pageable pageable);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto(
@@ -45,6 +55,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   java.util.List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(
       @Param("materialId") UUID materialId);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
@@ -62,6 +76,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
     """)
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT p
@@ -73,6 +91,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
     """)
   java.util.List<MaterialPrice> findAllAutoLoadPrices();
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       """
         SELECT p

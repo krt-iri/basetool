@@ -12,43 +12,88 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Refinery Order. */
 @Repository
 public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UUID> {
+  /**
+   * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
+   * LocationId}.
+   */
   boolean existsByLocationId(UUID locationId);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code MissionId}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   List<RefineryOrder> findByMissionId(UUID missionId);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code MissionIdAndOwnerId}. Eagerly
+   * fetches the configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   List<RefineryOrder> findByMissionIdAndOwnerId(UUID missionId, UUID ownerId);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code MissionIdIn}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   List<RefineryOrder> findByMissionIdIn(List<UUID> missionIds);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   List<RefineryOrder> findByOwnerId(UUID ownerId);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   Page<RefineryOrder> findByOwnerId(UUID ownerId, Pageable pageable);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code OwnerIdAndStatusIn}. Eagerly
+   * fetches the configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   Page<RefineryOrder> findByOwnerIdAndStatusIn(
       UUID ownerId,
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       Pageable pageable);
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   Page<RefineryOrder> findByStatusIn(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       Pageable pageable);
 
+  /**
+   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   Page<RefineryOrder> findAll(Pageable pageable);
 
+  /**
+   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
+   * {@code @Param} contract.
+   */
   @Modifying
   @Query("UPDATE RefineryOrder r SET r.mission = null WHERE r.mission.id IN :missionIds")
   void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
 
+  /**
+   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
+   * {@code @Param} contract.
+   */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       "UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")

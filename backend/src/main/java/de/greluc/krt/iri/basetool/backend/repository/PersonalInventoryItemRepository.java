@@ -17,10 +17,16 @@ import org.springframework.stereotype.Repository;
 public interface PersonalInventoryItemRepository
     extends JpaRepository<PersonalInventoryItem, UUID> {
 
+  /** Returns every entity matching the derived {@code findAllByOwnerSub} criteria. */
   Page<PersonalInventoryItem> findAllByOwnerSub(String ownerSub, Pageable pageable);
 
+  /**
+   * Returns every entity matching the derived {@code findAllByOwnerSubAndNameContainingIgnoreCase}
+   * criteria.
+   */
   Page<PersonalInventoryItem> findAllByOwnerSubAndNameContainingIgnoreCase(
       String ownerSub, String nameFragment, Pageable pageable);
 
+  /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerSub}. */
   Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
 }

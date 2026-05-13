@@ -13,23 +13,45 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Mission. */
 @Repository
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name, m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE') ORDER BY m.plannedStartTime ASC")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference();
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findById(UUID id);
 
+  /**
+   * Returns the first matching {@code PlannedStartTimeAfterOrderByPlannedStartTimeAsc} (limit 1).
+   * Eagerly fetches the configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(Instant date);
 
+  /**
+   * Returns the first matching {@code
+   * PlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc} (limit 1). Eagerly fetches
+   * the configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(
       Instant date);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
       "SELECT m FROM Mission m WHERE "
@@ -52,9 +74,17 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   List<Mission> findAll();
 
+  /**
+   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Page<Mission> findAll(Pageable pageable);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
       "SELECT m FROM Mission m WHERE "
@@ -73,6 +103,10 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("operationId") UUID operationId,
       Pageable pageable);
 
+  /**
+   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
+   * {@code @Param} contract.
+   */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       "UPDATE Mission m SET m.owner = :newUser WHERE m.owner = :oldUser")
@@ -80,6 +114,10 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User oldUser,
       @org.jetbrains.annotations.NotNull de.greluc.krt.iri.basetool.backend.model.User newUser);
 
+  /**
+   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
+   * {@code @Param} contract.
+   */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       value = "DELETE FROM mission_managers WHERE user_id = :userId",

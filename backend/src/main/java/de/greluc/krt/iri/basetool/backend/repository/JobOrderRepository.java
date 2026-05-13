@@ -15,9 +15,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data repository for Job Order. */
 @Repository
 public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(
       attributePaths = {
         "materials",
@@ -29,6 +34,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       })
   Optional<JobOrder> findById(UUID id);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @EntityGraph(
       attributePaths = {
         "materials",
@@ -41,19 +50,36 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId DESC")
   List<JobOrder> findAllActiveWithMaterials();
 
+  /**
+   * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
   @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
   Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Query("SELECT MAX(o.priority) FROM JobOrder o")
   Optional<Integer> findMaxPriority();
 
+  /**
+   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
+   * clauses.
+   */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
 
+  /** Derived Spring-Data query - returns entities matching {@code AssigneeId}. */
   @Query("SELECT j FROM JobOrder j JOIN j.assignees u WHERE u.id = :userId")
   List<JobOrder> findByAssigneeId(@Param("userId") UUID userId);
 
+  /**
+   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
+   * {@code @Param} contract.
+   */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       value = "DELETE FROM job_order_assignees WHERE user_id = :userId",
