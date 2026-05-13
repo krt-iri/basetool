@@ -569,7 +569,9 @@ public class JobOrderPageController {
   }
 
   private UUID getCurrentUserId(OidcUser principal) {
-    if (principal == null) return null;
+    if (principal == null) {
+      return null;
+    }
     try {
       return UUID.fromString(principal.getSubject());
     } catch (Exception e) {
@@ -584,7 +586,9 @@ public class JobOrderPageController {
   }
 
   private boolean isLogistician(OidcUser principal) {
-    if (principal == null) return false;
+    if (principal == null) {
+      return false;
+    }
 
     org.springframework.security.core.Authentication auth =
         org.springframework.security.core.context.SecurityContextHolder.getContext()

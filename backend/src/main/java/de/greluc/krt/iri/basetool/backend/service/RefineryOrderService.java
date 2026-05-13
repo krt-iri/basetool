@@ -206,7 +206,9 @@ public class RefineryOrderService {
   }
 
   private static Double zeroToNull(Double value) {
-    if (value == null) return null;
+    if (value == null) {
+      return null;
+    }
     return value == 0.0 ? null : value;
   }
 
@@ -471,7 +473,9 @@ public class RefineryOrderService {
   }
 
   private static String normalizeNote(String note) {
-    if (note == null) return null;
+    if (note == null) {
+      return null;
+    }
     String trimmed = note.trim();
     return trimmed.isEmpty() ? null : trimmed;
   }
@@ -491,8 +495,12 @@ public class RefineryOrderService {
       return;
     }
     for (de.greluc.krt.iri.basetool.backend.model.RefineryGood good : order.getGoods()) {
-      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) continue;
-      if (!good.getOutputMaterial().getId().equals(itemDto.materialId())) continue;
+      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
+        continue;
+      }
+      if (!good.getOutputMaterial().getId().equals(itemDto.materialId())) {
+        continue;
+      }
 
       double amount = itemDto.amount();
       String qType =

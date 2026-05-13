@@ -47,8 +47,12 @@ public class MemberManagementController {
               : "/api/v1/users/search?query=" + search;
       StringBuilder uri = new StringBuilder(base);
       uri.append(base.contains("?") ? "&" : "?");
-      if (page != null) uri.append("page=").append(page).append("&");
-      if (size != null) uri.append("size=").append(size).append("&");
+      if (page != null) {
+        uri.append("page=").append(page).append("&");
+      }
+      if (size != null) {
+        uri.append("size=").append(size).append("&");
+      }
       uri.append("sort=username,asc");
 
       PageResponse<UserDto> pageResponse =

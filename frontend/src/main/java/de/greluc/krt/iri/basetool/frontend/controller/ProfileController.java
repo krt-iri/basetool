@@ -53,7 +53,9 @@ public class ProfileController {
               "/api/v1/users/me", new ParameterizedTypeReference<Map<String, Object>>() {});
 
       if (user != null) {
-        if (user.get("rank") != null) model.addAttribute("rank", user.get("rank"));
+        if (user.get("rank") != null) {
+          model.addAttribute("rank", user.get("rank"));
+        }
         // Always overwrite description from DB, even if null (to allow clearing)
         // But if DB is null and Token has it? Prefer DB (it might have been deleted locally).
         // Actually, if DB has null, we might want to show empty.
@@ -133,8 +135,12 @@ public class ProfileController {
   }
 
   private static Long parseLong(Object o) {
-    if (o == null) return 0L;
-    if (o instanceof Number n) return n.longValue();
+    if (o == null) {
+      return 0L;
+    }
+    if (o instanceof Number n) {
+      return n.longValue();
+    }
     try {
       return Long.parseLong(String.valueOf(o));
     } catch (Exception ignored) {

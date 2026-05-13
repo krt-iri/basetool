@@ -61,9 +61,13 @@ public class UexUniverseSyncService {
   public void syncCities() {
     log.info("Starting sync for Citys...");
     List<UexCityDto> dtos = uexClient.getCities();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexCityDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       City entity =
           cityRepository
               .findByIdCity(dto.id())
@@ -148,9 +152,13 @@ public class UexUniverseSyncService {
   public void syncFactions() {
     log.info("Starting sync for Factions...");
     List<UexFactionDto> dtos = uexClient.getFactions();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexFactionDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Faction entity =
           factionRepository
               .findByIdFaction(dto.id())
@@ -186,9 +194,13 @@ public class UexUniverseSyncService {
   public void syncJurisdictions() {
     log.info("Starting sync for Jurisdictions...");
     List<UexJurisdictionDto> dtos = uexClient.getJurisdictions();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexJurisdictionDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Jurisdiction entity =
           jurisdictionRepository
               .findByIdJurisdiction(dto.id())
@@ -224,9 +236,13 @@ public class UexUniverseSyncService {
   public void syncMoons() {
     log.info("Starting sync for Moons...");
     List<UexMoonDto> dtos = uexClient.getMoons();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexMoonDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Moon entity =
           moonRepository
               .findByIdMoon(dto.id())
@@ -266,9 +282,13 @@ public class UexUniverseSyncService {
   public void syncOrbits() {
     log.info("Starting sync for Orbits...");
     List<UexOrbitDto> dtos = uexClient.getOrbits();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexOrbitDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Orbit entity =
           orbitRepository
               .findByIdOrbit(dto.id())
@@ -304,9 +324,13 @@ public class UexUniverseSyncService {
   public void syncOutposts() {
     log.info("Starting sync for Outposts...");
     List<UexOutpostDto> dtos = uexClient.getOutposts();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexOutpostDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Outpost entity =
           outpostRepository
               .findByIdOutpost(dto.id())
@@ -368,9 +392,13 @@ public class UexUniverseSyncService {
   public void syncPlanets() {
     log.info("Starting sync for Planets...");
     List<UexPlanetDto> dtos = uexClient.getPlanets();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexPlanetDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Planet entity =
           planetRepository
               .findByIdPlanet(dto.id())
@@ -408,9 +436,13 @@ public class UexUniverseSyncService {
   public void syncPois() {
     log.info("Starting sync for Pois...");
     List<UexPoiDto> dtos = uexClient.getPoi();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexPoiDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Poi entity =
           poiRepository
               .findByIdPoi(dto.id())
@@ -475,9 +507,13 @@ public class UexUniverseSyncService {
   public void syncSpaceStations() {
     log.info("Starting sync for SpaceStations...");
     List<UexSpaceStationDto> dtos = uexClient.getSpaceStations();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexSpaceStationDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       SpaceStation entity =
           spacestationRepository
               .findByIdSpaceStation(dto.id())
@@ -566,9 +602,13 @@ public class UexUniverseSyncService {
   public void syncTerminals() {
     log.info("Starting sync for Terminals...");
     List<UexTerminalDto> dtos = uexClient.getTerminals();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
     for (UexTerminalDto dto : dtos) {
-      if (dto.id() == null) continue;
+      if (dto.id() == null) {
+        continue;
+      }
       Terminal entity =
           terminalRepository
               .findByIdTerminal(dto.id())

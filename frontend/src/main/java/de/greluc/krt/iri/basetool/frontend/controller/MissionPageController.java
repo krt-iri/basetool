@@ -155,11 +155,21 @@ public class MissionPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/missions/search?");
-    if (search != null && !search.isBlank()) uri.append("query=").append(search).append("&");
-    if (start != null && !start.isBlank()) uri.append("start=").append(start).append("&");
-    if (end != null && !end.isBlank()) uri.append("end=").append(end).append("&");
-    if (page != null) uri.append("page=").append(page).append("&");
-    if (size != null) uri.append("size=").append(size).append("&");
+    if (search != null && !search.isBlank()) {
+      uri.append("query=").append(search).append("&");
+    }
+    if (start != null && !start.isBlank()) {
+      uri.append("start=").append(start).append("&");
+    }
+    if (end != null && !end.isBlank()) {
+      uri.append("end=").append(end).append("&");
+    }
+    if (page != null) {
+      uri.append("page=").append(page).append("&");
+    }
+    if (size != null) {
+      uri.append("size=").append(size).append("&");
+    }
 
     if ((status == null || status.isEmpty())) {
       if (showPast && principal != null) {
@@ -482,11 +492,18 @@ public class MissionPageController {
     }
     try {
       Map<String, Object> body = new HashMap<>();
-      if (form.userId() != null) body.put("userId", form.userId());
-      if (form.guestName() != null && !form.guestName().isBlank())
+      if (form.userId() != null) {
+        body.put("userId", form.userId());
+      }
+      if (form.guestName() != null && !form.guestName().isBlank()) {
         body.put("guestName", form.guestName());
-      if (form.desiredJobTypeId() != null) body.put("desiredJobTypeId", form.desiredJobTypeId());
-      if (form.squadronId() != null) body.put("squadronId", form.squadronId());
+      }
+      if (form.desiredJobTypeId() != null) {
+        body.put("desiredJobTypeId", form.desiredJobTypeId());
+      }
+      if (form.squadronId() != null) {
+        body.put("squadronId", form.squadronId());
+      }
       body.put("comment", form.comment());
 
       boolean isPublic = (principal == null);
@@ -709,23 +726,34 @@ public class MissionPageController {
     }
     try {
       Map<String, Object> body = new HashMap<>();
-      if (form.desiredJobTypeId() != null)
+      if (form.desiredJobTypeId() != null) {
         body.put("desiredMissionJobTypeId", form.desiredJobTypeId());
-      if (form.plannedMissionJobTypeId() != null)
+      }
+      if (form.plannedMissionJobTypeId() != null) {
         body.put("plannedMissionJobTypeId", form.plannedMissionJobTypeId());
-      if (form.squadronId() != null) body.put("squadronId", form.squadronId());
+      }
+      if (form.squadronId() != null) {
+        body.put("squadronId", form.squadronId());
+      }
       body.put("comment", form.comment());
       if (form.startTime() != null && !form.startTime().isBlank()) {
         java.time.Instant parsed = parseToInstant(form.startTime());
-        if (parsed != null) body.put("startTime", parsed.toString());
+        if (parsed != null) {
+          body.put("startTime", parsed.toString());
+        }
       }
       if (form.endTime() != null && !form.endTime().isBlank()) {
         java.time.Instant parsed = parseToInstant(form.endTime());
-        if (parsed != null) body.put("endTime", parsed.toString());
+        if (parsed != null) {
+          body.put("endTime", parsed.toString());
+        }
       }
-      if (form.payoutPreference() != null)
+      if (form.payoutPreference() != null) {
         body.put("payoutPreference", form.payoutPreference().name());
-      if (form.version() != null) body.put("version", form.version());
+      }
+      if (form.version() != null) {
+        body.put("version", form.version());
+      }
 
       boolean isPublic = (principal == null);
       backendApiClient.put(
@@ -1776,7 +1804,9 @@ public class MissionPageController {
   }
 
   private String extractParticipantName(MissionParticipantDto participant) {
-    if (participant == null) return "";
+    if (participant == null) {
+      return "";
+    }
     if (participant.user() != null) {
       if (participant.user().effectiveName() != null
           && !participant.user().effectiveName().isBlank()) {
@@ -1840,7 +1870,9 @@ public class MissionPageController {
       if (instantObj instanceof java.time.Instant i) {
         instant = i;
       } else if (instantObj instanceof String s) {
-        if (s.isBlank()) return "";
+        if (s.isBlank()) {
+          return "";
+        }
         instant = java.time.Instant.parse(s);
       } else {
         return String.valueOf(instantObj);

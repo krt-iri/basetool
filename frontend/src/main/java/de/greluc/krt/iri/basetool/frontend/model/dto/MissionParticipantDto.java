@@ -27,7 +27,9 @@ public record MissionParticipantDto(
   }
 
   private String formatInstant(Instant instant) {
-    if (instant == null) return "";
+    if (instant == null) {
+      return "";
+    }
     return instant.atZone(ZoneId.of("Europe/Berlin")).toLocalDateTime().toString();
   }
 }

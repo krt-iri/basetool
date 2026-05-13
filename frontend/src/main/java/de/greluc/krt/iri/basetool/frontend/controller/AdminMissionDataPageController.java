@@ -479,7 +479,9 @@ public class AdminMissionDataPageController {
   }
 
   private static UUID parseUuid(Object o) {
-    if (o == null) return null;
+    if (o == null) {
+      return null;
+    }
     try {
       return UUID.fromString(String.valueOf(o));
     } catch (Exception ignored) {
@@ -488,14 +490,22 @@ public class AdminMissionDataPageController {
   }
 
   private static boolean parseBoolean(Object o) {
-    if (o == null) return false;
-    if (o instanceof Boolean b) return b;
+    if (o == null) {
+      return false;
+    }
+    if (o instanceof Boolean b) {
+      return b;
+    }
     return Boolean.parseBoolean(String.valueOf(o));
   }
 
   private static Long parseLong(Object o) {
-    if (o == null) return 0L;
-    if (o instanceof Number n) return n.longValue();
+    if (o == null) {
+      return 0L;
+    }
+    if (o instanceof Number n) {
+      return n.longValue();
+    }
     try {
       return Long.parseLong(String.valueOf(o));
     } catch (Exception ignored) {

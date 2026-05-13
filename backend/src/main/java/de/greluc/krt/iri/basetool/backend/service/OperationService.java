@@ -129,7 +129,9 @@ public class OperationService {
             p.getUser() != null
                 ? p.getUser().getId().toString()
                 : (p.getGuestName() != null ? "guest_" + p.getGuestName() : null);
-        if (pId == null) continue;
+        if (pId == null) {
+          continue;
+        }
 
         String pName = p.getUser() != null ? p.getUser().getEffectiveName() : p.getGuestName();
         participantNames.putIfAbsent(pId, pName);
@@ -145,7 +147,9 @@ public class OperationService {
         }
 
         java.time.Instant pStart = p.getStartTime();
-        if (pStart == null) continue;
+        if (pStart == null) {
+          continue;
+        }
 
         java.time.Instant pEnd = p.getEndTime() != null ? p.getEndTime() : java.time.Instant.now();
 

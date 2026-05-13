@@ -130,8 +130,12 @@ public class ShipDataPageController {
   }
 
   private UUID parseUuid(Object o) {
-    if (o == null) return null;
-    if (o instanceof UUID u) return u;
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof UUID u) {
+      return u;
+    }
     try {
       return UUID.fromString(o.toString());
     } catch (Exception e) {

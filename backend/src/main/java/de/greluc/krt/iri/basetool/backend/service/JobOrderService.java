@@ -241,8 +241,12 @@ public class JobOrderService {
     activeOrders.remove(targetOrder);
 
     int newIndex = newPriority - 1;
-    if (newIndex < 0) newIndex = 0;
-    if (newIndex > activeOrders.size()) newIndex = activeOrders.size();
+    if (newIndex < 0) {
+      newIndex = 0;
+    }
+    if (newIndex > activeOrders.size()) {
+      newIndex = activeOrders.size();
+    }
 
     activeOrders.add(newIndex, targetOrder);
 

@@ -49,7 +49,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
     String path = request.getRequestURI();
     List<String> patterns = properties.getPaths();
-    if (patterns == null || patterns.isEmpty()) return true;
+    if (patterns == null || patterns.isEmpty()) {
+      return true;
+    }
     for (String pattern : patterns) {
       if (pathMatcher.match(pattern, path)) {
         return false;
@@ -123,9 +125,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   private String firstMatchingPattern(String path, List<String> patterns) {
-    if (patterns == null) return null;
+    if (patterns == null) {
+      return null;
+    }
     for (String p : patterns) {
-      if (pathMatcher.match(p, path)) return p;
+      if (pathMatcher.match(p, path)) {
+        return p;
+      }
     }
     return null;
   }

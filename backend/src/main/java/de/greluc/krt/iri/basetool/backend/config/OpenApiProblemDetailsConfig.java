@@ -22,7 +22,9 @@ public class OpenApiProblemDetailsConfig {
 
   private void customizeOpenApi(OpenAPI openAPI) {
     ensureProblemDetailSchema(openAPI);
-    if (openAPI.getPaths() == null) return;
+    if (openAPI.getPaths() == null) {
+      return;
+    }
     openAPI
         .getPaths()
         .values()
@@ -33,7 +35,9 @@ public class OpenApiProblemDetailsConfig {
                   .forEach(
                       operation -> {
                         ApiResponses responses = operation.getResponses();
-                        if (responses == null) return;
+                        if (responses == null) {
+                          return;
+                        }
                         addProblemResponse(responses, "400", "Bad Request");
                         addProblemResponse(responses, "401", "Unauthorized");
                         addProblemResponse(responses, "403", "Forbidden");

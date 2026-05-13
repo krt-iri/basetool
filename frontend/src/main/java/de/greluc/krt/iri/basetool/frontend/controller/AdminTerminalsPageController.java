@@ -102,7 +102,9 @@ public class AdminTerminalsPageController {
   }
 
   private UUID parseUuid(Object o) {
-    if (o == null) return null;
+    if (o == null) {
+      return null;
+    }
     try {
       return UUID.fromString(o.toString());
     } catch (Exception e) {

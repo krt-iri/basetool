@@ -168,8 +168,12 @@ public class PersonalInventoryItemService {
 
     List<UexLocationDto> hits = new java.util.ArrayList<>();
     for (City c : cityRepository.findAll()) {
-      if (c.getIdCity() == null || c.getName() == null) continue;
-      if (!needle.isEmpty() && !c.getName().toLowerCase(Locale.ROOT).contains(needle)) continue;
+      if (c.getIdCity() == null || c.getName() == null) {
+        continue;
+      }
+      if (!needle.isEmpty() && !c.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+        continue;
+      }
       hits.add(
           new UexLocationDto(
               c.getIdCity(),
@@ -179,8 +183,12 @@ public class PersonalInventoryItemService {
               c.getPlanetName()));
     }
     for (SpaceStation s : spaceStationRepository.findAll()) {
-      if (s.getIdSpaceStation() == null || s.getName() == null) continue;
-      if (!needle.isEmpty() && !s.getName().toLowerCase(Locale.ROOT).contains(needle)) continue;
+      if (s.getIdSpaceStation() == null || s.getName() == null) {
+        continue;
+      }
+      if (!needle.isEmpty() && !s.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+        continue;
+      }
       hits.add(
           new UexLocationDto(
               s.getIdSpaceStation(),

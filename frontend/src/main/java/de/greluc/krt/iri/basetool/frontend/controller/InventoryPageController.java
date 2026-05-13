@@ -52,8 +52,12 @@ public class InventoryPageController {
     List<AggregatedInventoryDto> aggregated = new ArrayList<>();
     try {
       StringBuilder uri = new StringBuilder("/api/v1/inventory/aggregated?");
-      if (page != null) uri.append("page=").append(page).append("&");
-      if (size != null) uri.append("size=").append(size).append("&");
+      if (page != null) {
+        uri.append("page=").append(page).append("&");
+      }
+      if (size != null) {
+        uri.append("size=").append(size).append("&");
+      }
       uri.append("sort=material.name,asc;quality,desc;amount,desc");
 
       PageResponse<AggregatedInventoryDto> p =
@@ -401,11 +405,17 @@ public class InventoryPageController {
     }
     StringBuilder rebuilt = new StringBuilder();
     for (String raw : query.split("&")) {
-      if (raw.isEmpty()) continue;
+      if (raw.isEmpty()) {
+        continue;
+      }
       int eq = raw.indexOf('=');
       String name = eq < 0 ? raw : raw.substring(0, eq);
-      if (name.isEmpty() || "fragment".equals(name)) continue;
-      if (!rebuilt.isEmpty()) rebuilt.append('&');
+      if (name.isEmpty() || "fragment".equals(name)) {
+        continue;
+      }
+      if (!rebuilt.isEmpty()) {
+        rebuilt.append('&');
+      }
       rebuilt.append(raw);
     }
     if (rebuilt.isEmpty()) {
@@ -611,7 +621,9 @@ public class InventoryPageController {
     org.springframework.security.core.Authentication auth =
         org.springframework.security.core.context.SecurityContextHolder.getContext()
             .getAuthentication();
-    if (auth == null || auth.getAuthorities() == null) return false;
+    if (auth == null || auth.getAuthorities() == null) {
+      return false;
+    }
     for (org.springframework.security.core.GrantedAuthority a : auth.getAuthorities()) {
       String r = a.getAuthority();
       if ("ROLE_LOGISTICIAN".equals(r) || "ROLE_OFFICER".equals(r) || "ROLE_ADMIN".equals(r)) {
@@ -626,9 +638,15 @@ public class InventoryPageController {
   }
 
   private Integer parseInteger(Object o) {
-    if (o == null) return null;
-    if (o instanceof Integer i) return i;
-    if (o instanceof Number n) return n.intValue();
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof Integer i) {
+      return i;
+    }
+    if (o instanceof Number n) {
+      return n.intValue();
+    }
     try {
       return Integer.parseInt(o.toString());
     } catch (Exception e) {
@@ -637,7 +655,9 @@ public class InventoryPageController {
   }
 
   private UUID parseUuid(Object o) {
-    if (o == null) return null;
+    if (o == null) {
+      return null;
+    }
     try {
       return UUID.fromString(o.toString());
     } catch (Exception e) {

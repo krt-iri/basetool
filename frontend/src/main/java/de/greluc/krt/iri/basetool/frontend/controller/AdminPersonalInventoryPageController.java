@@ -201,7 +201,9 @@ public class AdminPersonalInventoryPageController {
           new StringBuilder("/api/v1/admin/personal-inventory/")
               .append(URLEncoder.encode(userSub, StandardCharsets.UTF_8))
               .append('?');
-      if (page != null) uri.append("page=").append(page).append('&');
+      if (page != null) {
+        uri.append("page=").append(page).append('&');
+      }
       uri.append("size=").append(size == null ? 50 : size);
       if (sort != null && !sort.isBlank()) {
         uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));

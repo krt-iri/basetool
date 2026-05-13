@@ -54,7 +54,9 @@ public final class PaginationUtil {
       Sort.Direction dir = Sort.Direction.ASC;
       if (tokens.length > 1) {
         String d = tokens[1].trim();
-        if (d.equalsIgnoreCase("desc")) dir = Sort.Direction.DESC;
+        if (d.equalsIgnoreCase("desc")) {
+          dir = Sort.Direction.DESC;
+        }
       }
       orders.add(new Sort.Order(dir, field));
     }

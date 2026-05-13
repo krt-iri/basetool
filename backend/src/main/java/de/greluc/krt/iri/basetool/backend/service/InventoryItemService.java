@@ -689,7 +689,9 @@ public class InventoryItemService {
   }
 
   private Double roundAmount(Double amount) {
-    if (amount == null) return null;
+    if (amount == null) {
+      return null;
+    }
     return java.math.BigDecimal.valueOf(amount)
         .setScale(3, java.math.RoundingMode.HALF_UP)
         .doubleValue();

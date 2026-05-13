@@ -39,7 +39,9 @@ public interface RefineryOrderMapper {
    * treated as 0 so that legacy data does not trigger an NPE.
    */
   default Double computeProfit(RefineryOrder entity) {
-    if (entity == null) return 0d;
+    if (entity == null) {
+      return 0d;
+    }
     double sales = entity.getOreSales() != null ? entity.getOreSales() : 0d;
     double costs = entity.getExpenses() != null ? entity.getExpenses() : 0d;
     double other = entity.getOtherExpenses() != null ? entity.getOtherExpenses() : 0d;
@@ -54,7 +56,9 @@ public interface RefineryOrderMapper {
    * only the id - the persistence provider then materialises the managed instance on persist.
    */
   default Mission missionDtoToMission(MissionDto dto) {
-    if (dto == null) return null;
+    if (dto == null) {
+      return null;
+    }
     Mission mission = new Mission();
     mission.setId(dto.id());
     return mission;

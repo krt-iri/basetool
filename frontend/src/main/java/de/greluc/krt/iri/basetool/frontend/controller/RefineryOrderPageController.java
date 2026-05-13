@@ -693,7 +693,9 @@ public class RefineryOrderPageController {
   }
 
   private UUID getCurrentUserId(OidcUser principal) {
-    if (principal == null) return null;
+    if (principal == null) {
+      return null;
+    }
     try {
       // Try the subject directly (fastest path)
       return UUID.fromString(principal.getSubject());
@@ -716,12 +718,16 @@ public class RefineryOrderPageController {
    * "not set".
    */
   private static Double zeroToNull(Double value) {
-    if (value == null) return null;
+    if (value == null) {
+      return null;
+    }
     return value == 0.0 ? null : value;
   }
 
   private boolean isLogistician(OidcUser principal) {
-    if (principal == null) return false;
+    if (principal == null) {
+      return false;
+    }
 
     org.springframework.security.core.Authentication auth =
         org.springframework.security.core.context.SecurityContextHolder.getContext()

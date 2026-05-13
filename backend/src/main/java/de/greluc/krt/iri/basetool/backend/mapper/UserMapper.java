@@ -29,13 +29,17 @@ public interface UserMapper {
 
   /** MapStruct default - flattens the user's roles to a set of role-name strings. */
   default Set<String> roleNames(Set<Role> roles) {
-    if (roles == null) return Collections.emptySet();
+    if (roles == null) {
+      return Collections.emptySet();
+    }
     return roles.stream().map(Role::getName).collect(Collectors.toSet());
   }
 
   /** MapStruct default - flattens the permissions of every role the user owns into one set. */
   default Set<String> permissions(Set<Role> roles) {
-    if (roles == null) return Collections.emptySet();
+    if (roles == null) {
+      return Collections.emptySet();
+    }
     return roles.stream().flatMap(r -> r.getPermissions().stream()).collect(Collectors.toSet());
   }
 }

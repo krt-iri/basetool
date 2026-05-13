@@ -164,7 +164,9 @@ public class UserService {
 
   @Transactional
   public void syncUser(@NotNull KeycloakUserDto dto) {
-    if (dto.id() == null) return;
+    if (dto.id() == null) {
+      return;
+    }
 
     User user =
         userRepository
@@ -217,7 +219,9 @@ public class UserService {
 
   @Transactional
   public void markMissingUsers(Collection<UUID> currentIds) {
-    if (currentIds.isEmpty()) return;
+    if (currentIds.isEmpty()) {
+      return;
+    }
     userRepository.markMissingUsers(currentIds);
   }
 
@@ -283,8 +287,12 @@ public class UserService {
       }
       user.setRank(rank);
     }
-    if (description != null) user.setDescription(description);
-    if (displayName != null) user.setDisplayName(displayName.isBlank() ? null : displayName);
+    if (description != null) {
+      user.setDescription(description);
+    }
+    if (displayName != null) {
+      user.setDisplayName(displayName.isBlank() ? null : displayName);
+    }
     // joinDate can be explicitly set to null (clear the date)
     user.setJoinDate(joinDate);
     return userRepository.save(user);
@@ -306,8 +314,12 @@ public class UserService {
     if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(User.class, id);
     }
-    if (description != null) user.setDescription(description);
-    if (displayName != null) user.setDisplayName(displayName.isBlank() ? null : displayName);
+    if (description != null) {
+      user.setDescription(description);
+    }
+    if (displayName != null) {
+      user.setDisplayName(displayName.isBlank() ? null : displayName);
+    }
     return userRepository.save(user);
   }
 

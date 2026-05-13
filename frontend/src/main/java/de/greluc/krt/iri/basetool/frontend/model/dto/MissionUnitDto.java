@@ -19,7 +19,9 @@ public record MissionUnitDto(
    * order, used by the Mission detail view's "Job summary" widget.
    */
   public Map<String, Integer> getJobSummary() {
-    if (crew == null) return Map.of();
+    if (crew == null) {
+      return Map.of();
+    }
     Map<String, Integer> summary = new LinkedHashMap<>();
     for (MissionCrewDto c : crew) {
       if (c.jobTypes() != null) {

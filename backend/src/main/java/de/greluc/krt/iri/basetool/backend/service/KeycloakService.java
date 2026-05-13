@@ -55,7 +55,9 @@ public class KeycloakService {
               .retrieve()
               .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
 
-      if (users == null) return Collections.emptyList();
+      if (users == null) {
+        return Collections.emptyList();
+      }
 
       return users.stream()
           .map(
@@ -93,7 +95,9 @@ public class KeycloakService {
               .retrieve()
               .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
 
-      if (roles == null) return Collections.emptySet();
+      if (roles == null) {
+        return Collections.emptySet();
+      }
       return roles.stream()
           .map(r -> (String) r.get("name"))
           .filter(Objects::nonNull)

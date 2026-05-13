@@ -26,9 +26,13 @@ public class StaticCacheHeaderFilter extends OncePerRequestFilter {
       return true;
     }
     String uri = request.getRequestURI();
-    if (uri == null) return true;
+    if (uri == null) {
+      return true;
+    }
     for (String p : STATIC_PATHS) {
-      if (uri.startsWith(p)) return false;
+      if (uri.startsWith(p)) {
+        return false;
+      }
     }
     return true;
   }

@@ -64,14 +64,20 @@ public class HangarPageController {
                 .thenComparing(
                     (ShipDto s) -> {
                       String ins = s.insurance();
-                      if (ins == null || ins.equals("0")) return 3;
-                      if (ins.equals("LTI")) return 1;
+                      if (ins == null || ins.equals("0")) {
+                        return 3;
+                      }
+                      if (ins.equals("LTI")) {
+                        return 1;
+                      }
                       return 2;
                     })
                 .thenComparing(
                     (ShipDto s) -> {
                       String ins = s.insurance();
-                      if (ins == null || ins.equals("LTI") || ins.equals("0")) return 0;
+                      if (ins == null || ins.equals("LTI") || ins.equals("0")) {
+                        return 0;
+                      }
                       try {
                         return Integer.parseInt(ins);
                       } catch (NumberFormatException e) {
@@ -246,7 +252,9 @@ public class HangarPageController {
   }
 
   private Long parseLong(Object o) {
-    if (o == null) return null;
+    if (o == null) {
+      return null;
+    }
     try {
       if (o instanceof Number) {
         return ((Number) o).longValue();
@@ -262,7 +270,9 @@ public class HangarPageController {
   }
 
   private UUID parseUuid(Object o) {
-    if (o == null) return null;
+    if (o == null) {
+      return null;
+    }
     try {
       return UUID.fromString(o.toString());
     } catch (Exception e) {

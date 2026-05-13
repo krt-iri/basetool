@@ -93,7 +93,9 @@ public abstract class MissionMapper {
    * description is never exposed via the public detail endpoint.
    */
   public String resolveDescription(Mission mission) {
-    if (mission == null || mission.getDescription() == null) return null;
+    if (mission == null || mission.getDescription() == null) {
+      return null;
+    }
     if (authHelperService.isAuthenticated()) {
       return mission.getDescription();
     }
@@ -105,14 +107,18 @@ public abstract class MissionMapper {
    * MissionSecurityService}).
    */
   public boolean resolveCanEdit(Mission mission) {
-    if (mission == null) return false;
+    if (mission == null) {
+      return false;
+    }
     return missionSecurityService.canManageMission(
         mission.getId(), authHelperService.rawAuthentication());
   }
 
   /** Returns {@code true} iff the current caller may add/remove mission managers. */
   public boolean resolveCanManageManagers(Mission mission) {
-    if (mission == null) return false;
+    if (mission == null) {
+      return false;
+    }
     return missionSecurityService.canManageManagers(
         mission.getId(), authHelperService.rawAuthentication());
   }
@@ -123,7 +129,9 @@ public abstract class MissionMapper {
    * de.greluc.krt.iri.basetool.backend.service.MissionService#checkIn}).
    */
   public int resolveCheckedInParticipants(Mission mission) {
-    if (mission == null || mission.getParticipants() == null) return 0;
+    if (mission == null || mission.getParticipants() == null) {
+      return 0;
+    }
     return (int)
         mission.getParticipants().stream()
             .filter(p -> p != null && p.getStartTime() != null)
@@ -132,7 +140,9 @@ public abstract class MissionMapper {
 
   /** Counts all registered/enrolled participants of the mission, regardless of check-in state. */
   public int resolveRegisteredParticipants(Mission mission) {
-    if (mission == null || mission.getParticipants() == null) return 0;
+    if (mission == null || mission.getParticipants() == null) {
+      return 0;
+    }
     return mission.getParticipants().size();
   }
 
@@ -156,7 +166,9 @@ public abstract class MissionMapper {
    * previous alphabetical ordering for non-leaders.
    */
   public java.util.List<MissionCrewDto> resolveCrew(MissionUnit unit) {
-    if (unit == null || unit.getCrew() == null) return java.util.List.of();
+    if (unit == null || unit.getCrew() == null) {
+      return java.util.List.of();
+    }
     java.util.Comparator<MissionCrew> leaderFirst =
         java.util.Comparator.comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
             .thenComparing(
@@ -168,9 +180,13 @@ public abstract class MissionMapper {
   }
 
   private boolean isLeaderCrew(MissionCrew crew) {
-    if (crew == null || crew.getJobTypes() == null) return false;
+    if (crew == null || crew.getJobTypes() == null) {
+      return false;
+    }
     for (JobType jt : crew.getJobTypes()) {
-      if (jt != null && jt.isLeadershipRole()) return true;
+      if (jt != null && jt.isLeadershipRole()) {
+        return true;
+      }
     }
     return false;
   }
@@ -198,7 +214,9 @@ public abstract class MissionMapper {
    * guest name captured at sign-up.
    */
   public String resolveParticipantName(MissionCrew crew) {
-    if (crew.getParticipant() == null) return null;
+    if (crew.getParticipant() == null) {
+      return null;
+    }
     if (crew.getParticipant().getUser() != null) {
       return crew.getParticipant().getUser().getEffectiveName();
     }

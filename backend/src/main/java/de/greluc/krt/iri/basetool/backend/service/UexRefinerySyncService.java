@@ -32,13 +32,17 @@ public class UexRefinerySyncService {
   public void syncRefiningMethods() {
     log.info("Starting sync for Refining Methods...");
     List<UexRefiningMethodDto> dtos = uexClient.getRefineriesMethods();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
 
     int added = 0;
     int updated = 0;
 
     for (UexRefiningMethodDto dto : dtos) {
-      if (dto.name() == null || dto.name().isBlank()) continue;
+      if (dto.name() == null || dto.name().isBlank()) {
+        continue;
+      }
 
       RefiningMethod entity =
           refiningMethodRepository
@@ -59,8 +63,11 @@ public class UexRefinerySyncService {
 
       refiningMethodRepository.save(entity);
 
-      if (isNew) added++;
-      else updated++;
+      if (isNew) {
+        added++;
+      } else {
+        updated++;
+      }
     }
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
   }
@@ -69,17 +76,23 @@ public class UexRefinerySyncService {
   public void syncRefineryYields() {
     log.info("Starting sync for Refinery Yields...");
     List<UexRefineryYieldDto> dtos = uexClient.getRefineriesYields();
-    if (dtos.isEmpty()) return;
+    if (dtos.isEmpty()) {
+      return;
+    }
 
     int processed = 0;
 
     for (UexRefineryYieldDto dto : dtos) {
-      if (dto.idCommodity() == null || dto.idTerminal() == null || dto.value() == null) continue;
+      if (dto.idCommodity() == null || dto.idTerminal() == null || dto.value() == null) {
+        continue;
+      }
 
       Material material = materialRepository.findByIdCommodity(dto.idCommodity()).orElse(null);
       Terminal terminal = terminalRepository.findByIdTerminal(dto.idTerminal()).orElse(null);
 
-      if (material == null || terminal == null) continue;
+      if (material == null || terminal == null) {
+        continue;
+      }
 
       RefineryYield entity =
           refineryYieldRepository

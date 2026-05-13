@@ -48,13 +48,21 @@ public class MaterialsPageController {
       implements Comparable<TerminalCol> {
 
     private int getGroupPriority() {
-      if (cityName != null && !cityName.isBlank()) return 1;
+      if (cityName != null && !cityName.isBlank()) {
+        return 1;
+      }
       if (spaceStationName != null && !spaceStationName.isBlank()) {
-        if (Boolean.TRUE.equals(isJumpPoint)) return 2;
-        if (Boolean.TRUE.equals(hasLoadingDock)) return 3;
+        if (Boolean.TRUE.equals(isJumpPoint)) {
+          return 2;
+        }
+        if (Boolean.TRUE.equals(hasLoadingDock)) {
+          return 3;
+        }
         return 4;
       }
-      if (outpostName != null && !outpostName.isBlank()) return 5;
+      if (outpostName != null && !outpostName.isBlank()) {
+        return 5;
+      }
       return 6;
     }
 
