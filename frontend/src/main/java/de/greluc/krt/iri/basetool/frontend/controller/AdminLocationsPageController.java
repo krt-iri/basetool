@@ -22,6 +22,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin location-management page ({@code /admin/locations}).
+ *
+ * <p>Renders the location list (including hidden entries — admins need to see what's hidden to
+ * un-hide it) and toggles individual locations' visibility. Sort is alphabetical case-insensitive
+ * because backend sort treats locale-specific casing inconsistently across PostgreSQL collations.
+ */
 @Controller
 @RequestMapping("/admin/locations")
 @RequiredArgsConstructor
@@ -31,6 +38,14 @@ public class AdminLocationsPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Fetches all locations (one page of size 1000, including hidden), sorts case-insensitively by
+   * name and renders the table. A backend failure puts an error key in the model rather than
+   * blanking the page.
+   *
+   * @param model Thymeleaf model populated with the sorted location list
+   * @return the {@code admin/locations} view name
+   */
   @GetMapping
   public String listData(Model model) {
     try {
@@ -55,6 +70,18 @@ public class AdminLocationsPageController {
     return "admin/locations";
   }
 
+  /**
+   * Toggles a single location's hidden flag.
+   *
+   * <p>Reads the current record first to copy the existing name/description/version into the PUT
+   * body — the backend endpoint expects a full {@link LocationDto}, not a JSON merge patch. A 409
+   * with problem type {@code concurrency-conflict} surfaces as a dedicated optimistic-lock toast.
+   *
+   * @param id location id
+   * @param hidden desired new hidden flag
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/locations}
+   */
   @PostMapping("/{id}/toggle-visibility")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public String toggleLocationVisibility(

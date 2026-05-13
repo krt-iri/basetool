@@ -24,6 +24,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Read-mostly REST surface over the terminal catalog. UEX owns the table; the PUT endpoint is
+ * intentionally narrow — only the {@code hidden} flag flows through, every other field passed in
+ * the body is ignored.
+ */
 @RestController
 @RequestMapping("/api/v1/terminals")
 @RequiredArgsConstructor
@@ -33,6 +38,11 @@ public class TerminalController {
   private final TerminalService terminalService;
   private final TerminalMapper terminalMapper;
 
+  /**
+   * Paged terminal list with whitelist-enforced sort.
+   *
+   * @return paged terminal DTOs
+   */
   @GetMapping
   public PageResponse<TerminalDto> getAllTerminals(
       @RequestParam(required = false) Integer page,
@@ -52,11 +62,26 @@ public class TerminalController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Returns the terminal DTO.
+   *
+   * @param id terminal id
+   * @return the terminal DTO
+   */
   @GetMapping("/{id}")
   public TerminalDto getTerminal(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.getTerminal(id));
   }
 
+  /**
+   * Toggles the terminal's {@code hidden} flag. Only the {@code hidden} field from the body is
+   * applied; everything else is ignored so an admin cannot rename a UEX-imported terminal via this
+   * endpoint.
+   *
+   * @param id terminal id
+   * @param terminalDto request body — only {@code hidden} is read
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public TerminalDto updateTerminal(

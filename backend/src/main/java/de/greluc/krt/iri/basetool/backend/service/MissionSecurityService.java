@@ -18,6 +18,21 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Authorization helper for mission-scoped {@code @PreAuthorize} expressions.
+ *
+ * <p>Methods on this bean are referenced from {@code @PreAuthorize} on controllers and other
+ * services (e.g. {@code @missionSecurityService.canEditFinanceEntry(#id, authentication)}). Each
+ * method translates a "can the caller do X on resource Y" question into a boolean by combining the
+ * caller's authorities with the resource's owner/manager relations. Guest participants (unlinked,
+ * no user account) are deliberately editable by anyone so the mission-join flow stays usable
+ * without authentication — once a participant is linked to a user, only that user (or an elevated
+ * role) can edit them.
+ *
+ * <p>Missing resources translate to {@code NotFoundException} rather than {@code false} so a stale
+ * frontend gets a deterministic 404 instead of an opaque "access denied" for an entity that no
+ * longer exists.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -83,6 +98,20 @@ public class MissionSecurityService {
     return true;
   }
 
+  /**
+   * Authorizes editing or deleting a mission finance entry.
+   *
+   * <p>Grants access to ADMIN / OFFICER unconditionally; otherwise the entry's linked participant
+   * must belong to the calling user AND the user must currently be a registered participant of the
+   * same mission. The "still a participant" check prevents a former participant from editing their
+   * finance entries after they've been removed from the mission.
+   *
+   * @param entryId finance entry id
+   * @param authentication current Spring Security authentication
+   * @return true if the caller may edit the entry
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the entry does not
+   *     exist
+   */
   @Transactional(readOnly = true)
   public boolean canEditFinanceEntry(UUID entryId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -123,6 +152,16 @@ public class MissionSecurityService {
         .isPresent();
   }
 
+  /**
+   * Authorizes any management action on a mission (edit, add/remove participant, …). True when the
+   * caller carries one of the elevated authorities (via the role hierarchy: ADMIN, OFFICER,
+   * MISSION_MANAGER, plus the legacy non-{@code ROLE_}-prefixed equivalents) or is the mission's
+   * owner / a listed co-manager.
+   *
+   * @param missionId mission id
+   * @param authentication current Spring Security authentication
+   * @return true if the caller may manage the mission
+   */
   @Transactional(readOnly = true)
   public boolean canManageMission(UUID missionId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -148,6 +187,16 @@ public class MissionSecurityService {
         .orElse(false);
   }
 
+  /**
+   * Authorizes adding/removing co-managers on a mission. Same elevated-authority surface as {@link
+   * #canManageMission} plus the mission owner / current co-managers. Verbose {@code [DEBUG_LOG]}
+   * lines exist because this is the most common "why was I denied" report — the log tells exactly
+   * which authority check passed or failed for a given user.
+   *
+   * @param missionId mission id
+   * @param authentication current Spring Security authentication
+   * @return true if the caller may edit the manager list
+   */
   @Transactional(readOnly = true)
   public boolean canManageManagers(UUID missionId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -243,6 +292,15 @@ public class MissionSecurityService {
         .orElse(false);
   }
 
+  /**
+   * Returns true if the calling user is the mission's owner or appears in its manager list. Public
+   * helper because both {@code canManage*} methods need the same check and a private variant would
+   * be untestable in isolation.
+   *
+   * @param mission already-loaded mission
+   * @param authentication current Spring Security authentication
+   * @return true if the user owns or co-manages the mission
+   */
   public boolean isOwnerOrManager(Mission mission, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;

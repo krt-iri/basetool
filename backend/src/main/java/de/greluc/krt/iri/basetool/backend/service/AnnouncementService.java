@@ -11,6 +11,13 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages the single shared announcement row.
+ *
+ * <p>The table holds at most one logically active record — public callers see "the latest entry
+ * with non-blank content"; admins see the same record so edits never accumulate duplicates. The
+ * delete endpoint clears the whole table, which lets the next save start clean.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -18,6 +25,13 @@ public class AnnouncementService {
 
   private final AnnouncementRepository announcementRepository;
 
+  /**
+   * Returns the latest announcement with non-blank content, suitable for the home-page banner.
+   * Empty content means "no announcement is currently active" — distinguishes a freshly cleared
+   * announcement from an in-progress draft an admin saved with blank content.
+   *
+   * @return the active announcement, or empty
+   */
   public Optional<Announcement> getPublicAnnouncement() {
     return announcementRepository.findAll().stream()
         .filter(a -> a.getContent() != null && !a.getContent().isBlank())
@@ -26,6 +40,14 @@ public class AnnouncementService {
                 Announcement::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
   }
 
+  /**
+   * Returns the announcement the admin edit screen should load. Prefers the active record so an
+   * empty content does not produce a "blank screen" admin experience; falls back to the latest
+   * record overall (including blanks) so admins reuse the existing row across edits; finally
+   * creates an empty row on first use — saves accumulate-duplicate rows from an unfortunate race.
+   *
+   * @return the admin-view announcement record, never {@code null}
+   */
   public Announcement getAdminAnnouncement() {
     // Try the latest active announcement first; fall back to the latest entry
     // overall (even if its content is empty/null) so admins reuse the existing
@@ -41,6 +63,16 @@ public class AnnouncementService {
                     .orElseGet(() -> announcementRepository.save(new Announcement())));
   }
 
+  /**
+   * Updates the shared announcement with the given content. {@code version} is the optimistic lock
+   * value from the form; {@code null} bypasses the check (used for first-time create).
+   *
+   * @param content new announcement body
+   * @param version expected current version, or {@code null} for unconditional save
+   * @return the persisted announcement
+   * @throws ObjectOptimisticLockingFailureException when the current row's version no longer
+   *     matches the supplied {@code version}
+   */
   @Transactional
   public Announcement updateAnnouncement(@NotNull String content, @Nullable Long version) {
     Announcement announcement = getAdminAnnouncement();
@@ -53,6 +85,10 @@ public class AnnouncementService {
     return announcementRepository.save(announcement);
   }
 
+  /**
+   * Removes every announcement row. The next save creates a fresh row — no soft-delete needed
+   * because there is only ever one logical announcement.
+   */
   @Transactional
   public void deleteAnnouncement() {
     announcementRepository.deleteAll();

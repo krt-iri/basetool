@@ -52,6 +52,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the mission pages ({@code /missions}, {@code /missions/{id}}, {@code
+ * /missions/create}, plus a large surface of mutators for participants, units, crew, managers,
+ * frequencies and the assorted AJAX variants).
+ *
+ * <p>By far the largest controller in the project; missions are the central operational entity and
+ * the detail page serves as the squadron's single coordination surface. The controller exposes both
+ * classic form-post endpoints (with a flash-redirect dance) and AJAX {@code @ResponseBody}
+ * endpoints that mutate the same resources in place — the page uses the AJAX path for in-grid edits
+ * and the form-post path for full-page form submits (modals). Public paths ({@code
+ * addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference} etc.) accept
+ * unauthenticated callers so guests can join missions; the backend then strips sensitive fields
+ * from the response via the {@code cleanupForGuest} helper.
+ */
 @Controller
 @RequestMapping("/missions")
 @RequiredArgsConstructor
@@ -78,6 +92,15 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * Seeds the various form-backing objects the mission-detail template needs (participant, crew,
+   * unit, finance, manager, etc.) when they are not already present in the model. Authenticated
+   * callers additionally get their own user record stuffed into the participant form so the "join
+   * as me" default works without an extra fetch in the template.
+   *
+   * @param model Thymeleaf model populated with the seeded forms
+   * @param principal authenticated OIDC user, or {@code null} for guests
+   */
   public void addFormsToModel(Model model, OidcUser principal) {
     if (!model.containsAttribute("participantForm")) {
       ParticipantForm form =
@@ -137,11 +160,24 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * Web binder configuration scoped to this controller. Registers any custom property editors
+   * needed for the mission forms (currently only the inherited default editors).
+   *
+   * @param binder Spring data binder for the current request
+   */
   @InitBinder
   public void initBinder(WebDataBinder binder) {
     binder.registerCustomEditor(String.class, new StringTrimmerEditor(true));
   }
 
+  /**
+   * Renders the mission list ({@code /missions}). Public endpoint — guests see the full upcoming
+   * mission catalog with sensitive fields stripped by the backend; authenticated callers see the
+   * full record. Pagination + sort follow the standard URL-driven pattern.
+   *
+   * @return the {@code missions-index} view name
+   */
   @GetMapping
   public String listMissions(
       @RequestParam(required = false) String search,
@@ -209,6 +245,15 @@ public class MissionPageController {
     return "missions";
   }
 
+  /**
+   * Renders the mission-detail page ({@code /missions/{id}}). Loads the mission, the finance
+   * entries, the unit/crew/participant hierarchy, the manager list and the frequencies. The heavy
+   * {@code addFormsToModel} call seeds every form-backing object the template needs for the inline
+   * modals so the same controller method serves both fresh renders and post-flash re-renders after
+   * a validation failure.
+   *
+   * @return the {@code mission-detail} view name
+   */
   @GetMapping("/{id}")
   public String missionDetail(
       @PathVariable @NotNull UUID id, Model model, @AuthenticationPrincipal OidcUser principal) {
@@ -480,6 +525,12 @@ public class MissionPageController {
     return "mission-detail";
   }
 
+  /**
+   * Form-post endpoint that adds a participant to a mission. Public endpoint — anyone can join,
+   * authenticated or not (a guest provides a handle, an authenticated user is auto-resolved).
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/participant")
   public String addParticipant(
       @PathVariable @NotNull UUID id,
@@ -530,6 +581,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that marks a participant as checked in. Public for the guest-flow.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/participants/{participantId}/check-in")
   public String checkInParticipant(
       @PathVariable @NotNull UUID id,
@@ -551,6 +607,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that marks a participant as checked out.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/participants/{participantId}/check-out")
   public String checkOutParticipant(
       @PathVariable @NotNull UUID id,
@@ -572,6 +633,12 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * AJAX endpoint that updates a participant's payout preference (target wallet / split rules).
+   * Public so guests can change their own preference on missions they joined unauthenticated.
+   *
+   * @return the updated mission, or the propagated backend status on failure
+   */
   @PostMapping("/{id}/participants/{participantId}/payout-preference")
   @ResponseBody
   public org.springframework.http.ResponseEntity<MissionDto> updatePayoutPreference(
@@ -694,6 +761,11 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * Form-post endpoint that removes a participant from a mission.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/participants/{participantId}/delete")
   public String deleteParticipant(
       @PathVariable @NotNull UUID id,
@@ -712,6 +784,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that edits a participant's metadata (job type, ship type, etc.).
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/participants/{participantId}/update")
   public String updateParticipant(
       @PathVariable @NotNull UUID id,
@@ -769,6 +846,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that adds a unit (team grouping) to the mission.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units")
   @PreAuthorize("isAuthenticated()")
   public String addUnit(
@@ -798,6 +880,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that edits a unit's metadata.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units/{unitId}/update")
   @PreAuthorize("isAuthenticated()")
   public String updateUnit(
@@ -828,6 +915,12 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that removes a unit from the mission. The backend reassigns any participants
+   * in the deleted unit to the default unit so no participant becomes orphaned.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units/{unitId}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteUnit(
@@ -844,6 +937,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that creates a crew (ship-grouping) under a unit.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units/{unitId}/crew")
   @PreAuthorize("isAuthenticated()")
   public String addCrew(
@@ -876,6 +974,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that edits a crew (ship choice, lead participant, etc.).
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units/{unitId}/crew/{crewId}/update")
   @PreAuthorize("isAuthenticated()")
   public String updateCrew(
@@ -911,6 +1014,12 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that removes a crew. Participants assigned to the removed crew fall back to
+   * the unit's default slot.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/units/{unitId}/crew/{crewId}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteCrew(
@@ -929,6 +1038,14 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Renders the mission create form ({@code /missions/create}). Seeds the empty form plus the
+   * reference catalogs (operations, job types, locations) so the dropdowns work.
+   *
+   * @param model Thymeleaf model populated with the form and reference catalogs
+   * @param principal authenticated OIDC user
+   * @return the {@code mission-create} view name
+   */
   @GetMapping("/new")
   @PreAuthorize("isAuthenticated()")
   public String createMissionForm(Model model, @AuthenticationPrincipal OidcUser principal) {
@@ -948,6 +1065,13 @@ public class MissionPageController {
     return "mission-detail";
   }
 
+  /**
+   * Form-post endpoint that persists a new mission. Validation failures re-render the create form
+   * inline (BindingResult stays request-scoped). The page hands the freshly-created mission's id
+   * back via a redirect to its detail page on success.
+   *
+   * @return inline create view on failure, otherwise redirect to {@code /missions/{newId}}
+   */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   public String createMission(
@@ -1019,6 +1143,12 @@ public class MissionPageController {
     return "redirect:/missions";
   }
 
+  /**
+   * Form-post endpoint that persists edits to a mission. Carries the optimistic-lock version
+   * through the form; a 409 surfaces as the dedicated concurrency-conflict toast.
+   *
+   * @return redirect to the mission detail page
+   */
   @PostMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String updateMission(
@@ -1098,6 +1228,13 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that deletes (or cancels) a mission. The backend cascades by detaching
+   * inventory/refinery references rather than hard-deleting them, per the CHANGELOG entry for the
+   * deleteMission change.
+   *
+   * @return redirect to {@code /missions}
+   */
   @PostMapping("/{id}/delete")
   @PreAuthorize("hasRole('ADMIN')")
   public String deleteMission(
@@ -1113,6 +1250,12 @@ public class MissionPageController {
     return "redirect:/missions";
   }
 
+  /**
+   * AJAX endpoint that adds a co-manager to a mission. Co-managers can edit the mission like the
+   * owner; the owner cannot be removed via this endpoint.
+   *
+   * @return 200 on success, propagated backend status on failure
+   */
   @PostMapping("/{id}/managers/{userId}")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> addManager(
@@ -1171,6 +1314,12 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * AJAX endpoint that removes a co-manager. The owner is protected — removing the owner requires
+   * {@link #setMissionOwner} instead.
+   *
+   * @return 200 on success, propagated backend status on failure
+   */
   @DeleteMapping("/{id}/managers/{userId}")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> removeManager(
@@ -1229,6 +1378,12 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * AJAX endpoint that transfers mission ownership to another user. Backend ensures the old owner
+   * stays as a co-manager so they don't lose all access in one click.
+   *
+   * @return 200 on success, propagated backend status on failure
+   */
   @PutMapping("/{id}/owner/{userId}")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> setMissionOwner(
@@ -1289,6 +1444,12 @@ public class MissionPageController {
     }
   }
 
+  /**
+   * Form-post endpoint that creates or updates a frequency entry (radio channel) for the mission.
+   * Same endpoint serves both create and update — the form's id field discriminates.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/frequencies")
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   public String addOrUpdateFrequency(
@@ -1310,6 +1471,11 @@ public class MissionPageController {
     return "redirect:/missions/" + id;
   }
 
+  /**
+   * Form-post endpoint that removes a frequency entry.
+   *
+   * @return redirect to {@code /missions/{id}}
+   */
   @PostMapping("/{id}/frequencies/{frequencyId}/delete")
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   public String deleteFrequency(

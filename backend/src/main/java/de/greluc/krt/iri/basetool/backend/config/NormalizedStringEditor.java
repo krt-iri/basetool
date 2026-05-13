@@ -4,6 +4,16 @@ import java.beans.PropertyEditorSupport;
 import java.text.Normalizer;
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Spring {@link PropertyEditorSupport} that performs the same trim + NFC-normalize + length-cap as
+ * {@link NormalizedStringDeserializer}, but for form-bound (non-JSON) string fields.
+ *
+ * <p>Registered globally via {@link GlobalBindingAdvice} so a controller never has to repeat the
+ * normalization, and so a form post and a JSON post of the same value always reach the database in
+ * the same canonical form. The {@code emptyAsNull} flag controls whether a blank input becomes
+ * {@code null} (the default for write-DTOs) or stays the empty string (rare; only useful when a
+ * client genuinely needs to distinguish "not set" from "explicitly cleared").
+ */
 @RequiredArgsConstructor
 public class NormalizedStringEditor extends PropertyEditorSupport {
 

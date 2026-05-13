@@ -23,6 +23,20 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * CRUD plus completion (store) for refinery orders.
+ *
+ * <p>A refinery order tracks a player's ore-to-refined-good run at a specific terminal: input
+ * materials and quantities, refining method, expected output, expenses and sale proceeds. The
+ * service enforces "owner can edit / logistician can edit anyone" at the method boundary because
+ * the rule is per-resource (the role-only check in {@code @PreAuthorize} can't see the order's
+ * owner). The {@code store} operation finalizes a completed order by creating inventory items for
+ * each output material and clearing the order's open status.
+ *
+ * <p>Location validation: refinery orders can only target locations that actually host a refinery.
+ * The check runs at create + update time so a stale location pick surfaces as a 400 with a
+ * localized message instead of silently producing an unreachable order.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -37,6 +51,14 @@ public class RefineryOrderService {
   private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
 
+  /**
+   * Owner-scoped paged list with optional status filter.
+   *
+   * @param userId owner id
+   * @param statuses optional status filter; null/empty means "all statuses"
+   * @param pageable page request
+   * @return paged orders owned by the user
+   */
   public Page<RefineryOrder> getMyRefineryOrders(
       @NotNull UUID userId,
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
@@ -47,19 +69,47 @@ public class RefineryOrderService {
     return refineryOrderRepository.findByOwnerId(userId, pageable);
   }
 
+  /**
+   * Convenience overload without status filter.
+   *
+   * @param userId owner id
+   * @param pageable page request
+   * @return paged orders owned by the user
+   */
   public Page<RefineryOrder> getMyRefineryOrders(@NotNull UUID userId, @NotNull Pageable pageable) {
     return refineryOrderRepository.findByOwnerId(userId, pageable);
   }
 
+  /**
+   * Lists all refinery orders linked to a mission (used by the mission finance roll-up).
+   *
+   * @param missionId mission id
+   * @return all linked orders
+   */
   public List<RefineryOrder> getMissionRefineryOrders(@NotNull UUID missionId) {
     return refineryOrderRepository.findByMissionId(missionId);
   }
 
+  /**
+   * Lists the orders that BOTH belong to the given mission AND are owned by the given user. Used by
+   * the participant-scoped mission detail view so participants only see their own refinery lines.
+   *
+   * @param missionId mission id
+   * @param userId owner id
+   * @return matching orders
+   */
   public List<RefineryOrder> getMissionRefineryOrders(
       @NotNull UUID missionId, @NotNull UUID userId) {
     return refineryOrderRepository.findByMissionIdAndOwnerId(missionId, userId);
   }
 
+  /**
+   * Squadron-wide paged list with optional status filter (admin/logistician view).
+   *
+   * @param statuses optional status filter
+   * @param pageable page request
+   * @return paged orders across all users
+   */
   public Page<RefineryOrder> getAllRefineryOrders(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       @NotNull Pageable pageable) {
@@ -69,10 +119,23 @@ public class RefineryOrderService {
     return refineryOrderRepository.findAll(pageable);
   }
 
+  /**
+   * Convenience overload without status filter.
+   *
+   * @param pageable page request
+   * @return paged orders across all users
+   */
   public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
     return refineryOrderRepository.findAll(pageable);
   }
 
+  /**
+   * Returns the order.
+   *
+   * @param id refinery order primary key
+   * @return the order
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   public RefineryOrder getRefineryOrder(@NotNull UUID id) {
     return refineryOrderRepository
         .findById(id)
@@ -82,6 +145,20 @@ public class RefineryOrderService {
                     "error.refinery_order.not_found"));
   }
 
+  /**
+   * Persists a new refinery order owned by the given user. Resolves and validates every shallow
+   * reference in the payload (location, mission, refining method, materials in goods) and rejects
+   * with 404 / 400 if any id is missing or unknown. The location must host a refinery — picking a
+   * regular city is rejected explicitly.
+   *
+   * @param userId owner id
+   * @param order transient entity with shallow id-only references
+   * @return the persisted order
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
+   *     is unknown
+   * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the chosen
+   *     location does not host a refinery
+   */
   @Transactional
   public RefineryOrder createRefineryOrder(@NotNull UUID userId, @NotNull RefineryOrder order) {
     User user =
@@ -212,6 +289,16 @@ public class RefineryOrderService {
     return value == 0.0 ? null : value;
   }
 
+  /**
+   * Updates an existing refinery order. Enforces "must be owner OR logistician" explicitly (the
+   * role-only {@code @PreAuthorize} cannot see per-resource ownership). Validates the
+   * optimistic-lock version and the same shallow-reference resolution as {@link
+   * #createRefineryOrder}. The goods list is replaced wholesale; the old rows are orphan-removed.
+   *
+   * @throws AccessDeniedException when the caller is neither owner nor logistician
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale
+   */
   @Transactional
   public RefineryOrder updateRefineryOrder(
       @NotNull UUID userId,
@@ -340,6 +427,12 @@ public class RefineryOrderService {
     return refineryOrderRepository.save(order);
   }
 
+  /**
+   * Cancels (soft-deletes) a refinery order. Same owner-vs-logistician gate as {@link
+   * #updateRefineryOrder}.
+   *
+   * @throws AccessDeniedException when the caller is not allowed to delete this order
+   */
   @Transactional
   public void deleteRefineryOrder(
       @NotNull UUID userId, @NotNull UUID orderId, boolean isLogistician) {
@@ -356,6 +449,20 @@ public class RefineryOrderService {
     refineryOrderRepository.save(order);
   }
 
+  /**
+   * Completes a refinery order by creating inventory items for each output material.
+   *
+   * <p>The refinery rounding mode setting controls how fractional output quantities are rounded
+   * (see {@code SystemSettingService}). Each output material becomes one inventory row owned by the
+   * configured recipient (typically the order's owner, optionally redirected to a different user /
+   * job order from the store form).
+   *
+   * @throws AccessDeniedException when the caller is neither owner nor logistician
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the order or any
+   *     referenced id is unknown
+   * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the order is
+   *     already stored or has no output goods
+   */
   @Transactional
   public void storeRefineryOrder(
       @NotNull UUID userId,
@@ -503,12 +610,12 @@ public class RefineryOrderService {
       }
 
       double amount = itemDto.amount();
-      String quantityType =
+      String quantityTypeName =
           good.getOutputMaterial().getQuantityType() != null
               ? good.getOutputMaterial().getQuantityType().name()
               : null;
       long rawNew;
-      if ("SCU".equals(quantityType)) {
+      if ("SCU".equals(quantityTypeName)) {
         rawNew = Math.round(amount * 100.0d);
       } else {
         rawNew = Math.round(amount);

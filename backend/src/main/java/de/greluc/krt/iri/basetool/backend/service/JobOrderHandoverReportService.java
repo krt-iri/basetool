@@ -179,11 +179,11 @@ public class JobOrderHandoverReportService {
 
       // Orange separator line
       PdfContentByte cb = writer.getDirectContent();
-      float verticalPos = writer.getVerticalPosition(false);
+      float ypos = writer.getVerticalPosition(false);
       cb.setColorStroke(COLOR_ORANGE);
       cb.setLineWidth(0.5f);
-      cb.moveTo(40, verticalPos);
-      cb.lineTo(PageSize.A4.getWidth() - 40, verticalPos);
+      cb.moveTo(40, ypos);
+      cb.lineTo(PageSize.A4.getWidth() - 40, ypos);
       cb.stroke();
 
       document.add(new Paragraph(" ", new Font(Font.HELVETICA, 6)));
@@ -356,10 +356,9 @@ public class JobOrderHandoverReportService {
           float logoWidth = logo.getWidth() * scale;
           float margin = 20f;
           logo.scaleAbsolute(logoWidth, logoHeight);
+          // Position above the bottom orange bar
           logo.setAbsolutePosition(
-              PageSize.A4.getWidth() - logoWidth - margin,
-              // above the bottom orange bar
-              margin + 4f);
+              PageSize.A4.getWidth() - logoWidth - margin, margin + 4f);
           canvas.addImage(logo);
         } else {
           log.warn("staffel_iridium.png not found in classpath");

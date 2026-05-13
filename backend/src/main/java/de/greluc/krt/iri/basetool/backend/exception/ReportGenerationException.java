@@ -16,10 +16,23 @@ package de.greluc.krt.iri.basetool.backend.exception;
  */
 public class ReportGenerationException extends RuntimeException {
 
+  /**
+   * Creates a {@code ReportGenerationException} with a description of the report-pipeline failure.
+   *
+   * @param message human-readable summary of the report failure for server logging
+   */
   public ReportGenerationException(String message) {
     super(message);
   }
 
+  /**
+   * Creates a {@code ReportGenerationException} that wraps the original failure (typically an
+   * {@code IOException} from the PDF/CSV library). The cause is preserved for the server log; the
+   * client receives a localized generic detail.
+   *
+   * @param message human-readable summary of the report failure for server logging
+   * @param cause underlying library or I/O failure
+   */
   public ReportGenerationException(String message, Throwable cause) {
     super(message, cause);
   }

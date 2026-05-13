@@ -27,6 +27,19 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * CRUD plus aggregation for mission finance entries (income / expense rows attached to a
+ * participant).
+ *
+ * <p>The total-sum aggregation also folds in the profit/loss of refinery orders linked to the
+ * mission (ore sales minus expenses minus other expenses). Refinery orders surface here because the
+ * mission finance page is the single source of truth for a mission's bottom line — splitting
+ * refinery-derived profit into its own page would force users to mentally combine two numbers.
+ *
+ * <p>Update and delete are gated by {@code @PreAuthorize} on {@link
+ * MissionSecurityService#canEditFinanceEntry} — admins/officers can edit any entry, the
+ * participant's user can edit only their own.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,11 +54,26 @@ public class MissionFinanceEntryService {
       refineryOrderRepository;
   private final MissionMapper missionMapper;
 
+  /**
+   * Returns paged finance entries for the mission.
+   *
+   * @param missionId mission id
+   * @param pageable page request
+   * @return paged finance entries for the mission
+   */
   @Transactional(readOnly = true)
   public Page<MissionFinanceEntryDto> getEntriesByMission(UUID missionId, Pageable pageable) {
     return financeEntryRepository.findAllByMissionId(missionId, pageable).map(missionMapper::toDto);
   }
 
+  /**
+   * Aggregated bottom line for a mission: finance entries (income minus expense) plus refinery
+   * order profit. Legacy refinery rows with null sales/expenses are treated as 0 — early data
+   * pre-dates the column.
+   *
+   * @param missionId mission id
+   * @return signed total in mission credits
+   */
   @Transactional(readOnly = true)
   public BigDecimal calculateTotalSum(UUID missionId) {
     List<MissionFinanceEntry> entries = financeEntryRepository.findAllByMissionId(missionId);
@@ -74,6 +102,16 @@ public class MissionFinanceEntryService {
     return total;
   }
 
+  /**
+   * Creates a finance entry. The participant must belong to the named mission; mismatched
+   * participant + mission pair surfaces as a 400 {@link BadRequestException} rather than a 500 —
+   * distinguishes "bad inputs" from "server bug" for client error handling.
+   *
+   * @param dto create payload
+   * @return the persisted entry
+   * @throws NotFoundException when the mission or participant id does not resolve
+   * @throws BadRequestException when the participant belongs to a different mission
+   */
   @Transactional
   public MissionFinanceEntryDto createEntry(MissionFinanceEntryCreateDto dto) {
     Mission mission =
@@ -102,6 +140,18 @@ public class MissionFinanceEntryService {
     return missionMapper.toDto(entry);
   }
 
+  /**
+   * Updates an existing finance entry. Optimistic-lock check is explicit (the DTO carries the
+   * expected version) and surfaces as {@link BusinessConflictException} → 409 rather than Spring's
+   * automatic {@code ObjectOptimisticLockingFailureException}: this entity is only mutated through
+   * this service, so explicit checks keep the error path readable.
+   *
+   * @param entryId finance entry id
+   * @param dto update payload (carries the expected version)
+   * @return the persisted entry
+   * @throws NotFoundException when the entry does not exist
+   * @throws BusinessConflictException when the supplied version no longer matches
+   */
   @Transactional
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
   public MissionFinanceEntryDto updateEntry(UUID entryId, MissionFinanceEntryUpdateDto dto) {
@@ -124,6 +174,12 @@ public class MissionFinanceEntryService {
     return missionMapper.toDto(entry);
   }
 
+  /**
+   * Deletes a finance entry.
+   *
+   * @param entryId finance entry id
+   * @throws NotFoundException when the entry does not exist
+   */
   @Transactional
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
   public void deleteEntry(UUID entryId) {

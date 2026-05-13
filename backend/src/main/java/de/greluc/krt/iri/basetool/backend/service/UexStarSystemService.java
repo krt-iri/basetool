@@ -10,6 +10,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Imports the UEX star-system catalog.
+ *
+ * <p>Lookup priority: UEX {@code id_system}, then by name (legacy migration path for systems that
+ * pre-date the {@code id_system} column). Unknown systems are auto-created with a fallback name so
+ * the universe sync stays self-healing. Per-field dirty checking minimizes write traffic — only
+ * rows that actually changed get persisted.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -18,6 +26,10 @@ public class UexStarSystemService {
   private final UexClient uexClient;
   private final StarSystemRepository starSystemRepository;
 
+  /**
+   * Pulls the star-system catalog and upserts each row. Empty UEX response short-circuits without
+   * wiping local data.
+   */
   @Transactional
   public void fetchAndProcessStarSystems() {
     log.info("Starting synchronization of UEX star systems...");

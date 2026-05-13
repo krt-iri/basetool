@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the material-category reference table. Read is public; mutations are
+ * ADMIN/OFFICER only.
+ */
 @RestController
 @RequestMapping("/api/v1/material-categories")
 @RequiredArgsConstructor
@@ -26,16 +30,33 @@ public class MaterialCategoryController {
   private final MaterialCategoryService service;
   private final MaterialCategoryMapper mapper;
 
+  /**
+   * Returns all categories sorted alphabetically.
+   *
+   * @return all categories sorted alphabetically
+   */
   @GetMapping
   public List<MaterialCategoryDto> getAll() {
     return service.findAll().stream().map(mapper::toDto).collect(Collectors.toList());
   }
 
+  /**
+   * Returns the category DTO.
+   *
+   * @param id category id
+   * @return the category DTO
+   */
   @GetMapping("/{id}")
   public MaterialCategoryDto getById(@PathVariable UUID id) {
     return mapper.toDto(service.findById(id));
   }
 
+  /**
+   * Creates a new category.
+   *
+   * @param dto create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
@@ -44,6 +65,13 @@ public class MaterialCategoryController {
     return mapper.toDto(saved);
   }
 
+  /**
+   * Updates an existing category.
+   *
+   * @param id category id
+   * @param dto update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public MaterialCategoryDto update(@PathVariable UUID id, @RequestBody MaterialCategoryDto dto) {
@@ -52,6 +80,11 @@ public class MaterialCategoryController {
     return mapper.toDto(updated);
   }
 
+  /**
+   * Deletes a category. Rejected with 409 when any material still references it.
+   *
+   * @param id category id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public void delete(@PathVariable UUID id) {

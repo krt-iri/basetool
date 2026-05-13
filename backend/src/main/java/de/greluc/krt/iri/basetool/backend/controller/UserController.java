@@ -27,6 +27,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the local {@code app_user} mirror. The {@code /me} endpoints derive the user id
+ * from the JWT — never from the URL — so a caller can never impersonate another user via this path.
+ * {@code /attributes}, the logistician/mission-manager toggles and {@code DELETE} are admin-scoped.
+ */
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
@@ -39,6 +44,12 @@ public class UserController {
   private final UserService userService;
   private final UserMapper userMapper;
 
+  /**
+   * Paged user list. Open to every authenticated member because the participant pickers in the
+   * mission editor consume it.
+   *
+   * @return paged user DTOs
+   */
   @GetMapping
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
@@ -59,6 +70,11 @@ public class UserController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Lightweight typeahead projection (id + username + displayName).
+   *
+   * @return all users as reference DTOs
+   */
   @GetMapping("/lookup")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
@@ -66,6 +82,11 @@ public class UserController {
     return userService.findAllReference();
   }
 
+  /**
+   * Paged username/displayName substring search.
+   *
+   * @return paged user DTOs
+   */
   @GetMapping("/search")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
@@ -88,6 +109,12 @@ public class UserController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Returns the user DTO.
+   *
+   * @param id user id
+   * @return the user DTO
+   */
   @GetMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
@@ -95,12 +122,24 @@ public class UserController {
     return userMapper.toDto(userService.findById(id));
   }
 
+  /**
+   * Returns the calling user's own record (derived from the JWT subject).
+   *
+   * @return the user DTO
+   */
   @GetMapping("/me")
   @Transactional(readOnly = true)
   public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
     return userMapper.toDto(userService.findById(userService.getUserIdFromJwt(jwt)));
   }
 
+  /**
+   * Updates the calling user's own description + displayName. The JWT identifies the row — no
+   * impersonation possible.
+   *
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/me/description")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateMyDescription(
@@ -114,6 +153,12 @@ public class UserController {
             request.getVersion()));
   }
 
+  /**
+   * Records that the calling user has read the given announcement (clears the unread badge).
+   *
+   * @param announcementId announcement just read
+   * @return the persisted DTO
+   */
   @PutMapping("/me/read-announcement/{announcementId}")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateReadAnnouncement(
@@ -122,6 +167,15 @@ public class UserController {
         userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId));
   }
 
+  /**
+   * Admin/officer-only: edits an arbitrary user's attributes (rank, description, displayName,
+   * joinDate). Carries optimistic-lock version in the body so concurrent admin edits surface a 409
+   * instead of silently overwriting.
+   *
+   * @param id user id
+   * @param request typed body (NOT query params — keeps user values out of access logs)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/attributes")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public UserDto updateUserAttributes(
@@ -137,6 +191,10 @@ public class UserController {
             request.getJoinDate()));
   }
 
+  /**
+   * Flips the {@code is_logistician} flag. The JWT-to-authorities converter promotes the flag to
+   * {@code ROLE_LOGISTICIAN} on the next authentication.
+   */
   @PatchMapping("/{id}/logistician")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public UserDto updateLogisticianStatus(
@@ -144,6 +202,7 @@ public class UserController {
     return userMapper.toDto(userService.updateLogisticianStatus(id, isLogistician));
   }
 
+  /** Flips the {@code is_mission_manager} flag (mirrors {@link #updateLogisticianStatus}). */
   @PatchMapping("/{id}/mission-manager")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public UserDto updateMissionManagerStatus(
@@ -151,12 +210,19 @@ public class UserController {
     return userMapper.toDto(userService.updateMissionManagerStatus(id, isMissionManager));
   }
 
+  /**
+   * ADMIN-only: deletes a user account along with all owned data (ships, inventory, refinery
+   * orders, mission memberships).
+   *
+   * @param id user id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   public void deleteUser(@PathVariable @NotNull UUID id) {
     userService.deleteUser(id);
   }
 
+  /** Body for {@link #updateUserAttributes}. */
   @lombok.Data
   public static class UserAttributesRequest {
     @jakarta.validation.constraints.NotNull private Integer rank;
@@ -166,6 +232,7 @@ public class UserController {
     @org.jetbrains.annotations.Nullable private LocalDate joinDate;
   }
 
+  /** Body for {@link #updateMyDescription}. */
   @lombok.Data
   public static class UserDescriptionRequest {
     private String description;

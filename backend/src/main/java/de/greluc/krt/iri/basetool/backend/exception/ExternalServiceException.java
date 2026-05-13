@@ -17,10 +17,24 @@ package de.greluc.krt.iri.basetool.backend.exception;
  */
 public class ExternalServiceException extends RuntimeException {
 
+  /**
+   * Creates an {@code ExternalServiceException} with a description of the upstream problem.
+   *
+   * @param message human-readable summary; will be replaced by a localized generic detail before
+   *     reaching the client
+   */
   public ExternalServiceException(String message) {
     super(message);
   }
 
+  /**
+   * Creates an {@code ExternalServiceException} that wraps the original failure (network exception,
+   * {@code WebClientResponseException}, …). The cause is logged server-side; the client receives a
+   * generic localized detail to avoid leaking upstream implementation details.
+   *
+   * @param message human-readable summary for the server log
+   * @param cause underlying upstream failure
+   */
   public ExternalServiceException(String message, Throwable cause) {
     super(message, cause);
   }

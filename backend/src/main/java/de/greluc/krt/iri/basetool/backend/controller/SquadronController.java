@@ -26,6 +26,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the squadron reference table. Mutations are OFFICER/ADMIN; activate is
+ * ADMIN-only.
+ */
 @RestController
 @RequestMapping("/api/v1/squadrons")
 @RequiredArgsConstructor
@@ -37,6 +41,11 @@ public class SquadronController {
   private final SquadronService squadronService;
   private final SquadronMapper squadronMapper;
 
+  /**
+   * Paged list with {@code includeInactive} for the admin view.
+   *
+   * @return paged squadron DTOs
+   */
   @GetMapping
   public PageResponse<SquadronDto> getAllSquadrons(
       @RequestParam(required = false) Integer page,
@@ -55,12 +64,25 @@ public class SquadronController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Creates a new squadron. Duplicate name → 409.
+   *
+   * @param squadron create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
   }
 
+  /**
+   * Updates a squadron. Carries optimistic-lock version in the DTO body.
+   *
+   * @param id squadron id
+   * @param squadron update payload
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public SquadronDto updateSquadron(
@@ -68,12 +90,22 @@ public class SquadronController {
     return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
   }
 
+  /**
+   * Soft-deletes a squadron.
+   *
+   * @param id squadron id
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
   public void deleteSquadron(@PathVariable @NotNull UUID id) {
     squadronService.deleteSquadron(id);
   }
 
+  /**
+   * Reverses a soft-delete. ADMIN-only.
+   *
+   * @param id squadron id
+   */
   @PostMapping("/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
   public void activateSquadron(@PathVariable @NotNull UUID id) {

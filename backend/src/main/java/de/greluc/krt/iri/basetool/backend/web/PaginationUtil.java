@@ -8,10 +8,37 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+/**
+ * Static helpers that translate query-string pagination parameters into a Spring Data {@link
+ * Pageable} while enforcing the project's invariants: every list endpoint sorts against a fixed
+ * whitelist (no user-supplied JPA paths), every page request gets {@code id} appended as a
+ * tiebreaker so pages remain stable, and the {@code size} parameter is clamped so a single request
+ * cannot pin the database with an unbounded fetch.
+ */
 public final class PaginationUtil {
 
   private PaginationUtil() {}
 
+  /**
+   * Builds a {@link Pageable} from raw query parameters.
+   *
+   * <p>{@code page} defaults to 0 and is clamped to a non-negative value. {@code size} defaults to
+   * 50 and is clamped to {@code [1, 100000]}. {@code sort} is parsed as a semicolon-separated list
+   * of {@code field,asc|desc} tokens; unknown fields cause an {@link IllegalArgumentException}
+   * which the global error handler maps to a 400. If {@code id} is whitelisted but not already in
+   * the sort, it is appended as a tiebreaker so two equal primary-sort rows always come back in a
+   * deterministic order across pages.
+   *
+   * @param pageParam zero-based page index, may be {@code null}
+   * @param sizeParam page size, may be {@code null}
+   * @param sortParam raw {@code sort} query parameter, may be {@code null} or blank
+   * @param allowedSortFields whitelist of sortable field names (must include {@code
+   *     defaultSortField})
+   * @param defaultSortField fallback field used when {@code sortParam} is null/blank
+   * @return a {@link Pageable} ready to hand to a repository
+   * @throws IllegalArgumentException when {@code sortParam} contains a field not in {@code
+   *     allowedSortFields}
+   */
   public static Pageable createPageRequest(
       Integer pageParam,
       Integer sizeParam,
@@ -66,6 +93,14 @@ public final class PaginationUtil {
     return Sort.by(orders);
   }
 
+  /**
+   * Renders a {@link Sort} back into the {@code field,direction} string form that the controllers
+   * echo into the {@code PageResponse.sort} field, so the client receives the same syntax it sent
+   * in and can reuse it verbatim on the next page request.
+   *
+   * @param sort sort object as built by {@link #createPageRequest}
+   * @return list of {@code field,asc|desc} tokens in declaration order
+   */
   public static List<String> toSortStrings(Sort sort) {
     return sort.stream()
         .map(o -> o.getProperty() + "," + o.getDirection().name().toLowerCase())

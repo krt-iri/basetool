@@ -9,6 +9,16 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Caffeine-backed Spring cache manager for the project's reference-data caches.
+ *
+ * <p>Every cache has the same policy ({@code maximumSize=1000}, {@code expireAfterWrite=2m},
+ * statistics recording on). 2&nbsp;minutes is short enough that admin edits in Keycloak / the
+ * master-data screens become visible without manual cache eviction and long enough to amortize the
+ * cost of the catalog lookups that fire on every list-page render. {@code setAllowNullValues=false}
+ * forces services to never store {@code null} — a missed lookup must remain a miss so the next call
+ * retries instead of caching the absence.
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {
@@ -24,6 +34,14 @@ public class CacheConfig {
   public static final String SHIP_TYPES_CACHE = "shipTypes";
   public static final String STAR_SYSTEMS_CACHE = "starSystems";
 
+  /**
+   * Builds the shared {@link CacheManager} with the project's standard Caffeine policy and the
+   * fixed set of named caches above. Cache names are referenced from the {@code @Cacheable}
+   * annotations on the service layer; an unknown name throws at startup rather than silently
+   * creating a new cache.
+   *
+   * @return configured Caffeine cache manager
+   */
   @Bean
   public CacheManager cacheManager() {
     Caffeine<Object, Object> builder =

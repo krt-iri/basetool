@@ -87,7 +87,7 @@ public class BackendServiceException extends RuntimeException {
           return pd.getTitle();
         }
       } catch (Exception ignored) {
-        // RFC7807 body could not be parsed - fall through to the raw message.
+        // ProblemDetail body not present or unparseable — fall through to default message
       }
     }
     return String.valueOf(getMessage());
@@ -110,7 +110,7 @@ public class BackendServiceException extends RuntimeException {
           return type;
         }
       } catch (Exception ignored) {
-        // RFC7807 body could not be parsed - no problem type available.
+        // ProblemDetail body not present or unparseable — return null
       }
     }
     return null;

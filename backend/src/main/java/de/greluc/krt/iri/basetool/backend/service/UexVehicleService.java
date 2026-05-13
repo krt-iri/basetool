@@ -14,6 +14,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+/**
+ * Imports the UEX vehicle catalog into local {@code ship_type} rows.
+ *
+ * <p>Each UEX vehicle is upserted by case-insensitive name; the manufacturer is resolved from
+ * {@code companyName} via case-insensitive lookup in {@link
+ * de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository} (missing manufacturer means
+ * we keep whatever was previously linked rather than nulling the FK). The description is a
+ * synthesized multi-line summary (full name / SCU / crew / wiki|store URL).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +32,10 @@ public class UexVehicleService {
   private final ShipTypeRepository shipTypeRepository;
   private final ManufacturerRepository manufacturerRepository;
 
+  /**
+   * Pulls the UEX vehicle catalog and upserts each row. Empty response short-circuits without
+   * wiping local data.
+   */
   @Transactional
   public void syncVehicles() {
     log.info("Starting synchronization of UEX vehicles (ships)...");

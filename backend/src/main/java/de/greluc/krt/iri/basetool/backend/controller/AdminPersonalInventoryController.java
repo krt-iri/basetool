@@ -48,6 +48,12 @@ public class AdminPersonalInventoryController {
 
   private final PersonalInventoryItemService service;
 
+  /**
+   * Lists a target user's personal-inventory items.
+   *
+   * @param userSub target user's Keycloak {@code sub}
+   * @return paged response DTOs
+   */
   @GetMapping("/{userSub}")
   @Operation(summary = "List a specific user's personal inventory entries.")
   @ApiResponses({
@@ -71,6 +77,13 @@ public class AdminPersonalInventoryController {
     return PersonalInventoryController.toPageResponse(result);
   }
 
+  /**
+   * Creates an item on behalf of the target user.
+   *
+   * @param userSub target user's Keycloak {@code sub}
+   * @param request create payload
+   * @return the persisted DTO
+   */
   @PostMapping("/{userSub}")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a personal inventory entry on behalf of the given user.")
@@ -86,6 +99,13 @@ public class AdminPersonalInventoryController {
     return service.createForUser(userSub, request);
   }
 
+  /**
+   * Updates any personal-inventory item by id (admins are trusted to know the id).
+   *
+   * @param id item id
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/items/{id}")
   @Operation(summary = "Update any personal inventory entry by id.")
   @ApiResponses({
@@ -100,6 +120,11 @@ public class AdminPersonalInventoryController {
     return service.updateForUser(id, request);
   }
 
+  /**
+   * Deletes any personal-inventory item by id. Owner sub is logged at INFO for the audit trail.
+   *
+   * @param id item id
+   */
   @DeleteMapping("/items/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete any personal inventory entry by id.")

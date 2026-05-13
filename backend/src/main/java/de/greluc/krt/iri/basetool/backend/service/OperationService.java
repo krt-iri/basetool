@@ -14,6 +14,18 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * CRUD plus payout computation for the {@code operation} aggregate (one or more missions grouped
+ * under a single umbrella).
+ *
+ * <p>Deletion intentionally does NOT cascade to missions — the missions stay alive as
+ * operation-less rows so their participant / inventory / refinery history survives. The operation
+ * table is small; no caching here, every method goes through the repository directly.
+ *
+ * <p>The status transition uses the state machine declared on {@code OperationStatus}; admins can
+ * override the gate via {@code canOverrideStatus=true} (resolved at the controller boundary from
+ * the {@code Authentication}).
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -21,11 +33,24 @@ public class OperationService {
 
   private final OperationRepository operationRepository;
 
+  /**
+   * Returns paged operation list.
+   *
+   * @param pageable page request
+   * @return paged operation list
+   */
   @Transactional(readOnly = true)
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
     return operationRepository.findAll(pageable);
   }
 
+  /**
+   * Returns the operation.
+   *
+   * @param id operation primary key
+   * @return the operation
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   @Transactional(readOnly = true)
   public Operation getOperationById(@NotNull UUID id) {
     return operationRepository
@@ -36,11 +61,28 @@ public class OperationService {
                     "Operation not found"));
   }
 
+  /**
+   * Persists a new operation.
+   *
+   * @param operation transient entity
+   * @return the persisted operation
+   */
   @Transactional
   public Operation createOperation(@NotNull Operation operation) {
     return operationRepository.save(operation);
   }
 
+  /**
+   * Updates an existing operation. Validates the optimistic-lock version and the status state
+   * machine (unless the caller has the admin override).
+   *
+   * @param id operation primary key
+   * @param updateDto update payload (carries the expected version + new status)
+   * @param canOverrideStatus when true, the state-machine check is bypassed (admin/officer)
+   * @return the persisted operation
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   * @throws BadRequestException when the status transition is invalid and override is not granted
+   */
   @Transactional
   public Operation updateOperation(
       @NotNull UUID id, @NotNull OperationUpdateDto updateDto, boolean canOverrideStatus) {
@@ -71,6 +113,18 @@ public class OperationService {
     return operationRepository.save(operation);
   }
 
+  /**
+   * Deletes an operation without deleting its missions.
+   *
+   * <p>Each linked mission has its {@code operation} reference cleared (Hibernate dirty-checking
+   * emits a single {@code UPDATE} per mission). The in-memory collection is cleared explicitly so
+   * the bidirectional state stays consistent inside the transaction; the operation row is then
+   * removed. Participants, finance entries, inventory items and refinery orders of the underlying
+   * missions are untouched — this delete is purely a "ungroup" action.
+   *
+   * @param id operation primary key
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   @Transactional
   public void deleteOperation(@NotNull UUID id) {
     log.info("Deleting operation with ID: {}", id);
@@ -95,6 +149,25 @@ public class OperationService {
     log.info("Successfully deleted operation with ID: {}", id);
   }
 
+  /**
+   * Computes the per-participant time-share of an operation for payout splitting.
+   *
+   * <p>For each mission with valid {@code actualStartTime}/{@code actualEndTime}, the method
+   * iterates participants and accumulates the duration of their attendance clamped to the mission
+   * window. The percentage is the participant's clamped time divided by the operation's total
+   * clamped time. {@link de.greluc.krt.iri.basetool.backend.model.PayoutPreference} {@code DONATE}
+   * sticks once chosen (a single DONATE preference across all missions of the operation marks the
+   * participant as donating). Output is sorted alphabetically.
+   *
+   * <p>Uses {@link OperationRepository#findWithMissionsAndParticipantsById} with an explicit
+   * {@code @EntityGraph} so the loop's {@code .getMissions()/.getParticipants()/.getUser()} never
+   * trigger lazy SELECTs — would otherwise be {@code 1 + N + N*M} round trips for {@code N}
+   * missions × {@code M} participants each.
+   *
+   * @param id operation primary key
+   * @return per-participant payout shares, sorted by participant name
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
+   */
   @Transactional(readOnly = true)
   public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto>
       getOperationPayouts(@NotNull UUID id) {
@@ -125,27 +198,27 @@ public class OperationService {
 
       for (de.greluc.krt.iri.basetool.backend.model.MissionParticipant p :
           mission.getParticipants()) {
-        String participantKey =
+        String participantId =
             p.getUser() != null
                 ? p.getUser().getId().toString()
                 : (p.getGuestName() != null ? "guest_" + p.getGuestName() : null);
-        if (participantKey == null) {
+        if (participantId == null) {
           continue;
         }
 
         String participantName =
             p.getUser() != null ? p.getUser().getEffectiveName() : p.getGuestName();
-        participantNames.putIfAbsent(participantKey, participantName);
+        participantNames.putIfAbsent(participantId, participantName);
 
         de.greluc.krt.iri.basetool.backend.model.PayoutPreference currentPref =
             preferences.getOrDefault(
-                participantKey, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.PAYOUT);
+                participantId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.PAYOUT);
         if (p.getPayoutPreference()
             == de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE) {
           preferences.put(
-              participantKey, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE);
+              participantId, de.greluc.krt.iri.basetool.backend.model.PayoutPreference.DONATE);
         } else {
-          preferences.putIfAbsent(participantKey, currentPref);
+          preferences.putIfAbsent(participantId, currentPref);
         }
 
         java.time.Instant participantStart = p.getStartTime();
@@ -164,7 +237,7 @@ public class OperationService {
         if (effectiveEnd.isAfter(effectiveStart)) {
           long duration = java.time.Duration.between(effectiveStart, effectiveEnd).toMillis();
           validDurations.put(
-              participantKey, validDurations.getOrDefault(participantKey, 0L) + duration);
+              participantId, validDurations.getOrDefault(participantId, 0L) + duration);
           totalOperationValidDuration += duration;
         }
       }
@@ -172,8 +245,8 @@ public class OperationService {
 
     java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> result =
         new java.util.ArrayList<>();
-    for (String participantKey : participantNames.keySet()) {
-      long duration = validDurations.getOrDefault(participantKey, 0L);
+    for (String participantId : participantNames.keySet()) {
+      long duration = validDurations.getOrDefault(participantId, 0L);
       double percentage =
           totalOperationValidDuration > 0
               ? (double) duration / totalOperationValidDuration * 100.0
@@ -182,10 +255,10 @@ public class OperationService {
       percentage = Math.round(percentage * 100.0) / 100.0;
       result.add(
           new de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto(
-              participantKey,
-              participantNames.get(participantKey),
+              participantId,
+              participantNames.get(participantId),
               percentage,
-              preferences.get(participantKey)));
+              preferences.get(participantId)));
     }
 
     result.sort(

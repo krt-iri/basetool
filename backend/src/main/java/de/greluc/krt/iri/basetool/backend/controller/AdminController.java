@@ -28,6 +28,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the global admin pages — role permissions and arbitrary-user attribute edits.
+ * ADMIN-only at the class level.
+ */
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
@@ -40,6 +44,11 @@ public class AdminController {
   private final RoleMapper roleMapper;
   private final UserMapper userMapper;
 
+  /**
+   * Returns paged role list with whitelist-enforced sort.
+   *
+   * @return paged role list with whitelist-enforced sort
+   */
   @GetMapping("/roles")
   public PageResponse<RoleDto> getAllRoles(
       @RequestParam(required = false) Integer page,
@@ -58,18 +67,42 @@ public class AdminController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Replaces the permission set of a role. Permissions are re-read on every JWT authentication so
+   * the change takes effect on the next user login without a server restart.
+   *
+   * @param name role name
+   * @param permissions new permission set
+   * @return the persisted role DTO
+   */
   @PutMapping("/roles/{name}/permissions")
   public RoleDto updatePermissions(
       @PathVariable @NotNull String name, @RequestBody @NotNull Set<String> permissions) {
     return roleMapper.toDto(roleService.updatePermissions(name, permissions));
   }
 
+  /**
+   * Updates a role's descriptive text.
+   *
+   * @param name role name
+   * @param description new description text
+   * @return the persisted role DTO
+   */
   @PutMapping("/roles/{name}/description")
   public RoleDto updateRoleDescription(
       @PathVariable @NotNull String name, @RequestBody @NotNull String description) {
     return roleMapper.toDto(roleService.updateRoleDescription(name, description));
   }
 
+  /**
+   * Admin override of a user's editable attributes (rank, description, displayName, joinDate).
+   * Carries an optimistic-lock version in the body so two admins racing on the same user surface a
+   * 409 instead of silently overwriting.
+   *
+   * @param id user id
+   * @param request typed body (note: NOT query params — keeping user values out of access logs)
+   * @return the persisted user DTO
+   */
   @PutMapping("/users/{id}/attributes")
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id,

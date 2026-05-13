@@ -20,6 +20,22 @@ import org.springframework.http.MediaType;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Per-IP token-bucket rate limiter implemented with Bucket4j buckets in a Caffeine cache.
+ *
+ * <p>Active only on URI patterns listed in {@code app.rate-limit.paths} and disabled wholesale via
+ * {@code app.rate-limit.enabled=false}. Buckets are keyed by {@code clientIp + "|" + pattern} so
+ * each user-pattern combination gets its own token budget — a flood on {@code /api/v1/login} does
+ * not consume the budget for {@code /api/v1/missions}. The Caffeine cache expires entries after one
+ * hour of inactivity (1h hibernate-window keeps abusive clients limited across short pauses) and is
+ * capped at 100 000 entries to bound memory under a Slowloris-style attack.
+ *
+ * <p>{@code X-Forwarded-For} is only honored when the immediate peer is listed in {@code
+ * app.rate-limit.trusted-proxies}; blanket trust (the literal {@code "*"}) is explicitly rejected
+ * because it would let any client spoof the header and get a fresh bucket per request. Rejected
+ * requests get a 429 with an RFC&nbsp;7807 body and rate-limit headers ({@code X-Rate-Limit-Limit},
+ * {@code X-Rate-Limit-Remaining}, {@code X-Rate-Limit-Retry-After-Seconds}).
+ */
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
 
@@ -31,6 +47,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private final AntPathMatcher pathMatcher = new AntPathMatcher();
   private final Cache<String, Bucket> bucketCache;
 
+  /**
+   * Constructs the filter with the bucket cache sized from compile-time constants ({@code 1h}
+   * idle-expiry, 100 000 entries max). Both properties classes carry the validated
+   * {@code @ConfigurationProperties} values pulled from {@code application.yml}.
+   *
+   * @param properties bucket capacity/refill configuration plus path patterns and trusted proxies
+   * @param problemProperties RFC&nbsp;7807 problem-type base URI used in the 429 response body
+   */
   public RateLimitingFilter(
       RateLimitProperties properties, AppProblemProperties problemProperties) {
     this.properties = properties;

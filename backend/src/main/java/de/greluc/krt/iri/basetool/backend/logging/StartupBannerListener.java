@@ -46,6 +46,11 @@ public class StartupBannerListener {
   @Value("${spring.application.name:backend}")
   private String applicationName;
 
+  /**
+   * Emits the startup banner once the application context is fully initialized. Triggered by {@link
+   * ApplicationReadyEvent} so {@code @ConfigurationProperties}, datasource and security subsystems
+   * are all wired up and produce real values rather than placeholders.
+   */
   @EventListener(ApplicationReadyEvent.class)
   public void onReady() {
     log.info("============================================================");

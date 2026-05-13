@@ -50,6 +50,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the job-order pages ({@code /orders}, {@code /orders/{id}}, {@code
+ * /orders/create} plus a number of POST-only mutators).
+ *
+ * <p>Job orders are the central work unit of the logistics workflow: created by squadron members,
+ * assigned to logisticians, materialized via inventory handovers, and finally completed. The
+ * controller covers the entire lifecycle plus the priority/status mutations, the assignee
+ * management, the handover creation flow, and the unlink endpoints for materials and inventory
+ * items. The status filter on the list view is persisted in a 30-day cookie so a user keeps their
+ * preferred filter across sessions.
+ */
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
@@ -62,6 +73,20 @@ public class JobOrderPageController {
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
 
+  /**
+   * Renders the job-order list ({@code /orders}). The status filter follows a three-stage
+   * precedence: explicit query parameter wins, otherwise a persisted cookie ({@code
+   * orders_filter_status}, validated against {@link #VALID_STATUSES}), otherwise the default of
+   * {@code OPEN} + {@code IN_PROGRESS}. When the user sets an explicit filter, it gets written back
+   * into the cookie with a 30-day TTL.
+   *
+   * @param status optional explicit status filter
+   * @param cookieStatus previous persisted filter from the cookie
+   * @param response servlet response, used to update the persistence cookie
+   * @param model Thymeleaf model populated with orders, selected statuses and the aging thresholds
+   *     for the row-color rendering
+   * @return the {@code orders-index} view name
+   */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
@@ -141,6 +166,13 @@ public class JobOrderPageController {
     return "orders-index";
   }
 
+  /**
+   * Renders the order detail page ({@code /orders/{id}}). Loads the order plus the auxiliary
+   * material-status and assignee lists and exposes the role-derived edit flags so the template
+   * stays free of inline expression checks.
+   *
+   * @return the {@code order-detail} view name
+   */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
@@ -220,6 +252,15 @@ public class JobOrderPageController {
     return "orders-detail";
   }
 
+  /**
+   * Renders the create-order form ({@code /orders/create}). Seeds the materials, job-types and
+   * locations catalogs; the {@code source} parameter threads through so the post-save redirect can
+   * return to the originating page.
+   *
+   * @param source optional origin marker
+   * @param model Thymeleaf model populated with form and reference catalogs
+   * @return the {@code order-create} view name
+   */
   @GetMapping("/create")
   public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
     if (!model.containsAttribute("jobOrderForm")) {
@@ -237,6 +278,12 @@ public class JobOrderPageController {
     return "orders-create";
   }
 
+  /**
+   * Persists a new job order. Validation failures re-render inline so the BindingResult stays
+   * request-scoped. The source parameter determines the post-save redirect target.
+   *
+   * @return inline form view on failure, otherwise redirect
+   */
   @PostMapping("/create")
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -280,6 +327,13 @@ public class JobOrderPageController {
     }
   }
 
+  /**
+   * Reorders an order's priority (drag-and-drop between job orders). Backend uses pessimistic
+   * locking on the entire job-order priority sequence to serialize concurrent reorders, per the
+   * concurrency pattern in CLAUDE.md.
+   *
+   * @return redirect to {@code /orders}
+   */
   @PostMapping("/{id}/priority")
   @PreAuthorize("isAuthenticated()")
   public String updatePriority(
@@ -298,6 +352,13 @@ public class JobOrderPageController {
     return "redirect:/orders";
   }
 
+  /**
+   * AJAX status transition endpoint. Updates the job order's status (OPEN → IN_PROGRESS →
+   * COMPLETED, REJECTED). Backend enforces the state machine and rejects illegal transitions with a
+   * 400.
+   *
+   * @return updated order on success, propagated backend status code on failure
+   */
   @PostMapping("/{id}/status")
   @PreAuthorize("isAuthenticated()")
   @org.springframework.web.bind.annotation.ResponseBody
@@ -318,6 +379,13 @@ public class JobOrderPageController {
     }
   }
 
+  /**
+   * Persists an edit to the order's metadata (note, target inventory location, materials list).
+   * Restricted to logisticians at the controller boundary; backend additionally enforces a
+   * fine-grained role check on the {@code @PreAuthorize}-annotated service method.
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/update")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public String updateOrder(
@@ -350,6 +418,12 @@ public class JobOrderPageController {
     }
   }
 
+  /**
+   * Cancels (soft-deletes) a job order. Backend rejects the delete when the order has linked
+   * inventory items, per the {@code EntityInUseException} pattern.
+   *
+   * @return redirect to {@code /orders}
+   */
   @PostMapping("/{id}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
@@ -364,6 +438,12 @@ public class JobOrderPageController {
     return "redirect:/orders";
   }
 
+  /**
+   * Adds an assignee to the job order. The user-picker is fed by {@link UserProxyController}'s
+   * search endpoint.
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/assignees")
   @PreAuthorize("isAuthenticated()")
   public String addAssignee(
@@ -379,6 +459,17 @@ public class JobOrderPageController {
     return "redirect:/orders/" + id;
   }
 
+  /**
+   * Creates a material handover for the job order.
+   *
+   * <p>The backend service uses the {@code …WithinTransaction} concurrency pattern (see CLAUDE.md):
+   * it iterates the order's materials, collects ids that need a bulk clearing update, runs the bulk
+   * update exactly once after the loop, and re-fetches the aggregate root before the completion
+   * check — without that pattern a second {@code save()} on a detached child would silently merge
+   * and bump {@code @Version} a second time, triggering 409s for clean callers.
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/handovers")
   @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
   public String createHandover(
@@ -415,13 +506,13 @@ public class JobOrderPageController {
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
         try {
           handoverTime = Instant.parse(rawHandoverTime);
-        } catch (Exception isoEx) {
+        } catch (Exception eiso) {
           try {
             handoverTime =
                 LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
-          } catch (Exception localEx) {
+          } catch (Exception elocal) {
             log.warn("Could not parse handoverTime {}, using now()", rawHandoverTime);
           }
         }
@@ -451,6 +542,12 @@ public class JobOrderPageController {
     return "redirect:/orders/" + id;
   }
 
+  /**
+   * Removes a material requirement from the order without deleting any associated inventory items
+   * (the items keep their job-order link cleared by the backend).
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/materials/unlink")
   @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
   public String unlinkMaterial(
@@ -469,6 +566,12 @@ public class JobOrderPageController {
     return "redirect:/orders/" + id;
   }
 
+  /**
+   * Detaches an inventory item from the job order. The item stays in the user's inventory but no
+   * longer counts towards the order's progress.
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
   @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
   public String unlinkInventoryItem(
@@ -491,6 +594,11 @@ public class JobOrderPageController {
     return "redirect:/orders/" + id;
   }
 
+  /**
+   * Removes an assignee from the job order.
+   *
+   * @return redirect to the order detail page
+   */
   @PostMapping("/{id}/assignees/remove")
   @PreAuthorize("isAuthenticated()")
   public String removeAssignee(
@@ -505,6 +613,12 @@ public class JobOrderPageController {
     return "redirect:/orders/" + id;
   }
 
+  /**
+   * AJAX endpoint that lists inventory items eligible for linking to the given material on the
+   * given order. Used by the order-detail page's "link inventory" picker.
+   *
+   * @return list of inventory items (raw JSON), or 500 on backend failure
+   */
   @GetMapping("/{id}/materials/{matId}/inventory")
   @ResponseBody
   @PreAuthorize("isAuthenticated()")

@@ -22,11 +22,6 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest;
-import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest;
-import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
-import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
-import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
@@ -64,6 +59,34 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface over the mission aggregate — the squadron's planning and execution view. The surface
+ * is intentionally large because missions have many sub-aggregates (units, crew, participants,
+ * frequencies, managers, ownership) and Option A / multi-user concurrency required a second family
+ * of "slim" endpoints alongside the legacy MissionDto-returning ones.
+ *
+ * <p>Two endpoint families live side-by-side:
+ *
+ * <ul>
+ *   <li><b>Section patches</b> ({@code /core}, {@code /schedule}, {@code /flags}) split the mission
+ *       header into independently versioned sections so two managers editing different sections do
+ *       not collide on {@code Mission.version}.
+ *   <li><b>Slim sub-resource endpoints</b> ({@code .../slim}) return only the affected sub-DTO
+ *       instead of the full {@link MissionDto}. Behaviour is identical to the legacy
+ *       MissionDto-returning sibling; only the response shape differs. Legacy endpoints carry
+ *       {@code @Deprecated(forRemoval=true)} with sunset {@value #SLIM_DEPRECATION_SUNSET}.
+ * </ul>
+ *
+ * <p>Guest reads are heavily redacted: internal and past missions are hidden, and {@link
+ * #cleanupMissionForGuest} strips names, emails, internal inventory and refinery orders before the
+ * DTO leaves the controller. {@code addParticipantPublic} additionally resolves free-text guest
+ * names against registered users to prevent impersonation.
+ *
+ * <p>Authorisation is delegated to {@link MissionSecurityService} via SpEL ({@code
+ * canManageMission}, {@code canAccessParticipant}, {@code canManageManagers}, {@code
+ * canChangeOwner}). Owner changes use the dedicated {@code MissionOwnership} aggregate with its own
+ * version, so they do not invalidate other users' open mission forms.
+ */
 @RestController
 @RequestMapping("/api/v1/missions")
 @RequiredArgsConstructor
@@ -81,6 +104,13 @@ public class MissionController {
   /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
 
+  /**
+   * Paged mission list. Anonymous callers are silently restricted to {@code PLANNED}+{@code ACTIVE}
+   * non-internal missions; authenticated callers see everything.
+   *
+   * @param principal Spring Security principal (null for guests)
+   * @return paged mission list DTOs
+   */
   @GetMapping
   @Operation(summary = "List all missions (paginated)")
   @Transactional(readOnly = true)
@@ -108,6 +138,11 @@ public class MissionController {
     return toPageResponse(pageResult);
   }
 
+  /**
+   * Lightweight projection (id + label) of active missions for typeaheads.
+   *
+   * @return active missions as reference DTOs
+   */
   @GetMapping("/lookup")
   @Operation(
       summary = "Lookup active missions",
@@ -118,6 +153,19 @@ public class MissionController {
     return missionService.findAllActiveReference();
   }
 
+  /**
+   * Filtered + paged mission search. Anonymous callers are restricted to {@code PLANNED}+{@code
+   * ACTIVE} non-internal missions; an unsupported status filter from a guest returns an empty page
+   * (rather than 403) so the UI degrades silently.
+   *
+   * @param query free-text name fragment
+   * @param start lower bound on planned start time
+   * @param end upper bound on planned start time
+   * @param status status filter (one or more)
+   * @param operationId optional operation filter
+   * @param principal Spring Security principal (null for guests)
+   * @return paged mission list DTOs
+   */
   @GetMapping("/search")
   @Operation(summary = "Search missions (paginated)")
   @Transactional(readOnly = true)
@@ -164,6 +212,14 @@ public class MissionController {
     return toPageResponse(pageResult);
   }
 
+  /**
+   * Single-mission read. Guests are blocked from internal and past missions (403) and get a
+   * redacted DTO via {@link #cleanupMissionForGuest}.
+   *
+   * @param id mission id
+   * @param principal Spring Security principal (null for guests)
+   * @return the mission DTO
+   */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
   @Transactional(readOnly = true)
@@ -184,6 +240,13 @@ public class MissionController {
     return dto;
   }
 
+  /**
+   * Returns the next upcoming mission (or 204 when none). Internal missions are included only for
+   * authenticated callers; guests get the same redaction pass as {@link #getMissionById}.
+   *
+   * @param principal Spring Security principal (null for guests)
+   * @return mission DTO or 204 No Content
+   */
   @GetMapping("/next")
   @Operation(summary = "Get next upcoming mission")
   @Transactional(readOnly = true)
@@ -202,6 +265,15 @@ public class MissionController {
         .orElse(ResponseEntity.noContent().build());
   }
 
+  /**
+   * Redacts a mission DTO for an anonymous viewer: strips owner/managers, internal inventory and
+   * refinery orders, clears edit/manage flags, and recursively cleans each participant and
+   * sub-mission. This is the only path that controls what leaves the API for guests — never lift
+   * data into the controller layer without thinking about this method first.
+   *
+   * @param dto the full mission DTO
+   * @return a redacted copy safe for unauthenticated callers
+   */
   private MissionDto cleanupMissionForGuest(MissionDto dto) {
     Set<MissionParticipantDto> cleanedParticipants =
         dto.participants() == null
@@ -245,6 +317,14 @@ public class MissionController {
         dto.registeredParticipants());
   }
 
+  /**
+   * Redacts a participant DTO for guests: cleans the nested user via {@link #cleanupUserForGuest},
+   * keeps the displayed fields (squadron, job-type, comment, payout preference, times) intact
+   * because those are public per the squadron policy.
+   *
+   * @param dto the participant DTO
+   * @return a redacted copy safe for unauthenticated callers
+   */
   private MissionParticipantDto cleanupParticipantForGuest(MissionParticipantDto dto) {
     UserDto cleanedUser = dto.user() != null ? cleanupUserForGuest(dto.user()) : null;
     return new MissionParticipantDto(
@@ -261,6 +341,14 @@ public class MissionController {
         dto.version());
   }
 
+  /**
+   * Redacts a user DTO for guests: drops first/last name, email, description, roles, permissions,
+   * announcement watermark and join date. Username + displayName + rank remain visible because
+   * those are the public callsign tuple.
+   *
+   * @param dto the user DTO
+   * @return a redacted copy safe for unauthenticated callers
+   */
   private UserDto cleanupUserForGuest(UserDto dto) {
     return new UserDto(
         dto.id(),
@@ -283,23 +371,50 @@ public class MissionController {
         );
   }
 
+  /**
+   * Creates a new mission. The caller becomes the owner via {@link MissionService#createMission}.
+   *
+   * @param mission create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Create a new mission")
-  public MissionDto createMission(@RequestBody @jakarta.validation.Valid MissionDto mission) {
+  public MissionDto createMission(
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
     return missionMapper.toDto(missionService.createMission(missionMapper.toEntity(mission)));
   }
 
+  /**
+   * Attaches a new sub-mission to a parent. Sub-missions are independent missions that aggregate up
+   * to the parent for finance/payout roll-ups.
+   *
+   * @param id parent mission id
+   * @param subMission create payload for the sub-mission
+   * @return the persisted parent DTO with the new sub-mission attached
+   */
   @PostMapping("/{id}/sub-missions")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid MissionDto subMission) {
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto subMission) {
     return missionMapper.toDto(
         missionService.addSubMission(id, missionMapper.toEntity(subMission)));
   }
 
+  /**
+   * Full-replace update. Bumps {@code Mission.version}, so any second user editing the mission
+   * concurrently will get a 409 on their next save. Prefer the section patches ({@link
+   * #patchMissionCore}, {@link #patchMissionSchedule}, {@link #patchMissionFlags}) for
+   * multi-user-friendly edits.
+   *
+   * @param id mission id
+   * @param mission update payload (carries the expected version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -310,10 +425,20 @@ public class MissionController {
               + "(/core, /schedule, /flags) zu verwenden, damit parallele Aenderungen an "
               + "anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.")
   public MissionDto updateMission(
-      @PathVariable @NotNull UUID id, @RequestBody @jakarta.validation.Valid MissionDto mission) {
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
     return missionMapper.toDto(missionService.updateMission(id, missionMapper.toEntity(mission)));
   }
 
+  /**
+   * Patches the core header section (name, description, calendar link, status). Uses the dedicated
+   * core-section version so a parallel edit of schedule/flags does not invalidate this form.
+   *
+   * @param id mission id
+   * @param request core patch payload (carries the expected core-section version)
+   * @return the persisted DTO
+   */
   @PatchMapping("/{id}/core")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -324,7 +449,8 @@ public class MissionController {
               + " Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.")
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionCoreRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest request) {
     return missionMapper.toDto(
         missionService.updateCoreSection(
             id,
@@ -335,6 +461,14 @@ public class MissionController {
             request.version()));
   }
 
+  /**
+   * Patches the schedule section (meeting/planned/actual times). All times in UTC. Schedule has its
+   * own version so participants, units and finances editing in parallel does not collide.
+   *
+   * @param id mission id
+   * @param request schedule patch payload (carries the expected schedule-section version)
+   * @return the persisted DTO
+   */
   @PatchMapping("/{id}/schedule")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -345,7 +479,9 @@ public class MissionController {
               + "entkoppelter Sub-Collections nicht mehr zum Versionskonflikt. Zeitstempel in UTC.")
   public MissionDto patchMissionSchedule(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionScheduleRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest
+              request) {
     return missionMapper.toDto(
         missionService.updateScheduleSection(
             id,
@@ -357,6 +493,13 @@ public class MissionController {
             request.version()));
   }
 
+  /**
+   * Patches the flags section (currently only {@code isInternal}). Independently versioned.
+   *
+   * @param id mission id
+   * @param request flags patch payload (carries the expected flags-section version)
+   * @return the persisted DTO
+   */
   @PatchMapping("/{id}/flags")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -364,11 +507,19 @@ public class MissionController {
       description = "Aktualisiert nur die Flags-Sektion (z.B. isInternal) eines Einsatzes.")
   public MissionDto patchMissionFlags(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull PatchMissionFlagsRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest request) {
     return missionMapper.toDto(
         missionService.updateFlagsSection(id, request.isInternal(), request.version()));
   }
 
+  /**
+   * ADMIN-only mission delete. Cascades through participants, units, frequencies and finance
+   * entries.
+   *
+   * @param id mission id
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Delete a mission")
@@ -377,6 +528,14 @@ public class MissionController {
     return ResponseEntity.noContent().build();
   }
 
+  /**
+   * Self-enrolment shortcut — the caller adds themselves as participant. For adding others, use
+   * {@link #addParticipantPublic} or the slim {@code addParticipantSlim}.
+   *
+   * @param jwt caller's JWT
+   * @param id mission id
+   * @return the persisted DTO
+   */
   @PostMapping("/{id}/join")
   @Operation(summary = "Join a mission")
   @PreAuthorize("isAuthenticated()")
@@ -385,9 +544,18 @@ public class MissionController {
         missionService.addParticipant(id, userService.getUserIdFromJwt(jwt)));
   }
 
+  /**
+   * Legacy add-unit endpoint. Returns the full {@link MissionDto}. Replaced by {@link #addUnitSlim}
+   * which avoids coupling the parent {@code Mission.version} into every AJAX round-trip.
+   *
+   * @param id mission id
+   * @param request unit payload
+   * @return the persisted parent DTO
+   * @deprecated use {@link #addUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/units")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/slim")
@@ -411,9 +579,18 @@ public class MissionController {
             request.frequency()));
   }
 
+  /**
+   * Legacy update-unit endpoint.
+   *
+   * @param id mission id
+   * @param unitId unit id
+   * @param request unit payload
+   * @return the persisted parent DTO
+   * @deprecated use {@link #updateUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PutMapping("/{id}/units/{unitId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/{unitId}/slim")
@@ -438,9 +615,17 @@ public class MissionController {
             request.frequency()));
   }
 
+  /**
+   * Legacy delete-unit endpoint.
+   *
+   * @param id mission id
+   * @param unitId unit id
+   * @return the persisted parent DTO
+   * @deprecated use {@link #deleteUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/units/{unitId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/{unitId}/slim")
@@ -454,9 +639,18 @@ public class MissionController {
     return missionMapper.toDto(missionService.removeMissionUnit(id, unitId));
   }
 
+  /**
+   * Legacy add-crew endpoint.
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param request crew payload (participant + job types)
+   * @return the persisted parent DTO
+   * @deprecated use {@link #addCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/units/{missionUnitId}/crew")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim")
@@ -477,9 +671,19 @@ public class MissionController {
         missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds));
   }
 
+  /**
+   * Legacy update-crew endpoint — replaces the job-type set of a crew entry.
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param crewId crew entry id
+   * @param request crew payload
+   * @return the persisted parent DTO
+   * @deprecated use {@link #updateCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim")
@@ -501,9 +705,18 @@ public class MissionController {
         missionService.updateCrewInShip(id, missionUnitId, crewId, jobTypeIds));
   }
 
+  /**
+   * Legacy remove-crew endpoint.
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param crewId crew entry id
+   * @return the persisted parent DTO
+   * @deprecated use {@link #removeCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim")
@@ -521,9 +734,19 @@ public class MissionController {
     return missionMapper.toDto(missionService.removeCrewFromShip(id, missionUnitId, crewId));
   }
 
+  /**
+   * Legacy update-participant endpoint.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param request participant payload (carries the expected participant version)
+   * @param authentication current Spring Security authentication
+   * @return the persisted parent DTO
+   * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -554,9 +777,18 @@ public class MissionController {
             request.version()));
   }
 
+  /**
+   * Legacy check-in endpoint. Stamps {@code startTime} on the participant.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return the persisted parent DTO
+   * @deprecated use {@link #checkInParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-in")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-in/slim")
@@ -574,9 +806,18 @@ public class MissionController {
     return missionMapper.toDto(missionService.checkIn(id, participantId));
   }
 
+  /**
+   * Legacy check-out endpoint. Stamps {@code endTime} on the participant.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return the persisted parent DTO
+   * @deprecated use {@link #checkOutParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-out")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-out/slim")
@@ -594,9 +835,20 @@ public class MissionController {
     return missionMapper.toDto(missionService.checkOut(id, participantId));
   }
 
+  /**
+   * Legacy payout-preference endpoint. {@code DONATE} on any participant is sticky for the whole
+   * operation (handled in the service).
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param request payout preference payload
+   * @param authentication current Spring Security authentication
+   * @return the persisted parent DTO
+   * @deprecated use {@link #updatePayoutPreferenceSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}/payout-preference")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim")
@@ -616,9 +868,18 @@ public class MissionController {
         missionService.updatePayoutPreference(id, participantId, request.preference()));
   }
 
+  /**
+   * Legacy admin add-participant endpoint (registered users only). The public counterpart with
+   * guest support is {@link #addParticipantPublic}.
+   *
+   * @param id mission id
+   * @param request add-participant payload (registered user id)
+   * @return the persisted parent DTO
+   * @deprecated use {@link #addParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/slim")
@@ -634,9 +895,18 @@ public class MissionController {
     return missionMapper.toDto(missionService.addParticipant(id, request.userId()));
   }
 
+  /**
+   * Legacy remove-participant endpoint.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return the persisted parent DTO
+   * @deprecated use {@link #removeParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/participants/{participantId}")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -654,6 +924,25 @@ public class MissionController {
     return missionMapper.toDto(missionService.removeParticipant(id, participantId));
   }
 
+  /**
+   * Public add-participant endpoint. Accepts either an explicit {@code userId} (autocomplete pick)
+   * or a free-text {@code guestName}. Free-text names are resolved case-insensitively against the
+   * user table:
+   *
+   * <ul>
+   *   <li>unique match + authenticated caller → linked as registered participant;
+   *   <li>unique match + anonymous caller → 400 (spoofing protection);
+   *   <li>no match → treated as guest;
+   *   <li>multiple matches → 409 (ambiguous name).
+   * </ul>
+   *
+   * <p>Anonymous callers may never submit a {@code userId} directly.
+   *
+   * @param id mission id
+   * @param request add-participant payload (userId XOR guestName + comment + squadron)
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO
+   */
   @PostMapping("/{id}/participants/add")
   @Operation(
       summary = "Add a participant (public)",
@@ -737,9 +1026,17 @@ public class MissionController {
             request.squadronId()));
   }
 
+  /**
+   * Legacy add/update frequency endpoint — upsert by frequency-type.
+   *
+   * @param id mission id
+   * @param request frequency payload (type + value)
+   * @return the persisted parent DTO
+   * @deprecated use {@link #addOrUpdateFrequencySlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/frequencies")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/frequencies/slim")
@@ -751,14 +1048,23 @@ public class MissionController {
       deprecated = true)
   public MissionDto addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid AddFrequencyRequest request) {
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest request) {
     return missionMapper.toDto(
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value()));
   }
 
+  /**
+   * Legacy remove-frequency endpoint.
+   *
+   * @param id mission id
+   * @param frequencyId frequency id
+   * @return the persisted parent DTO
+   * @deprecated use {@link #removeFrequencySlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/frequencies/{frequencyId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/frequencies/{frequencyId}/slim")
@@ -774,9 +1080,19 @@ public class MissionController {
     return missionMapper.toDto(missionService.removeMissionFrequency(id, frequencyId));
   }
 
+  /**
+   * Legacy add-manager endpoint. Wraps the service call in try/catch with DEBUG_LOG markers to help
+   * debug intermittent test-environment failures — kept until the slim replacement absorbs
+   * production load.
+   *
+   * @param id mission id
+   * @param userId user id to add as manager
+   * @return the persisted parent DTO
+   * @deprecated use {@link #addManagerSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @PostMapping("/{id}/managers/{userId}")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/managers/{userId}/slim")
@@ -803,9 +1119,17 @@ public class MissionController {
     }
   }
 
+  /**
+   * Legacy remove-manager endpoint.
+   *
+   * @param id mission id
+   * @param userId user id to remove from managers
+   * @return the persisted parent DTO
+   * @deprecated use {@link #removeManagerSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
+   */
+  @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/managers/{userId}")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/managers/{userId}/slim")
@@ -828,9 +1152,19 @@ public class MissionController {
     }
   }
 
+  /**
+   * Legacy owner-change endpoint without optimistic lock on the ownership aggregate. Replaced by
+   * {@link #updateMissionOwner} which carries a version field and does not bump {@code
+   * Mission.version}.
+   *
+   * @param id mission id
+   * @param userId new owner id
+   * @return the persisted parent DTO
+   * @deprecated use {@link #updateMissionOwner}; sunset 2026-10-20
+   */
+  @Deprecated(forRemoval = true)
   @PutMapping("/{id}/owner/{userId}")
   @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
-  @Deprecated(forRemoval = true)
   @de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation(
       sunset = "2026-10-20",
       replacement = "/api/v1/missions/{id}/owner")
@@ -867,6 +1201,15 @@ public class MissionController {
     }
   }
 
+  /**
+   * Owner change through the dedicated {@code MissionOwnership} aggregate. The version field in the
+   * request must match the current ownership version (not {@code Mission.version}). The mission
+   * version stays untouched, so concurrent edits on other sections remain valid.
+   *
+   * @param id mission id
+   * @param request owner-change payload (new owner id + expected ownership version)
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}/owner")
   @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
   @Operation(
@@ -896,23 +1239,34 @@ public class MissionController {
   })
   public MissionDto updateMissionOwner(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdateMissionOwnerRequest request) {
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
     return missionMapper.toDto(mission);
   }
 
   // =====================================================================================
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
+
   // These endpoints are additive replacements for the legacy MissionDto-returning
   // sub-endpoints above. They return only the affected slim sub-DTO (or a slim list,
   // or 204 No Content) instead of the full MissionDto. This lets the frontend run
   // per-sub-aggregate DOM `data-version` synchronisation without coupling the
   // Mission parent version into every AJAX round-trip.
+
   // Behaviour and service-level concurrency semantics are IDENTICAL to the legacy
   // endpoints; only the response shape is slim. See ApiDeprecation annotations on
   // the legacy endpoints for the sunset date.
   // =====================================================================================
 
+  /**
+   * Locates a unit inside a mission aggregate by id, or throws {@link NotFoundException}. Used by
+   * the slim endpoints to project a single sub-aggregate without re-fetching from the database.
+   *
+   * @param mission mission aggregate
+   * @param unitId unit id to find
+   * @return the matching unit
+   */
   private de.greluc.krt.iri.basetool.backend.model.MissionUnit findUnit(
       de.greluc.krt.iri.basetool.backend.model.Mission mission, UUID unitId) {
     return mission.getAssignedUnits().stream()
@@ -921,6 +1275,13 @@ public class MissionController {
         .orElseThrow(() -> new NotFoundException("Mission unit not found"));
   }
 
+  /**
+   * Locates a participant inside a mission aggregate by id, or throws {@link NotFoundException}.
+   *
+   * @param mission mission aggregate
+   * @param participantId participant id to find
+   * @return the matching participant
+   */
   private de.greluc.krt.iri.basetool.backend.model.MissionParticipant findParticipant(
       de.greluc.krt.iri.basetool.backend.model.Mission mission, UUID participantId) {
     return mission.getParticipants().stream()
@@ -929,6 +1290,13 @@ public class MissionController {
         .orElseThrow(() -> new NotFoundException("Participant not found"));
   }
 
+  /**
+   * Locates a crew entry inside a unit by id, or throws {@link NotFoundException}.
+   *
+   * @param unit unit aggregate
+   * @param crewId crew entry id to find
+   * @return the matching crew entry
+   */
   private de.greluc.krt.iri.basetool.backend.model.MissionCrew findCrew(
       de.greluc.krt.iri.basetool.backend.model.MissionUnit unit, UUID crewId) {
     return unit.getCrew().stream()
@@ -939,6 +1307,14 @@ public class MissionController {
 
   // --- Units ---
 
+  /**
+   * Adds a unit and returns only the updated unit list (slim). Preferred over {@link #addUnit} —
+   * doesn't drag the {@code Mission.version} into the round-trip.
+   *
+   * @param id mission id
+   * @param request unit payload
+   * @return the updated unit list
+   */
   @PostMapping("/{id}/units/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -961,6 +1337,14 @@ public class MissionController {
     return mission.getAssignedUnits().stream().map(missionMapper::toDto).toList();
   }
 
+  /**
+   * Updates a unit and returns only the updated unit (slim).
+   *
+   * @param id mission id
+   * @param unitId unit id
+   * @param request unit payload
+   * @return the updated unit DTO
+   */
   @PutMapping("/{id}/units/{unitId}/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -982,6 +1366,13 @@ public class MissionController {
     return missionMapper.toDto(findUnit(mission, unitId));
   }
 
+  /**
+   * Deletes a unit; returns 204.
+   *
+   * @param id mission id
+   * @param unitId unit id
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}/units/{unitId}/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -995,6 +1386,14 @@ public class MissionController {
 
   // --- Crew ---
 
+  /**
+   * Adds crew and returns only the affected unit's crew list (slim).
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param request crew payload (participant + job types)
+   * @return the updated crew list of the unit
+   */
   @PostMapping("/{id}/units/{missionUnitId}/crew/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1012,6 +1411,15 @@ public class MissionController {
     return missionMapper.toDto(findUnit(mission, missionUnitId)).crew();
   }
 
+  /**
+   * Updates a crew entry and returns only the updated entry (slim).
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param crewId crew entry id
+   * @param request crew payload (job-type set)
+   * @return the updated crew DTO
+   */
   @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1028,6 +1436,14 @@ public class MissionController {
     return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
   }
 
+  /**
+   * Removes a crew entry; returns 204.
+   *
+   * @param id mission id
+   * @param missionUnitId unit id
+   * @param crewId crew entry id
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1043,6 +1459,15 @@ public class MissionController {
 
   // --- Participants ---
 
+  /**
+   * Updates a participant and returns only the updated participant (slim).
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param request participant payload (carries the expected participant version)
+   * @param authentication current Spring Security authentication
+   * @return the updated participant DTO
+   */
   @PutMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
@@ -1069,6 +1494,14 @@ public class MissionController {
     return missionMapper.toDto(findParticipant(mission, participantId));
   }
 
+  /**
+   * Slim check-in. Stamps {@code startTime} on the participant.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return the updated participant DTO
+   */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
@@ -1083,6 +1516,14 @@ public class MissionController {
     return missionMapper.toDto(findParticipant(mission, participantId));
   }
 
+  /**
+   * Slim check-out. Stamps {@code endTime} on the participant.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return the updated participant DTO
+   */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
@@ -1097,6 +1538,15 @@ public class MissionController {
     return missionMapper.toDto(findParticipant(mission, participantId));
   }
 
+  /**
+   * Slim payout-preference update. {@code DONATE} stays sticky for the whole operation.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param request payout preference payload
+   * @param authentication current Spring Security authentication
+   * @return the updated participant DTO
+   */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
@@ -1112,6 +1562,18 @@ public class MissionController {
     return missionMapper.toDto(findParticipant(mission, participantId));
   }
 
+  /**
+   * Slim add-participant — mirrors {@link #addParticipantPublic} logic with one extra access tier:
+   * an authenticated, non-manager caller may always self-enroll but needs {@code canManageMission}
+   * to add anyone else (raised at the HTTP boundary, not in the service). Returns only the updated
+   * participant list.
+   *
+   * @param id mission id
+   * @param request add-participant payload (userId XOR guestName + meta)
+   * @param jwt caller's JWT (null for anonymous)
+   * @param authentication current Spring Security authentication
+   * @return the updated participant list
+   */
   @PostMapping("/{id}/participants/slim")
   @Operation(
       summary = "Add a participant (slim response)",
@@ -1182,6 +1644,14 @@ public class MissionController {
     return mission.getParticipants().stream().map(missionMapper::toDto).toList();
   }
 
+  /**
+   * Removes a participant; returns 204.
+   *
+   * @param id mission id
+   * @param participantId participant id
+   * @param authentication current Spring Security authentication
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
@@ -1195,6 +1665,13 @@ public class MissionController {
     return ResponseEntity.noContent().build();
   }
 
+  /**
+   * Participants of a mission that are not yet on any unit's crew roster — drives the "unassigned"
+   * tray on the mission detail page.
+   *
+   * @param id mission id
+   * @return unassigned participant DTOs
+   */
   @GetMapping("/{id}/participants/unassigned")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1207,6 +1684,13 @@ public class MissionController {
 
   // --- Frequencies ---
 
+  /**
+   * Upserts a frequency by type; returns only the updated frequency list (slim).
+   *
+   * @param id mission id
+   * @param request frequency payload (type + value)
+   * @return the updated frequency list
+   */
   @PostMapping("/{id}/frequencies/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1215,12 +1699,20 @@ public class MissionController {
           "Adds or updates a frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addOrUpdateFrequencySlim(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid AddFrequencyRequest request) {
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.iri.basetool.backend.model.dto.request.AddFrequencyRequest request) {
     var mission =
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value());
     return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
   }
 
+  /**
+   * Removes a frequency; returns 204.
+   *
+   * @param id mission id
+   * @param frequencyId frequency id
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}/frequencies/{frequencyId}/slim")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
@@ -1234,6 +1726,14 @@ public class MissionController {
 
   // --- Managers ---
 
+  /**
+   * Adds a manager; returns the updated manager list as {@link UserReferenceDto}s (id + label
+   * only).
+   *
+   * @param id mission id
+   * @param userId user id to add as manager
+   * @return the updated manager list
+   */
   @PostMapping("/{id}/managers/{userId}/slim")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
   @Operation(
@@ -1245,6 +1745,13 @@ public class MissionController {
     return mission.getManagers().stream().map(userMapper::toReferenceDto).toList();
   }
 
+  /**
+   * Removes a manager; returns 204.
+   *
+   * @param id mission id
+   * @param userId user id to remove from managers
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}/managers/{userId}/slim")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
   @Operation(
@@ -1256,6 +1763,14 @@ public class MissionController {
     return ResponseEntity.noContent().build();
   }
 
+  /**
+   * Wraps a {@link Page} into the API-friendly {@link PageResponse} envelope (current page, page
+   * size, totals, sort tokens).
+   *
+   * @param page Spring Data page
+   * @param <T> element type
+   * @return the page response DTO
+   */
   private <T> PageResponse<T> toPageResponse(Page<T> page) {
     return new PageResponse<>(
         page.getContent(),

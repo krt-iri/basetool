@@ -8,9 +8,26 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * SpringDoc customizer that documents the project's HTTP caching contract in the generated OpenAPI
+ * spec.
+ *
+ * <p>Every {@code GET} endpoint goes through {@link ETagConfig#shallowEtagFilter} and therefore
+ * supports {@code If-None-Match} / 304 responses; the customizer adds a {@code 304 Not Modified}
+ * entry to the responses map and decorates the {@code 200} response with the {@code ETag} and
+ * {@code Cache-Control} header descriptions so client SDKs generated from the spec know they can
+ * implement conditional GET.
+ */
 @Configuration
 public class OpenApiCachingConfig {
 
+  /**
+   * Returns OpenAPI customizer that injects the {@code 304}/{@code ETag}/{@code Cache-Control}
+   * metadata on every {@code GET} operation.
+   *
+   * @return OpenAPI customizer that injects the {@code 304}/{@code ETag}/{@code Cache-Control}
+   *     metadata on every {@code GET} operation
+   */
   @Bean
   public OpenApiCustomizer cachingOpenApiCustomizer() {
     return openApi ->

@@ -14,6 +14,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin system-settings page ({@code /admin/settings}).
+ *
+ * <p>The page edits three independent system settings, each carrying its own optimistic-lock
+ * version: the yellow/red age thresholds for job-order aging colors and the refinery rounding mode.
+ * Every load fetches each setting individually so a single backend hiccup degrades to a default
+ * value and a logged warning rather than blanking the entire page; the persisted version fields are
+ * passed back through the form so the next save can use them.
+ */
 @Controller
 @RequestMapping("/admin/settings")
 @RequiredArgsConstructor
@@ -23,6 +32,14 @@ public class AdminSettingsPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Loads the three system settings and exposes value+version pairs to the form template. Missing
+   * settings fall back to documented defaults (30/90 days, rounding mode {@code UP}) so the page
+   * never renders an empty input.
+   *
+   * @param model Thymeleaf model populated with the value+version pairs
+   * @return the {@code admin-settings} view name
+   */
   @GetMapping
   public String viewSettings(Model model) {
     int yellowDays = 30;
@@ -70,6 +87,24 @@ public class AdminSettingsPageController {
     return "admin-settings";
   }
 
+  /**
+   * Persists the three settings in one form submit.
+   *
+   * <p>Validates the relationship invariant {@code yellow < red} and that both are non-negative
+   * before issuing any PUT — a violation short-circuits with a flash toast so the user sees the
+   * error immediately and no partial update reaches the backend. Each setting is updated via its
+   * own PUT carrying the form-supplied version (optimistic locking); a number-format error or any
+   * other failure surfaces as a localized toast.
+   *
+   * @param ageYellowDaysStr yellow-aging threshold (parsed as int)
+   * @param ageYellowVersion optimistic-lock version for the yellow setting
+   * @param ageRedDaysStr red-aging threshold (parsed as int)
+   * @param ageRedVersion optimistic-lock version for the red setting
+   * @param refineryRoundingMode rounding mode (one of {@code UP}/{@code DOWN}/{@code HALF_UP}/…)
+   * @param refineryRoundingVersion optimistic-lock version for the rounding setting
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/settings}
+   */
   @PostMapping
   public String updateSettings(
       @RequestParam("ageYellowDays") String ageYellowDaysStr,

@@ -22,6 +22,27 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+/**
+ * Backend security configuration: JWT resource-server, role hierarchy, CSRF policy and the request
+ * authorization matrix.
+ *
+ * <p>The backend is a pure resource server — incoming JWTs are validated against the Keycloak
+ * issuer, the {@link CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
+ * project-specific {@code is_logistician} / {@code is_mission_manager} flags on {@code app_user}
+ * into Spring authorities. The role hierarchy mirrors the CLAUDE.md matrix (admin/officer imply
+ * logistician/mission-manager).
+ *
+ * <p>The {@code authorizeHttpRequests} matrix in {@link #filterChain} is the single, exhaustive
+ * source for which endpoints are public, which require authentication, and which require a specific
+ * role/authority. The order matters — Spring evaluates the matchers top-down. Method-level
+ * {@code @PreAuthorize} on services adds fine-grained checks but never weakens the chain matcher.
+ *
+ * <p>CSRF is enabled with the cookie token repository except in the {@code test} profile, where it
+ * is disabled so MockMvc tests do not need to plumb the token through every call. API endpoints
+ * that are exclusively JSON and bearer-token authenticated ({@code /api/v1/missions/**}, {@code
+ * /api/v1/operations/**}, {@code /api/v1/orders}, {@code /api/v1/finance-entries}) are explicitly
+ * ignored because they can never be triggered from a CSRF-vulnerable browser flow.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -38,6 +59,14 @@ public class SecurityConfig {
   @Value("${app.cors.allowed-origin-patterns:}")
   private List<String> allowedOriginPatterns;
 
+  /**
+   * Declares the role hierarchy that {@code @PreAuthorize("hasRole('LOGISTICIAN')")} and friends
+   * use. Mirrors the matrix in {@code ROLES_AND_PERMISSIONS.md}: admin and officer both imply
+   * logistician and mission-manager, so an admin satisfies a {@code @PreAuthorize} for {@code
+   * LOGISTICIAN} without being explicitly granted that role.
+   *
+   * @return the {@link RoleHierarchy} bean consumed by Spring Security's expression handlers
+   */
   @Bean
   public static RoleHierarchy roleHierarchy() {
     return RoleHierarchyImpl.fromHierarchy(
@@ -49,6 +78,14 @@ public class SecurityConfig {
         """);
   }
 
+  /**
+   * Wires the project's {@link CustomJwtGrantedAuthoritiesConverter} into Spring Security's
+   * standard {@link JwtAuthenticationConverter}, so every authenticated request sees the merged
+   * authority set (Keycloak realm roles + DB-flag-derived roles).
+   *
+   * @param customConverter project-specific authorities converter
+   * @return wired {@code JwtAuthenticationConverter}
+   */
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter(
       CustomJwtGrantedAuthoritiesConverter customConverter) {
@@ -57,6 +94,22 @@ public class SecurityConfig {
     return converter;
   }
 
+  /**
+   * Builds the main {@link SecurityFilterChain}: CSRF policy (profile-dependent), CORS source,
+   * security response headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy,
+   * X-Content-Type-Options), the request-authorization matrix and JWT resource-server activation.
+   *
+   * <p>The matrix is profile-independent — same rules for {@code dev} and {@code prod}. Public
+   * endpoints (master data, mission-search, guest mission editing) are listed explicitly; every
+   * unlisted request falls through to {@code anyRequest().authenticated()}.
+   *
+   * @param http Spring Security builder
+   * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
+   * @param env active environment, used to detect the {@code test} profile so CSRF can be disabled
+   *     for MockMvc tests
+   * @return the configured security filter chain
+   * @throws Exception propagated from {@link HttpSecurity#build()}
+   */
   @Bean
   public SecurityFilterChain filterChain(
       HttpSecurity http,
@@ -223,6 +276,17 @@ public class SecurityConfig {
     return http.build();
   }
 
+  /**
+   * Per-environment CORS configuration.
+   *
+   * <p>The allowed origin patterns come from {@code app.cors.allowed-origin-patterns} — empty by
+   * default because the only legitimate caller is the Spring-Boot frontend running server-side, NOT
+   * a browser. {@code allowCredentials=false} is intentional and load-bearing: combined with a
+   * future misconfigured wildcard origin list it would be the difference between a 403 and a CSRF
+   * exposure across the entire API.
+   *
+   * @return CORS source applied to all paths
+   */
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();

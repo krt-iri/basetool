@@ -45,6 +45,17 @@ public class PersonalInventoryPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the personal-inventory list with the create/edit modal.
+   *
+   * @param q optional free-text filter; echoed back into the search input
+   * @param page zero-based page index
+   * @param size page size, defaults to 50
+   * @param sort optional sort spec ({@code field,asc|desc}); whitelisted by the backend
+   * @param model Thymeleaf model populated with the form, the filter query, the item list and page
+   *     metadata
+   * @return the {@code personal-inventory} view name
+   */
   @GetMapping
   public String view(
       @RequestParam(required = false) String q,
@@ -59,6 +70,20 @@ public class PersonalInventoryPageController {
     return "personal-inventory";
   }
 
+  /**
+   * Creates a new personal-inventory item.
+   *
+   * <p>Validation errors render the list view inline (no redirect) — pushing the BindingResult into
+   * a FlashAttribute would crash Spring Session's Jackson serialization because {@code
+   * BeanPropertyBindingResult} holds a back-reference to its model map (a self-referencing cycle
+   * that exceeds Jackson's 500-deep nesting cap).
+   *
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering on validation failure
+   * @param redirectAttributes flash attributes carrier
+   * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
+   */
   @PostMapping("/add")
   public String add(
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
@@ -98,6 +123,17 @@ public class PersonalInventoryPageController {
     return "redirect:/personal-inventory";
   }
 
+  /**
+   * Updates an existing personal-inventory item. Same self-referencing-BindingResult workaround as
+   * {@link #add}. A 409 surfaces as the dedicated optimistic-lock toast via {@link #classifyError}.
+   *
+   * @param id inventory item id
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used for inline re-rendering on validation failure
+   * @param redirectAttributes flash attributes carrier
+   * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
+   */
   @PostMapping("/{id}/update")
   public String update(
       @PathVariable @NotNull UUID id,
@@ -134,6 +170,13 @@ public class PersonalInventoryPageController {
     return "redirect:/personal-inventory";
   }
 
+  /**
+   * Deletes a personal-inventory item. Failure surfaces as a 409-aware toast.
+   *
+   * @param id inventory item id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /personal-inventory}
+   */
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {

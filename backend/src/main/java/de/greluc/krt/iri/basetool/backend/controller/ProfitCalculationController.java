@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST endpoint backing the profit-calculation page. Delegates to {@link ProfitCalculationService};
+ * restricted to authenticated members.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/materials/profit-calculation")
@@ -20,6 +24,13 @@ public class ProfitCalculationController {
 
   private final ProfitCalculationService profitCalculationService;
 
+  /**
+   * Computes profit rows for the chosen ship across an optional star-system filter.
+   *
+   * @param shipId ship type id (capacity comes from this)
+   * @param starSystemNames optional star system filter; null/empty = all systems
+   * @return per-material profit rows sorted alphabetically
+   */
   @GetMapping
   @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
   public List<ProfitCalculationDto> getProfitCalculation(

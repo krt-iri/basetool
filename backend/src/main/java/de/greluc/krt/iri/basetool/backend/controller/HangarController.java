@@ -40,6 +40,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * REST surface for the personal hangar (own ships), the squadron-wide overview, the admin per-user
+ * hangar, and the fleetview CSV import.
+ *
+ * <p>{@code /my-ships} reads the calling user's JWT to derive the owner id — never accepts it from
+ * the URL — so a caller cannot view another user's hangar via this endpoint. The admin-only {@code
+ * /users/{userId}/ships} surface takes the user id from the path explicitly and is gated by {@code
+ * hasRole('ADMIN')}. The {@code /squadron-overview} endpoint shapes its response based on the
+ * caller's role: only ADMIN/OFFICER see the per-ship owner details, every other authenticated
+ * caller gets just the aggregated counts.
+ */
 @RestController
 @RequestMapping("/api/v1/hangar")
 @RequiredArgsConstructor
@@ -49,6 +60,11 @@ public class HangarController {
   private final UserService userService;
   private final ShipMapper shipMapper;
 
+  /**
+   * Lists the calling user's own ships.
+   *
+   * @return paged ship DTOs
+   */
   @GetMapping("/my-ships")
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getMyShips(
@@ -70,6 +86,11 @@ public class HangarController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Lists ships across all users. Requires the {@code HANGAR_READ} authority.
+   *
+   * @return paged ship DTOs
+   */
   @GetMapping("/ships")
   @PreAuthorize("hasAuthority('HANGAR_READ')")
   @Transactional(readOnly = true)
@@ -91,6 +112,14 @@ public class HangarController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Per-ship-type aggregated count across the squadron. Admins and officers additionally see the
+   * per-ship owner / location / fitted breakdown; everyone else sees only the totals — the
+   * role-driven shaping happens at the HTTP boundary so the service stays free of {@code
+   * SecurityContextHolder} reads (the ArchUnit rule).
+   *
+   * @return paged overview DTOs
+   */
   @GetMapping("/squadron-overview")
   @Transactional(readOnly = true)
   public PageResponse<SquadronShipOverviewDto> getSquadronOverview(
@@ -120,6 +149,11 @@ public class HangarController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /**
+   * Adds a ship to the calling user's hangar.
+   *
+   * @return the persisted ship DTO
+   */
   @PostMapping("/ships")
   @PreAuthorize("isAuthenticated()")
   @Transactional
@@ -128,6 +162,12 @@ public class HangarController {
     return shipMapper.toDto(hangarService.addShip(userService.getUserIdFromJwt(jwt), shipRequest));
   }
 
+  /**
+   * Updates one of the calling user's ships. Service-layer ownership check ensures cross-user
+   * access is rejected.
+   *
+   * @return the persisted ship DTO
+   */
   @PutMapping("/ships/{id}")
   @PreAuthorize("isAuthenticated()")
   @Transactional
@@ -139,12 +179,21 @@ public class HangarController {
         hangarService.updateShip(userService.getUserIdFromJwt(jwt), id, shipRequest));
   }
 
+  /**
+   * Deletes one of the calling user's ships. Mission-unit references are detached before delete.
+   */
   @DeleteMapping("/ships/{id}")
   @PreAuthorize("isAuthenticated()")
   public void deleteMyShip(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     hangarService.deleteShip(userService.getUserIdFromJwt(jwt), id);
   }
 
+  /**
+   * Removes every ship the calling user owns. Mission-unit references to those ships are detached
+   * before delete so no FK constraint fires.
+   *
+   * @return 204 No Content
+   */
   @Operation(
       summary = "Alle eigenen Schiffe löschen",
       description =
@@ -164,6 +213,12 @@ public class HangarController {
 
   // Admin endpoints
 
+  /**
+   * Admin-only: lists a target user's hangar. User id comes from the path (not the JWT) so admins
+   * can inspect any user's fleet.
+   *
+   * @return paged ship DTOs
+   */
   @GetMapping("/users/{userId}/ships")
   @PreAuthorize("hasRole('ADMIN')")
   @Transactional(readOnly = true)
@@ -186,6 +241,7 @@ public class HangarController {
         PaginationUtil.toSortStrings(p.getSort()));
   }
 
+  /** Admin-only: adds a ship to a target user's hangar. */
   @PostMapping("/users/{userId}/ships")
   @PreAuthorize("hasRole('ADMIN')")
   @Transactional
@@ -194,6 +250,7 @@ public class HangarController {
     return shipMapper.toDto(hangarService.addShip(userId, shipRequest));
   }
 
+  /** Admin-only: updates a target user's ship. */
   @PutMapping("/users/{userId}/ships/{shipId}")
   @PreAuthorize("hasRole('ADMIN')")
   @Transactional
@@ -204,6 +261,7 @@ public class HangarController {
     return shipMapper.toDto(hangarService.updateShip(userId, shipId, shipRequest));
   }
 
+  /** Admin-only: deletes a target user's ship. */
   @DeleteMapping("/users/{userId}/ships/{shipId}")
   @PreAuthorize("hasRole('ADMIN')")
   public void deleteUserShip(
@@ -211,6 +269,13 @@ public class HangarController {
     hangarService.deleteShip(userId, shipId);
   }
 
+  /**
+   * Imports a Fleetview CSV export. Parses the file via {@code HangarImportService} and creates one
+   * ship row per CSV line. The caller's JWT is the owner of the new rows.
+   *
+   * @param file uploaded CSV file
+   * @return import summary (created / skipped / errored counts)
+   */
   @PostMapping("/import/fleetview")
   @PreAuthorize("isAuthenticated()")
   @Transactional
@@ -219,6 +284,7 @@ public class HangarController {
     return hangarImportService.importFleetview(userService.getUserIdFromJwt(jwt), file);
   }
 
+  /** Bulk reset of the {@code fitted} flag on every ship in the squadron. ADMIN/OFFICER-only. */
   @PostMapping("/ships/reset-fitted")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public void resetAllFittedStatus() {

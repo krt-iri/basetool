@@ -12,6 +12,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Thin REST proxy for the user-autocomplete used by participant/owner pickers.
+ *
+ * <p>Browser-side JS calls land on {@code /users/search} (no {@code /api/} prefix because Spring
+ * Security treats this path as authenticated-only-by-default); the controller forwards to the
+ * backend {@code /api/v1/users/search} with the bearer token attached by {@link BackendApiClient}.
+ * The page size is hardcoded at 1000 and sorted by username — autocomplete lists are short, so a
+ * single page covers any realistic squadron.
+ */
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -19,6 +28,14 @@ public class UserProxyController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Forwards the autocomplete query to the backend search endpoint and unwraps the page payload
+   * into a flat list. Empty list on backend failure or missing content — the autocomplete renders
+   * an empty result rather than surfacing the error.
+   *
+   * @param query free-text query to forward to the backend
+   * @return matching user records (raw JSON maps), never {@code null}
+   */
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchUsers(@RequestParam String query) {

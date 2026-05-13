@@ -35,6 +35,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface over the Operation aggregate. CRUD + aggregated finance/payout endpoints. Mutations
+ * require MISSION_MANAGER (which the JWT-to-authorities converter also grants users with {@code
+ * app_user.is_mission_manager=true}, even without the Keycloak realm role). Delete is ADMIN-only.
+ *
+ * <p>The status transitions follow the {@code OperationStatus.canTransitionTo} state machine:
+ * {@code PLANNED → {ACTIVE, CANCELED}}, {@code ACTIVE → {COMPLETED, CANCELED}}, terminal states are
+ * sticky. Admins can bypass the gate — {@link #updateOperation} resolves the role at the HTTP
+ * boundary and hands a boolean to the service to keep {@code SecurityContextHolder} out of the
+ * service layer (the ArchUnit rule).
+ */
 @RestController
 @RequestMapping("/api/v1/operations")
 @RequiredArgsConstructor
@@ -60,6 +71,11 @@ public class OperationController {
   // CustomJwtGrantedAuthoritiesConverter injects ROLE_MISSION_MANAGER from the DB flag at
   // JWT-decode time.
 
+  /**
+   * Returns paged operation DTOs (whitelist-enforced sort, {@code id} appended as tiebreaker).
+   *
+   * @return paged operation DTOs (whitelist-enforced sort, {@code id} appended as tiebreaker)
+   */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -90,6 +106,12 @@ public class OperationController {
         PaginationUtil.toSortStrings(dtoPage.getSort()));
   }
 
+  /**
+   * Returns the operation DTO.
+   *
+   * @param id operation id
+   * @return the operation DTO
+   */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Get operation by ID")
@@ -102,6 +124,12 @@ public class OperationController {
     return operationMapper.toDto(operationService.getOperationById(id));
   }
 
+  /**
+   * Aggregated finance roll-up across all missions of the operation.
+   *
+   * @param id operation id
+   * @return finance summary DTO
+   */
   @GetMapping("/{id}/finances")
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -119,6 +147,13 @@ public class OperationController {
     return operationFinanceService.getOperationFinances(id);
   }
 
+  /**
+   * Per-participant time-share for payout splitting (DONATE in any sub-mission is sticky for the
+   * whole operation).
+   *
+   * @param id operation id
+   * @return payout rows sorted by participant name
+   */
   @GetMapping("/{id}/payouts")
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -136,6 +171,12 @@ public class OperationController {
     return operationService.getOperationPayouts(id);
   }
 
+  /**
+   * Creates a new operation.
+   *
+   * @param createDto create payload
+   * @return the persisted DTO
+   */
   @PostMapping
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   @Operation(summary = "Create a new operation")
@@ -151,6 +192,16 @@ public class OperationController {
     return operationMapper.toDto(operationService.createOperation(operation));
   }
 
+  /**
+   * Updates an existing operation with optimistic-lock + state-machine validation. Admin role is
+   * resolved at the HTTP boundary and forwarded as a boolean so the service stays free of {@code
+   * SecurityContextHolder} reads (ArchUnit rule).
+   *
+   * @param id operation id
+   * @param updateDto update payload (carries expected version + new status)
+   * @param authentication current Spring Security authentication
+   * @return the persisted DTO
+   */
   @PutMapping("/{id}")
   @PreAuthorize("hasRole('MISSION_MANAGER')")
   @Operation(
@@ -186,6 +237,13 @@ public class OperationController {
         operationService.updateOperation(id, updateDto, canOverrideStatus));
   }
 
+  /**
+   * Deletes the operation but keeps its missions alive (sets {@code mission.operation=null}).
+   * ADMIN-only.
+   *
+   * @param id operation id
+   * @return 204 No Content
+   */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(

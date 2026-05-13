@@ -9,7 +9,9 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
- * {@link ExchangeFilterFunction}s emitted by the frontend {@code WebClient} to achieve two goals.
+ * Provides {@link ExchangeFilterFunction}s for the frontend {@code WebClient}.
+ *
+ * <p>Two goals:
  *
  * <ul>
  *   <li><b>Correlation propagation</b> – injects the current request's {@code X-Correlation-Id}
@@ -35,7 +37,7 @@ public class WebClientLoggingFilter {
   private final LoggingProperties loggingProperties;
 
   /**
-   * Builds the filter that propagates the correlation id.
+   * Returns filter that adds the correlation id header if one is bound to the current thread.
    *
    * @return filter that adds the correlation id header if one is bound to the current thread.
    */
@@ -55,7 +57,8 @@ public class WebClientLoggingFilter {
   }
 
   /**
-   * Builds the per-call structured logging filter.
+   * Returns filter that logs one line per call including method/host/path/status/duration. Slow
+   * calls are escalated to WARN.
    *
    * @return filter that logs one line per call including method/host/path/status/duration. Slow
    *     calls are escalated to WARN.

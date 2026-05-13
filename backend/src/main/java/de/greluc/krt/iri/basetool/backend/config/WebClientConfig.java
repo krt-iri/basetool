@@ -8,9 +8,27 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
+/**
+ * Centrally configured {@link WebClient.Builder} bean with timeouts and a bounded connection pool.
+ *
+ * <p>Explicit connect/read/write timeouts (5&nbsp;s connect, 30&nbsp;s read, 30&nbsp;s write) bound
+ * every layer of an outbound call so the JVM never hangs on a slow or misbehaving upstream like the
+ * UEX API. The previous configuration only had a Reactor-level {@code .timeout()} on the response
+ * {@code Mono}, which does NOT bound the socket-connect phase — a TCP connect to an unreachable
+ * host would still wait the OS default ({@code 1+}&nbsp;min on Linux, {@code 21}&nbsp;s on
+ * Windows). The connection pool is sized for the typical UEX-sync workload (50 concurrent
+ * connections, 20&nbsp;s idle eviction).
+ */
 @Configuration
 public class WebClientConfig {
 
+  /**
+   * Returns a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool and
+   * timeouts; injected by services that talk to external HTTP endpoints.
+   *
+   * @return a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool and
+   *     timeouts; injected by services that talk to external HTTP endpoints
+   */
   @Bean
   public WebClient.Builder webClientBuilder() {
     reactor.netty.resources.ConnectionProvider provider =

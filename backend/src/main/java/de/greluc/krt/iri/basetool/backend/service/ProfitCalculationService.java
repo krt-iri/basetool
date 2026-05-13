@@ -20,6 +20,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Computes the best per-material buy/sell margin given a chosen ship and an optional star-system
+ * filter.
+ *
+ * <p>Drives the profit-calculation page: for each material, finds the lowest auto-load buy price
+ * and the highest auto-load sell price across the (filtered) terminal set, then derives the per-SCU
+ * profit, the margin percent, and the full-load profit using the ship's SCU capacity. "Hull
+ * C"-class ships only get terminals with a loading dock — the in-universe rule that a Hull C cannot
+ * land planet-side.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,6 +38,18 @@ public class ProfitCalculationService {
   private final MaterialPriceRepository materialPriceRepository;
   private final ShipTypeRepository shipTypeRepository;
 
+  /**
+   * Calculates the profit table for one ship across the chosen star systems.
+   *
+   * <p>Materials without both a positive buy and a positive sell price are dropped. Hull-C
+   * filtering happens in memory after the price fetch so the SQL stays general-purpose. The result
+   * is sorted alphabetically by material name so the on-screen order is stable across reloads.
+   *
+   * @param shipId chosen ship type's id; supplies the SCU capacity
+   * @param starSystemNames optional star-system filter; null/empty means "all auto-load terminals"
+   * @return profit rows, one per material with both buy and sell sides; alphabetically sorted
+   * @throws IllegalArgumentException when {@code shipId} does not resolve to a ship type
+   */
   @Transactional(readOnly = true)
   public List<ProfitCalculationDto> calculateProfit(UUID shipId, List<String> starSystemNames) {
     log.debug("Calculating profit for shipId: {} and starSystems: {}", shipId, starSystemNames);

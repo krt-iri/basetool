@@ -54,20 +54,20 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    */
   @Query(
       """
-          SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto(
-              m.id, m.name, c.id, c.name, c.version,
-              m.isIllegal, m.isVolatileQt, m.isVolatileTime,
-              MIN(CASE WHEN p.priceBuy > 0 THEN p.priceBuy ELSE null END),
-              MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END)
-          )
-          FROM Material m
-          LEFT JOIN m.category c
-          JOIN MaterialPrice p ON p.material = m
-          WHERE (cast(:name as string) IS NULL
-              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')))
-          AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
-          GROUP BY m.id, m.name, c.id, c.name, c.version,
-              m.isIllegal, m.isVolatileQt, m.isVolatileTime
+      SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto(
+          m.id, m.name, c.id, c.name, c.version,
+          m.isIllegal, m.isVolatileQt, m.isVolatileTime,
+          MIN(CASE WHEN p.priceBuy > 0 THEN p.priceBuy ELSE null END),
+          MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END)
+      )
+      FROM Material m
+      LEFT JOIN m.category c
+      JOIN MaterialPrice p ON p.material = m
+      WHERE (cast(:name as string) IS NULL
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')))
+      AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
+      GROUP BY m.id, m.name, c.id, c.name, c.version,
+          m.isIllegal, m.isVolatileQt, m.isVolatileTime
       """)
   Page<MaterialPriceOverviewDto> getMaterialPriceOverview(
       @Param("name") String name, Pageable pageable);

@@ -48,6 +48,22 @@ public class AdminPersonalInventoryPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Renders the admin personal-inventory page.
+   *
+   * <p>Without a {@code userSub} selected the page shows the user picker and an empty item list.
+   * With {@code userSub} the picker pre-selects that user and the item table shows their inventory.
+   * {@code adminMode=true} drives the "ADMIN MODE" banner in the template so admins are visually
+   * reminded they are looking at someone else's data.
+   *
+   * @param userSub Keycloak {@code sub} of the user whose inventory to show, or {@code null}
+   * @param q optional free-text filter
+   * @param page zero-based page index
+   * @param size page size, defaults to 50
+   * @param sort optional sort spec
+   * @param model Thymeleaf model populated with users, items, page metadata and the admin banner
+   * @return the {@code admin/personal-inventory} view name
+   */
   @GetMapping
   public String view(
       @RequestParam(required = false) String userSub,
@@ -83,6 +99,18 @@ public class AdminPersonalInventoryPageController {
     return "admin/personal-inventory";
   }
 
+  /**
+   * Creates a personal-inventory item for the target user. Unlike its non-admin counterpart this
+   * handler is allowed to push the BindingResult through the redirect flash — the create flow here
+   * always redirects back through {@link #redirectToList} so the modal state has to survive the
+   * redirect.
+   *
+   * @param userSub target user's Keycloak {@code sub}
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the admin list (with optional form + binding-result flash)
+   */
   @PostMapping("/{userSub}/add")
   public String add(
       @PathVariable @NotNull String userSub,
@@ -118,6 +146,17 @@ public class AdminPersonalInventoryPageController {
     return redirectToList(userSub);
   }
 
+  /**
+   * Updates a target user's personal-inventory item. A 409 surfaces as a dedicated optimistic-lock
+   * toast via {@link #classifyError}.
+   *
+   * @param userSub target user's Keycloak {@code sub} (used only for the redirect target)
+   * @param id inventory item id
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the admin list
+   */
   @PostMapping("/{userSub}/{id}/update")
   public String update(
       @PathVariable @NotNull String userSub,
@@ -155,6 +194,14 @@ public class AdminPersonalInventoryPageController {
     return redirectToList(userSub);
   }
 
+  /**
+   * Deletes a target user's personal-inventory item.
+   *
+   * @param userSub target user's Keycloak {@code sub} (used only for the redirect target)
+   * @param id inventory item id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the admin list
+   */
   @PostMapping("/{userSub}/{id}/delete")
   public String delete(
       @PathVariable @NotNull String userSub,

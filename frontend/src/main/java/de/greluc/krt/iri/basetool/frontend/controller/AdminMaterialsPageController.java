@@ -28,6 +28,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Spring MVC controller for the admin material catalog ({@code /admin/materials}).
+ *
+ * <p>The materials list is the heaviest reference-data table in the app — every UEX commodity plus
+ * the project-specific job-order materials. The page renders the list once (sorted
+ * case-insensitively) and uses a dedicated AJAX endpoint for the field-by-field admin edits so a
+ * single category re-assignment doesn't reload the whole table. Category create/delete still goes
+ * through full-page redirects because both invalidate the materials cache.
+ */
 @Controller
 @RequestMapping("/admin/materials")
 @RequiredArgsConstructor
@@ -37,6 +46,16 @@ public class AdminMaterialsPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /**
+   * Loads the full materials list (size=1000, sorted by name asc) plus the category dropdown
+   * source. The "refined materials" model attribute is the same list sorted again
+   * case-insensitively — admins assign raw materials to a refined one even when the UEX flag is
+   * wrong, so the dropdown intentionally includes every material rather than filtering by {@code
+   * isRefined}.
+   *
+   * @param model Thymeleaf model populated with materials, refined-materials and categories
+   * @return the {@code admin/materials} view name
+   */
   @GetMapping
   public String listMaterials(Model model) {
     try {
@@ -81,6 +100,14 @@ public class AdminMaterialsPageController {
     return "admin/materials";
   }
 
+  /**
+   * Creates a new material category. The backend returns the created record; the page only needs to
+   * flash a success/error toast and redirect to refresh the dropdown.
+   *
+   * @param name category name (must be unique across categories — backend enforces)
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/materials}
+   */
   @PostMapping("/categories")
   public String createCategory(@RequestParam String name, RedirectAttributes redirectAttributes) {
     try {
@@ -96,6 +123,15 @@ public class AdminMaterialsPageController {
     return "redirect:/admin/materials";
   }
 
+  /**
+   * Deletes a material category. The backend's referential-integrity check refuses the call when
+   * any material still references the category — the resulting 409 surfaces as a generic delete
+   * error toast.
+   *
+   * @param id category id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/materials}
+   */
   @PostMapping("/categories/{id}/delete")
   public String deleteCategory(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -108,6 +144,20 @@ public class AdminMaterialsPageController {
     return "redirect:/admin/materials";
   }
 
+  /**
+   * AJAX endpoint that edits a single field on a material in place. The request's {@code
+   * updateType} discriminator selects which field is being touched ({@code CATEGORY}, {@code
+   * REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}); every other field on
+   * the material is preserved from the freshly-fetched current record. A {@code MANUAL_RAW} or
+   * {@code JOB_ORDER} change additionally clears the frontend's static-data cache so dependent
+   * pages see the new flag without a full reload. Failures collapse to a generic 500 — the AJAX
+   * layer in the template renders a toast instead of relying on per-status semantics.
+   *
+   * @param id material id
+   * @param request AJAX patch payload
+   * @return the freshly re-fetched material on success, 400 on unknown update type, 500 on backend
+   *     failure
+   */
   @ResponseBody
   @PutMapping("/{id}/ajax")
   public ResponseEntity<MaterialDto> updateMaterialAjax(

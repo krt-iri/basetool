@@ -17,6 +17,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Imports the UEX refining-method catalog and the per-terminal refinery yield matrix.
+ *
+ * <p>The two sync paths are independent and both idempotent. The yields path is the one that has
+ * shipped bugs in the past: it must never auto-create placeholder materials or terminals — the
+ * commodity catalog and the universe sync are the single sources of truth for those tables. A yield
+ * row with an unknown commodity or terminal id is silently skipped (the row gets retried on the
+ * next sync once the parent catalog catches up).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,6 +37,10 @@ public class UexRefinerySyncService {
   private final MaterialRepository materialRepository;
   private final TerminalRepository terminalRepository;
 
+  /**
+   * Syncs the {@code refining_method} table from UEX. Rows are upserted by name. Empty response or
+   * a row with blank name is silently skipped.
+   */
   @Transactional
   public void syncRefiningMethods() {
     log.info("Starting sync for Refining Methods...");
@@ -72,6 +85,10 @@ public class UexRefinerySyncService {
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
   }
 
+  /**
+   * Syncs the {@code refinery_yield} matrix from UEX. Rows where the commodity or terminal id is
+   * unknown locally are silently skipped — the catalog parents own those tables.
+   */
   @Transactional
   public void syncRefineryYields() {
     log.info("Starting sync for Refinery Yields...");

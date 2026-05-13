@@ -11,6 +11,14 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Seeds the default roles and the IRIDIUM squadron on first startup.
+ *
+ * <p>Roles are matched by {@code code}, not by {@code name}, so an admin renaming a role in the
+ * admin UI does not trigger a silent re-create with the default permissions on the next boot. The
+ * permission sets here are the baseline a fresh DB needs to bring up the security model — admins
+ * extend them at runtime via the role-management screens.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class DataInitializer {
@@ -18,6 +26,13 @@ public class DataInitializer {
   private final RoleRepository roleRepository;
   private final SquadronRepository squadronRepository;
 
+  /**
+   * Returns a {@link CommandLineRunner} that runs the role + squadron seeding exactly once at boot.
+   * Each individual upsert is guarded by an existence check, so the runner is safe to invoke on a
+   * non-empty database.
+   *
+   * @return the seeding runner Spring Boot executes after the context is ready
+   */
   @Bean
   public CommandLineRunner initRoles() {
     return args -> {

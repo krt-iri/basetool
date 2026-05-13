@@ -73,6 +73,15 @@ public class PersonalInventoryItemService {
   // Owner-scoped API
   // ---------------------------------------------------------------------------------
 
+  /**
+   * Owner-scoped paged list. Every row is filtered by {@code ownerSub} so a caller can never see
+   * another user's items even if they craft the query parameters.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param query optional case-insensitive substring filter on the item name
+   * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
+   * @return paged response DTOs
+   */
   public Page<PersonalInventoryItemResponse> listOwn(
       @NotNull String ownerSub, @Nullable String query, @NotNull Pageable pageable) {
     Page<PersonalInventoryItem> page =
@@ -83,10 +92,29 @@ public class PersonalInventoryItemService {
     return page.map(mapper::toResponse);
   }
 
+  /**
+   * Owner-scoped lookup of a single item. Returns 404 if the id is unknown OR if the item belongs
+   * to a different user (the two cases are deliberately indistinguishable in the response so a
+   * caller cannot probe for other users' item ids).
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @return response DTO
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   */
   public PersonalInventoryItemResponse getOwn(@NotNull String ownerSub, @NotNull UUID id) {
     return mapper.toResponse(loadOwn(ownerSub, id));
   }
 
+  /**
+   * Creates an item owned by the caller. The location name is resolved against the local UEX mirror
+   * and stored as a snapshot so a future UEX rename of the city/station does not silently change
+   * the displayed location.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param request create payload
+   * @return the persisted DTO
+   */
   @Transactional
   public PersonalInventoryItemResponse createOwn(
       @NotNull String ownerSub, @NotNull PersonalInventoryItemCreateRequest request) {
@@ -99,6 +127,17 @@ public class PersonalInventoryItemService {
     return mapper.toResponse(saved);
   }
 
+  /**
+   * Updates an owner-scoped item with explicit optimistic-lock check. Re-resolves the location
+   * snapshot only when the location reference actually changed.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
   @Transactional
   public PersonalInventoryItemResponse updateOwn(
       @NotNull String ownerSub,
@@ -108,6 +147,13 @@ public class PersonalInventoryItemService {
     return applyUpdate(entity, request);
   }
 
+  /**
+   * Deletes an owner-scoped item. 404 for unknown id / cross-owner attempts.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   */
   @Transactional
   public void deleteOwn(@NotNull String ownerSub, @NotNull UUID id) {
     PersonalInventoryItem entity = loadOwn(ownerSub, id);
@@ -121,17 +167,45 @@ public class PersonalInventoryItemService {
   // controller binding to keep this method out of reach of regular users.
   // ---------------------------------------------------------------------------------
 
+  /**
+   * Admin-scoped list. Identical implementation to {@link #listOwn} — the {@code targetSub}
+   * supplies the filter — but exposed under a separate name so the controller boundary is
+   * unambiguous: admins call this, regular users never can.
+   *
+   * @param targetSub Keycloak {@code sub} of the user being inspected
+   * @param query optional name filter
+   * @param pageable page request
+   * @return paged response DTOs
+   */
   public Page<PersonalInventoryItemResponse> listForUser(
       @NotNull String targetSub, @Nullable String query, @NotNull Pageable pageable) {
     return listOwn(targetSub, query, pageable);
   }
 
+  /**
+   * Admin-scoped create. Delegates to {@link #createOwn}; the controller layer is responsible for
+   * enforcing the ADMIN role.
+   *
+   * @param targetSub Keycloak {@code sub} of the user to create the item for
+   * @param request create payload
+   * @return the persisted DTO
+   */
   @Transactional
   public PersonalInventoryItemResponse createForUser(
       @NotNull String targetSub, @NotNull PersonalInventoryItemCreateRequest request) {
     return createOwn(targetSub, request);
   }
 
+  /**
+   * Admin-scoped update. Unlike {@link #updateOwn} this lookups the row by id alone — admins are
+   * trusted to know which item they're editing. Optimistic-lock check still applies.
+   *
+   * @param id item primary key
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the item id is unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
   @Transactional
   public PersonalInventoryItemResponse updateForUser(
       @NotNull UUID id, @NotNull PersonalInventoryItemUpdateRequest request) {
@@ -143,6 +217,13 @@ public class PersonalInventoryItemService {
     return applyUpdate(entity, request);
   }
 
+  /**
+   * Admin-scoped delete. Resolves by id alone; logs the owner sub at INFO so the audit trail shows
+   * which user's data was removed by which admin call.
+   *
+   * @param id item primary key
+   * @throws EntityNotFoundException when the item id is unknown
+   */
   @Transactional
   public void deleteForUser(@NotNull UUID id) {
     PersonalInventoryItem entity =
