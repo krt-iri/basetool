@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload SARIF report to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: build/reports/dependency-check/dependency-check-report.sarif
           category: owasp-dependency-check
