@@ -17,8 +17,8 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every material,
+   * ordered by name. Used to populate material pickers without pulling the full Material aggregate.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name, m.quantityType) FROM Material m ORDER BY m.name")
@@ -37,16 +37,18 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByName(String name);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns only the materials that actually have at least one price row at a non-hidden terminal -
+   * useful to suppress materials with no buy/sell data in the trade UI.
    */
   @Query(
       "SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))")
   Page<Material> findAllWithPrices(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Per-material price summary used by the price-overview view: best (minimum) positive buy price
+   * and best (maximum) positive sell price across every non-hidden terminal, plus the material's
+   * category and UEX-style flag columns flattened into the DTO. {@code name} is an optional
+   * case-insensitive substring filter.
    */
   @Query(
       """

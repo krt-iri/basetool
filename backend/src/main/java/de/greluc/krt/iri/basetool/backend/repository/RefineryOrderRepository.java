@@ -83,16 +83,17 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Page<RefineryOrder> findAll(Pageable pageable);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-clears the {@code mission} reference on every refinery order tied to one of the given
+   * missions so the orders survive a mission delete as unassigned (see CLAUDE.md "Operation delete
+   * keeps missions intact" rule for the broader pattern).
    */
   @Modifying
   @Query("UPDATE RefineryOrder r SET r.mission = null WHERE r.mission.id IN :missionIds")
   void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-reassigns every refinery order owned by {@code oldUser} to {@code newUser}; used by the
+   * user-merge flow so refinery history is preserved when two Keycloak accounts get consolidated.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(

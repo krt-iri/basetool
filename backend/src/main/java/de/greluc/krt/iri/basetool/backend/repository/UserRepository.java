@@ -18,8 +18,9 @@ import org.springframework.stereotype.Repository;
 public interface UserRepository extends JpaRepository<User, UUID> {
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective
+   * name with username fallback, rank) ordered by display name. Used to populate user pickers
+   * without pulling the full User aggregate.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY u.displayName")
@@ -86,16 +87,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   Page<User> findAll(Pageable pageable);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Sets {@code inKeycloak = false} on every user whose id is not in the freshly-synced Keycloak id
+   * list. Called by the periodic Keycloak sync so accounts removed upstream become flagged locally
+   * without being deleted (preserves history and FK references).
    */
   @org.springframework.data.jpa.repository.Modifying
   @Query("UPDATE User u SET u.inKeycloak = false WHERE u.id NOT IN :ids")
   void markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns every user carrying the {@code ADMIN} role (case-insensitive match), ordered by
+   * username.
    */
   @Query("SELECT u FROM User u JOIN u.roles r WHERE UPPER(r.name) = 'ADMIN' ORDER BY u.username")
   List<User> findAllAdmins();

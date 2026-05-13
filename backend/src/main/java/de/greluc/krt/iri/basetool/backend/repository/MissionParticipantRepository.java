@@ -36,8 +36,9 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   List<MissionParticipant> findByPlannedMissionJobTypeId(UUID jobTypeId);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-clears the {@code user} reference on every mission participant linked to the given user;
+   * used by the user-delete flow so mission history (guest name, status) survives but the personal
+   * link is removed.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(

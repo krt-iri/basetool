@@ -25,8 +25,10 @@ import org.springframework.stereotype.Repository;
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Loads every {@link InventoryItem} together with its {@code material}, {@code location}, {@code
+   * user}, {@code jobOrder} and {@code mission} relations in one query - the explicit JPQL plus
+   * {@code @EntityGraph} avoids the N+1 the default {@code findAll()} would emit when callers touch
+   * any of those fields.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query("SELECT i FROM InventoryItem i")
@@ -46,8 +48,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findByPersonalFalse(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Optional multi-filter search across non-personal inventory items. Each filter is gated by a
+   * boolean / nullable flag so callers can omit dimensions without building a dynamic query: {@code
+   * hasMaterials}, {@code hasJobOrders} and {@code hasMissions} turn the corresponding {@code IN
+   * :ids} clause on or off; a {@code null minQuality} skips the quality floor.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
@@ -67,8 +71,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Per-user variant of {@link #findGlobalByFilters} - same optional filter contract, but scoped to
+   * the items owned by {@code :user}. Used by the "my inventory" view to enforce isolation at the
+   * data layer rather than relying on the controller alone.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
@@ -89,8 +94,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Aggregates non-personal inventory by {@code material}: total amount, plus an amount-weighted
+   * mean quality (so 10 units at quality 800 plus 5 units at quality 600 land at {@code (10*800 +
+   * 5*600) / 15}). Used by the global "aggregated inventory" view; returns raw {@code Object[]}
+   * tuples - the service layer projects them into {@code AggregatedInventoryDto}.
    */
   @Query(
       "SELECT i.material as material, "
@@ -113,8 +120,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns the total {@code amount} of one material assigned to one job-order whose quality meets
+   * or exceeds the threshold; {@code 0.0} if there is no matching row. Native query because the
+   * {@code COALESCE} + {@code SUM} combination simplifies the null-handling at the call site (the
+   * job-order completion check would otherwise need a separate empty/null guard).
    */
   @Query(
       value =
@@ -129,16 +138,19 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("minQuality") Integer minQuality);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-clears the {@code jobOrder} reference on every inventory item linked to the given
+   * job-order so the items survive the job-order's deletion as unassigned stock.
    */
   @Modifying
   @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId")
   void unlinkJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-clears {@code jobOrder} only on items of one specific material under the job-order; used
+   * by the handover flow when a single material gets returned. {@code clearAutomatically =
+   * flushAutomatically = true} flushes pending changes first and clears the persistence context
+   * afterwards so any subsequent {@code repository.save(entity)} call in the same transaction does
+   * not collide with a stale {@code @Version} - see the loop-bulk-update note in CLAUDE.md.
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
@@ -147,16 +159,19 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-clears the {@code mission} reference on every inventory item belonging to one of the given
+   * missions so the items survive a mission delete as unassigned stock.
    */
   @Modifying
   @Query("UPDATE InventoryItem i SET i.mission = null WHERE i.mission.id IN :missionIds")
   void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Finds inventory items whose seven natural-key dimensions ({@code user}, {@code material},
+   * {@code location}, {@code quality}, {@code mission}, {@code jobOrder}, {@code personal}) all
+   * match - including the case where the mission, job-order or personal flag is {@code null} on
+   * both sides. Used by the create flow to merge new stock into an existing row instead of
+   * inserting a duplicate.
    */
   @Query(
       "SELECT i FROM InventoryItem i WHERE "
@@ -177,8 +192,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("personal") Boolean personal);
 
   /**
-   * Custom JPQL/native bulk update; see the {@code @Query} annotation for the WHERE clause and the
-   * {@code @Param} contract.
+   * Bulk-reassigns every inventory item owned by {@code oldUser} to {@code newUser}; used by the
+   * user-merge flow so stock is preserved when two Keycloak accounts get consolidated.
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(

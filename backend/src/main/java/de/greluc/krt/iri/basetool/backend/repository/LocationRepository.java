@@ -15,8 +15,8 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends JpaRepository<Location, UUID> {
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns slim {@code LocationReferenceDto}s (id + name) for every non-hidden location, ordered
+   * by name. Used to populate location pickers without pulling the full Location aggregate.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto(l.id, l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name")
@@ -47,8 +47,8 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
   Page<Location> findByHiddenFalse(Pageable pageable);
 
   /**
-   * Custom JPQL/native query; see the {@code @Query} annotation for the projection and filter
-   * clauses.
+   * Returns every location attached to a city or space-station that has a refinery; used as the
+   * picker source when the user creates a refinery order.
    */
   @Query(
       "SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s WHERE c.hasRefinery = true OR s.hasRefinery = true")
