@@ -6,7 +6,7 @@ name: Dependency Check
 # Trigger model:
 #   - weekly cron (Monday 06:00 UTC) catches CVEs published after the last PR
 #   - workflow_dispatch lets a maintainer force a fresh scan on demand
-#   - push to master that touches dependency declarations triggers an
+#   - push to main that touches dependency declarations triggers an
 #     immediate scan so newly-introduced libraries get a same-day verdict
 #
 # The plugin's first run downloads the NVD feed (~500 MB) and takes 5-15
@@ -17,7 +17,7 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - 'build.gradle.kts'
       - '**/build.gradle.kts'
