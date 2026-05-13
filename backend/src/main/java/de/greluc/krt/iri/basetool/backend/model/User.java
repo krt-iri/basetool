@@ -10,6 +10,7 @@ import java.util.UUID;
 import lombok.*;
 import org.jetbrains.annotations.Nullable;
 
+/** User JPA entity. */
 @Entity
 @Table(name = "app_user")
 @Getter

@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
+/** Data transfer record carrying Job Type payload. */
 public record JobTypeDto(
     UUID id,
     String name,

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 
+/** Form-binding object for Refinery Order input. */
 @Data
 public class RefineryOrderForm {
   private String startedAt;
@@ -40,6 +41,7 @@ public class RefineryOrderForm {
   private String source;
   @Valid private List<RefineryGoodForm> goods = new ArrayList<>();
 
+  /** Seeds the form with one empty good row so the "add good" UI starts non-empty. */
   public RefineryOrderForm() {
     goods.add(new RefineryGoodForm());
   }

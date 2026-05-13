@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
+/** Form-binding object for Ship Type input. */
 public record ShipTypeForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
     @NotNull(message = "{validation.manufacturer.required}") UUID manufacturerId,

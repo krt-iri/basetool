@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.*;
 
+/** Job Order Handover JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -41,6 +42,7 @@ public class JobOrderHandover extends AbstractEntity<UUID> {
   @Builder.Default
   private Set<JobOrderHandoverItem> items = new HashSet<>();
 
+  /** Adds a handover item and keeps the bidirectional back-reference in sync. */
   public void addItem(JobOrderHandoverItem item) {
     items.add(item);
     item.setJobOrderHandover(this);

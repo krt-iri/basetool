@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.form;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/** Form-binding object for Manufacturer input. */
 public record ManufacturerForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
     @NotBlank(message = "{validation.abbreviation.required}") @Size(max = 50) String abbreviation,

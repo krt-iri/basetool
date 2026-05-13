@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.form;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
+/** Form-binding object for Participant input. */
 public record ParticipantForm(
     UUID userId,
     @Size(max = 255) String guestName,

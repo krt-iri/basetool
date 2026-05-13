@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/** Material Price JPA entity. */
 @Entity
 @Getter
 @Setter

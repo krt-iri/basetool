@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.*;
 
+/** Refinery Order JPA entity. */
 @Entity
 @Getter
 @Setter

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import lombok.*;
 
+/** Refinery Good JPA entity. */
 @Entity
 @Getter
 @Setter

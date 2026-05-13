@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/** Data transfer record carrying Refinery Order List payload. */
 public record RefineryOrderListDto(
     UUID id,
     UserReferenceDto owner,
@@ -19,6 +20,9 @@ public record RefineryOrderListDto(
     String status,
     List<RefineryGoodDto> goods,
     Long version) {
+  /**
+   * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
+   */
   public Instant getEndsAt() {
     if (startedAt != null && durationMinutes != null) {
       return startedAt.plus(durationMinutes, java.time.temporal.ChronoUnit.MINUTES);

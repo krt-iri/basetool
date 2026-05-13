@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.*;
 
+/** Mission Unit JPA entity. */
 @Entity
 @Getter
 @Setter

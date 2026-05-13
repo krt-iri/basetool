@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Data transfer record carrying Mission List payload. */
 public record MissionListDto(
     UUID id,
     String name,

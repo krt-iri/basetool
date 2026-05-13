@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 
 import java.util.UUID;
 
+/** Data transfer record carrying Terminal payload. */
 public record TerminalDto(
     UUID id,
     String name,

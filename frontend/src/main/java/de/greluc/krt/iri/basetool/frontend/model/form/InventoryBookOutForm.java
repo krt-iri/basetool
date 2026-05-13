@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.Data;
 
+/** Form-binding object for Inventory Book Out input. */
 @Data
 public class InventoryBookOutForm {
 

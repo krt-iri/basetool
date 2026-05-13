@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Inbound request payload for the Update Participant operation. */
 public record UpdateParticipantRequest(
     UUID desiredMissionJobTypeId,
     UUID plannedMissionJobTypeId,

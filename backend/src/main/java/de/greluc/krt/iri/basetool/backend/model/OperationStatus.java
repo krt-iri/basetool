@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
+/** Enumeration of Operation Status values. */
 public enum OperationStatus {
   PLANNED,
   ACTIVE,

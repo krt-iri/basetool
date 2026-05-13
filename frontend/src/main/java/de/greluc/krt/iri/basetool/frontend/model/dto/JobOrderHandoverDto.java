@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/** Data transfer record carrying Job Order Handover payload. */
 public record JobOrderHandoverDto(
     UUID id,
     UUID jobOrderId,

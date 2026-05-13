@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/** Data transfer record carrying Material Matrix Item payload. */
 public record MaterialMatrixItemDto(
     UUID materialId,
     String materialName,
@@ -23,6 +24,10 @@ public record MaterialMatrixItemDto(
     Boolean isJumpPoint,
     Boolean hasLoadingDock,
     Boolean isAutoLoad) {
+  /**
+   * Convenience constructor used by JPA tuple-mapping queries that surface the {@code
+   * MaterialCategory} fields as flat columns; wraps them into a {@link MaterialCategoryDto}.
+   */
   public MaterialMatrixItemDto(
       UUID materialId,
       String materialName,

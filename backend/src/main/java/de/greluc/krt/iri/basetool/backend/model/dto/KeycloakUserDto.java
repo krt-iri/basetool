@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Set;
 import java.util.UUID;
 
+/** Data transfer record carrying Keycloak User payload. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KeycloakUserDto(
     UUID id,

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.*;
 
+/** Job Type JPA entity. */
 @Entity
 @Getter
 @Setter

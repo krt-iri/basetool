@@ -5,6 +5,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.Builder;
 
+/**
+ * Inbound JSON record for UEX Corp's commodity-price endpoint. Mapped onto the project's {@code
+ * MaterialPrice} rows by {@code UexCommodityService}; downstream code consumes the entity, not this
+ * DTO.
+ */
 @Builder
 public record UexCommodityPriceDto(
     @JsonProperty("id_commodity") Integer idCommodity,

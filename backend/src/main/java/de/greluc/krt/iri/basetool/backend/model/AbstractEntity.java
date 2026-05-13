@@ -14,6 +14,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.proxy.HibernateProxy;
 import org.springframework.data.domain.Persistable;
 
+/** Base class shared by all JPA entities (Abstract Entity). */
 @MappedSuperclass
 @Getter
 @Setter

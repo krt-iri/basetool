@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
+/** Data transfer record carrying Mission Finance Entry Update payload. */
 public record MissionFinanceEntryUpdateDto(
     String note,
     @NotNull FinanceType type,

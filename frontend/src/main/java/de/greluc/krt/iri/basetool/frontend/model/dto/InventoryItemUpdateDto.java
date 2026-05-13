@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
+/** Data transfer record carrying Inventory Item Update payload. */
 public record InventoryItemUpdateDto(
     UUID materialId,
     UUID locationId,

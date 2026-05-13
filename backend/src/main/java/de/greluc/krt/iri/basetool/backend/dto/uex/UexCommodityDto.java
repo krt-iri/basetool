@@ -3,6 +3,11 @@ package de.greluc.krt.iri.basetool.backend.dto.uex;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 
+/**
+ * Inbound JSON record for UEX Corp's <code>/commodities</code> catalogue endpoint. Mapped to the
+ * project's own {@code Material} entity by {@code UexCommodityService}; downstream code consumes
+ * the entity, not this DTO.
+ */
 @Builder
 public record UexCommodityDto(
     @JsonProperty("id") Integer id,
