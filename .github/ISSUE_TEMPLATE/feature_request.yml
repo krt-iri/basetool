@@ -1,0 +1,90 @@
+name: Feature Request
+description: Ein neues Feature oder eine Erweiterung vorschlagen.
+title: "[Feature] "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Use Case
+      description: >-
+        Welches Problem löst das Feature? Wer profitiert davon?
+        Welche Rolle (ADMIN / OFFICER / LOGISTICIAN / MISSION_MANAGER /
+        SQUADRON_MEMBER / GUEST)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Vorgeschlagene Lösung
+      description: >-
+        Wie könnte das Feature aussehen? UI-Skizze, API-Shape, Workflow —
+        was immer hilft, das Endbild zu schärfen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen / Workarounds
+      description: >-
+        Was wäre die Lösung ohne dieses Feature? Welche Alternativen
+        wurden verworfen und warum?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Betroffener Bereich
+      multiple: true
+      options:
+        - Backend (REST API / Service / Repository)
+        - Frontend (Thymeleaf / Controller / JS)
+        - Datenbank / Flyway-Migration
+        - Security / OIDC / Keycloak / Rollen
+        - UEX-Integration
+        - Hangar / Inventory / Refinery
+        - Mission Planning / Operations
+        - Inventar / Bestand
+        - i18n / UI-Texte / Styleguide
+        - Build / Gradle / CI
+        - Docker / Compose / Stack
+        - Sonstiges
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Implementierungsumfang (zur Erinnerung)
+      description: Bitte abhaken, was bei der Umsetzung mitgedacht werden muss.
+      options:
+        - label: Erfordert eine Flyway-Migration (V<n>__<desc>.sql)
+        - label: Erfordert neue/geänderte Rollen-Logik (`@PreAuthorize`, `app_user`-Flags)
+        - label: Erfordert Multi-User-Datenisolation (Filter nach JWT-`sub`)
+        - label: Hat eine UI-Komponente (Responsive-Check Smartphone/Tablet/Desktop/Ultra-wide nötig)
+        - label: Führt neue user-sichtbare Strings ein (i18n-Keys in de + en + Fallback)
+        - label: Erfordert einen Eintrag in `CHANGELOG.md` unter `[Unreleased]`
+        - label: Erfordert OpenAPI-Updates (`openapi.json` + SpringDoc-Annotationen)
+        - label: Erfordert Resilience4j-Konfiguration für neue Backend-Calls
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien
+      description: Woran erkennen wir, dass das Feature "fertig" ist?
+      value: |
+        - [ ]
+        - [ ] Tests vorhanden (Unit + ggf. MVC-/Integrations-Test)
+        - [ ] `./gradlew check` läuft grün
+        - [ ] CHANGELOG-Eintrag vorhanden
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Self-Check
+      options:
+        - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
+          required: true

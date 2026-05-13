@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class SystemSettingService {
 
   private final SystemSettingRepository systemSettingRepository;
@@ -31,7 +32,6 @@ public class SystemSettingService {
    *
    * @return all settings as DTOs
    */
-  @Transactional(readOnly = true)
   public List<SystemSettingDto> getAllSettings() {
     return systemSettingRepository.findAll().stream().map(systemSettingMapper::toDto).toList();
   }
@@ -43,7 +43,6 @@ public class SystemSettingService {
    * @return the setting DTO
    * @throws NotFoundException when the key is not present
    */
-  @Transactional(readOnly = true)
   public SystemSettingDto getSetting(String key) {
     return systemSettingRepository
         .findById(key)
@@ -58,7 +57,6 @@ public class SystemSettingService {
    * @param key setting key
    * @return the string value, or empty when the key is absent
    */
-  @Transactional(readOnly = true)
   public Optional<String> getSettingValue(String key) {
     return systemSettingRepository.findById(key).map(SystemSetting::getValue);
   }

@@ -26,6 +26,7 @@ import org.springframework.util.StringUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class UexVehicleService {
 
   private final UexClient uexClient;

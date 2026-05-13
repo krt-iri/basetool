@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +35,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew

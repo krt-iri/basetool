@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ProfitCalculationService {
 
   private final MaterialPriceRepository materialPriceRepository;
@@ -50,7 +51,6 @@ public class ProfitCalculationService {
    * @return profit rows, one per material with both buy and sell sides; alphabetically sorted
    * @throws IllegalArgumentException when {@code shipId} does not resolve to a ship type
    */
-  @Transactional(readOnly = true)
   public List<ProfitCalculationDto> calculateProfit(UUID shipId, List<String> starSystemNames) {
     log.debug("Calculating profit for shipId: {} and starSystems: {}", shipId, starSystemNames);
 

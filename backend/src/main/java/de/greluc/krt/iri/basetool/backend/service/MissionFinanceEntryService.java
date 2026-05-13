@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class MissionFinanceEntryService {
 
   private final MissionFinanceEntryRepository financeEntryRepository;
@@ -61,7 +62,6 @@ public class MissionFinanceEntryService {
    * @param pageable page request
    * @return paged finance entries for the mission
    */
-  @Transactional(readOnly = true)
   public Page<MissionFinanceEntryDto> getEntriesByMission(UUID missionId, Pageable pageable) {
     return financeEntryRepository.findAllByMissionId(missionId, pageable).map(missionMapper::toDto);
   }
@@ -74,7 +74,6 @@ public class MissionFinanceEntryService {
    * @param missionId mission id
    * @return signed total in mission credits
    */
-  @Transactional(readOnly = true)
   public BigDecimal calculateTotalSum(UUID missionId) {
     List<MissionFinanceEntry> entries = financeEntryRepository.findAllByMissionId(missionId);
     BigDecimal total = BigDecimal.ZERO;

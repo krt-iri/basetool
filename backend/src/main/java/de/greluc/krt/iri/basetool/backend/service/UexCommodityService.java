@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class UexCommodityService {
 
   private final UexClient uexClient;

@@ -62,6 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class InventoryItemService {
 
   /**
@@ -90,7 +91,6 @@ public class InventoryItemService {
    * @param pageable page request
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
-  @Transactional(readOnly = true)
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
     return inventoryItemRepository
         .getAggregatedInventory(pageable)
@@ -113,7 +113,6 @@ public class InventoryItemService {
    * @return paged inventory items (excludes personal items)
    * @throws NotFoundException when the material id is unknown
    */
-  @Transactional(readOnly = true)
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
     Material material =
         materialRepository
@@ -132,7 +131,6 @@ public class InventoryItemService {
    * @param pageable page request
    * @return paged inventory items owned by the user
    */
-  @Transactional(readOnly = true)
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
@@ -146,7 +144,6 @@ public class InventoryItemService {
    * @param userId owner id
    * @return aggregated items grouped by material
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId) {
     return getMyAggregatedInventory(userId, null, null, null, null);
@@ -160,7 +157,6 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
     return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
@@ -179,7 +175,6 @@ public class InventoryItemService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(
           UUID userId,
@@ -220,7 +215,6 @@ public class InventoryItemService {
    * @param minQuality optional min-quality filter
    * @return aggregated squadron-wide items
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
     return getAllAggregatedInventory(materialIds, minQuality, null, null);
@@ -236,7 +230,6 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items grouped by material
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(
           List<UUID> materialIds,
@@ -323,7 +316,6 @@ public class InventoryItemService {
    * @param pageable page request
    * @return paged inventory items
    */
-  @Transactional(readOnly = true)
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds, Integer minQuality, Pageable pageable) {
     return getAllInventory(materialIds, minQuality, null, null, pageable);
@@ -340,7 +332,6 @@ public class InventoryItemService {
    * @param pageable page request
    * @return paged inventory items
    */
-  @Transactional(readOnly = true)
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds,
       Integer minQuality,
@@ -776,7 +767,6 @@ public class InventoryItemService {
    * @return sorted list of {@link MaterialCollectionEntryDto}
    * @throws NotFoundException when the job order is unknown
    */
-  @Transactional(readOnly = true)
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
     jobOrderRepository
         .findById(jobOrderId)

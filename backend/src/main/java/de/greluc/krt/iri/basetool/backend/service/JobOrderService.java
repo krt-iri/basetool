@@ -49,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class JobOrderService {
 
   /**
@@ -121,7 +122,6 @@ public class JobOrderService {
    * @param pageable page request
    * @return paged job orders as DTOs
    */
-  @Transactional(readOnly = true)
   public Page<JobOrderDto> getAllJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
     if (statuses == null || statuses.isEmpty()) {
       return jobOrderRepository.findAll(pageable).map(this::mapToDtoWithStock);
@@ -159,7 +159,6 @@ public class JobOrderService {
    * @return the order as a DTO
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
    */
-  @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(UUID id) {
     JobOrder jobOrder =
         jobOrderRepository
@@ -178,7 +177,6 @@ public class JobOrderService {
    * @param materialId target material on that order
    * @return list of inventory items as DTOs
    */
-  @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto>
       getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
     JobOrder jobOrder =

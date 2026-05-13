@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class OperationFinanceService {
 
   private final OperationRepository operationRepository;
@@ -57,7 +58,6 @@ public class OperationFinanceService {
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no operation
    *     matches the id
    */
-  @Transactional(readOnly = true)
   public OperationFinanceDto getOperationFinances(UUID operationId) {
     Operation operation =
         operationRepository

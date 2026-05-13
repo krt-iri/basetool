@@ -1,0 +1,61 @@
+name: Task / Refactor / Chore
+description: Eine technische Aufgabe ohne direkte User-Sichtbarkeit (Refactor, Tech-Debt, Build, Dependency, Doku).
+title: "[Task] "
+labels:
+  - task
+  - triage
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Kontext / Motivation
+      description: >-
+        Warum ist diese Aufgabe sinnvoll? Welcher Schmerz, welches Risiko
+        oder welcher Nutzen ist damit verbunden? Falls vorhanden: Link auf
+        den auslösenden Bug / Issue / PR.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: >-
+        Was genau soll passieren? Wo? Welche Module, Pakete oder Dateien
+        sind betroffen? Was ist explizit NICHT Teil dieser Aufgabe?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Art der Aufgabe
+      options:
+        - Refactor
+        - Tech-Debt
+        - Dependency-Upgrade (versions.properties / libs.versions.toml)
+        - Build / CI / GitHub Actions
+        - Doku (CLAUDE.md / README / CHANGELOG / Javadoc)
+        - Test-Coverage / Test-Infrastruktur
+        - Performance
+        - Sonstiges
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien
+      description: Was muss zutreffen, damit die Aufgabe als abgeschlossen gilt?
+      value: |
+        - [ ]
+        - [ ] `./gradlew check` läuft grün (Checkstyle, SpotBugs, Tests)
+        - [ ] Keine neuen Lint-Warnungen im geänderten Code
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Self-Check
+      options:
+        - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
+          required: true

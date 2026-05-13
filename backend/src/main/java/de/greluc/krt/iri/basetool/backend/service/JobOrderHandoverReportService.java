@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class JobOrderHandoverReportService {
 
   private static final Color COLOR_BLACK = new Color(0x00, 0x00, 0x00);
@@ -71,7 +72,6 @@ public class JobOrderHandoverReportService {
    * @param userZone the time zone to render the handover time in; may be {@code null}
    * @return PDF as byte array
    */
-  @Transactional(readOnly = true)
   public byte @NotNull [] generateHandoverReport(
       @NotNull UUID jobOrderId, @NotNull UUID handoverId, ZoneId userZone) {
     log.debug(

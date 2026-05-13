@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class OperationService {
 
   private final OperationRepository operationRepository;
@@ -39,7 +40,6 @@ public class OperationService {
    * @param pageable page request
    * @return paged operation list
    */
-  @Transactional(readOnly = true)
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
     return operationRepository.findAll(pageable);
   }
@@ -51,7 +51,6 @@ public class OperationService {
    * @return the operation
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
    */
-  @Transactional(readOnly = true)
   public Operation getOperationById(@NotNull UUID id) {
     return operationRepository
         .findById(id)
@@ -168,7 +167,6 @@ public class OperationService {
    * @return per-participant payout shares, sorted by participant name
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no match
    */
-  @Transactional(readOnly = true)
   public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto>
       getOperationPayouts(@NotNull UUID id) {
     // Use the explicit fetch graph: the loop below touches missions,
