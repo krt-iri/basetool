@@ -8,10 +8,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Danke fuer die Meldung. Bitte fuelle die Felder so vollstaendig wie moeglich aus —
-        unvollstaendige Reports verzoegern den Fix.
+        Danke für die Meldung. Bitte fülle die Felder so vollständig wie möglich aus —
+        unvollständige Reports verzögern den Fix.
 
-        **Sicherheitsluecken bitte NICHT hier melden**, sondern vertraulich ueber
+        **Sicherheitslücken bitte NICHT hier melden**, sondern vertraulich über
         [GitHub Security Advisories](https://github.com/krt-iri/basetool/security/advisories/new).
 
   - type: textarea
@@ -42,7 +42,7 @@ body:
         - i18n / UI-Texte / Styleguide
         - Build / Gradle / CI
         - Docker / Compose / Stack
-        - Sonstiges (im Detail erlaeutern)
+        - Sonstiges (im Detail erläutern)
     validations:
       required: true
 
@@ -90,10 +90,10 @@ body:
   - type: textarea
     id: actual
     attributes:
-      label: Tatsaechliches Verhalten
+      label: Tatsächliches Verhalten
       description: >-
         Stacktrace, Screenshot, HTTP-Response — was zur Diagnose hilft.
-        Bitte keine Tokens, Passwoerter oder personenbezogenen Daten posten.
+        Bitte keine Tokens, Passwörter oder personenbezogenen Daten posten.
     validations:
       required: true
 
@@ -103,7 +103,7 @@ body:
       label: Logs / Correlation-ID
       description: >-
         Die `correlationId` aus dem `X-Correlation-Id`-Response-Header oder
-        aus dem MDC-Log-Feld. Wenn ein Stacktrace vorliegt, bitte vollstaendig
+        aus dem MDC-Log-Feld. Wenn ein Stacktrace vorliegt, bitte vollständig
         posten — aber sensitive Daten vorher entfernen.
       render: text
 
@@ -134,7 +134,7 @@ body:
   - type: dropdown
     id: device
     attributes:
-      label: Endgeraet (nur bei UI-Bugs)
+      label: Endgerät (nur bei UI-Bugs)
       description: Welche der vier KRT-Device-Klassen war betroffen?
       options:
         - nicht relevant
@@ -150,7 +150,7 @@ body:
       options:
         - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
           required: true
-        - label: Ich habe keine Tokens, Passwoerter, Mail-Adressen oder Klarnamen im Report hinterlassen.
+        - label: Ich habe keine Tokens, Passwörter, Mail-Adressen oder Klarnamen im Report hinterlassen.
           required: true
-        - label: Mir ist klar, dass Sicherheitsluecken vertraulich gemeldet werden muessen — nicht hier.
+        - label: Mir ist klar, dass Sicherheitslücken vertraulich gemeldet werden müssen — nicht hier.
           required: true
