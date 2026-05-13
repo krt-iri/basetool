@@ -4,7 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
-import org.jetbrains.annotations.NotNull;
+import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -15,6 +15,7 @@ import org.springframework.validation.annotation.Validated;
  */
 @Getter
 @Setter
+@ToString
 @Validated
 @ConfigurationProperties(prefix = "app.logging")
 public class LoggingProperties {
@@ -41,17 +42,4 @@ public class LoggingProperties {
 
     /** Feature flag for structured (JSON) logging, activated in {@code logback-spring.xml}. */
     private boolean structuredEnabled = false;
-
-    @NotNull
-    @Override
-    public String toString() {
-        return "LoggingProperties{" +
-                "correlationIdHeader='" + correlationIdHeader + '\'' +
-                ", correlationIdMdcKey='" + correlationIdMdcKey + '\'' +
-                ", userIdMdcKey='" + userIdMdcKey + '\'' +
-                ", slowRequestThresholdMs=" + slowRequestThresholdMs +
-                ", slowBackendCallThresholdMs=" + slowBackendCallThresholdMs +
-                ", structuredEnabled=" + structuredEnabled +
-                '}';
-    }
 }

@@ -1,17 +1,15 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
+import lombok.RequiredArgsConstructor;
+
 import java.beans.PropertyEditorSupport;
 import java.text.Normalizer;
 
+@RequiredArgsConstructor
 public class NormalizedStringEditor extends PropertyEditorSupport {
 
     private final int maxLength;
     private final boolean emptyAsNull;
-
-    public NormalizedStringEditor(int maxLength, boolean emptyAsNull) {
-        this.maxLength = maxLength;
-        this.emptyAsNull = emptyAsNull;
-    }
 
     @Override
     public void setAsText(String text) throws IllegalArgumentException {
