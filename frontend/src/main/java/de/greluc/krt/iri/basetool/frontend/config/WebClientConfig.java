@@ -38,6 +38,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
+/** Spring configuration for Web Client. */
 @Configuration
 @RequiredArgsConstructor
 public class WebClientConfig {
@@ -125,6 +126,10 @@ public class WebClientConfig {
             .transformDeferred(CircuitBreakerOperator.of(cb));
   }
 
+  /**
+   * OAuth2 authorised-client manager providing {@code authorization_code} and {@code refresh_token}
+   * flows for the authenticated backend WebClient.
+   */
   @Bean
   public OAuth2AuthorizedClientManager authorizedClientManager(
       ClientRegistrationRepository clientRegistrationRepository,
@@ -141,6 +146,11 @@ public class WebClientConfig {
     return authorizedClientManager;
   }
 
+  /**
+   * Authenticated WebClient against the backend: 16 MB max in-memory codec, Resilience4j chain
+   * (timeout, retry, circuit breaker, bulkhead), correlation-id propagation, OAuth2 bearer relay,
+   * defaults to {@code Accept: application/json}.
+   */
   @Bean
   public WebClient webClient(
       OAuth2AuthorizedClientManager authorizedClientManager,
@@ -172,6 +182,10 @@ public class WebClientConfig {
         .build();
   }
 
+  /**
+   * Anonymous WebClient against the backend's public endpoints. Same resilience and logging chain
+   * as {@link #webClient} but without OAuth2 bearer relay.
+   */
   @Bean
   public WebClient publicWebClient(
       CircuitBreakerRegistry cbRegistry,

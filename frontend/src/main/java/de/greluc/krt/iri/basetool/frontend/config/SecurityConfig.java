@@ -28,6 +28,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
+/** Spring configuration for Security. */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -62,6 +63,11 @@ public class SecurityConfig {
     };
   }
 
+  /**
+   * Declares the Keycloak-role inheritance: {@code ADMIN} inherits {@code LOGISTICIAN} and {@code
+   * MISSION_MANAGER}; {@code OFFICER} inherits {@code LOGISTICIAN} and {@code MISSION_MANAGER}.
+   * Mirrored from {@code ROLES_AND_PERMISSIONS.md} - keep both in sync.
+   */
   @Bean
   public static RoleHierarchy roleHierarchy() {
     return RoleHierarchyImpl.fromHierarchy(
@@ -73,6 +79,11 @@ public class SecurityConfig {
                 """);
   }
 
+  /**
+   * Main security filter chain. Wires CSP-nonce, bot-protection, session-debug, request-logging and
+   * backend-role-sync filters; configures OAuth2 login against Keycloak with smart OIDC logout; and
+   * declares the path-by-path permitAll / authenticated matrix.
+   */
   @Bean
   public SecurityFilterChain filterChain(
       HttpSecurity http,
@@ -225,6 +236,10 @@ public class SecurityConfig {
     };
   }
 
+  /**
+   * Maps Keycloak realm roles from the OIDC token's {@code realm_access.roles} claim onto Spring
+   * {@code ROLE_…} authorities (upper-cased, spaces replaced with underscores).
+   */
   @Bean
   @SuppressWarnings("unchecked")
   public GrantedAuthoritiesMapper userAuthoritiesMapper() {

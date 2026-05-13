@@ -20,6 +20,7 @@ public final class CorrelationContext {
     // utility
   }
 
+  /** Stores the given correlation id in the calling thread; a blank value clears the slot. */
   public static void set(@Nullable String correlationId) {
     if (correlationId == null || correlationId.isBlank()) {
       HOLDER.remove();
@@ -28,10 +29,12 @@ public final class CorrelationContext {
     }
   }
 
+  /** Returns the correlation id stored for the current thread, or {@code null} if none set. */
   @Nullable public static String get() {
     return HOLDER.get();
   }
 
+  /** Removes the stored correlation id - call from {@code finally} blocks to avoid leakage. */
   public static void clear() {
     HOLDER.remove();
   }

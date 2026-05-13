@@ -41,11 +41,19 @@ public class BackendServiceException extends RuntimeException {
   private final @NotNull List<FieldError> fieldErrors;
   private final @Nullable String problemDetail;
 
+  /**
+   * Convenience constructor when only the HTTP status is known; problem code becomes {@code
+   * CODE_UNKNOWN}.
+   */
   public BackendServiceException(
       @NotNull String message, @Nullable Throwable cause, int statusCode) {
     this(message, cause, statusCode, CODE_UNKNOWN, null, Collections.emptyList(), null);
   }
 
+  /**
+   * Full constructor used by {@link #fromProblem(WebClientResponseException, ObjectMapper)} after
+   * parsing RFC-7807.
+   */
   public BackendServiceException(
       @NotNull String message,
       @Nullable Throwable cause,

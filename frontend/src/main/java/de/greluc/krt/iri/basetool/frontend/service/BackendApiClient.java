@@ -16,6 +16,18 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+/**
+ * WebClient wrapper for the backend REST API. Centralises the resilience chain (Resilience4j Retry,
+ * CircuitBreaker, bulkhead, timeout - see {@link
+ * de.greluc.krt.iri.basetool.frontend.config.WebClientConfig}), turns RFC-7807 problem responses
+ * into {@link BackendServiceException}, and exposes typed convenience overloads for every HTTP
+ * verb. {@code getCached(...)} layers Spring Cache on top using {@link
+ * CacheConfig#STATIC_DATA_CACHE}.
+ *
+ * <p>Page controllers should call into this client and let {@link
+ * de.greluc.krt.iri.basetool.frontend.exception.GlobalExceptionHandler} surface failures - do not
+ * catch {@link BackendServiceException} on the call site.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -31,30 +43,40 @@ public class BackendApiClient {
    */
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
     return get(uri, responseType, false);
   }
 
+  /** GET overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
+  /** GET overload for simple (non-generic) return types. */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   public <T> T get(String uri, Class<T> responseType) {
     return get(uri, responseType, false);
   }
 
+  /**
+   * Class-typed GET overload that targets the anonymous public WebClient when {@code isPublic} is
+   * true.
+   */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   public <T> T get(String uri, Class<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
+  /**
+   * Cached GET; subsequent calls within {@link CacheConfig#STATIC_DATA_CACHE}'s TTL hit the cache.
+   */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
@@ -62,6 +84,9 @@ public class BackendApiClient {
     return getCached(uri, responseType, false);
   }
 
+  /**
+   * Cached GET overload that targets the anonymous public WebClient when {@code isPublic} is true.
+   */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
@@ -69,6 +94,7 @@ public class BackendApiClient {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
+  /** Class-typed cached GET. */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
@@ -76,6 +102,10 @@ public class BackendApiClient {
     return getCached(uri, responseType, false);
   }
 
+  /**
+   * Class-typed cached GET overload that targets the anonymous public WebClient when {@code
+   * isPublic} is true.
+   */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
@@ -83,6 +113,7 @@ public class BackendApiClient {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
+  /** Drops every entry in {@link CacheConfig#STATIC_DATA_CACHE}; call after admin mutations. */
   @org.springframework.cache.annotation.CacheEvict(
       cacheNames = CacheConfig.STATIC_DATA_CACHE,
       allEntries = true)
@@ -111,11 +142,15 @@ public class BackendApiClient {
     }
   }
 
+  /**
+   * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
+   */
   @CircuitBreaker(name = "backend")
   public <T, R> R post(String uri, T body, Class<R> responseType) {
     return post(uri, body, responseType, false);
   }
 
+  /** POST overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   @CircuitBreaker(name = "backend")
   public <T, R> R post(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePost(isPublic ? publicWebClient : webClient, uri, body, responseType);
@@ -133,11 +168,13 @@ public class BackendApiClient {
     }
   }
 
+  /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
   @CircuitBreaker(name = "backend")
   public <T, R> R put(String uri, T body, Class<R> responseType) {
     return put(uri, body, responseType, false);
   }
 
+  /** PUT overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   @CircuitBreaker(name = "backend")
   public <T, R> R put(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePut(isPublic ? publicWebClient : webClient, uri, body, responseType);
@@ -155,11 +192,13 @@ public class BackendApiClient {
     }
   }
 
+  /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
   @CircuitBreaker(name = "backend")
   public <R> R delete(String uri, Class<R> responseType) {
     return delete(uri, responseType, false);
   }
 
+  /** DELETE overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   @CircuitBreaker(name = "backend")
   public <R> R delete(String uri, Class<R> responseType, boolean isPublic) {
     return executeDelete(isPublic ? publicWebClient : webClient, uri, responseType);
@@ -175,11 +214,15 @@ public class BackendApiClient {
     }
   }
 
+  /**
+   * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
+   */
   @CircuitBreaker(name = "backend")
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
     return patch(uri, body, responseType, false);
   }
 
+  /** PATCH overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   @CircuitBreaker(name = "backend")
   public <T, R> R patch(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePatch(isPublic ? publicWebClient : webClient, uri, body, responseType);

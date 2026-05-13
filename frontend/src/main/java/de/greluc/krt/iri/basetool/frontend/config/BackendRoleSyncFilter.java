@@ -24,6 +24,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/** Servlet filter handling Backend Role Sync. */
 @Component
 @RequiredArgsConstructor
 @Slf4j

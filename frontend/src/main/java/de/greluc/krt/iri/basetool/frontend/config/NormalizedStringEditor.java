@@ -4,6 +4,7 @@ import java.beans.PropertyEditorSupport;
 import java.text.Normalizer;
 import lombok.RequiredArgsConstructor;
 
+/** Spring Normalized String property editor. */
 @RequiredArgsConstructor
 public class NormalizedStringEditor extends PropertyEditorSupport {
 

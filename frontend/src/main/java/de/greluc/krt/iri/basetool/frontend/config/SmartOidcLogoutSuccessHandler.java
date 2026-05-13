@@ -30,6 +30,12 @@ public class SmartOidcLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler
 
   private final OidcClientInitiatedLogoutSuccessHandler oidcHandler;
 
+  /**
+   * @param clientRegistrationRepository Keycloak client registry for resolving the end-session
+   *     endpoint URL
+   * @param postLogoutRedirectUri target URL to redirect to after a successful logout (may contain
+   *     the {@code {baseUrl}} placeholder)
+   */
   public SmartOidcLogoutSuccessHandler(
       @NotNull ClientRegistrationRepository clientRegistrationRepository,
       @NotNull String postLogoutRedirectUri) {
