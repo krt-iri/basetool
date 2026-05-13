@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+
+jobs:
+  build:
+    name: Build, Test & Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # `./gradlew build` runs `assemble` + `check`, and `check` pulls in the
+      # JUnit suite, Checkstyle (Google style) and the SpotBugs `spotbugsMain`
+      # task that the root build script wires into `check`. JaCoCo report
+      # generation is `finalizedBy` the Test task and runs even when tests
+      # fail. `--continue` keeps the build going so lint reports still get
+      # generated when tests fail and vice versa.
+      - name: Build, run tests and lint
+        run: ./gradlew build --continue --stacktrace
+
+      - name: Generate CycloneDX SBOMs
+        if: success()
+        run: ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
+
+      - name: Upload JUnit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload JaCoCo coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: '**/build/reports/jacoco/**'
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Checkstyle reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkstyle-reports
+          path: '**/build/reports/checkstyle/**'
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload SpotBugs reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-reports
+          path: '**/build/reports/spotbugs/**'
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload CycloneDX SBOMs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sboms
+          path: |
+            backend/docs/*-bom.*
+            frontend/docs/*-bom.*
+          retention-days: 30
+          if-no-files-found: warn

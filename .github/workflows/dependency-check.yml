@@ -1,0 +1,92 @@
+name: Dependency Check
+
+# OWASP Dependency-Check scans every transitive dependency for known CVEs and
+# emits SARIF that GitHub aggregates under the repository's Security tab.
+#
+# Trigger model:
+#   - weekly cron (Monday 06:00 UTC) catches CVEs published after the last PR
+#   - workflow_dispatch lets a maintainer force a fresh scan on demand
+#   - push to master that touches dependency declarations triggers an
+#     immediate scan so newly-introduced libraries get a same-day verdict
+#
+# The plugin's first run downloads the NVD feed (~500 MB) and takes 5-15
+# minutes; subsequent runs reuse the cache and finish in seconds. Set the
+# `NVD_API_KEY` repository secret to avoid the public NVD rate limit.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'build.gradle.kts'
+      - '**/build.gradle.kts'
+      - 'versions.properties'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/gradle-wrapper.properties'
+
+concurrency:
+  group: dep-check-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  owasp:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Cache NVD feed
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nvd-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run dependencyCheckAggregate
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -n "$NVD_API_KEY" ]; then
+            ./gradlew dependencyCheckAggregate --stacktrace -PnvdApiKey="$NVD_API_KEY"
+          else
+            ./gradlew dependencyCheckAggregate --stacktrace
+          fi
+
+      - name: Upload SARIF report to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: build/reports/dependency-check/dependency-check-report.sarif
+          category: owasp-dependency-check
+
+      - name: Upload dependency-check reports as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-reports
+          path: build/reports/dependency-check/
+          retention-days: 30
+          if-no-files-found: ignore
