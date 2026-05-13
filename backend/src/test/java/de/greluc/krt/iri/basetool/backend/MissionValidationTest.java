@@ -1,12 +1,20 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddParticipantPublicRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
-import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,245 +29,258 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.util.Set;
-import java.util.UUID;
-
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class MissionValidationTest {
 
-    @Autowired
-    private WebApplicationContext context;
+  @Autowired private WebApplicationContext context;
 
-    private MockMvc mockMvc;
+  private MockMvc mockMvc;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired private UserRepository userRepository;
 
-    @Autowired
-    private MissionRepository missionRepository;
+  @Autowired private MissionRepository missionRepository;
 
-    @Autowired
-    private ShipRepository shipRepository;
+  @Autowired private ShipRepository shipRepository;
 
-    @Autowired
-    private ShipTypeRepository shipTypeRepository;
+  @Autowired private ShipTypeRepository shipTypeRepository;
 
-    @Autowired
-    private MissionService missionService;
+  @Autowired private MissionService missionService;
 
-    @Autowired
-    private JobTypeRepository jobTypeRepository;
+  @Autowired private JobTypeRepository jobTypeRepository;
 
-    @Autowired
-    private SquadronRepository squadronRepository;
+  @Autowired private SquadronRepository squadronRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    private User officerUser;
-    private Mission mission;
-    private MissionUnit missionShip;
-    private JobType taskJobType;
-    private JobType crewJobType;
-    private Squadron testSquadron;
+  private User officerUser;
+  private Mission mission;
+  private MissionUnit missionShip;
+  private JobType taskJobType;
+  private JobType crewJobType;
+  private Squadron testSquadron;
 
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-        officerUser = new User();
-        officerUser.setId(UUID.randomUUID());
-        officerUser.setUsername("officer1");
-        userRepository.save(officerUser);
+    officerUser = new User();
+    officerUser.setId(UUID.randomUUID());
+    officerUser.setUsername("officer1");
+    userRepository.save(officerUser);
 
-        testSquadron = new Squadron();
-        testSquadron.setName("Test Sq");
-        testSquadron.setShorthand("TS");
-        testSquadron = squadronRepository.save(testSquadron);
+    testSquadron = new Squadron();
+    testSquadron.setName("Test Sq");
+    testSquadron.setShorthand("TS");
+    testSquadron = squadronRepository.save(testSquadron);
 
-        ShipType st = new ShipType();
-        st.setName("Fighter");
-        shipTypeRepository.save(st);
+    ShipType st = new ShipType();
+    st.setName("Fighter");
+    shipTypeRepository.save(st);
 
-        Ship ship = new Ship();
-        ship.setName("Test Ship");
-        ship.setInsurance("10");
-        ship.setOwner(officerUser);
-        ship.setShipType(st);
-        shipRepository.save(ship);
+    Ship ship = new Ship();
+    ship.setName("Test Ship");
+    ship.setInsurance("10");
+    ship.setOwner(officerUser);
+    ship.setShipType(st);
+    shipRepository.save(ship);
 
-        mission = new Mission();
-        mission.setName("Test Mission");
-        mission.setStatus("PLANNED");
-        mission = missionRepository.save(mission);
+    mission = new Mission();
+    mission.setName("Test Mission");
+    mission.setStatus("PLANNED");
+    mission = missionRepository.save(mission);
 
-        missionService.addParticipant(mission.getId(), officerUser.getId());
-        missionService.addUnitToMission(mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null);
-        mission = missionRepository.findById(mission.getId()).orElseThrow();
-        missionShip = mission.getAssignedUnits().iterator().next();
+    missionService.addParticipant(mission.getId(), officerUser.getId());
+    missionService.addUnitToMission(
+        mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null);
+    mission = missionRepository.findById(mission.getId()).orElseThrow();
+    missionShip = mission.getAssignedUnits().iterator().next();
 
-        taskJobType = new JobType();
-        taskJobType.setName("Task Job");
-        taskJobType.setArchetype(JobTypeArchetype.MISSION); // Incorrect archetype for crew
-        taskJobType = jobTypeRepository.save(taskJobType);
+    taskJobType = new JobType();
+    taskJobType.setName("Task Job");
+    taskJobType.setArchetype(JobTypeArchetype.MISSION); // Incorrect archetype for crew
+    taskJobType = jobTypeRepository.save(taskJobType);
 
-        crewJobType = new JobType();
-        crewJobType.setName("Crew Job");
-        crewJobType.setArchetype(JobTypeArchetype.CREW); // Incorrect archetype for participant fields
-        crewJobType = jobTypeRepository.save(crewJobType);
-    }
+    crewJobType = new JobType();
+    crewJobType.setName("Crew Job");
+    crewJobType.setArchetype(JobTypeArchetype.CREW); // Incorrect archetype for participant fields
+    crewJobType = jobTypeRepository.save(crewJobType);
+  }
 
-    private UUID getParticipantId(User user) {
-        Mission m = missionRepository.findById(mission.getId()).orElseThrow();
-        return m.getParticipants().stream()
-            .filter(p -> p.getUser() != null && p.getUser().getId().equals(user.getId()))
-            .findFirst().orElseThrow().getId();
-    }
+  private UUID getParticipantId(User user) {
+    Mission m = missionRepository.findById(mission.getId()).orElseThrow();
+    return m.getParticipants().stream()
+        .filter(p -> p.getUser() != null && p.getUser().getId().equals(user.getId()))
+        .findFirst()
+        .orElseThrow()
+        .getId();
+  }
 
-    @Test
-    void testAddCrewWithInvalidJobTypeArchetype_ShouldReturn400() throws Exception {
-        AddCrewRequest request = new AddCrewRequest(getParticipantId(officerUser), Set.of(taskJobType.getId()));
+  @Test
+  void testAddCrewWithInvalidJobTypeArchetype_ShouldReturn400() throws Exception {
+    AddCrewRequest request =
+        new AddCrewRequest(getParticipantId(officerUser), Set.of(taskJobType.getId()));
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/units/" + missionShip.getId() + "/crew")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/units/" + missionShip.getId() + "/crew")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest()); // Expecting 400
-    }
+        .andExpect(status().isBadRequest()); // Expecting 400
+  }
 
-    @Test
-    void testUpdateParticipant_WithCrewArchetypeAsDesired_ShouldReturn400() throws Exception {
-        UpdateParticipantRequest request = new UpdateParticipantRequest(
-                crewJobType.getId(), null, "Invalid Update", null, null, null, null, null, 0L);
+  @Test
+  void testUpdateParticipant_WithCrewArchetypeAsDesired_ShouldReturn400() throws Exception {
+    UpdateParticipantRequest request =
+        new UpdateParticipantRequest(
+            crewJobType.getId(), null, "Invalid Update", null, null, null, null, null, 0L);
 
-        mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(officerUser))
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
+    mockMvc
+        .perform(
+            put("/api/v1/missions/"
+                    + mission.getId()
+                    + "/participants/"
+                    + getParticipantId(officerUser))
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
+        .andExpect(status().isBadRequest());
+  }
 
-    @Test
-    void testUpdateParticipant_WithCrewArchetypeAsPlanned_ShouldReturn400() throws Exception {
-        UpdateParticipantRequest request = new UpdateParticipantRequest(
-                null, crewJobType.getId(), "Invalid Update", null, null, null, null, null, 0L);
+  @Test
+  void testUpdateParticipant_WithCrewArchetypeAsPlanned_ShouldReturn400() throws Exception {
+    UpdateParticipantRequest request =
+        new UpdateParticipantRequest(
+            null, crewJobType.getId(), "Invalid Update", null, null, null, null, null, 0L);
 
-        mockMvc.perform(put("/api/v1/missions/" + mission.getId() + "/participants/" + getParticipantId(officerUser))
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
+    mockMvc
+        .perform(
+            put("/api/v1/missions/"
+                    + mission.getId()
+                    + "/participants/"
+                    + getParticipantId(officerUser))
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
+        .andExpect(status().isBadRequest());
+  }
 
-    @Test
-    void testAddParticipantPublic_GuestNameTaken_ShouldReturn400() throws Exception {
-        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
-            null, "officer1", null, null, null
-        );
+  @Test
+  void testAddParticipantPublic_GuestNameTaken_ShouldReturn400() throws Exception {
+    AddParticipantPublicRequest request =
+        new AddParticipantPublicRequest(null, "officer1", null, null, null);
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
+        .andExpect(status().isBadRequest());
+  }
 
-    @Test
-    void testAddParticipantPublic_GuestNameUnique_ShouldReturn200() throws Exception {
-        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
-            null, "UniqueGuestName", taskJobType.getId(), "Comment", testSquadron.getId()
-        );
+  @Test
+  void testAddParticipantPublic_GuestNameUnique_ShouldReturn200() throws Exception {
+    AddParticipantPublicRequest request =
+        new AddParticipantPublicRequest(
+            null, "UniqueGuestName", taskJobType.getId(), "Comment", testSquadron.getId());
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
-    }
+        .andExpect(status().isOk());
+  }
 
-    /**
-     * Reproduces the bug where an authenticated squadron member types a registered user's
-     * exact name (e.g. "lord_adley") without picking it from the autocomplete dropdown.
-     * The backend must resolve the name to the matching user instead of rejecting the
-     * request with "Guest name is already taken.".
-     */
-    @Test
-    void testAddParticipantPublic_AuthenticatedFreetextName_IsResolvedToMember() throws Exception {
-        User lordAdley = new User();
-        lordAdley.setId(UUID.randomUUID());
-        lordAdley.setUsername("lord_adley");
-        userRepository.save(lordAdley);
+  /**
+   * Reproduces the bug where an authenticated squadron member types a registered user's exact name
+   * (e.g. "lord_adley") without picking it from the autocomplete dropdown. The backend must resolve
+   * the name to the matching user instead of rejecting the request with "Guest name is already
+   * taken.".
+   */
+  @Test
+  void testAddParticipantPublic_AuthenticatedFreetextName_IsResolvedToMember() throws Exception {
+    User lordAdley = new User();
+    lordAdley.setId(UUID.randomUUID());
+    lordAdley.setUsername("lord_adley");
+    userRepository.save(lordAdley);
 
-        User caller = new User();
-        caller.setId(UUID.randomUUID());
-        caller.setUsername("caller");
-        userRepository.save(caller);
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setUsername("caller");
+    userRepository.save(caller);
 
-        // Intentionally mixed case + whitespace to verify case-insensitive, trimmed match.
-        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
-            null, "  Lord_Adley  ", null, null, null
-        );
+    // Intentionally mixed case + whitespace to verify case-insensitive, trimmed match.
+    AddParticipantPublicRequest request =
+        new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null);
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
-                .with(jwt().jwt(builder -> builder.subject(caller.getId().toString()))
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(caller.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+        .andExpect(status().isOk());
 
-        Mission refreshed = missionRepository.findById(mission.getId()).orElseThrow();
-        boolean linked = refreshed.getParticipants().stream()
+    Mission refreshed = missionRepository.findById(mission.getId()).orElseThrow();
+    boolean linked =
+        refreshed.getParticipants().stream()
             .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(lordAdley.getId()));
-        org.junit.jupiter.api.Assertions.assertTrue(linked,
-            "Freetext participant name must be resolved to the matching registered user.");
-    }
+    org.junit.jupiter.api.Assertions.assertTrue(
+        linked, "Freetext participant name must be resolved to the matching registered user.");
+  }
 
-    /**
-     * Two registered users share the same displayName. A free-text participant entry matching
-     * that name is ambiguous and must be rejected with 409 Conflict – never silently assigned.
-     */
-    @Test
-    void testAddParticipantPublic_AmbiguousFreetextName_ShouldReturn409() throws Exception {
-        User u1 = new User();
-        u1.setId(UUID.randomUUID());
-        u1.setUsername("ambig_a");
-        u1.setDisplayName("Shared Alias");
-        userRepository.save(u1);
+  /**
+   * Two registered users share the same displayName. A free-text participant entry matching that
+   * name is ambiguous and must be rejected with 409 Conflict – never silently assigned.
+   */
+  @Test
+  void testAddParticipantPublic_AmbiguousFreetextName_ShouldReturn409() throws Exception {
+    User u1 = new User();
+    u1.setId(UUID.randomUUID());
+    u1.setUsername("ambig_a");
+    u1.setDisplayName("Shared Alias");
+    userRepository.save(u1);
 
-        User u2 = new User();
-        u2.setId(UUID.randomUUID());
-        u2.setUsername("ambig_b");
-        u2.setDisplayName("Shared Alias");
-        userRepository.save(u2);
+    User u2 = new User();
+    u2.setId(UUID.randomUUID());
+    u2.setUsername("ambig_b");
+    u2.setDisplayName("Shared Alias");
+    userRepository.save(u2);
 
-        User caller = new User();
-        caller.setId(UUID.randomUUID());
-        caller.setUsername("caller2");
-        userRepository.save(caller);
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setUsername("caller2");
+    userRepository.save(caller);
 
-        AddParticipantPublicRequest request = new AddParticipantPublicRequest(
-            null, "Shared Alias", null, null, null
-        );
+    AddParticipantPublicRequest request =
+        new AddParticipantPublicRequest(null, "Shared Alias", null, null, null);
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
-                .with(jwt().jwt(builder -> builder.subject(caller.getId().toString()))
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(caller.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict());
-    }
+        .andExpect(status().isConflict());
+  }
 }

@@ -1,7 +1,15 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,80 +24,76 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.util.UUID;
-
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class UserManagementTest {
 
-    @Autowired
-    private WebApplicationContext context;
-    
-    private MockMvc mockMvc;
+  @Autowired private WebApplicationContext context;
 
-    @Autowired
-    private UserRepository userRepository;
+  private MockMvc mockMvc;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @Autowired private UserRepository userRepository;
 
-    private User testUser;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+  private User testUser;
 
-        testUser = new User();
-        testUser.setId(UUID.randomUUID());
-        testUser.setUsername("testmember");
-        testUser.setRank(1);
-        userRepository.save(testUser);
-    }
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    @Test
-    void testGetAllUsers_Admin_Allowed() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
-    }
+    testUser = new User();
+    testUser.setId(UUID.randomUUID());
+    testUser.setUsername("testmember");
+    testUser.setRank(1);
+    userRepository.save(testUser);
+  }
 
-    @Test
-    void testGetAllUsers_Guest_Forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
-                .andExpect(status().isForbidden());
-    }
+  @Test
+  void testGetAllUsers_Admin_Allowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
+  }
 
-    @Test
-    void testGetAllUsers_Officer_Allowed() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
-    }
+  @Test
+  void testGetAllUsers_Guest_Forbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+        .andExpect(status().isForbidden());
+  }
 
-    @Test
-    void testUpdateUserAttributes_Admin_Allowed() throws Exception {
-        String updateJson = "{\"rank\": 5, \"description\": \"Promoted\", \"version\": " + testUser.getVersion() + "}";
+  @Test
+  void testGetAllUsers_Officer_Allowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users")
+                .with(
+                    jwt()
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
+  }
 
-        mockMvc.perform(put("/api/v1/users/" + testUser.getId() + "/attributes")
+  @Test
+  void testUpdateUserAttributes_Admin_Allowed() throws Exception {
+    String updateJson =
+        "{\"rank\": 5, \"description\": \"Promoted\", \"version\": " + testUser.getVersion() + "}";
+
+    mockMvc
+        .perform(
+            put("/api/v1/users/" + testUser.getId() + "/attributes")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.rank").value(5))
-                .andExpect(jsonPath("$.description").value("Promoted"));
-    }
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rank").value(5))
+        .andExpect(jsonPath("$.description").value("Promoted"));
+  }
 }

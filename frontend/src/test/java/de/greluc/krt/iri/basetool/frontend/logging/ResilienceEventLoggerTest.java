@@ -18,40 +18,42 @@ import org.slf4j.LoggerFactory;
 
 class ResilienceEventLoggerTest {
 
-    private ListAppender<ILoggingEvent> appender;
-    private Logger logger;
+  private ListAppender<ILoggingEvent> appender;
+  private Logger logger;
 
-    @BeforeEach
-    void setUp() {
-        logger = (Logger) LoggerFactory.getLogger(ResilienceEventLogger.class);
-        appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(Level.INFO);
-    }
+  @BeforeEach
+  void setUp() {
+    logger = (Logger) LoggerFactory.getLogger(ResilienceEventLogger.class);
+    appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.INFO);
+  }
 
-    @AfterEach
-    void tearDown() {
-        logger.detachAppender(appender);
-    }
+  @AfterEach
+  void tearDown() {
+    logger.detachAppender(appender);
+  }
 
-    @Test
-    void logsCircuitBreakerStateTransitionAsWarn() {
-        CircuitBreakerRegistry cbReg = CircuitBreakerRegistry.ofDefaults();
-        // Force a circuit breaker to exist so the logger subscribes to it.
-        CircuitBreaker cb = cbReg.circuitBreaker("test-instance");
-        RetryRegistry retryReg = RetryRegistry.ofDefaults();
-        BulkheadRegistry bhReg = BulkheadRegistry.ofDefaults();
-        TimeLimiterRegistry tlReg = TimeLimiterRegistry.ofDefaults();
+  @Test
+  void logsCircuitBreakerStateTransitionAsWarn() {
+    CircuitBreakerRegistry cbReg = CircuitBreakerRegistry.ofDefaults();
+    // Force a circuit breaker to exist so the logger subscribes to it.
+    CircuitBreaker cb = cbReg.circuitBreaker("test-instance");
+    RetryRegistry retryReg = RetryRegistry.ofDefaults();
+    BulkheadRegistry bhReg = BulkheadRegistry.ofDefaults();
+    TimeLimiterRegistry tlReg = TimeLimiterRegistry.ofDefaults();
 
-        ResilienceEventLogger rel = new ResilienceEventLogger(cbReg, retryReg, bhReg, tlReg);
-        rel.subscribe();
+    ResilienceEventLogger rel = new ResilienceEventLogger(cbReg, retryReg, bhReg, tlReg);
+    rel.subscribe();
 
-        cb.transitionToOpenState();
+    cb.transitionToOpenState();
 
-        assertThat(appender.list)
-                .anyMatch(e -> e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
-                        && e.getFormattedMessage().contains("state transition"));
-    }
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
+                    && e.getFormattedMessage().contains("state transition"));
+  }
 }

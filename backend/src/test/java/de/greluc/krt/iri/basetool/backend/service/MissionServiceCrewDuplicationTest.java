@@ -1,96 +1,96 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class MissionServiceCrewDuplicationTest {
 
-    @Mock private MissionRepository missionRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private MissionParticipantRepository missionParticipantRepository;
-    @Mock private ShipRepository shipRepository;
-    @Mock private JobTypeRepository jobTypeRepository;
-    @Mock private SquadronRepository squadronRepository;
+  @Mock private MissionRepository missionRepository;
+  @Mock private UserRepository userRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private ShipRepository shipRepository;
+  @Mock private JobTypeRepository jobTypeRepository;
+  @Mock private SquadronRepository squadronRepository;
 
-    @InjectMocks
-    private MissionService missionService;
+  @InjectMocks private MissionService missionService;
 
-    @Test
-    void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToSameUnit() {
-        UUID missionId = UUID.randomUUID();
-        UUID unitId = UUID.randomUUID();
-        UUID participantId = UUID.randomUUID();
+  @Test
+  void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToSameUnit() {
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
 
-        Mission mission = new Mission();
-        mission.setId(missionId);
+    Mission mission = new Mission();
+    mission.setId(missionId);
 
-        MissionUnit unit = new MissionUnit();
-        unit.setId(unitId);
-        mission.getAssignedUnits().add(unit);
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
 
-        MissionParticipant participant = new MissionParticipant();
-        participant.setId(participantId);
-        mission.getParticipants().add(participant);
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    mission.getParticipants().add(participant);
 
-        // Pre-assign participant to the same unit
-        MissionCrew existingCrew = new MissionCrew();
-        existingCrew.setMissionUnit(unit);
-        existingCrew.setParticipant(participant);
-        unit.getCrew().add(existingCrew);
+    // Pre-assign participant to the same unit
+    MissionCrew existingCrew = new MissionCrew();
+    existingCrew.setMissionUnit(unit);
+    existingCrew.setParticipant(participant);
+    unit.getCrew().add(existingCrew);
 
-        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-        
-        // Expect exception when trying to add same participant again
-        assertThrows(de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException.class, () -> 
-            missionService.addCrewToShip(missionId, unitId, participantId, Collections.emptySet())
-        );
-    }
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    @Test
-    void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToOtherUnit() {
-        UUID missionId = UUID.randomUUID();
-        UUID unitId1 = UUID.randomUUID();
-        UUID unitId2 = UUID.randomUUID();
-        UUID participantId = UUID.randomUUID();
+    // Expect exception when trying to add same participant again
+    assertThrows(
+        de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException.class,
+        () ->
+            missionService.addCrewToShip(missionId, unitId, participantId, Collections.emptySet()));
+  }
 
-        Mission mission = new Mission();
-        mission.setId(missionId);
+  @Test
+  void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToOtherUnit() {
+    UUID missionId = UUID.randomUUID();
+    UUID unitId1 = UUID.randomUUID();
+    UUID unitId2 = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
 
-        MissionUnit unit1 = new MissionUnit();
-        unit1.setId(unitId1);
-        mission.getAssignedUnits().add(unit1);
-        
-        MissionUnit unit2 = new MissionUnit();
-        unit2.setId(unitId2);
-        mission.getAssignedUnits().add(unit2);
+    Mission mission = new Mission();
+    mission.setId(missionId);
 
-        MissionParticipant participant = new MissionParticipant();
-        participant.setId(participantId);
-        mission.getParticipants().add(participant);
+    MissionUnit unit1 = new MissionUnit();
+    unit1.setId(unitId1);
+    mission.getAssignedUnits().add(unit1);
 
-        // Pre-assign participant to unit 1
-        MissionCrew existingCrew = new MissionCrew();
-        existingCrew.setMissionUnit(unit1);
-        existingCrew.setParticipant(participant);
-        unit1.getCrew().add(existingCrew);
+    MissionUnit unit2 = new MissionUnit();
+    unit2.setId(unitId2);
+    mission.getAssignedUnits().add(unit2);
 
-        when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    mission.getParticipants().add(participant);
 
-        // Expect exception when trying to add same participant to unit 2
-        assertThrows(de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException.class, () -> 
-            missionService.addCrewToShip(missionId, unitId2, participantId, Collections.emptySet())
-        );
-    }
+    // Pre-assign participant to unit 1
+    MissionCrew existingCrew = new MissionCrew();
+    existingCrew.setMissionUnit(unit1);
+    existingCrew.setParticipant(participant);
+    unit1.getCrew().add(existingCrew);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+
+    // Expect exception when trying to add same participant to unit 2
+    assertThrows(
+        de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException.class,
+        () ->
+            missionService.addCrewToShip(
+                missionId, unitId2, participantId, Collections.emptySet()));
+  }
 }

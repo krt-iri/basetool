@@ -5,8 +5,4 @@ import java.util.List;
 import java.util.UUID;
 
 public record OperationFinanceDto(
-        UUID operationId,
-        BigDecimal totalSum,
-        List<MissionFinanceSummaryDto> missions
-) {
-}
+    UUID operationId, BigDecimal totalSum, List<MissionFinanceSummaryDto> missions) {}

@@ -10,5 +10,4 @@ public record InventoryItemCreateDto(
     Double amount,
     Boolean personal,
     UUID missionId,
-    UUID jobOrderId
-) {}
+    UUID jobOrderId) {}

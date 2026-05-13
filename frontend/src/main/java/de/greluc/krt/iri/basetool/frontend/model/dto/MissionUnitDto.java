@@ -6,27 +6,26 @@ import java.util.Map;
 import java.util.UUID;
 
 public record MissionUnitDto(
-        UUID id,
-        String name,
-        ShipTypeDto shipType,
-        ShipDto ship,
-        Double frequency,
-        Boolean highValueUnit,
-        List<MissionCrewDto> crew
-) {
-    public Map<String, Integer> getJobSummary() {
-        if (crew == null) return Map.of();
-        Map<String, Integer> summary = new LinkedHashMap<>();
-        for (MissionCrewDto c : crew) {
-            if (c.jobTypes() != null) {
-                for (JobTypeDto job : c.jobTypes()) {
-                    String jobName = job.name();
-                    if (jobName != null) {
-                        summary.put(jobName, summary.getOrDefault(jobName, 0) + 1);
-                    }
-                }
-            }
+    UUID id,
+    String name,
+    ShipTypeDto shipType,
+    ShipDto ship,
+    Double frequency,
+    Boolean highValueUnit,
+    List<MissionCrewDto> crew) {
+  public Map<String, Integer> getJobSummary() {
+    if (crew == null) return Map.of();
+    Map<String, Integer> summary = new LinkedHashMap<>();
+    for (MissionCrewDto c : crew) {
+      if (c.jobTypes() != null) {
+        for (JobTypeDto job : c.jobTypes()) {
+          String jobName = job.name();
+          if (jobName != null) {
+            summary.put(jobName, summary.getOrDefault(jobName, 0) + 1);
+          }
         }
-        return summary;
+      }
     }
+    return summary;
+  }
 }

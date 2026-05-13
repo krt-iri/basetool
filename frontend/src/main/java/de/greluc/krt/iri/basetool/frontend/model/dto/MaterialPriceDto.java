@@ -11,5 +11,4 @@ public record MaterialPriceDto(
     Integer scuBuy,
     Integer scuSell,
     Boolean statusBuy,
-    Boolean statusSell
-) {}
+    Boolean statusSell) {}

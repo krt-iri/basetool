@@ -11,9 +11,8 @@ public record UexStarSystemDto(
     @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("wiki") String wiki,
     @JsonProperty("jurisdiction_name") String jurisdictionName,
-    @JsonProperty("faction_name") String factionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("faction_name") String factionName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

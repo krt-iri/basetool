@@ -1,11 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.dto.uex;
 
+import java.util.List;
 import lombok.Builder;
 
-import java.util.List;
-
 @Builder
-public record UexResponseDto<T>(
-        String status,
-        List<T> data
-) {}
+public record UexResponseDto<T>(String status, List<T> data) {}

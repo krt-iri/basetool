@@ -40,9 +40,8 @@ public record UexSpaceStationDto(
     @JsonProperty("moon_name") String moonName,
     @JsonProperty("city_name") String cityName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("jurisdiction_name") String jurisdictionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("jurisdiction_name") String jurisdictionName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

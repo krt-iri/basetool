@@ -4,10 +4,4 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record MissionFinanceEntryCreateDto(
-        UUID missionId,
-        UUID participantId,
-        String note,
-        FinanceType type,
-        BigDecimal amount
-) {
-}
+    UUID missionId, UUID participantId, String note, FinanceType type, BigDecimal amount) {}

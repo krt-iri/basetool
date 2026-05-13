@@ -7,5 +7,4 @@ public record GroupedInventoryDto(
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    List<InventoryItemDto> items
-) {}
+    List<InventoryItemDto> items) {}

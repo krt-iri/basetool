@@ -7,9 +7,9 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface MaterialCategoryMapper {
-    MaterialCategoryDto toDto(MaterialCategory entity);
+  MaterialCategoryDto toDto(MaterialCategory entity);
 
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    MaterialCategory toEntity(MaterialCategoryDto dto);
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  MaterialCategory toEntity(MaterialCategoryDto dto);
 }

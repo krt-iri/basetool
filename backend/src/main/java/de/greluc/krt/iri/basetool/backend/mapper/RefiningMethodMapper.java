@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface RefiningMethodMapper {
-    RefiningMethodDto toDto(RefiningMethod entity);
-    RefiningMethod toEntity(RefiningMethodDto dto);
+  RefiningMethodDto toDto(RefiningMethod entity);
+
+  RefiningMethod toEntity(RefiningMethodDto dto);
 }

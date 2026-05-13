@@ -10,38 +10,38 @@ import org.springframework.web.method.HandlerMethod;
 @Configuration
 public class OpenApiDeprecationConfig {
 
-    @Bean
-    public OperationCustomizer deprecationCustomizer() {
-        return (Operation operation, HandlerMethod handlerMethod) -> {
-            ApiDeprecation deprecation = handlerMethod.getMethodAnnotation(ApiDeprecation.class);
-            boolean isDeprecated = handlerMethod.hasMethodAnnotation(Deprecated.class);
+  @Bean
+  public OperationCustomizer deprecationCustomizer() {
+    return (Operation operation, HandlerMethod handlerMethod) -> {
+      ApiDeprecation deprecation = handlerMethod.getMethodAnnotation(ApiDeprecation.class);
+      boolean isDeprecated = handlerMethod.hasMethodAnnotation(Deprecated.class);
 
-            if (deprecation == null) {
-                deprecation = handlerMethod.getBeanType().getAnnotation(ApiDeprecation.class);
-            }
-            if (!isDeprecated) {
-                isDeprecated = handlerMethod.getBeanType().isAnnotationPresent(Deprecated.class);
-            }
+      if (deprecation == null) {
+        deprecation = handlerMethod.getBeanType().getAnnotation(ApiDeprecation.class);
+      }
+      if (!isDeprecated) {
+        isDeprecated = handlerMethod.getBeanType().isAnnotationPresent(Deprecated.class);
+      }
 
-            if (isDeprecated || deprecation != null) {
-                operation.setDeprecated(true);
+      if (isDeprecated || deprecation != null) {
+        operation.setDeprecated(true);
 
-                if (deprecation != null) {
-                    StringBuilder desc = new StringBuilder();
-                    if (operation.getDescription() != null && !operation.getDescription().isBlank()) {
-                        desc.append(operation.getDescription()).append("\n\n");
-                    }
-                    desc.append("**DEPRECATED**");
-                    if (!deprecation.sunset().isEmpty()) {
-                        desc.append("\n- Sunset Date: ").append(deprecation.sunset());
-                    }
-                    if (!deprecation.replacement().isEmpty()) {
-                        desc.append("\n- Replacement: `").append(deprecation.replacement()).append("`");
-                    }
-                    operation.setDescription(desc.toString().trim());
-                }
-            }
-            return operation;
-        };
-    }
+        if (deprecation != null) {
+          StringBuilder desc = new StringBuilder();
+          if (operation.getDescription() != null && !operation.getDescription().isBlank()) {
+            desc.append(operation.getDescription()).append("\n\n");
+          }
+          desc.append("**DEPRECATED**");
+          if (!deprecation.sunset().isEmpty()) {
+            desc.append("\n- Sunset Date: ").append(deprecation.sunset());
+          }
+          if (!deprecation.replacement().isEmpty()) {
+            desc.append("\n- Replacement: `").append(deprecation.replacement()).append("`");
+          }
+          operation.setDescription(desc.toString().trim());
+        }
+      }
+      return operation;
+    };
+  }
 }

@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class PrivacyController {
 
-    @GetMapping("/privacy")
-    public String showPrivacy(Model model) {
-        return "privacy";
-    }
+  @GetMapping("/privacy")
+  public String showPrivacy(Model model) {
+    return "privacy";
+  }
 }

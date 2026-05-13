@@ -1,13 +1,11 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
+import java.time.LocalDate;
 import org.jetbrains.annotations.Nullable;
 
-import java.time.LocalDate;
-
 public record UserAttributesUpdateDto(
-        Integer rank,
-        String description,
-        String displayName,
-        Long version,
-        @Nullable LocalDate joinDate
-) {}
+    Integer rank,
+    String description,
+    String displayName,
+    Long version,
+    @Nullable LocalDate joinDate) {}

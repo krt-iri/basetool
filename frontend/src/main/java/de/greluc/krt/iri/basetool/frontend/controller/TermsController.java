@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class TermsController {
 
-    @GetMapping("/terms")
-    public String showTerms(Model model) {
-        return "terms";
-    }
+  @GetMapping("/terms")
+  public String showTerms(Model model) {
+    return "terms";
+  }
 }

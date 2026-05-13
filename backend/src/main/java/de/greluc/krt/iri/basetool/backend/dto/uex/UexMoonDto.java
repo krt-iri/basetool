@@ -16,9 +16,8 @@ public record UexMoonDto(
     @JsonProperty("planet_name") String planetName,
     @JsonProperty("orbit_name") String orbitName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("jurisdiction_name") String jurisdictionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("jurisdiction_name") String jurisdictionName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

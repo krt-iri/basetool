@@ -4,6 +4,8 @@ import de.greluc.krt.iri.basetool.backend.model.MaterialPrice;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,14 +13,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-import java.util.UUID;
-
 @Repository
 public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UUID> {
-    Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
+  Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
 
-    @Query("""
+  @Query(
+      """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto(
             p.id, t.name, p.priceBuy, p.priceSell, p.scuBuy, p.scuSell, p.statusBuy, p.statusSell
         )
@@ -27,9 +27,11 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
         WHERE p.material.id = :materialId
         AND (t.hidden = false OR t.hidden IS NULL)
     """)
-    Page<MaterialPriceDto> findPricesByMaterialId(@Param("materialId") UUID materialId, Pageable pageable);
+  Page<MaterialPriceDto> findPricesByMaterialId(
+      @Param("materialId") UUID materialId, Pageable pageable);
 
-    @Query("""
+  @Query(
+      """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto(
             t.id, t.name, p.priceSell
         )
@@ -40,13 +42,15 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
         AND (t.hidden = false OR t.hidden IS NULL)
         ORDER BY p.priceSell DESC NULLS LAST, t.name ASC
     """)
-    java.util.List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(@Param("materialId") UUID materialId);
+  java.util.List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(
+      @Param("materialId") UUID materialId);
 
-    @Query("""
+  @Query(
+      """
         SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto(
-            m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END, 
-            CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END, 
-            CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END, 
+            m.id, m.name, CASE WHEN m.isIllegal = 1 THEN true ELSE false END,
+            CASE WHEN m.isVolatileQt = 1 THEN true ELSE false END,
+            CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
             c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName, p.priceBuy, p.priceSell,
             t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint, t.hasLoadingDock, t.isAutoLoad
         )
@@ -56,9 +60,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
         JOIN p.terminal t
         WHERE (t.hidden = false OR t.hidden IS NULL)
     """)
-    Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
+  Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
-    @Query("""
+  @Query(
+      """
         SELECT p
         FROM MaterialPrice p
         JOIN FETCH p.material m
@@ -66,9 +71,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
         WHERE (t.hidden = false OR t.hidden IS NULL)
         AND t.isAutoLoad = true
     """)
-    java.util.List<MaterialPrice> findAllAutoLoadPrices();
+  java.util.List<MaterialPrice> findAllAutoLoadPrices();
 
-    @Query("""
+  @Query(
+      """
         SELECT p
         FROM MaterialPrice p
         JOIN FETCH p.material m
@@ -77,5 +83,6 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
         AND t.isAutoLoad = true
         AND t.starSystemName IN :starSystems
     """)
-    java.util.List<MaterialPrice> findAllAutoLoadPricesInSystems(@Param("starSystems") java.util.Collection<String> starSystems);
+  java.util.List<MaterialPrice> findAllAutoLoadPricesInSystems(
+      @Param("starSystems") java.util.Collection<String> starSystems);
 }

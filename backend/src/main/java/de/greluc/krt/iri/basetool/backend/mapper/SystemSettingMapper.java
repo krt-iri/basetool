@@ -6,5 +6,5 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
 public interface SystemSettingMapper {
-    SystemSettingDto toDto(SystemSetting setting);
+  SystemSettingDto toDto(SystemSetting setting);
 }

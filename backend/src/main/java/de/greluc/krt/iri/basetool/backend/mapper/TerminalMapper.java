@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface TerminalMapper {
-    TerminalDto toDto(Terminal entity);
-    Terminal toEntity(TerminalDto dto);
+  TerminalDto toDto(Terminal entity);
+
+  Terminal toEntity(TerminalDto dto);
 }

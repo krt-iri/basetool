@@ -10,5 +10,4 @@ public record InventoryItemUpdateDto(
     Boolean personal,
     UUID jobOrderId,
     UUID missionId,
-    Long version
-) {}
+    Long version) {}

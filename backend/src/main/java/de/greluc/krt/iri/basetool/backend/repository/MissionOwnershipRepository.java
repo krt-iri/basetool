@@ -6,5 +6,5 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MissionOwnershipRepository extends JpaRepository<MissionOwnership, UUID> {
-    Optional<MissionOwnership> findByMissionId(UUID missionId);
+  Optional<MissionOwnership> findByMissionId(UUID missionId);
 }

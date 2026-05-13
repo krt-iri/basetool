@@ -1,19 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
-import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-
-import java.util.UUID;
-
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -25,91 +11,112 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
 /**
- * MVC-Tests fuer den unlinkInventoryItem-POST-Pfad in {@link JobOrderPageController#unlinkInventoryItem}.
+ * MVC-Tests fuer den unlinkInventoryItem-POST-Pfad in {@link
+ * JobOrderPageController#unlinkInventoryItem}.
  *
- * <p>Testet, dass Logistiker/Officer/Admin einen einzelnen Lagereintrag aus einem Auftrag entlinken koennen:
+ * <p>Testet, dass Logistiker/Officer/Admin einen einzelnen Lagereintrag aus einem Auftrag entlinken
+ * koennen:
  *
  * <ul>
- *   <li>Logistiker kann Lagereintrag entlinken (success-Toast + Redirect).</li>
- *   <li>Einfacher Member ohne Logistiker-Rechte erhaelt 403 Forbidden.</li>
- *   <li>Backend-Fehler bei Logistiker → error-Toast + Redirect.</li>
+ *   <li>Logistiker kann Lagereintrag entlinken (success-Toast + Redirect).
+ *   <li>Einfacher Member ohne Logistiker-Rechte erhaelt 403 Forbidden.
+ *   <li>Backend-Fehler bei Logistiker → error-Toast + Redirect.
  * </ul>
  */
 @SpringBootTest
 class JobOrderPageControllerUnlinkInventoryItemMvcTest {
 
-    @Autowired
-    private WebApplicationContext context;
+  @Autowired private WebApplicationContext context;
 
-    private MockMvc mockMvc;
+  private MockMvc mockMvc;
 
-    @MockitoBean
-    private BackendApiClient backendApiClient;
+  @MockitoBean private BackendApiClient backendApiClient;
 
-    @MockitoBean
-    private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository;
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
 
-    @BeforeEach
-    void setup() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
-    }
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
 
-    @Test
-    @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
-    void unlinkInventoryItem_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast() throws Exception {
-        // Given
-        UUID orderId = UUID.randomUUID();
-        UUID inventoryItemId = UUID.randomUUID();
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void unlinkInventoryItem_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
+      throws Exception {
+    // Given
+    UUID orderId = UUID.randomUUID();
+    UUID inventoryItemId = UUID.randomUUID();
 
-        when(backendApiClient.delete(
-                eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(
+            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
+            eq(Void.class)))
+        .thenReturn(null);
 
-        // When
-        mockMvc.perform(post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink")
-                        .with(csrf()))
-                // Then
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/" + orderId))
-                .andExpect(flash().attribute("successToast", "orders.detail.inventory.unlink.success"));
+    // When
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
+        // Then
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/" + orderId))
+        .andExpect(flash().attribute("successToast", "orders.detail.inventory.unlink.success"));
 
-        verify(backendApiClient).delete(
-                eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"), eq(Void.class));
-    }
+    verify(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
+            eq(Void.class));
+  }
 
-    @Test
-    @WithMockUser(roles = {"MEMBER"})
-    void unlinkInventoryItem_AsPlainMember_ShouldReturn403() throws Exception {
-        // Given
-        UUID orderId = UUID.randomUUID();
-        UUID inventoryItemId = UUID.randomUUID();
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void unlinkInventoryItem_AsPlainMember_ShouldReturn403() throws Exception {
+    // Given
+    UUID orderId = UUID.randomUUID();
+    UUID inventoryItemId = UUID.randomUUID();
 
-        // When / Then
-        mockMvc.perform(post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink")
-                        .with(csrf()))
-                .andExpect(status().isForbidden());
-    }
+    // When / Then
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
 
-    @Test
-    @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
-    void unlinkInventoryItem_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
-        // Given
-        UUID orderId = UUID.randomUUID();
-        UUID inventoryItemId = UUID.randomUUID();
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void unlinkInventoryItem_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
+    // Given
+    UUID orderId = UUID.randomUUID();
+    UUID inventoryItemId = UUID.randomUUID();
 
-        doThrow(new BackendServiceException("Internal Server Error", null, 500))
-                .when(backendApiClient).delete(
-                        eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"), eq(Void.class));
+    doThrow(new BackendServiceException("Internal Server Error", null, 500))
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
+            eq(Void.class));
 
-        // When
-        mockMvc.perform(post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink")
-                        .with(csrf()))
-                // Then
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/" + orderId))
-                .andExpect(flash().attribute("errorToast", "orders.detail.inventory.unlink.error"));
-    }
+    // When
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
+        // Then
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/" + orderId))
+        .andExpect(flash().attribute("errorToast", "orders.detail.inventory.unlink.error"));
+  }
 }

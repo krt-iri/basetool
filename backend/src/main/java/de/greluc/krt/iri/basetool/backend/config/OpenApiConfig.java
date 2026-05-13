@@ -11,20 +11,23 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
-    @Bean
-    public OpenAPI krtOpenAPI() {
-        return new OpenAPI()
-                .openapi("3.1.1")
-                .info(new Info()
-                        .title("KRT Basetool Backend API")
-                        .version("1.0")
-                        .description("API documentation for the KRT Basetool Backend application."))
-                .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"))
-                .components(new Components()
-                        .addSecuritySchemes("bearer-jwt",
-                                new SecurityScheme()
-                                        .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
-                                        .bearerFormat("JWT")));
-    }
+  @Bean
+  public OpenAPI krtOpenAPI() {
+    return new OpenAPI()
+        .openapi("3.1.1")
+        .info(
+            new Info()
+                .title("KRT Basetool Backend API")
+                .version("1.0")
+                .description("API documentation for the KRT Basetool Backend application."))
+        .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"))
+        .components(
+            new Components()
+                .addSecuritySchemes(
+                    "bearer-jwt",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")));
+  }
 }

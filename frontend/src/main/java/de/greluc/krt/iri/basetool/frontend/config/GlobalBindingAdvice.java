@@ -6,8 +6,8 @@ import org.springframework.web.bind.annotation.InitBinder;
 
 @ControllerAdvice
 public class GlobalBindingAdvice {
-    @InitBinder
-    public void initBinder(WebDataBinder binder) {
-        binder.registerCustomEditor(String.class, new NormalizedStringEditor(8000, true));
-    }
+  @InitBinder
+  public void initBinder(WebDataBinder binder) {
+    binder.registerCustomEditor(String.class, new NormalizedStringEditor(8000, true));
+  }
 }

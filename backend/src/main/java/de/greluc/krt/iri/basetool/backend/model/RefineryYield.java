@@ -1,9 +1,8 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Entity
 @Getter
@@ -13,18 +12,18 @@ import java.util.UUID;
 @AllArgsConstructor
 public class RefineryYield extends AbstractEntity<UUID> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "terminal_id", nullable = false)
-    private Terminal terminal;
+  @ManyToOne
+  @JoinColumn(name = "terminal_id", nullable = false)
+  private Terminal terminal;
 
-    @ManyToOne
-    @JoinColumn(name = "material_id", nullable = false)
-    private Material material;
+  @ManyToOne
+  @JoinColumn(name = "material_id", nullable = false)
+  private Material material;
 
-    @Column(nullable = false)
-    private Integer yieldBonus;
+  @Column(nullable = false)
+  private Integer yieldBonus;
 }

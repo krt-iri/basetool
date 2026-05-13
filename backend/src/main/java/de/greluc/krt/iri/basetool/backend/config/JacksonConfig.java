@@ -9,18 +9,18 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class JacksonConfig {
 
-    @Bean
-    @Primary
-    public ObjectMapper objectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(normalizedStringModule());
-        return mapper;
-    }
+  @Bean
+  @Primary
+  public ObjectMapper objectMapper() {
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.registerModule(normalizedStringModule());
+    return mapper;
+  }
 
-    @Bean
-    public SimpleModule normalizedStringModule() {
-        SimpleModule module = new SimpleModule();
-        module.addDeserializer(String.class, new NormalizedStringDeserializer());
-        return module;
-    }
+  @Bean
+  public SimpleModule normalizedStringModule() {
+    SimpleModule module = new SimpleModule();
+    module.addDeserializer(String.class, new NormalizedStringDeserializer());
+    return module;
+  }
 }

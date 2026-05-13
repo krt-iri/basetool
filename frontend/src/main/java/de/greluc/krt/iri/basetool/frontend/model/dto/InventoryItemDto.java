@@ -15,5 +15,4 @@ public record InventoryItemDto(
     UUID missionId,
     String missionName,
     String note,
-    Long version
-) {}
+    Long version) {}

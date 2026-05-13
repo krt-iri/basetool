@@ -5,15 +5,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record RefineryGoodDto(
-        UUID id,
-        @NotNull
-        MaterialDto inputMaterial,
-        @NotNull
-        @Min(1)
-        Integer inputQuantity,
-        MaterialDto outputMaterial,
-        @Min(1)
-        Integer outputQuantity,
-        Integer quality
-) {
-}
+    UUID id,
+    @NotNull MaterialDto inputMaterial,
+    @NotNull @Min(1) Integer inputQuantity,
+    MaterialDto outputMaterial,
+    @Min(1) Integer outputQuantity,
+    Integer quality) {}
