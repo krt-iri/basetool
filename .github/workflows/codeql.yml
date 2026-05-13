@@ -1,0 +1,122 @@
+name: CodeQL
+
+# Semantic SAST via GitHub CodeQL. Closes the gap left by Checkstyle (style),
+# SpotBugs (local bug patterns) and OWASP Dependency-Check (third-party CVEs):
+# CodeQL performs taint-tracking and data-flow analysis on the project's own
+# code and surfaces SQL/Path/XSS/SSRF-style vulnerabilities that the other
+# tools cannot see.
+#
+# Languages:
+#   - java-kotlin     -> backend + frontend Java sources (build-mode: manual,
+#                        Gradle compiles main + test sources for extraction).
+#   - javascript-typescript -> frontend's own JS under
+#                        `frontend/src/main/resources/static/js/` (vendor
+#                        bundles excluded via the inline config below).
+#
+# Trigger model:
+#   - push to main     -> establishes the baseline so PRs can diff against it.
+#   - pull_request     -> required check candidate; results show up inline in
+#                        the PR's Files Changed tab and as a PR check.
+#   - schedule (weekly Tuesday 06:17 UTC, offset from the Monday OWASP
+#                        dependency-check run) -> picks up new CodeQL queries
+#                        that GitHub ships, even on quiet branches.
+#   - workflow_dispatch -> manual re-run from the Actions UI.
+#
+# Blocking is enforced via branch protection in repository settings: the two
+# matrix check names ("CodeQL / Analyze (java-kotlin)" and
+# "CodeQL / Analyze (javascript-typescript)") must be marked as required
+# status checks against `main` AFTER this workflow has run at least once on
+# main so the check names are known to GitHub. See CHANGELOG.md entry for
+# the exact gh CLI commands.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * 2'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  packages: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 25 (Temurin)
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make gradlew executable
+        if: matrix.language == 'java-kotlin'
+        run: chmod +x ./gradlew
+
+      # `security-extended` adds the precision-2/3 security queries on top of
+      # the default suite. `security-and-quality` would also pull in
+      # maintainability/style queries that overlap with Checkstyle/SpotBugs
+      # and produce noise. The inline `paths-ignore` keeps vendor bundles and
+      # generated artefacts out of the JS extraction (no point scanning
+      # minified third-party libraries — their CVEs are covered by the OWASP
+      # dependency-check workflow).
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - '**/build/**'
+              - '**/node_modules/**'
+              - 'frontend/src/main/resources/static/js/vendor/**'
+              - '**/*.min.js'
+
+      # CodeQL's Java extractor reads `.class` files produced by the Gradle
+      # compile tasks plus the source tree. `compileJava` covers
+      # `src/main/java/`; `compileTestJava` covers `src/test/java/` so test
+      # helpers and architectural assertions in `ArchitectureTest` are
+      # included in the analysis. Running `build` would also execute the
+      # JUnit suite + Checkstyle + SpotBugs + JaCoCo, which the dedicated
+      # `ci.yml` already does — duplicating that here would just burn
+      # runner minutes without adding extraction value.
+      - name: Compile Java sources for extraction
+        if: matrix.language == 'java-kotlin'
+        run: ./gradlew compileJava compileTestJava --stacktrace
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
