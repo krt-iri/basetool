@@ -12,8 +12,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app")
 public class AppBackendProperties {
-    /** Base URL of the backend API used by the frontend. */
-    @NotBlank
-    @URL
-    private String backendUrl;
+  /** Base URL of the backend API used by the frontend. */
+  @NotBlank @URL private String backendUrl;
 }

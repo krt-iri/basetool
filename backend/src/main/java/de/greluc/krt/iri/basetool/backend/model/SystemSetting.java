@@ -15,10 +15,10 @@ import lombok.*;
 @Table(name = "system_setting")
 public class SystemSetting extends AbstractEntity<String> {
 
-    @Id
-    @Column(name = "setting_key", nullable = false, unique = true)
-    private String id;
+  @Id
+  @Column(name = "setting_key", nullable = false, unique = true)
+  private String id;
 
-    @Column(name = "setting_value", nullable = false)
-    private String value;
+  @Column(name = "setting_value", nullable = false)
+  private String value;
 }

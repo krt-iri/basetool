@@ -9,17 +9,17 @@ package de.greluc.krt.iri.basetool.backend.exception;
  * state machines that refuse a transition from the current step, or invariants that hold across
  * several aggregates and cannot be expressed by a simple uniqueness constraint.
  *
- * <p>Mapped to HTTP {@code 409 Conflict} by
- * {@link de.greluc.krt.iri.basetool.backend.exception.GlobalExceptionHandler} with the stable
- * error code {@code BUSINESS_CONFLICT}.
+ * <p>Mapped to HTTP {@code 409 Conflict} by {@link
+ * de.greluc.krt.iri.basetool.backend.exception.GlobalExceptionHandler} with the stable error code
+ * {@code BUSINESS_CONFLICT}.
  */
 public class BusinessConflictException extends RuntimeException {
 
-    public BusinessConflictException(String message) {
-        super(message);
-    }
+  public BusinessConflictException(String message) {
+    super(message);
+  }
 
-    public BusinessConflictException(String message, Throwable cause) {
-        super(message, cause);
-    }
+  public BusinessConflictException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

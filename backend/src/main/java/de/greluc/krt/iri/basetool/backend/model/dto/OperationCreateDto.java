@@ -5,8 +5,4 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record OperationCreateDto(
-        @NotBlank String name,
-        String description,
-        @NotNull OperationStatus status
-) {
-}
+    @NotBlank String name, String description, @NotNull OperationStatus status) {}

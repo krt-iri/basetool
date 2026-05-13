@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface FrequencyTypeMapper {
-    FrequencyTypeDto toDto(FrequencyType entity);
-    FrequencyType toEntity(FrequencyTypeDto dto);
+  FrequencyTypeDto toDto(FrequencyType entity);
+
+  FrequencyType toEntity(FrequencyTypeDto dto);
 }

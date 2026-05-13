@@ -3,8 +3,4 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-public record AddParticipantRequest(
-        @NotNull
-        UUID userId
-) {
-}
+public record AddParticipantRequest(@NotNull UUID userId) {}

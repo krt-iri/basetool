@@ -22,5 +22,4 @@ public record MaterialMatrixItemDto(
     String outpostName,
     Boolean isJumpPoint,
     Boolean hasLoadingDock,
-    Boolean isAutoLoad
-) {}
+    Boolean isAutoLoad) {}

@@ -1,174 +1,246 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import de.greluc.krt.iri.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.iri.basetool.backend.mapper.RefineryOrderMapper;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-
-import org.springframework.security.access.AccessDeniedException;
 @RestController
 @RequestMapping("/api/v1/refinery-orders")
 @RequiredArgsConstructor
 @Transactional
 public class RefineryOrderController {
-    private final RefineryOrderService refineryOrderService;
-    private final UserService userService;
-    private final RefineryOrderMapper mapper;
-    private final AuthHelperService authHelperService;
+  private final RefineryOrderService refineryOrderService;
+  private final UserService userService;
+  private final RefineryOrderMapper mapper;
+  private final AuthHelperService authHelperService;
 
-    // User endpoints
+  // User endpoints
 
-    @GetMapping("/my-orders")
-    @PreAuthorize("isAuthenticated()")
-    @Transactional(readOnly = true)
-    public PageResponse<RefineryOrderListDto> getMyRefineryOrders(@AuthenticationPrincipal Jwt jwt,
-                                                           @RequestParam(required = false) List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> status,
-                                                           @RequestParam(required = false) Integer page,
-                                                           @RequestParam(required = false) Integer size,
-                                                           @RequestParam(required = false) String sort) {
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("startedAt", "durationMinutes", "expenses", "id"), "startedAt");
-        Page<RefineryOrder> p = refineryOrderService.getMyRefineryOrders(userService.getUserIdFromJwt(jwt), status, pageable);
-        List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-        return new PageResponse<>(dtoList, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
+  @GetMapping("/my-orders")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public PageResponse<RefineryOrderListDto> getMyRefineryOrders(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false)
+          List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> status,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            Set.of("startedAt", "durationMinutes", "expenses", "id"),
+            "startedAt");
+    Page<RefineryOrder> p =
+        refineryOrderService.getMyRefineryOrders(
+            userService.getUserIdFromJwt(jwt), status, pageable);
+    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
+    return new PageResponse<>(
+        dtoList,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  @GetMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public RefineryOrderDto getRefineryOrder(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
+    RefineryOrder order = refineryOrderService.getRefineryOrder(id);
+
+    if (authHelperService.isLogisticianOrAbove()
+        || (order.getOwner() != null
+            && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
+      return mapper.toDto(order);
     }
 
-    @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    @Transactional(readOnly = true)
-    public RefineryOrderDto getRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
-        RefineryOrder order = refineryOrderService.getRefineryOrder(id);
-        
-        if (authHelperService.isLogisticianOrAbove() || (order.getOwner() != null && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
-            return mapper.toDto(order);
-        }
-        
-        // For now, allow read access to everyone if they can see the list
-        return mapper.toDto(order);
+    // For now, allow read access to everyone if they can see the list
+    return mapper.toDto(order);
+  }
+
+  @GetMapping("/mission/{missionId}")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public List<RefineryOrderListDto> getMissionRefineryOrders(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
+    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    if (isLogistician) {
+      return refineryOrderService.getMissionRefineryOrders(missionId).stream()
+          .map(mapper::toListDto)
+          .toList();
+    }
+    return refineryOrderService
+        .getMissionRefineryOrders(missionId, userService.getUserIdFromJwt(jwt))
+        .stream()
+        .map(mapper::toListDto)
+        .toList();
+  }
+
+  @PostMapping
+  @PreAuthorize("isAuthenticated()")
+  public RefineryOrderDto createMyRefineryOrder(
+      @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    UUID userId = userService.getUserIdFromJwt(jwt);
+    if (orderDto.owner() != null && orderDto.owner().id() != null) {
+      if (authHelperService.isLogisticianOrAbove()) {
+        userId = orderDto.owner().id();
+      }
+    }
+    return mapper.toDto(
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+  }
+
+  @PutMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  public RefineryOrderDto updateMyRefineryOrder(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    UUID callerId = userService.getUserIdFromJwt(jwt);
+    RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
+
+    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+
+    UUID targetUserId = callerId;
+    if (isLogistician) {
+      if (orderDto.owner() != null && orderDto.owner().id() != null) {
+        targetUserId = orderDto.owner().id();
+      } else if (existing.getOwner() != null) {
+        targetUserId = existing.getOwner().getId();
+      }
+    } else {
+      // Normal user: must be the owner
+      if (existing.getOwner() == null || !existing.getOwner().getId().equals(callerId)) {
+        throw new AccessDeniedException("Access denied: You do not own this refinery order");
+      }
     }
 
-    @GetMapping("/mission/{missionId}")
-    @PreAuthorize("isAuthenticated()")
-    @Transactional(readOnly = true)
-    public List<RefineryOrderListDto> getMissionRefineryOrders(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
-        boolean isLogistician = authHelperService.isLogisticianOrAbove();
-        if (isLogistician) {
-            return refineryOrderService.getMissionRefineryOrders(missionId).stream().map(mapper::toListDto).toList();
-        }
-        return refineryOrderService.getMissionRefineryOrders(missionId, userService.getUserIdFromJwt(jwt)).stream().map(mapper::toListDto).toList();
-    }
+    return mapper.toDto(
+        refineryOrderService.updateRefineryOrder(
+            targetUserId, id, mapper.toEntity(orderDto), isLogistician));
+  }
 
-    @PostMapping
-    @PreAuthorize("isAuthenticated()")
-    public RefineryOrderDto createMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
-        UUID userId = userService.getUserIdFromJwt(jwt);
-        if (orderDto.owner() != null && orderDto.owner().id() != null) {
-            if (authHelperService.isLogisticianOrAbove()) {
-                userId = orderDto.owner().id();
-            }
-        }
-        return mapper.toDto(refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
-    }
+  @DeleteMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  public void deleteMyRefineryOrder(
+      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
+    refineryOrderService.deleteRefineryOrder(
+        userService.getUserIdFromJwt(jwt), id, authHelperService.isLogisticianOrAbove());
+  }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public RefineryOrderDto updateMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
-        UUID callerId = userService.getUserIdFromJwt(jwt);
-        RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
-        
-        boolean isLogistician = authHelperService.isLogisticianOrAbove();
-        
-        UUID targetUserId = callerId;
-        if (isLogistician) {
-            if (orderDto.owner() != null && orderDto.owner().id() != null) {
-                targetUserId = orderDto.owner().id();
-            } else if (existing.getOwner() != null) {
-                targetUserId = existing.getOwner().getId();
-            }
-        } else {
-            // Normal user: must be the owner
-            if (existing.getOwner() == null || !existing.getOwner().getId().equals(callerId)) {
-                throw new AccessDeniedException("Access denied: You do not own this refinery order");
-            }
-        }
+  @PostMapping("/{id}/store")
+  @PreAuthorize("isAuthenticated()")
+  public void storeMyRefineryOrder(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
+    refineryOrderService.storeRefineryOrder(
+        userService.getUserIdFromJwt(jwt), id, dto, authHelperService.isLogisticianOrAbove());
+  }
 
-        return mapper.toDto(refineryOrderService.updateRefineryOrder(targetUserId, id, mapper.toEntity(orderDto), isLogistician));
-    }
+  // Admin/Officer endpoints
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public void deleteMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
-        refineryOrderService.deleteRefineryOrder(userService.getUserIdFromJwt(jwt), id, authHelperService.isLogisticianOrAbove());
-    }
+  @GetMapping("/all")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public PageResponse<RefineryOrderListDto> getAllRefineryOrders(
+      @RequestParam(required = false)
+          List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> status,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            Set.of("startedAt", "durationMinutes", "expenses", "id"),
+            "startedAt");
+    Page<RefineryOrder> p = refineryOrderService.getAllRefineryOrders(status, pageable);
+    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
+    return new PageResponse<>(
+        dtoList,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
 
-    @PostMapping("/{id}/store")
-    @PreAuthorize("isAuthenticated()")
-    public void storeMyRefineryOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
-        refineryOrderService.storeRefineryOrder(userService.getUserIdFromJwt(jwt), id, dto, authHelperService.isLogisticianOrAbove());
-    }
+  @GetMapping("/users/{userId}")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @Transactional(readOnly = true)
+  public PageResponse<RefineryOrderListDto> getUserRefineryOrders(
+      @PathVariable @NotNull UUID userId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            Set.of("startedAt", "durationMinutes", "expenses", "id"),
+            "startedAt");
+    Page<RefineryOrder> p = refineryOrderService.getMyRefineryOrders(userId, pageable);
+    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
+    return new PageResponse<>(
+        dtoList,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
 
-    // Admin/Officer endpoints
+  @PostMapping("/users/{userId}")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public RefineryOrderDto createUserRefineryOrder(
+      @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    return mapper.toDto(
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+  }
 
-    @GetMapping("/all")
-    @PreAuthorize("isAuthenticated()")
-    @Transactional(readOnly = true)
-    public PageResponse<RefineryOrderListDto> getAllRefineryOrders(@RequestParam(required = false) List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> status,
-                                                            @RequestParam(required = false) Integer page,
-                                                            @RequestParam(required = false) Integer size,
-                                                            @RequestParam(required = false) String sort) {
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("startedAt", "durationMinutes", "expenses", "id"), "startedAt");
-        Page<RefineryOrder> p = refineryOrderService.getAllRefineryOrders(status, pageable);
-        List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-        return new PageResponse<>(dtoList, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
-    }
+  @PutMapping("/users/{userId}/{orderId}")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public RefineryOrderDto updateUserRefineryOrder(
+      @PathVariable @NotNull UUID userId,
+      @PathVariable @NotNull UUID orderId,
+      @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    return mapper.toDto(
+        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true));
+  }
 
-    @GetMapping("/users/{userId}")
-    @PreAuthorize("hasRole('LOGISTICIAN')")
-    @Transactional(readOnly = true)
-    public PageResponse<RefineryOrderListDto> getUserRefineryOrders(@PathVariable @NotNull UUID userId,
-                                                             @RequestParam(required = false) Integer page,
-                                                             @RequestParam(required = false) Integer size,
-                                                             @RequestParam(required = false) String sort) {
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("startedAt", "durationMinutes", "expenses", "id"), "startedAt");
-        Page<RefineryOrder> p = refineryOrderService.getMyRefineryOrders(userId, pageable);
-        List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-        return new PageResponse<>(dtoList, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
-    }
-
-    @PostMapping("/users/{userId}")
-    @PreAuthorize("hasRole('LOGISTICIAN')")
-    public RefineryOrderDto createUserRefineryOrder(@PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
-        return mapper.toDto(refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
-    }
-
-    @PutMapping("/users/{userId}/{orderId}")
-    @PreAuthorize("hasRole('LOGISTICIAN')")
-    public RefineryOrderDto updateUserRefineryOrder(@PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
-        return mapper.toDto(refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true));
-    }
-
-    @DeleteMapping("/users/{userId}/{orderId}")
-    @PreAuthorize("hasRole('LOGISTICIAN')")
-    public void deleteUserRefineryOrder(@PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
-        refineryOrderService.deleteRefineryOrder(userId, orderId, true);
-    }
+  @DeleteMapping("/users/{userId}/{orderId}")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public void deleteUserRefineryOrder(
+      @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
+    refineryOrderService.deleteRefineryOrder(userId, orderId, true);
+  }
 }

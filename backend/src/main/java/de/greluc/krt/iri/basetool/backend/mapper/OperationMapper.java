@@ -10,11 +10,11 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OperationMapper {
 
-    OperationDto toDto(Operation entity);
+  OperationDto toDto(Operation entity);
 
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "missions", ignore = true)
-    Operation toEntity(OperationCreateDto dto);
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "missions", ignore = true)
+  Operation toEntity(OperationCreateDto dto);
 }

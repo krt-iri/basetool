@@ -11,9 +11,8 @@ public record UexJurisdictionDto(
     @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("nickname") String nickname,
     @JsonProperty("wiki") String wiki,
-    @JsonProperty("faction_name") String factionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("faction_name") String factionName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

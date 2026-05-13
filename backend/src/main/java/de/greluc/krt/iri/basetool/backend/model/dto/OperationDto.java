@@ -5,12 +5,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record OperationDto(
-        UUID id,
-        String name,
-        String description,
-        OperationStatus status,
-        Long version,
-        Instant createdAt,
-        Instant updatedAt
-) {
-}
+    UUID id,
+    String name,
+    String description,
+    OperationStatus status,
+    Long version,
+    Instant createdAt,
+    Instant updatedAt) {}

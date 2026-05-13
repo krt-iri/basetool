@@ -1,11 +1,21 @@
 package de.greluc.krt.iri.basetool.backend.security;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,147 +31,135 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /**
  * Regression guard for {@link de.greluc.krt.iri.basetool.backend.controller.OperationController}'s
- * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} gates. Two grant paths
- * exist for that role: the Keycloak realm role and the
- * {@code app_user.is_mission_manager} DB flag. The DB-flag path is wired in
- * {@link CustomJwtGrantedAuthoritiesConverter} and is not visible from the
- * controller annotations alone; this test pins the integration end-to-end so
- * a refactor of the converter cannot silently lock out DB-flag managers from
- * the operation endpoints.
+ * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} gates. Two grant paths exist for that role:
+ * the Keycloak realm role and the {@code app_user.is_mission_manager} DB flag. The DB-flag path is
+ * wired in {@link CustomJwtGrantedAuthoritiesConverter} and is not visible from the controller
+ * annotations alone; this test pins the integration end-to-end so a refactor of the converter
+ * cannot silently lock out DB-flag managers from the operation endpoints.
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class OperationMissionManagerFlagTest {
 
-    private MockMvc mockMvc;
+  private MockMvc mockMvc;
 
-    @Autowired
-    private WebApplicationContext context;
+  @Autowired private WebApplicationContext context;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired private UserRepository userRepository;
 
-    @Autowired
-    private OperationRepository operationRepository;
+  @Autowired private OperationRepository operationRepository;
 
-    @Autowired
-    private CustomJwtGrantedAuthoritiesConverter converter;
+  @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
-    }
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
 
-    @Test
-    void dbFlagAlone_grantsCreateOperation() throws Exception {
-        User manager = newUser("dbflag-create-manager", true);
-        Collection<GrantedAuthority> authorities = authoritiesFor(manager);
-        assertTrue(authorities.stream()
-                        .anyMatch(a -> "ROLE_MISSION_MANAGER".equals(a.getAuthority())),
-                "Converter must promote the DB flag to ROLE_MISSION_MANAGER");
+  @Test
+  void dbFlagAlone_grantsCreateOperation() throws Exception {
+    User manager = newUser("dbflag-create-manager", true);
+    Collection<GrantedAuthority> authorities = authoritiesFor(manager);
+    assertTrue(
+        authorities.stream().anyMatch(a -> "ROLE_MISSION_MANAGER".equals(a.getAuthority())),
+        "Converter must promote the DB flag to ROLE_MISSION_MANAGER");
 
-        mockMvc.perform(post("/api/v1/operations")
-                        .with(jwtFor(manager, authorities))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Op DBFlag Create\",\"status\":\"PLANNED\"}"))
-                .andExpect(status().isOk());
-    }
+    mockMvc
+        .perform(
+            post("/api/v1/operations")
+                .with(jwtFor(manager, authorities))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Op DBFlag Create\",\"status\":\"PLANNED\"}"))
+        .andExpect(status().isOk());
+  }
 
-    @Test
-    void dbFlagAlone_grantsUpdateOperation() throws Exception {
-        User manager = newUser("dbflag-update-manager", true);
-        Operation existing = newOperation("Pre-existing Op");
+  @Test
+  void dbFlagAlone_grantsUpdateOperation() throws Exception {
+    User manager = newUser("dbflag-update-manager", true);
+    Operation existing = newOperation("Pre-existing Op");
 
-        Collection<GrantedAuthority> authorities = authoritiesFor(manager);
+    Collection<GrantedAuthority> authorities = authoritiesFor(manager);
 
-        String body = "{\"name\":\"Renamed via DB-flag manager\",\"status\":\"PLANNED\",\"version\":"
-                + existing.getVersion() + "}";
+    String body =
+        "{\"name\":\"Renamed via DB-flag manager\",\"status\":\"PLANNED\",\"version\":"
+            + existing.getVersion()
+            + "}";
 
-        mockMvc.perform(put("/api/v1/operations/" + existing.getId())
-                        .with(jwtFor(manager, authorities))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk());
-    }
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + existing.getId())
+                .with(jwtFor(manager, authorities))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+  }
 
-    @Test
-    void noFlagAndNoKeycloakRole_isRejectedFromCreateOperation() throws Exception {
-        // Negative control: same flow, but the user has neither the DB flag
-        // nor any role claim. @PreAuthorize must reject with 403.
-        User plainUser = newUser("plain-member", false);
-        Collection<GrantedAuthority> authorities = authoritiesFor(plainUser);
-        assertTrue(authorities.stream()
-                        .noneMatch(a -> "ROLE_MISSION_MANAGER".equals(a.getAuthority())),
-                "Converter must NOT grant ROLE_MISSION_MANAGER without flag or role");
+  @Test
+  void noFlagAndNoKeycloakRole_isRejectedFromCreateOperation() throws Exception {
+    // Negative control: same flow, but the user has neither the DB flag
+    // nor any role claim. @PreAuthorize must reject with 403.
+    User plainUser = newUser("plain-member", false);
+    Collection<GrantedAuthority> authorities = authoritiesFor(plainUser);
+    assertTrue(
+        authorities.stream().noneMatch(a -> "ROLE_MISSION_MANAGER".equals(a.getAuthority())),
+        "Converter must NOT grant ROLE_MISSION_MANAGER without flag or role");
 
-        mockMvc.perform(post("/api/v1/operations")
-                        .with(jwtFor(plainUser, authorities))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Should be blocked\",\"status\":\"PLANNED\"}"))
-                .andExpect(status().isForbidden());
-    }
+    mockMvc
+        .perform(
+            post("/api/v1/operations")
+                .with(jwtFor(plainUser, authorities))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Should be blocked\",\"status\":\"PLANNED\"}"))
+        .andExpect(status().isForbidden());
+  }
 
-    // ── helpers ────────────────────────────────────────────────────────────
+  // ── helpers ────────────────────────────────────────────────────────────
 
-    private User newUser(String username, boolean missionManager) {
-        User u = new User();
-        u.setId(UUID.randomUUID());
-        u.setUsername(username);
-        u.setMissionManager(missionManager);
-        return userRepository.save(u);
-    }
+  private User newUser(String username, boolean missionManager) {
+    User u = new User();
+    u.setId(UUID.randomUUID());
+    u.setUsername(username);
+    u.setMissionManager(missionManager);
+    return userRepository.save(u);
+  }
 
-    private Operation newOperation(String name) {
-        Operation op = new Operation();
-        op.setName(name);
-        op.setStatus(OperationStatus.PLANNED);
-        return operationRepository.save(op);
-    }
+  private Operation newOperation(String name) {
+    Operation op = new Operation();
+    op.setName(name);
+    op.setStatus(OperationStatus.PLANNED);
+    return operationRepository.save(op);
+  }
 
-    private Collection<GrantedAuthority> authoritiesFor(User user) {
-        Jwt jwt = Jwt.withTokenValue("token")
-                .header("alg", "none")
-                .claim("sub", user.getId().toString())
-                .claim("preferred_username", user.getUsername())
-                .build();
-        Collection<GrantedAuthority> resolved = converter.convert(jwt);
-        return resolved != null ? resolved : Collections.emptyList();
-    }
+  private Collection<GrantedAuthority> authoritiesFor(User user) {
+    Jwt jwt =
+        Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("sub", user.getId().toString())
+            .claim("preferred_username", user.getUsername())
+            .build();
+    Collection<GrantedAuthority> resolved = converter.convert(jwt);
+    return resolved != null ? resolved : Collections.emptyList();
+  }
 
-    /**
-     * Build the MockMvc JWT post-processor with the authorities we just
-     * resolved from the converter. Bypassing the converter on the MockMvc
-     * test JWT is the normal pattern in this codebase — the integration we
-     * are testing is "converter output + controller @PreAuthorize", so we
-     * call the converter explicitly and feed the result into the mocked
-     * JWT authentication.
-     */
-    private org.springframework.test.web.servlet.request.RequestPostProcessor jwtFor(
-            User user, Collection<GrantedAuthority> authorities) {
-        return jwt()
-                .jwt(builder -> builder
-                        .subject(user.getId().toString())
-                        .claim("preferred_username", user.getUsername()))
-                .authorities(authorities);
-    }
+  /**
+   * Build the MockMvc JWT post-processor with the authorities we just resolved from the converter.
+   * Bypassing the converter on the MockMvc test JWT is the normal pattern in this codebase — the
+   * integration we are testing is "converter output + controller @PreAuthorize", so we call the
+   * converter explicitly and feed the result into the mocked JWT authentication.
+   */
+  private org.springframework.test.web.servlet.request.RequestPostProcessor jwtFor(
+      User user, Collection<GrantedAuthority> authorities) {
+    return jwt()
+        .jwt(
+            builder ->
+                builder
+                    .subject(user.getId().toString())
+                    .claim("preferred_username", user.getUsername()))
+        .authorities(authorities);
+  }
 }

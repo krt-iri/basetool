@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface StarSystemMapper {
-    StarSystemDto toDto(StarSystem starSystem);
-    StarSystem toEntity(StarSystemDto dto);
+  StarSystemDto toDto(StarSystem starSystem);
+
+  StarSystem toEntity(StarSystemDto dto);
 }

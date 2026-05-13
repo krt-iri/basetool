@@ -1,53 +1,34 @@
 package de.greluc.krt.iri.basetool.backend.config;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.time.Duration;
 import lombok.Data;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import java.time.Duration;
-
 @Data
 @Configuration
 @Validated
 @ConfigurationProperties(prefix = "app.keycloak.sync")
 public class KeycloakSyncProperties {
-    /**
-     * Whether to enable the periodic user sync.
-     */
-    private boolean enabled = true;
+  /** Whether to enable the periodic user sync. */
+  private boolean enabled = true;
 
-    /**
-     * Interval for the sync task. Default is 5 minutes.
-     */
-    @NotNull
-    private Duration interval = Duration.ofMinutes(5);
+  /** Interval for the sync task. Default is 5 minutes. */
+  @NotNull private Duration interval = Duration.ofMinutes(5);
 
-    /**
-     * Keycloak base URL for admin API (e.g. http://localhost:8080).
-     */
-    @NotBlank
-    @URL
-    private String adminUrl;
+  /** Keycloak base URL for admin API (e.g. http://localhost:8080). */
+  @NotBlank @URL private String adminUrl;
 
-    /**
-     * Realm to sync users from.
-     */
-    @NotBlank
-    private String realm;
+  /** Realm to sync users from. */
+  @NotBlank private String realm;
 
-    /**
-     * Client ID for admin access (must have manage-users or view-users role).
-     */
-    @NotBlank
-    private String clientId;
+  /** Client ID for admin access (must have manage-users or view-users role). */
+  @NotBlank private String clientId;
 
-    /**
-     * Client Secret for admin access.
-     */
-    @NotBlank
-    private String clientSecret;
+  /** Client Secret for admin access. */
+  @NotBlank private String clientSecret;
 }

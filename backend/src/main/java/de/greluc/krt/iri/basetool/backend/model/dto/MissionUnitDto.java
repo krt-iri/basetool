@@ -4,12 +4,10 @@ import java.util.List;
 import java.util.UUID;
 
 public record MissionUnitDto(
-        UUID id,
-        String name,
-        ShipTypeDto shipType,
-        ShipDto ship,
-        Double frequency,
-        Boolean highValueUnit,
-        List<MissionCrewDto> crew
-) {
-}
+    UUID id,
+    String name,
+    ShipTypeDto shipType,
+    ShipDto ship,
+    Double frequency,
+    Boolean highValueUnit,
+    List<MissionCrewDto> crew) {}

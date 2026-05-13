@@ -5,9 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record OperationUpdateDto(
-        @NotBlank String name,
-        String description,
-        @NotNull OperationStatus status,
-        @NotNull Long version
-) {
-}
+    @NotBlank String name,
+    String description,
+    @NotNull OperationStatus status,
+    @NotNull Long version) {}

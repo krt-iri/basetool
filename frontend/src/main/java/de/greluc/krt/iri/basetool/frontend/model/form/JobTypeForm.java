@@ -8,9 +8,8 @@ public record JobTypeForm(
     @Size(max = 1000) String description,
     @NotBlank(message = "{validation.archetype.required}") @Size(max = 50) String archetype,
     Boolean isLeadershipRole,
-    Long version
-) {
-    public Boolean getIsLeadershipRole() {
-        return isLeadershipRole;
-    }
+    Long version) {
+  public Boolean getIsLeadershipRole() {
+    return isLeadershipRole;
+  }
 }

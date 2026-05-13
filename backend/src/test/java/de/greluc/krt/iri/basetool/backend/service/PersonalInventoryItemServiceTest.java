@@ -1,5 +1,10 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import de.greluc.krt.iri.basetool.backend.mapper.PersonalInventoryItemMapper;
 import de.greluc.krt.iri.basetool.backend.model.City;
 import de.greluc.krt.iri.basetool.backend.model.PersonalInventoryItem;
@@ -13,6 +18,9 @@ import de.greluc.krt.iri.basetool.backend.repository.CityRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpaceStationRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,274 +36,276 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryItemServiceTest {
 
-    private static final String OWNER = "owner-sub-1";
-    private static final String OTHER = "other-sub-2";
+  private static final String OWNER = "owner-sub-1";
+  private static final String OTHER = "other-sub-2";
 
-    @Mock
-    private PersonalInventoryItemRepository repository;
+  @Mock private PersonalInventoryItemRepository repository;
 
-    /**
-     * Use the real MapStruct-generated mapper – its behavior is part of the service's
-     * contract (e.g., snapshot vs. ownerSub propagation) and we do not want a stub to
-     * mask wiring mistakes.
-     */
-    @Spy
-    private PersonalInventoryItemMapper mapper = Mappers.getMapper(PersonalInventoryItemMapper.class);
+  /**
+   * Use the real MapStruct-generated mapper – its behavior is part of the service's contract (e.g.,
+   * snapshot vs. ownerSub propagation) and we do not want a stub to mask wiring mistakes.
+   */
+  @Spy
+  private PersonalInventoryItemMapper mapper = Mappers.getMapper(PersonalInventoryItemMapper.class);
 
-    @Mock
-    private CityRepository cityRepository;
+  @Mock private CityRepository cityRepository;
 
-    @Mock
-    private SpaceStationRepository spaceStationRepository;
+  @Mock private SpaceStationRepository spaceStationRepository;
 
-    @InjectMocks
-    private PersonalInventoryItemService service;
+  @InjectMocks private PersonalInventoryItemService service;
 
-    private City lorville;
-    private SpaceStation portOlisar;
+  private City lorville;
+  private SpaceStation portOlisar;
 
-    @BeforeEach
-    void setUp() {
-        lorville = new City();
-        lorville.setIdCity(42);
-        lorville.setName("Lorville");
-        lorville.setStarSystemName("Stanton");
-        lorville.setPlanetName("Hurston");
+  @BeforeEach
+  void setUp() {
+    lorville = new City();
+    lorville.setIdCity(42);
+    lorville.setName("Lorville");
+    lorville.setStarSystemName("Stanton");
+    lorville.setPlanetName("Hurston");
 
-        portOlisar = new SpaceStation();
-        portOlisar.setIdSpaceStation(99);
-        portOlisar.setName("Port Olisar");
-        portOlisar.setStarSystemName("Stanton");
-    }
+    portOlisar = new SpaceStation();
+    portOlisar.setIdSpaceStation(99);
+    portOlisar.setName("Port Olisar");
+    portOlisar.setStarSystemName("Stanton");
+  }
 
-    // -------------------------------------------------------------------- listOwn
+  // -------------------------------------------------------------------- listOwn
 
-    @Test
-    void listOwnShouldQueryRepositoryWithOwnerSubFilter() {
-        // Given
-        Pageable pageable = PageRequest.of(0, 10);
-        when(repository.findAllByOwnerSub(eq(OWNER), eq(pageable)))
-                .thenReturn(new PageImpl<>(List.of(sample(OWNER, 1L))));
+  @Test
+  void listOwnShouldQueryRepositoryWithOwnerSubFilter() {
+    // Given
+    Pageable pageable = PageRequest.of(0, 10);
+    when(repository.findAllByOwnerSub(eq(OWNER), eq(pageable)))
+        .thenReturn(new PageImpl<>(List.of(sample(OWNER, 1L))));
 
-        // When
-        Page<PersonalInventoryItemResponse> result = service.listOwn(OWNER, null, pageable);
+    // When
+    Page<PersonalInventoryItemResponse> result = service.listOwn(OWNER, null, pageable);
 
-        // Then
-        assertEquals(1, result.getTotalElements());
-        verify(repository).findAllByOwnerSub(OWNER, pageable);
-        verify(repository, never()).findAll(any(Pageable.class));
-    }
+    // Then
+    assertEquals(1, result.getTotalElements());
+    verify(repository).findAllByOwnerSub(OWNER, pageable);
+    verify(repository, never()).findAll(any(Pageable.class));
+  }
 
-    @Test
-    void listOwnShouldDelegateToFilteredQueryWhenSearchTermIsProvided() {
-        Pageable pageable = PageRequest.of(0, 10);
-        when(repository.findAllByOwnerSubAndNameContainingIgnoreCase(eq(OWNER), eq("med"), eq(pageable)))
-                .thenReturn(new PageImpl<>(List.of()));
+  @Test
+  void listOwnShouldDelegateToFilteredQueryWhenSearchTermIsProvided() {
+    Pageable pageable = PageRequest.of(0, 10);
+    when(repository.findAllByOwnerSubAndNameContainingIgnoreCase(
+            eq(OWNER), eq("med"), eq(pageable)))
+        .thenReturn(new PageImpl<>(List.of()));
 
-        service.listOwn(OWNER, "  med  ", pageable);
+    service.listOwn(OWNER, "  med  ", pageable);
 
-        verify(repository).findAllByOwnerSubAndNameContainingIgnoreCase(OWNER, "med", pageable);
-        verify(repository, never()).findAllByOwnerSub(any(), any());
-    }
+    verify(repository).findAllByOwnerSubAndNameContainingIgnoreCase(OWNER, "med", pageable);
+    verify(repository, never()).findAllByOwnerSub(any(), any());
+  }
 
-    // -------------------------------------------------------------------- createOwn
+  // -------------------------------------------------------------------- createOwn
 
-    @Test
-    void createOwnShouldStampOwnerSubFromAuthAndResolveSnapshotFromUex() {
-        // Given
-        when(cityRepository.findByIdCity(42)).thenReturn(Optional.of(lorville));
-        when(repository.save(any(PersonalInventoryItem.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+  @Test
+  void createOwnShouldStampOwnerSubFromAuthAndResolveSnapshotFromUex() {
+    // Given
+    when(cityRepository.findByIdCity(42)).thenReturn(Optional.of(lorville));
+    when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PersonalInventoryItemCreateRequest req = new PersonalInventoryItemCreateRequest(
-                "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
+    PersonalInventoryItemCreateRequest req =
+        new PersonalInventoryItemCreateRequest(
+            "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
 
-        // When
-        PersonalInventoryItemResponse result = service.createOwn(OWNER, req);
+    // When
+    PersonalInventoryItemResponse result = service.createOwn(OWNER, req);
 
-        // Then
-        ArgumentCaptor<PersonalInventoryItem> captor = ArgumentCaptor.forClass(PersonalInventoryItem.class);
-        verify(repository).save(captor.capture());
-        PersonalInventoryItem persisted = captor.getValue();
-        assertEquals(OWNER, persisted.getOwnerSub(),
-                "ownerSub must be taken from the JWT, not from the request");
-        assertEquals("Lorville", persisted.getLocationNameSnapshot(),
-                "snapshot must be denormalized from the local UEX mirror");
-        assertEquals(3, result.quantity());
-    }
+    // Then
+    ArgumentCaptor<PersonalInventoryItem> captor =
+        ArgumentCaptor.forClass(PersonalInventoryItem.class);
+    verify(repository).save(captor.capture());
+    PersonalInventoryItem persisted = captor.getValue();
+    assertEquals(
+        OWNER,
+        persisted.getOwnerSub(),
+        "ownerSub must be taken from the JWT, not from the request");
+    assertEquals(
+        "Lorville",
+        persisted.getLocationNameSnapshot(),
+        "snapshot must be denormalized from the local UEX mirror");
+    assertEquals(3, result.quantity());
+  }
 
-    @Test
-    void createOwnShouldRejectUnknownLocationWithEntityNotFound() {
-        when(spaceStationRepository.findByIdSpaceStation(404)).thenReturn(Optional.empty());
+  @Test
+  void createOwnShouldRejectUnknownLocationWithEntityNotFound() {
+    when(spaceStationRepository.findByIdSpaceStation(404)).thenReturn(Optional.empty());
 
-        PersonalInventoryItemCreateRequest req = new PersonalInventoryItemCreateRequest(
-                "Ghost", null, 404, PersonalInventoryLocationType.SPACE_STATION, 1);
+    PersonalInventoryItemCreateRequest req =
+        new PersonalInventoryItemCreateRequest(
+            "Ghost", null, 404, PersonalInventoryLocationType.SPACE_STATION, 1);
 
-        assertThrows(EntityNotFoundException.class, () -> service.createOwn(OWNER, req));
-        verify(repository, never()).save(any());
-    }
+    assertThrows(EntityNotFoundException.class, () -> service.createOwn(OWNER, req));
+    verify(repository, never()).save(any());
+  }
 
-    // -------------------------------------------------------------------- updateOwn
+  // -------------------------------------------------------------------- updateOwn
 
-    @Test
-    void updateOwnShouldUseOwnerScopedLookupAndApplyChanges() {
-        UUID id = UUID.randomUUID();
-        PersonalInventoryItem managed = sample(OWNER, 7L);
-        managed.setId(id);
-        managed.setLocationUexId(42);
-        managed.setLocationType(PersonalInventoryLocationType.CITY);
-        managed.setLocationNameSnapshot("Lorville");
+  @Test
+  void updateOwnShouldUseOwnerScopedLookupAndApplyChanges() {
+    UUID id = UUID.randomUUID();
+    PersonalInventoryItem managed = sample(OWNER, 7L);
+    managed.setId(id);
+    managed.setLocationUexId(42);
+    managed.setLocationType(PersonalInventoryLocationType.CITY);
+    managed.setLocationNameSnapshot("Lorville");
 
-        when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
-        when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+    when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PersonalInventoryItemUpdateRequest req = new PersonalInventoryItemUpdateRequest(
-                "Renamed", "note", 42, PersonalInventoryLocationType.CITY, 5, 7L);
+    PersonalInventoryItemUpdateRequest req =
+        new PersonalInventoryItemUpdateRequest(
+            "Renamed", "note", 42, PersonalInventoryLocationType.CITY, 5, 7L);
 
-        // When
-        PersonalInventoryItemResponse result = service.updateOwn(OWNER, id, req);
+    // When
+    PersonalInventoryItemResponse result = service.updateOwn(OWNER, id, req);
 
-        // Then – no UEX lookup needed because the location did not change
-        verify(cityRepository, never()).findByIdCity(any());
-        verify(spaceStationRepository, never()).findByIdSpaceStation(any());
-        assertEquals("Renamed", result.name());
-        assertEquals(5, result.quantity());
-    }
+    // Then – no UEX lookup needed because the location did not change
+    verify(cityRepository, never()).findByIdCity(any());
+    verify(spaceStationRepository, never()).findByIdSpaceStation(any());
+    assertEquals("Renamed", result.name());
+    assertEquals(5, result.quantity());
+  }
 
-    @Test
-    void updateOwnShouldThrow409OnVersionMismatch() {
-        UUID id = UUID.randomUUID();
-        PersonalInventoryItem managed = sample(OWNER, 5L);
-        managed.setId(id);
-        when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+  @Test
+  void updateOwnShouldThrow409OnVersionMismatch() {
+    UUID id = UUID.randomUUID();
+    PersonalInventoryItem managed = sample(OWNER, 5L);
+    managed.setId(id);
+    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
 
-        PersonalInventoryItemUpdateRequest staleReq = new PersonalInventoryItemUpdateRequest(
-                "x", null, 42, PersonalInventoryLocationType.CITY, 1, /* stale */ 4L);
+    PersonalInventoryItemUpdateRequest staleReq =
+        new PersonalInventoryItemUpdateRequest(
+            "x", null, 42, PersonalInventoryLocationType.CITY, 1, /* stale */ 4L);
 
-        assertThrows(ObjectOptimisticLockingFailureException.class,
-                () -> service.updateOwn(OWNER, id, staleReq));
-        verify(repository, never()).save(any());
-    }
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> service.updateOwn(OWNER, id, staleReq));
+    verify(repository, never()).save(any());
+  }
 
-    @Test
-    void updateOwnShouldRefreshSnapshotWhenLocationChanges() {
-        UUID id = UUID.randomUUID();
-        PersonalInventoryItem managed = sample(OWNER, 3L);
-        managed.setId(id);
-        managed.setLocationUexId(42);
-        managed.setLocationType(PersonalInventoryLocationType.CITY);
-        managed.setLocationNameSnapshot("Lorville");
+  @Test
+  void updateOwnShouldRefreshSnapshotWhenLocationChanges() {
+    UUID id = UUID.randomUUID();
+    PersonalInventoryItem managed = sample(OWNER, 3L);
+    managed.setId(id);
+    managed.setLocationUexId(42);
+    managed.setLocationType(PersonalInventoryLocationType.CITY);
+    managed.setLocationNameSnapshot("Lorville");
 
-        when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
-        when(spaceStationRepository.findByIdSpaceStation(99)).thenReturn(Optional.of(portOlisar));
-        when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+    when(spaceStationRepository.findByIdSpaceStation(99)).thenReturn(Optional.of(portOlisar));
+    when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PersonalInventoryItemUpdateRequest req = new PersonalInventoryItemUpdateRequest(
-                "Same", null, 99, PersonalInventoryLocationType.SPACE_STATION, 1, 3L);
+    PersonalInventoryItemUpdateRequest req =
+        new PersonalInventoryItemUpdateRequest(
+            "Same", null, 99, PersonalInventoryLocationType.SPACE_STATION, 1, 3L);
 
-        PersonalInventoryItemResponse result = service.updateOwn(OWNER, id, req);
+    PersonalInventoryItemResponse result = service.updateOwn(OWNER, id, req);
 
-        assertEquals("Port Olisar", result.locationName(),
-                "Changing location must refresh the denormalized snapshot");
-        verify(spaceStationRepository).findByIdSpaceStation(99);
-    }
+    assertEquals(
+        "Port Olisar",
+        result.locationName(),
+        "Changing location must refresh the denormalized snapshot");
+    verify(spaceStationRepository).findByIdSpaceStation(99);
+  }
 
-    // ------------------------------------------------------ DATA ISOLATION
+  // ------------------------------------------------------ DATA ISOLATION
 
-    @Test
-    void anotherUserMustNotSeeForeignItem() {
-        UUID id = UUID.randomUUID();
-        // The repository correctly returns empty when filtered by the wrong owner.
-        when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+  @Test
+  void anotherUserMustNotSeeForeignItem() {
+    UUID id = UUID.randomUUID();
+    // The repository correctly returns empty when filtered by the wrong owner.
+    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> service.getOwn(OTHER, id));
-    }
+    assertThrows(EntityNotFoundException.class, () -> service.getOwn(OTHER, id));
+  }
 
-    @Test
-    void anotherUserMustNotUpdateForeignItem() {
-        UUID id = UUID.randomUUID();
-        when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+  @Test
+  void anotherUserMustNotUpdateForeignItem() {
+    UUID id = UUID.randomUUID();
+    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
 
-        PersonalInventoryItemUpdateRequest req = new PersonalInventoryItemUpdateRequest(
-                "x", null, 42, PersonalInventoryLocationType.CITY, 1, 0L);
+    PersonalInventoryItemUpdateRequest req =
+        new PersonalInventoryItemUpdateRequest(
+            "x", null, 42, PersonalInventoryLocationType.CITY, 1, 0L);
 
-        assertThrows(EntityNotFoundException.class, () -> service.updateOwn(OTHER, id, req));
-        verify(repository, never()).save(any());
-    }
+    assertThrows(EntityNotFoundException.class, () -> service.updateOwn(OTHER, id, req));
+    verify(repository, never()).save(any());
+  }
 
-    @Test
-    void anotherUserMustNotDeleteForeignItem() {
-        UUID id = UUID.randomUUID();
-        when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+  @Test
+  void anotherUserMustNotDeleteForeignItem() {
+    UUID id = UUID.randomUUID();
+    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
-        verify(repository, never()).delete(any());
-    }
+    assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
+    verify(repository, never()).delete(any());
+  }
 
-    // ------------------------------------------------------ ADMIN PATH
+  // ------------------------------------------------------ ADMIN PATH
 
-    @Test
-    void adminUpdateForUserDoesNotEnforceOwnerScope() {
-        UUID id = UUID.randomUUID();
-        PersonalInventoryItem foreign = sample(OWNER, 1L);
-        foreign.setId(id);
-        foreign.setLocationUexId(42);
-        foreign.setLocationType(PersonalInventoryLocationType.CITY);
-        foreign.setLocationNameSnapshot("Lorville");
+  @Test
+  void adminUpdateForUserDoesNotEnforceOwnerScope() {
+    UUID id = UUID.randomUUID();
+    PersonalInventoryItem foreign = sample(OWNER, 1L);
+    foreign.setId(id);
+    foreign.setLocationUexId(42);
+    foreign.setLocationType(PersonalInventoryLocationType.CITY);
+    foreign.setLocationNameSnapshot("Lorville");
 
-        when(repository.findById(id)).thenReturn(Optional.of(foreign));
-        when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.findById(id)).thenReturn(Optional.of(foreign));
+    when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PersonalInventoryItemUpdateRequest req = new PersonalInventoryItemUpdateRequest(
-                "Admin Touched", null, 42, PersonalInventoryLocationType.CITY, 9, 1L);
+    PersonalInventoryItemUpdateRequest req =
+        new PersonalInventoryItemUpdateRequest(
+            "Admin Touched", null, 42, PersonalInventoryLocationType.CITY, 9, 1L);
 
-        PersonalInventoryItemResponse result = service.updateForUser(id, req);
+    PersonalInventoryItemResponse result = service.updateForUser(id, req);
 
-        assertEquals("Admin Touched", result.name());
-        // Owner sub on the entity is preserved, even though the admin is a different user.
-        assertEquals(OWNER, foreign.getOwnerSub());
-    }
+    assertEquals("Admin Touched", result.name());
+    // Owner sub on the entity is preserved, even though the admin is a different user.
+    assertEquals(OWNER, foreign.getOwnerSub());
+  }
 
-    // ------------------------------------------------------ UEX search
+  // ------------------------------------------------------ UEX search
 
-    @Test
-    void searchLocationsShouldMergeAndCapResults() {
-        when(cityRepository.findAll()).thenReturn(List.of(lorville));
-        when(spaceStationRepository.findAll()).thenReturn(List.of(portOlisar));
+  @Test
+  void searchLocationsShouldMergeAndCapResults() {
+    when(cityRepository.findAll()).thenReturn(List.of(lorville));
+    when(spaceStationRepository.findAll()).thenReturn(List.of(portOlisar));
 
-        List<UexLocationDto> all = service.searchLocations(null, 25);
-        assertEquals(2, all.size());
+    List<UexLocationDto> all = service.searchLocations(null, 25);
+    assertEquals(2, all.size());
 
-        List<UexLocationDto> filtered = service.searchLocations("port", 25);
-        assertEquals(1, filtered.size());
-        assertEquals(PersonalInventoryLocationType.SPACE_STATION, filtered.get(0).type());
-    }
+    List<UexLocationDto> filtered = service.searchLocations("port", 25);
+    assertEquals(1, filtered.size());
+    assertEquals(PersonalInventoryLocationType.SPACE_STATION, filtered.get(0).type());
+  }
 
-    // ------------------------------------------------------ helpers
+  // ------------------------------------------------------ helpers
 
-    private static PersonalInventoryItem sample(String ownerSub, long version) {
-        PersonalInventoryItem e = PersonalInventoryItem.builder()
-                .ownerSub(ownerSub)
-                .name("Item")
-                .note(null)
-                .locationUexId(42)
-                .locationType(PersonalInventoryLocationType.CITY)
-                .locationNameSnapshot("Lorville")
-                .quantity(1)
-                .build();
-        e.setVersion(version);
-        return e;
-    }
+  private static PersonalInventoryItem sample(String ownerSub, long version) {
+    PersonalInventoryItem e =
+        PersonalInventoryItem.builder()
+            .ownerSub(ownerSub)
+            .name("Item")
+            .note(null)
+            .locationUexId(42)
+            .locationType(PersonalInventoryLocationType.CITY)
+            .locationNameSnapshot("Lorville")
+            .quantity(1)
+            .build();
+    e.setVersion(version);
+    return e;
+  }
 }

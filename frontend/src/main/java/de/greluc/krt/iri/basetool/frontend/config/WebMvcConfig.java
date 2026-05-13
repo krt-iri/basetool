@@ -9,13 +9,18 @@ import org.springframework.web.servlet.resource.VersionResourceResolver;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/**")
-                .addResourceLocations("classpath:/META-INF/resources/", "classpath:/resources/", "classpath:/static/", "classpath:/public/")
-                .setCachePeriod(31536000)
-                .resourceChain(true)
-                .addResolver(new VersionResourceResolver().addContentVersionStrategy("/**"))
-                .addTransformer(new CssLinkResourceTransformer());
-    }
+  @Override
+  public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry
+        .addResourceHandler("/**")
+        .addResourceLocations(
+            "classpath:/META-INF/resources/",
+            "classpath:/resources/",
+            "classpath:/static/",
+            "classpath:/public/")
+        .setCachePeriod(31536000)
+        .resourceChain(true)
+        .addResolver(new VersionResourceResolver().addContentVersionStrategy("/**"))
+        .addTransformer(new CssLinkResourceTransformer());
+  }
 }

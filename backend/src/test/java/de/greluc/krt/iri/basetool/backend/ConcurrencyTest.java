@@ -1,16 +1,10 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -20,125 +14,132 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the {@code Mission @Version} optimistic-locking guarantee under
- * <em>real</em> concurrent access. The previous incarnation of this test
- * simulated two users sequentially (load → update → save → load-stale →
- * update-stale → save-stale-throws) which exercised the SQL semantics of the
- * version column but could not surface timing-dependent bugs (early commit,
- * connection-pool starvation, persistence-context cross-thread leakage, …).
+ * Verifies the {@code Mission @Version} optimistic-locking guarantee under <em>real</em> concurrent
+ * access. The previous incarnation of this test simulated two users sequentially (load → update →
+ * save → load-stale → update-stale → save-stale-throws) which exercised the SQL semantics of the
+ * version column but could not surface timing-dependent bugs (early commit, connection-pool
+ * starvation, persistence-context cross-thread leakage, …).
  *
- * <p>This rewrite launches several worker threads, makes them all load the
- * same entity, holds them at a {@link CountDownLatch} until everyone has the
- * same stale version, then releases them to attempt a save simultaneously.
- * Postgres serialises the UPDATE statements via row-level locks; exactly one
- * thread sees its {@code UPDATE … WHERE version = N} return rows-affected = 1
- * (success), and every other thread sees rows-affected = 0 which Hibernate
- * translates to {@link ObjectOptimisticLockingFailureException}.
+ * <p>This rewrite launches several worker threads, makes them all load the same entity, holds them
+ * at a {@link CountDownLatch} until everyone has the same stale version, then releases them to
+ * attempt a save simultaneously. Postgres serialises the UPDATE statements via row-level locks;
+ * exactly one thread sees its {@code UPDATE … WHERE version = N} return rows-affected = 1
+ * (success), and every other thread sees rows-affected = 0 which Hibernate translates to {@link
+ * ObjectOptimisticLockingFailureException}.
  *
- * <p>The test is deliberately <strong>not</strong> annotated with
- * {@code @Transactional} — a Spring-managed test transaction would wrap all
- * setup in one rolled-back transaction that the worker threads (each running
- * in their own session) could not see. Each thread relies on Spring Data
- * JPA's per-method {@code @Transactional} on the repository calls.
+ * <p>The test is deliberately <strong>not</strong> annotated with {@code @Transactional} — a
+ * Spring-managed test transaction would wrap all setup in one rolled-back transaction that the
+ * worker threads (each running in their own session) could not see. Each thread relies on Spring
+ * Data JPA's per-method {@code @Transactional} on the repository calls.
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class ConcurrencyTest {
 
-    private static final int THREADS = 5;
-    private static final int START_TIMEOUT_SECONDS = 5;
-    private static final int FINISH_TIMEOUT_SECONDS = 30;
+  private static final int THREADS = 5;
+  private static final int START_TIMEOUT_SECONDS = 5;
+  private static final int FINISH_TIMEOUT_SECONDS = 30;
 
-    @Autowired
-    private MissionRepository missionRepository;
+  @Autowired private MissionRepository missionRepository;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    private UUID seedMissionId;
+  private UUID seedMissionId;
 
-    @AfterEach
-    void cleanupSeedRow() {
-        // Without an outer @Transactional the seed mission survives the test;
-        // remove it so adjacent tests that snapshot the table can rely on a
-        // clean baseline.
-        if (seedMissionId != null) {
-            missionRepository.deleteById(seedMissionId);
-            seedMissionId = null;
-        }
+  @AfterEach
+  void cleanupSeedRow() {
+    // Without an outer @Transactional the seed mission survives the test;
+    // remove it so adjacent tests that snapshot the table can rely on a
+    // clean baseline.
+    if (seedMissionId != null) {
+      missionRepository.deleteById(seedMissionId);
+      seedMissionId = null;
     }
+  }
 
-    @Test
-    void missionUpdate_underRealConcurrentContention_exactlyOneThreadWins() throws Exception {
-        Mission seed = new Mission();
-        seed.setName("Concurrency Mission " + UUID.randomUUID());
-        seed.setStatus("PLANNED");
-        seedMissionId = missionRepository.save(seed).getId();
-        final UUID id = seedMissionId;
+  @Test
+  void missionUpdate_underRealConcurrentContention_exactlyOneThreadWins() throws Exception {
+    Mission seed = new Mission();
+    seed.setName("Concurrency Mission " + UUID.randomUUID());
+    seed.setStatus("PLANNED");
+    seedMissionId = missionRepository.save(seed).getId();
+    final UUID id = seedMissionId;
 
-        CountDownLatch ready = new CountDownLatch(THREADS);
-        CountDownLatch go = new CountDownLatch(1);
-        AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger conflictCount = new AtomicInteger();
-        AtomicInteger otherErrorCount = new AtomicInteger();
-        List<Throwable> unexpectedErrors = new java.util.concurrent.CopyOnWriteArrayList<>();
+    CountDownLatch ready = new CountDownLatch(THREADS);
+    CountDownLatch go = new CountDownLatch(1);
+    AtomicInteger successCount = new AtomicInteger();
+    AtomicInteger conflictCount = new AtomicInteger();
+    AtomicInteger otherErrorCount = new AtomicInteger();
+    List<Throwable> unexpectedErrors = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
-        List<Future<?>> futures = new ArrayList<>(THREADS);
-        try {
-            for (int i = 0; i < THREADS; i++) {
-                final int idx = i;
-                futures.add(pool.submit(() -> {
-                    try {
-                        Mission stale = missionRepository.findById(id).orElseThrow();
-                        ready.countDown();
-                        if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                            otherErrorCount.incrementAndGet();
-                            return;
-                        }
-                        stale.setName("Updated by thread " + idx);
-                        try {
-                            missionRepository.save(stale);
-                            successCount.incrementAndGet();
-                        } catch (ObjectOptimisticLockingFailureException expected) {
-                            conflictCount.incrementAndGet();
-                        }
-                    } catch (Throwable t) {
-                        otherErrorCount.incrementAndGet();
-                        unexpectedErrors.add(t);
+    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+    List<Future<?>> futures = new ArrayList<>(THREADS);
+    try {
+      for (int i = 0; i < THREADS; i++) {
+        final int idx = i;
+        futures.add(
+            pool.submit(
+                () -> {
+                  try {
+                    Mission stale = missionRepository.findById(id).orElseThrow();
+                    ready.countDown();
+                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                      otherErrorCount.incrementAndGet();
+                      return;
                     }
+                    stale.setName("Updated by thread " + idx);
+                    try {
+                      missionRepository.save(stale);
+                      successCount.incrementAndGet();
+                    } catch (ObjectOptimisticLockingFailureException expected) {
+                      conflictCount.incrementAndGet();
+                    }
+                  } catch (Throwable t) {
+                    otherErrorCount.incrementAndGet();
+                    unexpectedErrors.add(t);
+                  }
                 }));
-            }
+      }
 
-            assertTrue(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-                    "all worker threads should have loaded the mission within "
-                            + START_TIMEOUT_SECONDS + "s");
-            go.countDown();
+      assertTrue(
+          ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+          "all worker threads should have loaded the mission within "
+              + START_TIMEOUT_SECONDS
+              + "s");
+      go.countDown();
 
-            for (Future<?> f : futures) {
-                f.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            }
-        } finally {
-            pool.shutdownNow();
-            pool.awaitTermination(5, TimeUnit.SECONDS);
-        }
-
-        assertEquals(0, otherErrorCount.get(),
-                () -> "no thread should have thrown an unexpected exception, got: "
-                        + unexpectedErrors);
-        assertEquals(1, successCount.get(),
-                "exactly one thread should win the optimistic-lock race");
-        assertEquals(THREADS - 1, conflictCount.get(),
-                "every other thread should see ObjectOptimisticLockingFailureException");
-
-        Mission persisted = missionRepository.findById(id).orElseThrow();
-        assertTrue(persisted.getName().startsWith("Updated by thread "),
-                "winning thread's update must be the one that landed in the DB, got: "
-                        + persisted.getName());
+      for (Future<?> f : futures) {
+        f.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+      pool.awaitTermination(5, TimeUnit.SECONDS);
     }
+
+    assertEquals(
+        0,
+        otherErrorCount.get(),
+        () -> "no thread should have thrown an unexpected exception, got: " + unexpectedErrors);
+    assertEquals(1, successCount.get(), "exactly one thread should win the optimistic-lock race");
+    assertEquals(
+        THREADS - 1,
+        conflictCount.get(),
+        "every other thread should see ObjectOptimisticLockingFailureException");
+
+    Mission persisted = missionRepository.findById(id).orElseThrow();
+    assertTrue(
+        persisted.getName().startsWith("Updated by thread "),
+        "winning thread's update must be the one that landed in the DB, got: "
+            + persisted.getName());
+  }
 }

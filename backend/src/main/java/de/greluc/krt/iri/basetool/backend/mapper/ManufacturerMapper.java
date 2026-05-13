@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface ManufacturerMapper {
-    ManufacturerDto toDto(Manufacturer entity);
-    Manufacturer toEntity(ManufacturerDto dto);
+  ManufacturerDto toDto(Manufacturer entity);
+
+  Manufacturer toEntity(ManufacturerDto dto);
 }

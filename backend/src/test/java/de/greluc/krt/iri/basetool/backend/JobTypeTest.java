@@ -1,9 +1,17 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,229 +26,305 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.time.Instant;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class JobTypeTest {
 
-    @Autowired
-    private WebApplicationContext context;
+  @Autowired private WebApplicationContext context;
 
-    private MockMvc mockMvc;
+  private MockMvc mockMvc;
 
-    @Autowired
-    private JobTypeRepository jobTypeRepository;
+  @Autowired private JobTypeRepository jobTypeRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired private UserRepository userRepository;
 
-    @Autowired
-    private MissionRepository missionRepository;
+  @Autowired private MissionRepository missionRepository;
 
-    @Autowired
-    private MissionParticipantRepository missionParticipantRepository;
+  @Autowired private MissionParticipantRepository missionParticipantRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    private User officerUser;
-    private User guestUser;
-    private User adminUser;
+  private User officerUser;
+  private User guestUser;
+  private User adminUser;
 
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-        officerUser = new User();
-        officerUser.setId(UUID.randomUUID());
-        officerUser.setUsername("officerJob");
-        userRepository.save(officerUser);
+    officerUser = new User();
+    officerUser.setId(UUID.randomUUID());
+    officerUser.setUsername("officerJob");
+    userRepository.save(officerUser);
 
-        guestUser = new User();
-        guestUser.setId(UUID.randomUUID());
-        guestUser.setUsername("guestJob");
-        userRepository.save(guestUser);
+    guestUser = new User();
+    guestUser.setId(UUID.randomUUID());
+    guestUser.setUsername("guestJob");
+    userRepository.save(guestUser);
 
-        adminUser = new User();
-        adminUser.setId(UUID.randomUUID());
-        adminUser.setUsername("adminJob");
-        userRepository.save(adminUser);
-    }
+    adminUser = new User();
+    adminUser.setId(UUID.randomUUID());
+    adminUser.setUsername("adminJob");
+    userRepository.save(adminUser);
+  }
 
-    @Test
-    void testCreateJobType_Officer_Allowed() throws Exception {
-        JobTypeDto jobType = new JobTypeDto(null, "Pilot", "Flies the ship", JobTypeArchetype.CREW, null, true, false, null);
+  @Test
+  void testCreateJobType_Officer_Allowed() throws Exception {
+    JobTypeDto jobType =
+        new JobTypeDto(
+            null, "Pilot", "Flies the ship", JobTypeArchetype.CREW, null, true, false, null);
 
-        mockMvc.perform(post("/api/v1/job-types")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+    mockMvc
+        .perform(
+            post("/api/v1/job-types")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
-                .andExpect(status().isOk());
-        
-        assertEquals(1, jobTypeRepository.findAll().size());
-    }
+        .andExpect(status().isOk());
 
-    @Test
-    void testCreateJobType_Guest_Forbidden() throws Exception {
-        JobTypeDto jobType = new JobTypeDto(null, "Hacker", null, JobTypeArchetype.MISSION, null, true, false, null);
+    assertEquals(1, jobTypeRepository.findAll().size());
+  }
 
-        mockMvc.perform(post("/api/v1/job-types")
-                .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))
+  @Test
+  void testCreateJobType_Guest_Forbidden() throws Exception {
+    JobTypeDto jobType =
+        new JobTypeDto(null, "Hacker", null, JobTypeArchetype.MISSION, null, true, false, null);
+
+    mockMvc
+        .perform(
+            post("/api/v1/job-types")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
-                .andExpect(status().isForbidden());
-    }
+        .andExpect(status().isForbidden());
+  }
 
-    @Test
-    void testCreateJobType_WithParent() throws Exception {
-        // Create parent
-        JobType parent = new JobType();
-        parent.setName("Engineer");
-        parent.setArchetype(JobTypeArchetype.CREW);
-        parent = jobTypeRepository.save(parent);
+  @Test
+  void testCreateJobType_WithParent() throws Exception {
+    // Create parent
+    JobType parent = new JobType();
+    parent.setName("Engineer");
+    parent.setArchetype(JobTypeArchetype.CREW);
+    parent = jobTypeRepository.save(parent);
 
-        // Create child DTO referencing parent by ID
-        JobTypeDto child = new JobTypeDto(null, "Power Plant Engineer", null, JobTypeArchetype.CREW, parent.getId(), true, false, null);
+    // Create child DTO referencing parent by ID
+    JobTypeDto child =
+        new JobTypeDto(
+            null,
+            "Power Plant Engineer",
+            null,
+            JobTypeArchetype.CREW,
+            parent.getId(),
+            true,
+            false,
+            null);
 
-        mockMvc.perform(post("/api/v1/job-types")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+    mockMvc
+        .perform(
+            post("/api/v1/job-types")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(child)))
-                .andExpect(status().isOk());
+        .andExpect(status().isOk());
 
-        JobType savedChild = jobTypeRepository.findAll().stream()
-                .filter(j -> j.getName().equals("Power Plant Engineer"))
-                .findFirst().orElseThrow();
-        
-        assertNotNull(savedChild.getParent());
-        assertEquals(parent.getId(), savedChild.getParent().getId());
-    }
+    JobType savedChild =
+        jobTypeRepository.findAll().stream()
+            .filter(j -> j.getName().equals("Power Plant Engineer"))
+            .findFirst()
+            .orElseThrow();
 
-    @Test
-    void testCreateJobType_WithEmptyParent_ShouldWork() throws Exception {
-        JobTypeDto jobType = new JobTypeDto(null, "Test Empty Parent", null, JobTypeArchetype.CREW, null, true, false, null);
+    assertNotNull(savedChild.getParent());
+    assertEquals(parent.getId(), savedChild.getParent().getId());
+  }
 
-        mockMvc.perform(post("/api/v1/job-types")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+  @Test
+  void testCreateJobType_WithEmptyParent_ShouldWork() throws Exception {
+    JobTypeDto jobType =
+        new JobTypeDto(
+            null, "Test Empty Parent", null, JobTypeArchetype.CREW, null, true, false, null);
+
+    mockMvc
+        .perform(
+            post("/api/v1/job-types")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
-                .andExpect(status().isOk());
-    }
+        .andExpect(status().isOk());
+  }
 
-    @Test
-    void testCreateJobType_WithoutArchetype_ShouldFail() throws Exception {
-        JobTypeDto jobType = new JobTypeDto(null, "Ghost Job", null, null, null, true, false, null);
-        mockMvc.perform(post("/api/v1/job-types")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+  @Test
+  void testCreateJobType_WithoutArchetype_ShouldFail() throws Exception {
+    JobTypeDto jobType = new JobTypeDto(null, "Ghost Job", null, null, null, true, false, null);
+    mockMvc
+        .perform(
+            post("/api/v1/job-types")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
-                .andExpect(status().isBadRequest());
-    }
+        .andExpect(status().isBadRequest());
+  }
 
-    @Test
-    void testDeleteJobType_SoftDelete_Success() throws Exception {
-        // Given
-        JobType parent = new JobType();
-        parent.setName("Parent Job");
-        parent.setArchetype(JobTypeArchetype.CREW);
-        parent = jobTypeRepository.save(parent);
+  @Test
+  void testDeleteJobType_SoftDelete_Success() throws Exception {
+    // Given
+    JobType parent = new JobType();
+    parent.setName("Parent Job");
+    parent.setArchetype(JobTypeArchetype.CREW);
+    parent = jobTypeRepository.save(parent);
 
-        JobType child = new JobType();
-        child.setName("Child Job");
-        child.setArchetype(JobTypeArchetype.CREW);
-        child.setParent(parent);
-        jobTypeRepository.save(child);
+    JobType child = new JobType();
+    child.setName("Child Job");
+    child.setArchetype(JobTypeArchetype.CREW);
+    child.setParent(parent);
+    jobTypeRepository.save(child);
 
-        // When / Then
-        mockMvc.perform(delete("/api/v1/job-types/" + parent.getId())
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-                .andExpect(status().isOk());
+    // When / Then
+    mockMvc
+        .perform(
+            delete("/api/v1/job-types/" + parent.getId())
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE"))))
+        .andExpect(status().isOk());
 
-        // Check if soft deleted
-        JobType softDeletedParent = jobTypeRepository.findById(parent.getId()).orElseThrow();
-        assertFalse(softDeletedParent.isActive());
-        
-        // Child still has reference
-        JobType updatedChild = jobTypeRepository.findById(child.getId()).orElseThrow();
-        assertNotNull(updatedChild.getParent());
-    }
+    // Check if soft deleted
+    JobType softDeletedParent = jobTypeRepository.findById(parent.getId()).orElseThrow();
+    assertFalse(softDeletedParent.isActive());
 
-    @Test
-    void testDeleteJobType_SoftDelete_WithParticipant_Success() throws Exception {
-        // Given
-        JobType jobType = new JobType();
-        jobType.setName("Turret Gunner");
-        jobType.setArchetype(JobTypeArchetype.CREW);
-        jobType = jobTypeRepository.save(jobType);
+    // Child still has reference
+    JobType updatedChild = jobTypeRepository.findById(child.getId()).orElseThrow();
+    assertNotNull(updatedChild.getParent());
+  }
 
-        Mission mission = new Mission();
-        mission.setName("Test Mission");
-        mission.setStatus("PLANNED");
-        mission.setPlannedStartTime(Instant.now());
-        mission = missionRepository.save(mission);
+  @Test
+  void testDeleteJobType_SoftDelete_WithParticipant_Success() throws Exception {
+    // Given
+    JobType jobType = new JobType();
+    jobType.setName("Turret Gunner");
+    jobType.setArchetype(JobTypeArchetype.CREW);
+    jobType = jobTypeRepository.save(jobType);
 
-        MissionParticipant participant = new MissionParticipant();
-        participant.setMission(mission);
-        participant.setGuestName("Test Guest");
-        participant.setDesiredMissionJobType(jobType);
-        participant = missionParticipantRepository.save(participant);
+    Mission mission = new Mission();
+    mission.setName("Test Mission");
+    mission.setStatus("PLANNED");
+    mission.setPlannedStartTime(Instant.now());
+    mission = missionRepository.save(mission);
 
-        // When / Then
-        mockMvc.perform(delete("/api/v1/job-types/" + jobType.getId())
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-                .andExpect(status().isOk());
+    MissionParticipant participant = new MissionParticipant();
+    participant.setMission(mission);
+    participant.setGuestName("Test Guest");
+    participant.setDesiredMissionJobType(jobType);
+    participant = missionParticipantRepository.save(participant);
 
-        JobType softDeletedJobType = jobTypeRepository.findById(jobType.getId()).orElseThrow();
-        assertFalse(softDeletedJobType.isActive());
-        
-        MissionParticipant updatedParticipant = missionParticipantRepository.findById(participant.getId()).orElseThrow();
-        assertNotNull(updatedParticipant.getDesiredMissionJobType());
-    }
+    // When / Then
+    mockMvc
+        .perform(
+            delete("/api/v1/job-types/" + jobType.getId())
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE"))))
+        .andExpect(status().isOk());
 
-    @Test
-    void testActivateJobType_Success() throws Exception {
-        // Given
-        JobType jobType = new JobType();
-        jobType.setName("Inactive Job");
-        jobType.setArchetype(JobTypeArchetype.CREW);
-        jobType.setActive(false);
-        jobType = jobTypeRepository.save(jobType);
+    JobType softDeletedJobType = jobTypeRepository.findById(jobType.getId()).orElseThrow();
+    assertFalse(softDeletedJobType.isActive());
 
-        // When / Then
-        // Officer cannot activate
-        mockMvc.perform(post("/api/v1/job-types/" + jobType.getId() + "/activate")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-                .andExpect(status().isForbidden());
+    MissionParticipant updatedParticipant =
+        missionParticipantRepository.findById(participant.getId()).orElseThrow();
+    assertNotNull(updatedParticipant.getDesiredMissionJobType());
+  }
 
-        // Admin can activate
-        mockMvc.perform(post("/api/v1/job-types/" + jobType.getId() + "/activate")
-                .with(jwt().jwt(builder -> builder.subject(adminUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-                .andExpect(status().isOk());
+  @Test
+  void testActivateJobType_Success() throws Exception {
+    // Given
+    JobType jobType = new JobType();
+    jobType.setName("Inactive Job");
+    jobType.setArchetype(JobTypeArchetype.CREW);
+    jobType.setActive(false);
+    jobType = jobTypeRepository.save(jobType);
 
-        JobType activatedJobType = jobTypeRepository.findById(jobType.getId()).orElseThrow();
-        assertTrue(activatedJobType.isActive());
-    }
+    // When / Then
+    // Officer cannot activate
+    mockMvc
+        .perform(
+            post("/api/v1/job-types/" + jobType.getId() + "/activate")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE"))))
+        .andExpect(status().isForbidden());
+
+    // Admin can activate
+    mockMvc
+        .perform(
+            post("/api/v1/job-types/" + jobType.getId() + "/activate")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_ADMIN"),
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE"))))
+        .andExpect(status().isOk());
+
+    JobType activatedJobType = jobTypeRepository.findById(jobType.getId()).orElseThrow();
+    assertTrue(activatedJobType.isActive());
+  }
 }

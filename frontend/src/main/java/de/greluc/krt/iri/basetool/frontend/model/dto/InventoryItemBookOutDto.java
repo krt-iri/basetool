@@ -12,5 +12,4 @@ public record InventoryItemBookOutDto(
     CheckoutType type,
     String terminal,
     @Min(0) BigDecimal sellAmount,
-    @NotNull Long version
-) {}
+    @NotNull Long version) {}

@@ -11,5 +11,4 @@ public record MaterialUpdateAjaxRequest(
     String quantityType,
     Boolean isManualRawMaterial,
     Boolean isJobOrder,
-    @NotNull Long version
-) {}
+    @NotNull Long version) {}

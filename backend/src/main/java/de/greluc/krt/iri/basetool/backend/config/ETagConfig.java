@@ -9,18 +9,19 @@ import org.springframework.web.filter.ShallowEtagHeaderFilter;
 @Configuration
 public class ETagConfig {
 
-    @Bean
-    public ShallowEtagHeaderFilter shallowEtagFilter() {
-        return new ShallowEtagHeaderFilter();
-    }
+  @Bean
+  public ShallowEtagHeaderFilter shallowEtagFilter() {
+    return new ShallowEtagHeaderFilter();
+  }
 
-    @Bean
-    public FilterRegistrationBean<ShallowEtagHeaderFilter> shallowEtagHeaderFilter(ShallowEtagHeaderFilter shallowEtagFilter) {
-        FilterRegistrationBean<ShallowEtagHeaderFilter> filter = new FilterRegistrationBean<>();
-        filter.setFilter(shallowEtagFilter);
-        // Ensure ETag is applied early so conditional requests can be short-circuited
-        filter.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
-        filter.addUrlPatterns("/*");
-        return filter;
-    }
+  @Bean
+  public FilterRegistrationBean<ShallowEtagHeaderFilter> shallowEtagHeaderFilter(
+      ShallowEtagHeaderFilter shallowEtagFilter) {
+    FilterRegistrationBean<ShallowEtagHeaderFilter> filter = new FilterRegistrationBean<>();
+    filter.setFilter(shallowEtagFilter);
+    // Ensure ETag is applied early so conditional requests can be short-circuited
+    filter.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
+    filter.addUrlPatterns("/*");
+    return filter;
+  }
 }

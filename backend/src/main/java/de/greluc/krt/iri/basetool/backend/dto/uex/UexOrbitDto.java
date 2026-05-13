@@ -11,9 +11,8 @@ public record UexOrbitDto(
     @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("star_system_name") String starSystemName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("jurisdiction_name") String jurisdictionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("jurisdiction_name") String jurisdictionName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

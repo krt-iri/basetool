@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -24,12 +25,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 /**
- * REST endpoints for the user-facing personal inventory. Every method enforces data
- * isolation by deriving the owner identifier from the JWT {@code sub} claim and never
- * accepting it from the request body.
+ * REST endpoints for the user-facing personal inventory. Every method enforces data isolation by
+ * deriving the owner identifier from the JWT {@code sub} claim and never accepting it from the
+ * request body.
  */
 @RestController
 @RequestMapping("/api/v1/personal-inventory")
@@ -40,98 +39,103 @@ import java.util.UUID;
 @Slf4j
 public class PersonalInventoryController {
 
-    private final PersonalInventoryItemService service;
+  private final PersonalInventoryItemService service;
 
-    @GetMapping
-    @Operation(summary = "List own personal inventory entries (paginated, sortable, optional name filter).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Paginated list of the caller's items."),
-            @ApiResponse(responseCode = "401", description = "Authentication required.")
-    })
-    public PageResponse<PersonalInventoryItemResponse> list(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String q,
-            JwtAuthenticationToken authentication) {
-        String ownerSub = requireSub(authentication);
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort,
-                PersonalInventoryItemService.SORTABLE_FIELDS,
-                PersonalInventoryItemService.DEFAULT_SORT_FIELD);
-        Page<PersonalInventoryItemResponse> result = service.listOwn(ownerSub, q, pageable);
-        return toPageResponse(result);
-    }
+  @GetMapping
+  @Operation(
+      summary = "List own personal inventory entries (paginated, sortable, optional name filter).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Paginated list of the caller's items."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public PageResponse<PersonalInventoryItemResponse> list(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String q,
+      JwtAuthenticationToken authentication) {
+    String ownerSub = requireSub(authentication);
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            PersonalInventoryItemService.SORTABLE_FIELDS,
+            PersonalInventoryItemService.DEFAULT_SORT_FIELD);
+    Page<PersonalInventoryItemResponse> result = service.listOwn(ownerSub, q, pageable);
+    return toPageResponse(result);
+  }
 
-    @GetMapping("/{id}")
-    @Operation(summary = "Fetch a single personal inventory entry owned by the caller.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Item found."),
-            @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
-    })
-    public PersonalInventoryItemResponse get(@PathVariable UUID id, JwtAuthenticationToken auth) {
-        return service.getOwn(requireSub(auth), id);
-    }
+  @GetMapping("/{id}")
+  @Operation(summary = "Fetch a single personal inventory entry owned by the caller.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Item found."),
+    @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
+  })
+  public PersonalInventoryItemResponse get(@PathVariable UUID id, JwtAuthenticationToken auth) {
+    return service.getOwn(requireSub(auth), id);
+  }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a new personal inventory entry for the caller.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Item created."),
-            @ApiResponse(responseCode = "400", description = "Validation failed."),
-            @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
-    })
-    public PersonalInventoryItemResponse create(@Valid @RequestBody PersonalInventoryItemCreateRequest request,
-                                                JwtAuthenticationToken auth) {
-        return service.createOwn(requireSub(auth), request);
-    }
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "Create a new personal inventory entry for the caller.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Item created."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+  })
+  public PersonalInventoryItemResponse create(
+      @Valid @RequestBody PersonalInventoryItemCreateRequest request, JwtAuthenticationToken auth) {
+    return service.createOwn(requireSub(auth), request);
+  }
 
-    @PutMapping("/{id}")
-    @Operation(summary = "Update an existing personal inventory entry owned by the caller.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Item updated."),
-            @ApiResponse(responseCode = "400", description = "Validation failed."),
-            @ApiResponse(responseCode = "404", description = "Item not found, not owned, or location unknown."),
-            @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
-    })
-    public PersonalInventoryItemResponse update(@PathVariable UUID id,
-                                                @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
-                                                JwtAuthenticationToken auth) {
-        return service.updateOwn(requireSub(auth), id, request);
-    }
+  @PutMapping("/{id}")
+  @Operation(summary = "Update an existing personal inventory entry owned by the caller.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Item updated."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Item not found, not owned, or location unknown."),
+    @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
+  })
+  public PersonalInventoryItemResponse update(
+      @PathVariable UUID id,
+      @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
+      JwtAuthenticationToken auth) {
+    return service.updateOwn(requireSub(auth), id, request);
+  }
 
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Delete one of the caller's personal inventory entries.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Item deleted."),
-            @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
-    })
-    public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
-        service.deleteOwn(requireSub(auth), id);
-    }
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete one of the caller's personal inventory entries.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Item deleted."),
+    @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
+  })
+  public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
+    service.deleteOwn(requireSub(auth), id);
+  }
 
-    @NotNull
-    private static String requireSub(JwtAuthenticationToken auth) {
-        if (auth == null || auth.getToken() == null) {
-            throw new AccessDeniedException("Missing JWT.");
-        }
-        Jwt jwt = auth.getToken();
-        String sub = jwt.getSubject();
-        if (sub == null || sub.isBlank()) {
-            throw new AccessDeniedException("JWT does not contain a subject claim.");
-        }
-        return sub;
+  @NotNull private static String requireSub(JwtAuthenticationToken auth) {
+    if (auth == null || auth.getToken() == null) {
+      throw new AccessDeniedException("Missing JWT.");
     }
+    Jwt jwt = auth.getToken();
+    String sub = jwt.getSubject();
+    if (sub == null || sub.isBlank()) {
+      throw new AccessDeniedException("JWT does not contain a subject claim.");
+    }
+    return sub;
+  }
 
-    @NotNull
-    static <T> PageResponse<T> toPageResponse(Page<T> page) {
-        return new PageResponse<>(
-                page.getContent(),
-                page.getNumber(),
-                page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),
-                PaginationUtil.toSortStrings(page.getSort())
-        );
-    }
+  @NotNull static <T> PageResponse<T> toPageResponse(Page<T> page) {
+    return new PageResponse<>(
+        page.getContent(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages(),
+        PaginationUtil.toSortStrings(page.getSort()));
+  }
 }

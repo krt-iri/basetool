@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface AnnouncementMapper {
-    AnnouncementDto toDto(Announcement announcement);
-    Announcement toEntity(AnnouncementDto dto);
+  AnnouncementDto toDto(Announcement announcement);
+
+  Announcement toEntity(AnnouncementDto dto);
 }

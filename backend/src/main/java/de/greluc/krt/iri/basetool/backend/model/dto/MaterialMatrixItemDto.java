@@ -22,18 +22,48 @@ public record MaterialMatrixItemDto(
     String outpostName,
     Boolean isJumpPoint,
     Boolean hasLoadingDock,
-    Boolean isAutoLoad
-) {
-    public MaterialMatrixItemDto(
-        UUID materialId, String materialName, Boolean isIllegal, Boolean isVolatileQt, Boolean isVolatileTime,
-        UUID categoryId, String categoryName, Long categoryVersion,
-        UUID terminalId, String terminalName, String terminalNickname, String starSystemName,
-        BigDecimal priceBuy, BigDecimal priceSell, String cityName, String spaceStationName, 
-        String outpostName, Boolean isJumpPoint, Boolean hasLoadingDock, Boolean isAutoLoad
-    ) {
-        this(materialId, materialName, isIllegal, isVolatileQt, isVolatileTime,
-             categoryId != null ? new MaterialCategoryDto(categoryId, categoryName, categoryVersion) : null,
-             terminalId, terminalName, terminalNickname, starSystemName, priceBuy, priceSell, 
-             cityName, spaceStationName, outpostName, isJumpPoint, hasLoadingDock, isAutoLoad);
-    }
+    Boolean isAutoLoad) {
+  public MaterialMatrixItemDto(
+      UUID materialId,
+      String materialName,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      UUID categoryId,
+      String categoryName,
+      Long categoryVersion,
+      UUID terminalId,
+      String terminalName,
+      String terminalNickname,
+      String starSystemName,
+      BigDecimal priceBuy,
+      BigDecimal priceSell,
+      String cityName,
+      String spaceStationName,
+      String outpostName,
+      Boolean isJumpPoint,
+      Boolean hasLoadingDock,
+      Boolean isAutoLoad) {
+    this(
+        materialId,
+        materialName,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        categoryId != null
+            ? new MaterialCategoryDto(categoryId, categoryName, categoryVersion)
+            : null,
+        terminalId,
+        terminalName,
+        terminalNickname,
+        starSystemName,
+        priceBuy,
+        priceSell,
+        cityName,
+        spaceStationName,
+        outpostName,
+        isJumpPoint,
+        hasLoadingDock,
+        isAutoLoad);
+  }
 }

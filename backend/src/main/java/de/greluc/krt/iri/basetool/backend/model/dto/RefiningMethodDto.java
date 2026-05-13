@@ -3,12 +3,10 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import java.util.UUID;
 
 public record RefiningMethodDto(
-        UUID id,
-        String name,
-        String description,
-        String code,
-        Integer ratingYield,
-        Integer ratingCost,
-        Integer ratingSpeed
-) {
-}
+    UUID id,
+    String name,
+    String description,
+    String code,
+    Integer ratingYield,
+    Integer ratingCost,
+    Integer ratingSpeed) {}

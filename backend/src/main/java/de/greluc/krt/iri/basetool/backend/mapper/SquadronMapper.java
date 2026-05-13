@@ -7,9 +7,9 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface SquadronMapper {
-    SquadronDto toDto(Squadron entity);
+  SquadronDto toDto(Squadron entity);
 
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    Squadron toEntity(SquadronDto dto);
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  Squadron toEntity(SquadronDto dto);
 }

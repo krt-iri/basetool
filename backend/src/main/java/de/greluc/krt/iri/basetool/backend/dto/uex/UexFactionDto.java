@@ -11,15 +11,16 @@ public record UexFactionDto(
     @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("wiki") String wiki,
     @JsonProperty("is_piracy") Integer isPiracy,
-    @JsonProperty("is_bounty_hunting") Integer isBountyHunting
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
-    public Boolean checkIsPiracy() {
-        return isPiracy != null && isPiracy == 1;
-    }
-    public Boolean checkIsBountyHunting() {
-        return isBountyHunting != null && isBountyHunting == 1;
-    }
+    @JsonProperty("is_bounty_hunting") Integer isBountyHunting) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
+
+  public Boolean checkIsPiracy() {
+    return isPiracy != null && isPiracy == 1;
+  }
+
+  public Boolean checkIsBountyHunting() {
+    return isBountyHunting != null && isBountyHunting == 1;
+  }
 }

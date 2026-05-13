@@ -4,10 +4,4 @@ import java.util.Set;
 import java.util.UUID;
 
 public record MissionCrewDto(
-        UUID id,
-        UUID participantId,
-        String participantName,
-        Set<JobTypeDto> jobTypes,
-        Long version
-) {
-}
+    UUID id, UUID participantId, String participantName, Set<JobTypeDto> jobTypes, Long version) {}

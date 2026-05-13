@@ -1,5 +1,12 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import de.greluc.krt.iri.basetool.backend.mapper.OperationMapper;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
@@ -8,6 +15,8 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.OperationFinanceService;
 import de.greluc.krt.iri.basetool.backend.service.OperationService;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -18,136 +27,125 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class OperationControllerTest {
 
-    @Mock
-    private OperationService operationService;
+  @Mock private OperationService operationService;
 
-    @Mock
-    private OperationMapper operationMapper;
+  @Mock private OperationMapper operationMapper;
 
-    @Mock
-    private OperationFinanceService operationFinanceService;
+  @Mock private OperationFinanceService operationFinanceService;
 
-    @InjectMocks
-    private OperationController operationController;
+  @InjectMocks private OperationController operationController;
 
-    @Test
-    void shouldCreateOperation() {
-        // Given
-        OperationCreateDto createDto = new OperationCreateDto("Test", "Desc", OperationStatus.PLANNED);
-        Operation operation = new Operation();
-        OperationDto operationDto = new OperationDto(UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, 0L, null, null);
+  @Test
+  void shouldCreateOperation() {
+    // Given
+    OperationCreateDto createDto = new OperationCreateDto("Test", "Desc", OperationStatus.PLANNED);
+    Operation operation = new Operation();
+    OperationDto operationDto =
+        new OperationDto(
+            UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, 0L, null, null);
 
-        when(operationMapper.toEntity(createDto)).thenReturn(operation);
-        when(operationService.createOperation(operation)).thenReturn(operation);
-        when(operationMapper.toDto(operation)).thenReturn(operationDto);
+    when(operationMapper.toEntity(createDto)).thenReturn(operation);
+    when(operationService.createOperation(operation)).thenReturn(operation);
+    when(operationMapper.toDto(operation)).thenReturn(operationDto);
 
-        // When
-        OperationDto result = operationController.createOperation(createDto);
+    // When
+    OperationDto result = operationController.createOperation(createDto);
 
-        // Then
-        assertNotNull(result);
-        assertEquals("Test", result.name());
-        verify(operationService, times(1)).createOperation(operation);
+    // Then
+    assertNotNull(result);
+    assertEquals("Test", result.name());
+    verify(operationService, times(1)).createOperation(operation);
+  }
+
+  // --- Sort whitelisting ---------------------------------------------------
+  // CLAUDE.md hard rule: list endpoints must NOT pass user-supplied sort
+  // field names straight into Sort.by(...). The controller funnels through
+  // PaginationUtil + ALLOWED_SORT and any unknown field must surface as a
+  // 400 (IllegalArgumentException -> GlobalExceptionHandler).
+
+  @Test
+  void getAllOperations_defaultParams_sortsByCreatedAtDesc_withIdAsTiebreaker() {
+    when(operationService.getAllOperations(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    operationController.getAllOperations(0, 10, "createdAt,desc");
+
+    ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+    verify(operationService).getAllOperations(captor.capture());
+    Pageable pageable = captor.getValue();
+    assertEquals(0, pageable.getPageNumber());
+    assertEquals(10, pageable.getPageSize());
+
+    Sort sort = pageable.getSort();
+    Sort.Order primary = sort.getOrderFor("createdAt");
+    assertNotNull(primary, "createdAt must be in the sort");
+    assertEquals(Sort.Direction.DESC, primary.getDirection());
+    // PaginationUtil appends id as a stable tiebreaker because id is in
+    // ALLOWED_SORT. Without this, two operations with the same createdAt
+    // could swap order between pages.
+    assertNotNull(
+        sort.getOrderFor("id"),
+        "PaginationUtil must add `id` as a secondary sort for page stability");
+  }
+
+  @Test
+  void getAllOperations_acceptsWhitelistedSortFields() {
+    when(operationService.getAllOperations(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    for (String field : List.of("id", "name", "status", "description", "createdAt", "updatedAt")) {
+      operationController.getAllOperations(0, 10, field + ",asc");
     }
 
-    // --- Sort whitelisting ---------------------------------------------------
-    // CLAUDE.md hard rule: list endpoints must NOT pass user-supplied sort
-    // field names straight into Sort.by(...). The controller funnels through
-    // PaginationUtil + ALLOWED_SORT and any unknown field must surface as a
-    // 400 (IllegalArgumentException -> GlobalExceptionHandler).
+    verify(operationService, times(6)).getAllOperations(any(Pageable.class));
+  }
 
-    @Test
-    void getAllOperations_defaultParams_sortsByCreatedAtDesc_withIdAsTiebreaker() {
-        when(operationService.getAllOperations(any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+  @Test
+  void getAllOperations_rejectsUnknownSortField_with400() {
+    // "password" is a typical hostile probe — it is not a column on
+    // Operation, and accepting it would either crash with a 500 (Spring
+    // JPA can't resolve the property) or, worse, leak schema details.
+    // PaginationUtil short-circuits to IllegalArgumentException, which
+    // GlobalExceptionHandler translates to a problem+json 400.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operationController.getAllOperations(0, 10, "password,asc"));
 
-        operationController.getAllOperations(0, 10, "createdAt,desc");
+    verify(operationService, never()).getAllOperations(any(Pageable.class));
+  }
 
-        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(operationService).getAllOperations(captor.capture());
-        Pageable pageable = captor.getValue();
-        assertEquals(0, pageable.getPageNumber());
-        assertEquals(10, pageable.getPageSize());
+  @Test
+  void getAllOperations_rejectsArbitraryJpaPath_with400() {
+    // Regression guard: even a real JPA path like `missions.id` (which
+    // would otherwise be silently accepted by Spring Data JPA and trigger
+    // a join) must be rejected because the whitelist only contains scalar
+    // fields on Operation itself.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operationController.getAllOperations(0, 10, "missions.id,asc"));
+  }
 
-        Sort sort = pageable.getSort();
-        Sort.Order primary = sort.getOrderFor("createdAt");
-        assertNotNull(primary, "createdAt must be in the sort");
-        assertEquals(Sort.Direction.DESC, primary.getDirection());
-        // PaginationUtil appends id as a stable tiebreaker because id is in
-        // ALLOWED_SORT. Without this, two operations with the same createdAt
-        // could swap order between pages.
-        assertNotNull(sort.getOrderFor("id"),
-                "PaginationUtil must add `id` as a secondary sort for page stability");
-    }
+  @Test
+  void getAllOperations_wrapsServicePageIntoPageResponse() {
+    Operation entity = new Operation();
+    OperationDto dto =
+        new OperationDto(UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, 0L, null, null);
+    // Echo the incoming Pageable back through the PageImpl so the
+    // Sort survives the .map() in the controller — otherwise getSort()
+    // would default to Sort.unsorted() and the assertion below loses
+    // meaning.
+    when(operationService.getAllOperations(any(Pageable.class)))
+        .thenAnswer(invocation -> new PageImpl<>(List.of(entity), invocation.getArgument(0), 1));
+    when(operationMapper.toDto(entity)).thenReturn(dto);
 
-    @Test
-    void getAllOperations_acceptsWhitelistedSortFields() {
-        when(operationService.getAllOperations(any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+    PageResponse<OperationDto> resp = operationController.getAllOperations(0, 10, "createdAt,desc");
 
-        for (String field : List.of("id", "name", "status", "description", "createdAt", "updatedAt")) {
-            operationController.getAllOperations(0, 10, field + ",asc");
-        }
-
-        verify(operationService, times(6)).getAllOperations(any(Pageable.class));
-    }
-
-    @Test
-    void getAllOperations_rejectsUnknownSortField_with400() {
-        // "password" is a typical hostile probe — it is not a column on
-        // Operation, and accepting it would either crash with a 500 (Spring
-        // JPA can't resolve the property) or, worse, leak schema details.
-        // PaginationUtil short-circuits to IllegalArgumentException, which
-        // GlobalExceptionHandler translates to a problem+json 400.
-        assertThrows(IllegalArgumentException.class,
-                () -> operationController.getAllOperations(0, 10, "password,asc"));
-
-        verify(operationService, never()).getAllOperations(any(Pageable.class));
-    }
-
-    @Test
-    void getAllOperations_rejectsArbitraryJpaPath_with400() {
-        // Regression guard: even a real JPA path like `missions.id` (which
-        // would otherwise be silently accepted by Spring Data JPA and trigger
-        // a join) must be rejected because the whitelist only contains scalar
-        // fields on Operation itself.
-        assertThrows(IllegalArgumentException.class,
-                () -> operationController.getAllOperations(0, 10, "missions.id,asc"));
-    }
-
-    @Test
-    void getAllOperations_wrapsServicePageIntoPageResponse() {
-        Operation entity = new Operation();
-        OperationDto dto = new OperationDto(UUID.randomUUID(), "Op", "d",
-                OperationStatus.PLANNED, 0L, null, null);
-        // Echo the incoming Pageable back through the PageImpl so the
-        // Sort survives the .map() in the controller — otherwise getSort()
-        // would default to Sort.unsorted() and the assertion below loses
-        // meaning.
-        when(operationService.getAllOperations(any(Pageable.class)))
-                .thenAnswer(invocation -> new PageImpl<>(
-                        List.of(entity), invocation.getArgument(0), 1));
-        when(operationMapper.toDto(entity)).thenReturn(dto);
-
-        PageResponse<OperationDto> resp =
-                operationController.getAllOperations(0, 10, "createdAt,desc");
-
-        assertEquals(1, resp.totalElements());
-        assertEquals(dto, resp.content().getFirst());
-        assertTrue(resp.sort().contains("createdAt,desc"),
-                "the echoed sort must reflect the active ordering");
-    }
+    assertEquals(1, resp.totalElements());
+    assertEquals(dto, resp.content().getFirst());
+    assertTrue(
+        resp.sort().contains("createdAt,desc"), "the echoed sort must reflect the active ordering");
+  }
 }

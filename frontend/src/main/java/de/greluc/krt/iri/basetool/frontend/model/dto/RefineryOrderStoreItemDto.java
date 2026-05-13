@@ -9,5 +9,4 @@ public record RefineryOrderStoreItemDto(
     Double amount,
     UUID userId,
     UUID jobOrderId,
-    String note
-) {}
+    String note) {}

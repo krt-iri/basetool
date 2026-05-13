@@ -25,9 +25,8 @@ public record UexTerminalDto(
     @JsonProperty("outpost_name") String outpostName,
     @JsonProperty("city_name") String cityName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("company_name") String companyName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("company_name") String companyName) {
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

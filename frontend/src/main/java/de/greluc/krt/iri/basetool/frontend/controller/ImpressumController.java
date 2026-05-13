@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ImpressumController {
 
-    @GetMapping("/impressum")
-    public String showImpressum(Model model) {
-        return "impressum";
-    }
+  @GetMapping("/impressum")
+  public String showImpressum(Model model) {
+    return "impressum";
+  }
 }

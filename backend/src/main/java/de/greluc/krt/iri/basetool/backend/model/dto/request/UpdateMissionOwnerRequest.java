@@ -8,7 +8,4 @@ import java.util.UUID;
  * aggregate. The {@code version} must match the current {@code MissionOwnership.version} (NOT the
  * parent {@code Mission.version}) to prevent lost updates on concurrent owner changes.
  */
-public record UpdateMissionOwnerRequest(
-        @NotNull UUID userId,
-        @NotNull Long version
-) {}
+public record UpdateMissionOwnerRequest(@NotNull UUID userId, @NotNull Long version) {}
