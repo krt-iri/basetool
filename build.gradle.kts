@@ -73,6 +73,36 @@ subprojects {
         csv.required.set(true)
         html.required.set(true)
       }
+      // Strip generated code from the JaCoCo report — coverage on Lombok /
+      // MapStruct / Spring-Boot-Application boilerplate is noise, not signal.
+      //
+      // Lombok-generated methods are auto-excluded by JaCoCo because
+      // `lombok.config` at the project root sets
+      // `lombok.addLombokGeneratedAnnotation = true` (JaCoCo 0.8.2+ honours
+      // any annotation named "Generated" with CLASS/RUNTIME retention).
+      //
+      // MapStruct's `@Generated` is `javax.annotation.processing.Generated`
+      // which is SOURCE-retention — invisible to JaCoCo at bytecode time —
+      // so the generated *MapperImpl classes have to be removed by class-
+      // pattern excludes. The interface (`*Mapper`) is NOT excluded: it
+      // carries default methods, comparators, `computeProfit(...)` etc. that
+      // we explicitly test.
+      //
+      // Also exclude the auto-generated Spring Boot `*Application` main
+      // class (one-line `SpringApplication.run(...)` stubs) so coverage is
+      // not artificially lowered by code we have no meaningful way to
+      // unit-test.
+      classDirectories.setFrom(
+        files(classDirectories.files.map { dir ->
+          fileTree(dir) {
+            exclude(
+              "**/*MapperImpl.class",
+              "**/*MapperImpl\$*.class",
+              "**/*Application.class"
+            )
+          }
+        })
+      )
     }
   }
 

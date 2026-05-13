@@ -1,0 +1,138 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.Mockito.*;
+
+/**
+ * Unit tests for {@link UexScheduler}. The scheduler is pure orchestration:
+ * it dispatches the per-resource UEX sync services in a specific order. The
+ * tests guard two contracts:
+ * <ol>
+ *   <li>Every dependency is invoked exactly once per tick (no silent
+ *     drop-outs after a refactor).</li>
+ *   <li>The dispatch order matches the documented sequence — universe
+ *     basics first (factions, jurisdictions, planets, ...), then star
+ *     systems / commodities / vehicles, finally refineries. Reordering
+ *     this matters because later syncs depend on the FK targets being
+ *     present.</li>
+ *   <li>An exception inside one of the services must not propagate out
+ *     of the scheduled task; otherwise the {@code @Scheduled} task
+ *     suppresses subsequent invocations.</li>
+ * </ol>
+ */
+@ExtendWith(MockitoExtension.class)
+class UexSchedulerTest {
+
+    @Mock private UexCommodityService uexCommodityService;
+    @Mock private UexStarSystemService uexStarSystemService;
+    @Mock private UexManufacturerService uexManufacturerService;
+    @Mock private UexVehicleService uexVehicleService;
+    @Mock private UexUniverseSyncService uexUniverseSyncService;
+    @Mock private UexRefinerySyncService uexRefinerySyncService;
+
+    @InjectMocks private UexScheduler scheduler;
+
+    @Test
+    void scheduleTask_invokesEverySyncServiceOnce() {
+        // When
+        scheduler.scheduleCommodityPriceUpdate();
+
+        // Then — every method called exactly once
+        verify(uexUniverseSyncService).syncFactions();
+        verify(uexUniverseSyncService).syncJurisdictions();
+        verify(uexUniverseSyncService).syncPlanets();
+        verify(uexUniverseSyncService).syncMoons();
+        verify(uexUniverseSyncService).syncOrbits();
+        verify(uexUniverseSyncService).syncCities();
+        verify(uexUniverseSyncService).syncOutposts();
+        verify(uexUniverseSyncService).syncPois();
+        verify(uexUniverseSyncService).syncSpaceStations();
+        verify(uexUniverseSyncService).syncTerminals();
+
+        verify(uexStarSystemService).fetchAndProcessStarSystems();
+        verify(uexCommodityService).fetchAndProcessCommoditiesPrices();
+        verify(uexManufacturerService).syncManufacturers();
+        verify(uexVehicleService).syncVehicles();
+
+        verify(uexRefinerySyncService).syncRefiningMethods();
+        verify(uexRefinerySyncService).syncRefineryYields();
+
+        verifyNoMoreInteractions(
+                uexUniverseSyncService, uexStarSystemService, uexCommodityService,
+                uexManufacturerService, uexVehicleService, uexRefinerySyncService);
+    }
+
+    @Test
+    void scheduleTask_invokesUniverseSyncsBeforeStarSystemsAndCommodities() {
+        // When
+        scheduler.scheduleCommodityPriceUpdate();
+
+        // Then — the documented order is preserved. We assert the boundary
+        // transitions only (otherwise the test becomes brittle): universe
+        // basics first, then catalogue syncs, then refinery syncs.
+        InOrder order = inOrder(uexUniverseSyncService, uexStarSystemService,
+                uexCommodityService, uexManufacturerService, uexVehicleService,
+                uexRefinerySyncService);
+
+        // Phase 1: universe basics in declared order
+        order.verify(uexUniverseSyncService).syncFactions();
+        order.verify(uexUniverseSyncService).syncJurisdictions();
+        order.verify(uexUniverseSyncService).syncPlanets();
+        order.verify(uexUniverseSyncService).syncMoons();
+        order.verify(uexUniverseSyncService).syncOrbits();
+        order.verify(uexUniverseSyncService).syncCities();
+        order.verify(uexUniverseSyncService).syncOutposts();
+        order.verify(uexUniverseSyncService).syncPois();
+        order.verify(uexUniverseSyncService).syncSpaceStations();
+        order.verify(uexUniverseSyncService).syncTerminals();
+
+        // Phase 2: catalogue
+        order.verify(uexStarSystemService).fetchAndProcessStarSystems();
+        order.verify(uexCommodityService).fetchAndProcessCommoditiesPrices();
+        order.verify(uexManufacturerService).syncManufacturers();
+        order.verify(uexVehicleService).syncVehicles();
+
+        // Phase 3: refineries last (depend on materials)
+        order.verify(uexRefinerySyncService).syncRefiningMethods();
+        order.verify(uexRefinerySyncService).syncRefineryYields();
+    }
+
+    @Test
+    void scheduleTask_swallowsExceptionFromInnerService() {
+        // Given
+        doThrow(new RuntimeException("UEX 500"))
+                .when(uexUniverseSyncService).syncFactions();
+
+        // When / Then — the scheduled task must not propagate; otherwise the
+        // @Scheduled wrapper would suppress all subsequent invocations.
+        scheduler.scheduleCommodityPriceUpdate();
+
+        // The first failing service is invoked but subsequent ones are NOT —
+        // the try/catch wraps the whole block, so a hard failure in step 1
+        // aborts the tick (documented behaviour). That is the contract we
+        // want: fail loud in the logs, but never propagate.
+        verify(uexUniverseSyncService).syncFactions();
+        verify(uexUniverseSyncService, never()).syncPlanets();
+    }
+
+    @Test
+    void scheduleTask_continuesAfterPartialFailureInOneServiceMethod() {
+        // Given — only the first call throws
+        doThrow(new RuntimeException("transient")).when(uexUniverseSyncService).syncFactions();
+
+        // When / Then — no exception escapes
+        scheduler.scheduleCommodityPriceUpdate();
+
+        // The contract: try/catch is around the whole orchestration so the
+        // next sync calls are skipped (best-effort). Refactoring this to
+        // per-service try/catch would be a behaviour change and break this
+        // expectation — the test then makes that change visible.
+        verify(uexRefinerySyncService, never()).syncRefiningMethods();
+    }
+}

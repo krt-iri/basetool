@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:32af32d6-e0f4-4a16-b58f-25a6733ada59" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:4e6d6f5d-0690-427d-9644-0bd4dd2de80f" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-12T06:09:38Z</timestamp>
+    <timestamp>2026-05-13T09:32:56Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -1035,6 +1035,172 @@ of Jackson components maintained by FasterXML.com</description>
       </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar">
+      <group>com.squareup.okhttp3</group>
+      <name>mockwebserver3</name>
+      <version>5.3.2</version>
+      <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
+      <hashes>
+        <hash alg="MD5">7e054031640bcd6da7ec0948b8c3acda</hash>
+        <hash alg="SHA-1">b759ca96141cdd58291dea97211864f621e4c7bd</hash>
+        <hash alg="SHA-256">53a6e024ecc2b3f45d04d085161c6c10526a344b80bf3f0d4e6a13c33c183998</hash>
+        <hash alg="SHA-512">5f0cdec3ee67aeff87c4a5953e1afe87a8619ca8765daa4e58a8787ee9c2b625c8b34c9721ecc6c814d8dcb12452ef2818ebe184985102f1e30f20966cbb5b17</hash>
+        <hash alg="SHA-384">7c41343fea8789ee648f55db7be054346dadead895fce8830aa8b7d0280c65cfd41d847b58b83ce38f838abc9ba203a0</hash>
+        <hash alg="SHA3-384">10f04dfdd4e463ae01eef7649774964a6468596f243b517050ea8197981f3a8f50adee55311054cf52e7a566a15b285d</hash>
+        <hash alg="SHA3-256">8c0e166cabdc473fede2b1cc199d2f24534ec0796945749f411bb47cf6ba7d0e</hash>
+        <hash alg="SHA3-512">bbdf663d8a902a66541bdd1e923ae37c54da78f9a9d04409b57dc701a29970550c736c5816f1aaab626f821f5fbdd4f1644fc618f65d1122de023bd2fc552e37</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okhttp</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar">
+      <group>com.squareup.okhttp3</group>
+      <name>mockwebserver</name>
+      <version>5.3.2</version>
+      <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
+      <hashes>
+        <hash alg="MD5">6e47978c1f3d50bae09398b948d4a487</hash>
+        <hash alg="SHA-1">58f89e39ed9f68a9cb12e4da6de64848b177e727</hash>
+        <hash alg="SHA-256">6164a5783acb87278f42ef0581d2de222bd6bcc00a2e833611b2eddf0c7b8669</hash>
+        <hash alg="SHA-512">ccd255932ecffc3d218bda9e269233da1b8fe993bb6ca768ba8c46749d099672906001e71ed024b95c0b744d868a2e415dba598bbf69fac23402d6e116066df6</hash>
+        <hash alg="SHA-384">a0784689ddbf8dbde98d49550d6dd107e7b5b03bb7c5153b617bbed4464fecb3311519b461eab46a662d9ad5fb298935</hash>
+        <hash alg="SHA3-384">9e7f56470bceb0f19b4117ea52a9898f3cb965a8d357e2272f8bebb60bc2856d6684fd96cd64168a56c844a1b0aaa438</hash>
+        <hash alg="SHA3-256">a41d4afaea1d92b87764042ce008ac03946bb1ca47b9ca8ef2e3cd9170cb80e9</hash>
+        <hash alg="SHA3-512">5970c714e12ed125e62211565749064ced25fbda4672247c4600261fdefa9a8c3e2f99ab94b83e197603450ab5470470908dbd5e72e24e7aba9ccb20b90d4bf1</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okhttp</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar">
+      <group>com.squareup.okhttp3</group>
+      <name>okhttp-jvm</name>
+      <version>5.3.2</version>
+      <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
+      <hashes>
+        <hash alg="MD5">827a887aa959c1f1d6b12f3345df2484</hash>
+        <hash alg="SHA-1">f31e8de27feebe1e56d6c9d354a0986b65be0e1d</hash>
+        <hash alg="SHA-256">c771f48075b763f6c322055e21129a94b7de4c1faf3f8f58ace320b0c9517a30</hash>
+        <hash alg="SHA-512">302cba8ec649ecb20512b4878b9f347645cdeada2001e7469363b21ca251bbb05c00e48e426449a88780f0ec25c672f214112b101d8dfd059b5275999ab48768</hash>
+        <hash alg="SHA-384">a2bc92e52d8e1b2b9be40b0955828313f32a4276717bf7e1cace0aefa3bf5fad17997e409aeca7f68f335c9d975f1073</hash>
+        <hash alg="SHA3-384">e585ea8e1ffbd6599654b5f7e9b1210ff972799f5019420652a0215b7dde6660b3a15e56b39d4702b42e307b3040b5d1</hash>
+        <hash alg="SHA3-256">4737bb453c46672bef36c86ea7292a46f9552caaccfd7e6799bb9b3c508c4467</hash>
+        <hash alg="SHA3-512">08ed5b2a6449ca0b8cced909bc2ded5cf20314b5bf8f8b094ed8641c5dd90e6b738fc66c917dd0eafbcf1e51497ba05ca154cc3d6fb4832a0ebc350a35c26abe</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okhttp</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom">
+      <group>com.squareup.okhttp3</group>
+      <name>okhttp</name>
+      <version>5.3.2</version>
+      <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okhttp</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar">
+      <group>com.squareup.okio</group>
+      <name>okio-jvm</name>
+      <version>3.16.4</version>
+      <description>A modern I/O library for Android, Java, and Kotlin Multiplatform.</description>
+      <hashes>
+        <hash alg="MD5">34d866f45bb2a65bf601cde52b72d096</hash>
+        <hash alg="SHA-1">ceb794cf0bbf8d0d20f49aa91ce20db7fd77675d</hash>
+        <hash alg="SHA-256">2196b993cd34dbbd919e7e01f57a4781b58bee80f86106163e287c20343a96a7</hash>
+        <hash alg="SHA-512">1a7158538ae341b8a61fe7292506e12ca6063c5a51a1c122d0e934164395c7da585dc31b26ed88a993c47aeca89f6a854042c67a4bc7d771d35a0ece6c4dbde0</hash>
+        <hash alg="SHA-384">37949576947630aba9caf7b24ffb00677f4b21b29a98543a0a66043340d20bb42128419d2bebc4b2f2b93569f35f9ada</hash>
+        <hash alg="SHA3-384">32830517d7f960b4c86229f5347e40033658999029162aad0f273636640ed8b7130689de57277aaff169ac9f227885be</hash>
+        <hash alg="SHA3-256">3f65833b5d5128064f885b68da6a3955667cf4c31a098da08431561949fe398b</hash>
+        <hash alg="SHA3-512">ee404499bb148b817e575c22049cb5487531605413bf38edf8fd2cecf0d15f899de42e37d7dafa5dc8bc5493e24b7a976c2bc14c42d6d7056af410bd72513ad3</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okio/</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom">
+      <group>com.squareup.okio</group>
+      <name>okio</name>
+      <version>3.16.4</version>
+      <description>A modern I/O library for Android, Java, and Kotlin Multiplatform.</description>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.squareup.okio/okio@3.16.4?type=pom</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/square/okio/</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
     <component type="library" bom-ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar">
@@ -2502,6 +2668,51 @@ file comparators, endian transformation classes, and much more.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/junit/junit@4.13.2?type=jar">
+      <publisher>JUnit</publisher>
+      <group>junit</group>
+      <name>junit</name>
+      <version>4.13.2</version>
+      <description>JUnit is a unit testing framework for Java, created by Erich Gamma and Kent Beck.</description>
+      <hashes>
+        <hash alg="MD5">d98a9a02a99a9acd22d7653cbcc1f31f</hash>
+        <hash alg="SHA-1">8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12</hash>
+        <hash alg="SHA-256">8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3</hash>
+        <hash alg="SHA-512">a31b9950f929a7e5a600d89787ef40e42a8a8e2392e210d0c0f45b3572937670a18a524f1815508cd1152cd1eaa7275cb7430ba45c053be365c83c231bccd3f0</hash>
+        <hash alg="SHA-384">9f85c56a77c699eb87630b9e8224068a34c296bcd9aadb52248dd4665036f5bf1048fe75e5cb590b59e7855ca716acae</hash>
+        <hash alg="SHA3-384">590cfd9396424583879ca8ad732870406bab18325ac72fb2bbe188b9611278d6341700badf7cfc32525b8ff42900c905</hash>
+        <hash alg="SHA3-256">a06b3fd2fd1d9f4306b58125484e3605a395afe5ffe2c801e43ae462f366a430</hash>
+        <hash alg="SHA3-512">a6d25ce3c14f9065f06dfd0e68e1dad5c03bd5de0a302c44ca4733d2cb87ec1bc6f0abd36d65aeee8caf328b6881432c4b682fa4b4b1fa931c3c950de5129fb2</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-1.0</id>
+          <url>http://www.eclipse.org/legal/epl-v10.html</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/junit/junit@4.13.2?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>http://www.junit.org</url>
+        </reference>
+        <reference type="build-system">
+          <url>https://github.com/junit-team/junit4/actions</url>
+        </reference>
+        <reference type="distribution">
+          <url>https://github.com/junit-team/junit4/wiki/Download-and-Install</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/junit-team/junit4/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/junit-team/junit4</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/net.bytebuddy/byte-buddy-agent@1.17.8?type=jar">
       <group>net.bytebuddy</group>
       <name>byte-buddy-agent</name>
@@ -3912,6 +4123,38 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.hamcrest/hamcrest-core@3.0?type=jar">
+      <group>org.hamcrest</group>
+      <name>hamcrest-core</name>
+      <version>3.0</version>
+      <description>Core Hamcrest API - deprecated, please use "hamcrest" instead</description>
+      <hashes>
+        <hash alg="MD5">622d37a84ac87b732cb512de0f288c2e</hash>
+        <hash alg="SHA-1">254f69f4b0ca22198acfc19fcdd5f96140431c3e</hash>
+        <hash alg="SHA-256">b78a3a81692f421cc01fc17ded9a45e9fb6f3949c712f8ec4d01da6b8c06bc6e</hash>
+        <hash alg="SHA-512">da4fe935a24bd7632c1cd0b0dce8ef08b52a0df67a977a96823e9c2a8147fe02350ec8f2678f4edb0b170aeb9dd7002872686f7965675babe15534d28442dd4b</hash>
+        <hash alg="SHA-384">d3691f306575762ef97a8321b2fdcfdb64e96a377278a32a128495480df7c06f9903240f4e6b02a202bd171d5c2f1c7a</hash>
+        <hash alg="SHA3-384">11cb06bf51ddfb6e3937a823ba916a582fabe21ff502bb71353ae8acb31f0e34b35c48ef68081a6775815a692562f042</hash>
+        <hash alg="SHA3-256">722ef291cdda4a9ff5917401a611fb80507e1461409de74dd77007b00ca259e5</hash>
+        <hash alg="SHA3-512">3153b0c3cc0a5212ea32e9ca10b81c84f8f222c03adacae2eeb25c34c80da3b6d10118b7b186dd758f97bfece6a77bcebbf16a05eae1600b416897aea2cd1c53</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>BSD-3-Clause</id>
+          <url>https://opensource.org/licenses/BSD-3-Clause</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.hamcrest/hamcrest-core@3.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/hamcrest/JavaHamcrest</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.hamcrest/hamcrest@3.0?type=jar">
       <group>org.hamcrest</group>
       <name>hamcrest</name>
@@ -4279,6 +4522,38 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
       </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar">
+      <group>org.jetbrains.kotlin</group>
+      <name>kotlin-stdlib</name>
+      <version>2.2.21</version>
+      <description>Kotlin Standard Library</description>
+      <hashes>
+        <hash alg="MD5">493bc156c79fe10064e9f6b605c8297c</hash>
+        <hash alg="SHA-1">fa374a986e128314c3db00a20aae55f72a258511</hash>
+        <hash alg="SHA-256">6558a3d233da56a20934b32159f9db5f86ed5816ef098f78a2c223dc6abb79dd</hash>
+        <hash alg="SHA-512">cb7f62e2eb4c13f7a9873876f19d9dcb69c33d5e963c7cd87178f3789d65f29d2b6cf697573c04758428d2da6e26f2fdd3f0af46dedd8d04ad81d331e95859d7</hash>
+        <hash alg="SHA-384">09ed380b932f8efc46a516dbe0d92685bf7f3a3096eaa1c041125651b56735457280020f9f6df060e645ac6ee9e7caa1</hash>
+        <hash alg="SHA3-384">5b2bb7b3d977588b8b47f98d8572c1985350a6672d65576973bc410039855ede15934118058fa1bd8ad8841d29e68c61</hash>
+        <hash alg="SHA3-256">549cfd1201fc8d9eb65e363391f21d7610636d0f44fae374983becd60350632d</hash>
+        <hash alg="SHA3-512">0709855aa95e76440e2dae29dd99bbd2e1be57281b5b023bb4431ec72417d82275f0e335ba5423f5f8a85ae95624668becf3797f4785b538db84a1063d4da296</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/JetBrains/kotlin</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
     <component type="library" bom-ref="pkg:maven/org.jetbrains/annotations@17.0.0?type=jar">
@@ -9385,6 +9660,29 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.reflections/reflections@0.10.2?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-simple@2.0.17?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom"/>
+      <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar"/>
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom"/>
+      <dependency ref="pkg:maven/junit/junit@4.13.2?type=jar"/>
+      <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom"/>
+      <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar">
+      <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom">
+      <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>
     <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
@@ -9407,6 +9705,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar"/>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar"/>
+      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar"/>
       <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar"/>
       <dependency ref="pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar"/>
@@ -9639,6 +9938,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/jaxen/jaxen@2.0.1?type=jar"/>
+    <dependency ref="pkg:maven/junit/junit@4.13.2?type=jar">
+      <dependency ref="pkg:maven/org.hamcrest/hamcrest-core@3.0?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy-agent@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.java.dev.jna/jna@5.18.1?type=jar"/>
@@ -9771,6 +10073,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.6?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.glassfish.jaxb/txw2@4.0.6?type=jar"/>
+    <dependency ref="pkg:maven/org.hamcrest/hamcrest-core@3.0?type=jar">
+      <dependency ref="pkg:maven/org.hamcrest/hamcrest@3.0?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.hamcrest/hamcrest@3.0?type=jar"/>
     <dependency ref="pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2?type=jar"/>
     <dependency ref="pkg:maven/org.hibernate.models/hibernate-models@1.0.1?type=jar">
@@ -9809,6 +10114,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/org.javassist/javassist@3.28.0-GA?type=jar"/>
     <dependency ref="pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"/>
+    <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar">
+      <dependency ref="pkg:maven/org.jetbrains/annotations@17.0.0?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.jetbrains/annotations@17.0.0?type=jar"/>
     <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
     <dependency ref="pkg:maven/org.jruby/jruby-complete@9.3.8.0?type=jar"/>
