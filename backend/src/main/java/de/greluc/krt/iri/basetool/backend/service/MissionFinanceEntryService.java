@@ -25,6 +25,7 @@ import org.springframework.security.access.AccessDeniedException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class MissionFinanceEntryService {
 
     private final MissionFinanceEntryRepository financeEntryRepository;
@@ -35,13 +36,11 @@ public class MissionFinanceEntryService {
     private final de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository refineryOrderRepository;
     private final MissionMapper missionMapper;
 
-    @Transactional(readOnly = true)
     public Page<MissionFinanceEntryDto> getEntriesByMission(UUID missionId, Pageable pageable) {
         return financeEntryRepository.findAllByMissionId(missionId, pageable)
                 .map(missionMapper::toDto);
     }
 
-    @Transactional(readOnly = true)
     public BigDecimal calculateTotalSum(UUID missionId) {
         List<MissionFinanceEntry> entries = financeEntryRepository.findAllByMissionId(missionId);
         BigDecimal total = BigDecimal.ZERO;

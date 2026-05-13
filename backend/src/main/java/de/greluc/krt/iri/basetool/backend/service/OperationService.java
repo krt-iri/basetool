@@ -18,16 +18,15 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class OperationService {
 
     private final OperationRepository operationRepository;
 
-    @Transactional(readOnly = true)
     public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
         return operationRepository.findAll(pageable);
     }
 
-    @Transactional(readOnly = true)
     public Operation getOperationById(@NotNull UUID id) {
         return operationRepository.findById(id)
                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Operation not found"));
@@ -78,7 +77,6 @@ public class OperationService {
         log.info("Successfully deleted operation with ID: {}", id);
     }
 
-    @Transactional(readOnly = true)
     public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
         // Use the explicit fetch graph: the loop below touches missions,
         // participants and the participants' user reference. Without the

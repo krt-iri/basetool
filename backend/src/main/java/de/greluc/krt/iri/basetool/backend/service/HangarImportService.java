@@ -51,6 +51,7 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class HangarImportService {
 
     /** Neutral insurance default used for all imported ships (no insurance data in fleetview.json). */

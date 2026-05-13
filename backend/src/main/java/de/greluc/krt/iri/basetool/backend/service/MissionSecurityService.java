@@ -24,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class MissionSecurityService {
 
     private final MissionRepository missionRepository;
@@ -47,7 +48,6 @@ public class MissionSecurityService {
      * instead of letting a plain {@link RuntimeException} bubble up as a generic
      * {@code 500 Internal Server Error} (see RFC7807 Problem Details).
      */
-    @Transactional(readOnly = true)
     public boolean canAccessParticipant(UUID missionId, UUID participantId, Authentication authentication) {
         MissionParticipant p = missionParticipantRepository.findById(participantId)
                 .orElseThrow(() -> new NotFoundException("Participant not found"));
@@ -83,7 +83,6 @@ public class MissionSecurityService {
         return true;
     }
 
-    @Transactional(readOnly = true)
     public boolean canEditFinanceEntry(UUID entryId, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
@@ -111,7 +110,6 @@ public class MissionSecurityService {
                 entry.getMission().getId(), currentUserId).isPresent();
     }
 
-    @Transactional(readOnly = true)
     public boolean canManageMission(UUID missionId, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
@@ -132,7 +130,6 @@ public class MissionSecurityService {
                 .orElse(false);
     }
 
-    @Transactional(readOnly = true)
     public boolean canManageManagers(UUID missionId, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             log.warn("[DEBUG_LOG] Authentication failed or missing for canManageManagers on mission {}", missionId);
@@ -177,7 +174,6 @@ public class MissionSecurityService {
      * the owner, since they would otherwise be able to displace the original owner
      * and grant themselves ownership of any mission they have manager rights on.
      */
-    @Transactional(readOnly = true)
     public boolean canChangeOwner(UUID missionId, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
