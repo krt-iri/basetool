@@ -33,6 +33,7 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` a
 - **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
 - **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case leave a one-line comment explaining why.
 - Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
+- **Run `./gradlew spotlessApply` locally before every push.** Spotless is wired into `check` via `isEnforceCheck = true`, and Checkstyle runs with `isIgnoreFailures = false` + `maxWarnings = 0` — any unformatted Java file or new Checkstyle warning fails CI immediately.
 
 ## Local stack
 
@@ -175,6 +176,7 @@ class GuidelinesExampleTest {
 - **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
 - Keep `README.md` current when architecture or env vars change.
 - **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
+- **Javadoc is gate-enforced.** Missing Javadoc on a new `public`/`protected` member fails the build via Checkstyle's `MissingJavadocType` / `MissingJavadocMethod` checks — there is no warn-only grace period. Same gate covers summary period (`SummaryJavadoc`), placement between annotations and the declaration (`InvalidJavadocPosition`), `<p>` after blank lines (`JavadocParagraph`), and `@param`/`@return`/`@throws` order (`AtclauseOrder`).
 
 ## Git
 
