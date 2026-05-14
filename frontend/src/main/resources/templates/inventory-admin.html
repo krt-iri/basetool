@@ -926,7 +926,8 @@
     }
 
     function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
-        document.getElementById('bookOutForm').action = '/inventory/' + id + '/book-out';
+        var bookOutForm = document.getElementById('bookOutForm');
+        bookOutForm.action = window.safeSameOriginUrl('/inventory/' + id + '/book-out', bookOutForm.action);
         
         const amountInput = document.getElementById('amount');
         const targetAmountInput = document.getElementById('targetAmount');

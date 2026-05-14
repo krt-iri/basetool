@@ -67,7 +67,7 @@
                 <tbody>
                     <tr th:each="item : ${aggregated}"
                         th:data-href="@{/inventory/all(materialIds=${item.material.id})}"
-                        onclick="window.location.href=this.getAttribute('data-href')"
+                        onclick="var u = window.safeSameOriginUrl(this.getAttribute('data-href')); if(u) window.location.href = u"
                         style="cursor: pointer;" class="clickable-row">
                         <td th:text="${item.material.name}" style="color: var(--color-primary);">Material</td>
                         <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>

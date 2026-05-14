@@ -33,10 +33,16 @@ PATTERN = re.compile(
 
 # Multi-line message support: arguments may span multiple lines and may contain
 # concatenated string literals.  We need a more permissive matcher.
+#
+# CodeQL py/redos: the inner `[\w.]*` is made possessive (`*+`, Python 3.11+) so
+# the identifier alternative cannot backtrack into different splits of the same
+# run of identifier characters. Without that, a long run of letters that fails
+# the outer `\)` anchor produces exponential backtracking (`AAA...A` without a
+# trailing paren). The rest of the alternatives don't overlap each other.
 PATTERN_ML = re.compile(
     r'new\s+(?:org\.springframework\.web\.server\.)?ResponseStatusException\s*\(\s*'
     r'HttpStatus\.(?P<status>NOT_FOUND|BAD_REQUEST|CONFLICT|FORBIDDEN|INTERNAL_SERVER_ERROR)\s*,\s*'
-    r'(?P<msg>(?:"(?:[^"\\]|\\.)*"|\s|\+|[A-Za-z_][\w.]*|\(|\))+)\s*\)',
+    r'(?P<msg>(?:"(?:[^"\\]|\\.)*"|\s|\+|[A-Za-z_][\w.]*+|\(|\))+)\s*\)',
     re.DOTALL,
 )
 
