@@ -1,0 +1,197 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.model.dto.MemberEvaluationResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.service.MemberEvaluationService;
+import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * REST endpoints for {@code MemberEvaluation}.
+ *
+ * <p>Personal view ({@code /my}) is filtered by JWT sub (data isolation). Admin/Officer view
+ * ({@code /all} and upsert) requires ADMIN or OFFICER role.
+ */
+@RestController
+@RequestMapping("/api/v1/promotion/evaluations")
+@RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
+@Tag(name = "Member Evaluations", description = "Manage member promotion evaluations.")
+@SecurityRequirement(name = "bearerAuth")
+@Slf4j
+public class MemberEvaluationController {
+
+  private final MemberEvaluationService service;
+
+  /**
+   * Returns every {@link MemberEvaluationResponse} owned by the calling member, filtered by the JWT
+   * {@code sub} claim so callers see only their own promotion evaluations.
+   *
+   * @param auth the authenticated JWT token used to resolve the caller's {@code sub} claim
+   * @return the calling member's evaluations
+   */
+  @GetMapping("/my")
+  @Operation(summary = "List own evaluations (JWT-sub filtered).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Own evaluations."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public List<MemberEvaluationResponse> listMy(JwtAuthenticationToken auth) {
+    return service.listForUser(requireSub(auth));
+  }
+
+  /**
+   * Returns a paginated slice of the caller's own {@link MemberEvaluationResponse} entries with
+   * sort fields restricted to {@link MemberEvaluationService#SORTABLE_FIELDS} to prevent
+   * information disclosure via unstable user-supplied sorts.
+   *
+   * @param page zero-based page index, or {@code null} for the default
+   * @param size page size, or {@code null} for the default
+   * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
+   *     default
+   * @param auth the authenticated JWT token used to resolve the caller's {@code sub} claim
+   * @return a {@link PageResponse} of the caller's evaluations
+   */
+  @GetMapping("/my/paged")
+  @Operation(summary = "List own evaluations paginated (JWT-sub filtered).")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "Paginated own evaluations.")})
+  public PageResponse<MemberEvaluationResponse> listMyPaged(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort,
+      JwtAuthenticationToken auth) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            MemberEvaluationService.SORTABLE_FIELDS,
+            MemberEvaluationService.DEFAULT_SORT_FIELD);
+    return toPageResponse(service.listForUserPaged(requireSub(auth), pageable));
+  }
+
+  /**
+   * Returns a paginated slice of every {@link MemberEvaluationResponse} in the system for promotion
+   * reviewers. Authorization is enforced in the service layer and limited to ADMIN or OFFICER
+   * callers.
+   *
+   * @param page zero-based page index, or {@code null} for the default
+   * @param size page size, or {@code null} for the default
+   * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
+   *     default
+   * @return a {@link PageResponse} covering all evaluations
+   */
+  @GetMapping("/all")
+  @Operation(summary = "List all member evaluations (ADMIN/OFFICER only).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "All evaluations."),
+    @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
+  })
+  public PageResponse<MemberEvaluationResponse> listAll(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            MemberEvaluationService.SORTABLE_FIELDS,
+            MemberEvaluationService.DEFAULT_SORT_FIELD);
+    return toPageResponse(service.listAll(pageable));
+  }
+
+  /**
+   * Creates or updates the evaluation record for the given user and promotion category. The request
+   * body carries the new score and notes; the optimistic-locking {@code version} echoed back by the
+   * client guards against concurrent edits and surfaces as HTTP 409 on conflict.
+   *
+   * @param userId Keycloak {@code sub} of the member being evaluated
+   * @param categoryId identifier of the {@link
+   *     de.greluc.krt.iri.basetool.backend.model.PromotionCategory}
+   * @param request validated payload carrying the new score, notes, and {@code version}
+   * @return the persisted evaluation in its response form
+   */
+  @PutMapping("/user/{userId}/category/{categoryId}")
+  @Operation(summary = "Upsert evaluation for a user/category. Requires ADMIN or OFFICER role.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Evaluation upserted."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "403", description = "Insufficient permissions."),
+    @ApiResponse(responseCode = "404", description = "Category not found."),
+    @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
+  })
+  public MemberEvaluationResponse upsert(
+      @PathVariable String userId,
+      @PathVariable UUID categoryId,
+      @Valid @RequestBody MemberEvaluationUpdateRequest request) {
+    return service.upsert(userId, categoryId, request);
+  }
+
+  /**
+   * Permanently removes the evaluation identified by {@code id}, dropping the row used to track a
+   * member's standing in one promotion category. Restricted to ADMIN or OFFICER callers.
+   *
+   * @param id identifier of the {@link de.greluc.krt.iri.basetool.backend.model.MemberEvaluation}
+   *     to delete
+   */
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete a member evaluation. Requires ADMIN or OFFICER role.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Deleted."),
+    @ApiResponse(responseCode = "404", description = "Not found.")
+  })
+  public void delete(@PathVariable UUID id) {
+    service.delete(id);
+  }
+
+  @NotNull
+  private static String requireSub(JwtAuthenticationToken auth) {
+    if (auth == null || auth.getToken() == null) {
+      throw new AccessDeniedException("Missing JWT.");
+    }
+    Jwt jwt = auth.getToken();
+    String sub = jwt.getSubject();
+    if (sub == null || sub.isBlank()) {
+      throw new AccessDeniedException("JWT does not contain a subject claim.");
+    }
+    return sub;
+  }
+
+  private static <T> PageResponse<T> toPageResponse(org.springframework.data.domain.Page<T> page) {
+    return new PageResponse<>(
+        page.getContent(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages(),
+        PaginationUtil.toSortStrings(page.getSort()));
+  }
+}

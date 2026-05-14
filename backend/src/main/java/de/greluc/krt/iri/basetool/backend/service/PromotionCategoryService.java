@@ -1,0 +1,172 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.mapper.PromotionCategoryMapper;
+import de.greluc.krt.iri.basetool.backend.model.PromotionCategory;
+import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.repository.PromotionCategoryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.PromotionTopicRepository;
+import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Domain service for {@link PromotionCategory} CRUD operations. Write operations are restricted to
+ * ADMIN and OFFICER roles.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class PromotionCategoryService {
+
+  public static final Set<String> SORTABLE_FIELDS =
+      Set.of("id", "name", "sortOrder", "createdAt", "updatedAt");
+  public static final String DEFAULT_SORT_FIELD = "sortOrder";
+
+  private final PromotionCategoryRepository repository;
+  private final PromotionTopicRepository topicRepository;
+  private final PromotionCategoryMapper mapper;
+
+  /**
+   * Returns a paginated slice of every {@link PromotionCategoryResponse} across all topics. The
+   * controller validates the caller-supplied sort against {@link #SORTABLE_FIELDS} before this
+   * method is invoked.
+   *
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of categories
+   */
+  public Page<PromotionCategoryResponse> list(@NotNull Pageable pageable) {
+    return repository.findAll(pageable).map(mapper::toResponse);
+  }
+
+  /**
+   * Returns a paginated slice of the {@link PromotionCategoryResponse} entries that belong to the
+   * given {@link PromotionTopic}.
+   *
+   * @param topicId identifier of the parent topic
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of categories scoped to the topic
+   */
+  public Page<PromotionCategoryResponse> listByTopic(
+      @NotNull UUID topicId, @NotNull Pageable pageable) {
+    return repository.findAllByTopicId(topicId, pageable).map(mapper::toResponse);
+  }
+
+  /**
+   * Returns every {@link PromotionCategoryResponse} for the given topic ordered by {@code
+   * sortOrder}. Used by the promotion UI to render the full evaluation table without pagination.
+   *
+   * @param topicId identifier of the parent topic
+   * @return the topic's categories in display order
+   */
+  public List<PromotionCategoryResponse> listAllByTopic(@NotNull UUID topicId) {
+    return repository.findAllByTopicIdOrderBySortOrderAsc(topicId).stream()
+        .map(mapper::toResponse)
+        .toList();
+  }
+
+  /**
+   * Resolves a single {@link PromotionCategoryResponse} by identifier.
+   *
+   * @param id identifier of the category
+   * @return the matching category in response form
+   * @throws EntityNotFoundException if no category exists for that id
+   */
+  public PromotionCategoryResponse get(@NotNull UUID id) {
+    return mapper.toResponse(load(id));
+  }
+
+  /**
+   * Persists a new {@link PromotionCategory} attached to the topic referenced by the request.
+   * Restricted to ADMIN or OFFICER callers via {@link PreAuthorize}.
+   *
+   * @param request validated payload describing the new category
+   * @return the persisted category in response form
+   * @throws EntityNotFoundException if the referenced topic does not exist
+   */
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
+    PromotionTopic topic =
+        topicRepository
+            .findById(request.topicId())
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+    PromotionCategory entity = mapper.toEntity(request);
+    entity.setTopic(topic);
+    PromotionCategory saved = repository.save(entity);
+    log.info("Created PromotionCategory id={} name={}", saved.getId(), saved.getName());
+    return mapper.toResponse(saved);
+  }
+
+  /**
+   * Updates the category identified by {@code id} and rebinds it to the topic referenced by the
+   * request. The caller-supplied {@code version} is compared against the loaded entity and a
+   * mismatch produces an {@link ObjectOptimisticLockingFailureException} that surfaces as HTTP 409.
+   *
+   * @param id identifier of the category to update
+   * @param request validated payload with the new field values and the previously fetched {@code
+   *     version}
+   * @return the updated category in response form
+   * @throws EntityNotFoundException if the category or referenced topic does not exist
+   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
+   *     matches the persisted entity
+   */
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  public PromotionCategoryResponse update(
+      @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
+    PromotionCategory entity = load(id);
+    if (!entity.getVersion().equals(request.version())) {
+      throw new ObjectOptimisticLockingFailureException(PromotionCategory.class, id);
+    }
+    PromotionTopic topic =
+        topicRepository
+            .findById(request.topicId())
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+    mapper.updateEntity(entity, request);
+    entity.setTopic(topic);
+    PromotionCategory saved = repository.save(entity);
+    log.info("Updated PromotionCategory id={}", id);
+    return mapper.toResponse(saved);
+  }
+
+  /**
+   * Permanently removes the category identified by {@code id}, cascading the orphan removal to its
+   * {@link de.greluc.krt.iri.basetool.backend.model.PromotionLevelContent} children. Restricted to
+   * ADMIN or OFFICER callers.
+   *
+   * @param id identifier of the category to delete
+   * @throws EntityNotFoundException if no category exists for that id
+   */
+  @Transactional
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  public void delete(@NotNull UUID id) {
+    PromotionCategory entity = load(id);
+    repository.delete(entity);
+    log.info("Deleted PromotionCategory id={}", id);
+  }
+
+  @NotNull
+  private PromotionCategory load(@NotNull UUID id) {
+    return repository
+        .findById(id)
+        .orElseThrow(() -> new EntityNotFoundException("PromotionCategory not found: " + id));
+  }
+}

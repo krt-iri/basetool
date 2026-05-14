@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{promotion.my.title} + ' - ' + #{app.title}">Meine Bewertungen - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+    <style>
+        .eval-topic { margin-bottom: 2rem; }
+        .eval-topic-header {
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            color: var(--color-primary);
+            font-size: 1.1rem;
+            letter-spacing: 0.08em;
+            border-bottom: 1px solid var(--color-primary);
+            padding-bottom: 0.4rem;
+            margin-bottom: 1rem;
+        }
+        .badge-level {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.75rem;
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+        }
+        .badge-none {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.75rem;
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid #444;
+            color: #666;
+        }
+        .eligibility-card {
+            background: #141414;
+            border: 1px solid #333;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .eligibility-card.is-eligible { border-color: var(--color-primary); box-shadow: 0 0 8px rgba(231,126,35,0.25); }
+        .eligibility-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .eligibility-title {
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            color: var(--color-primary);
+            font-size: 0.95rem;
+            letter-spacing: 0.08em;
+        }
+        .eligibility-status {
+            font-family: 'Ethnocentric', sans-serif;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 0.2rem 0.6rem;
+            border: 1px solid;
+            letter-spacing: 0.06em;
+        }
+        .eligibility-status.is-eligible { color: #4caf50; border-color: #4caf50; }
+        .eligibility-status.not-eligible { color: #d35400; border-color: #d35400; }
+        .eligibility-status.no-rules { color: #888; border-color: #555; }
+        .checks-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .checks-table th { color: var(--color-gray-2); font-weight: 400; text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #2a2a2a; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .checks-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e1e; color: var(--color-gray-1); vertical-align: top; }
+        .checks-table tr:last-child td { border-bottom: none; }
+        .check-status-ok { color: #4caf50; font-weight: 700; }
+        .check-status-missing { color: #d35400; font-weight: 700; }
+        @media (max-width: 768px) {
+            .eval-table-wrapper, .checks-wrapper { overflow-x: auto; }
+            .eligibility-card-header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{promotion.my.title}">Meine Bewertungen</h1>
+        <p th:text="#{promotion.my.subtitle}">Deine aktuellen Bewertungen</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <h2 th:text="#{promotion.my.eligibility.title}">Beförderbarkeit</h2>
+        <p th:text="#{promotion.my.eligibility.subtitle}" style="color:var(--color-gray-2);margin-bottom:1rem;font-size:0.9rem;">Zeigt, welche Beförderungen anhand deiner aktuellen Bewertungen möglich sind.</p>
+
+        <div th:if="${#lists.isEmpty(eligibilities)}">
+            <p th:text="#{promotion.my.eligibility.none}" style="color:var(--color-gray-2);">Es sind aktuell keine Rangvoraussetzungen konfiguriert.</p>
+        </div>
+
+        <div th:each="elig : ${eligibilities}" th:classappend="${elig.eligible} ? ' is-eligible' : ''" class="eligibility-card">
+            <div class="eligibility-card-header">
+                <span class="eligibility-title">
+                    <span th:text="#{promotion.overview.rank.from}">Rang</span>
+                    <span th:text="${elig.fromRank}">20</span>
+                    &rarr;
+                    <span th:text="#{promotion.overview.rank.to}">Rang</span>
+                    <span th:text="${elig.toRank}">19</span>
+                </span>
+                <span th:if="${elig.eligible}" class="eligibility-status is-eligible" th:text="#{promotion.my.eligibility.eligible}">Beförderbar</span>
+                <span th:if="${!elig.eligible and elig.hasConfiguredRules}" class="eligibility-status not-eligible" th:text="#{promotion.my.eligibility.not.eligible}">Voraussetzungen offen</span>
+                <span th:if="${!elig.hasConfiguredRules}" class="eligibility-status no-rules" th:text="#{promotion.my.eligibility.no.rules}">Keine Regeln definiert</span>
+            </div>
+            <div th:if="${!#lists.isEmpty(elig.checks)}" class="checks-wrapper" style="overflow-x:auto;">
+                <table class="checks-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
+                            <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
+                            <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
+                            <th th:text="#{promotion.my.eligibility.progress}">Erfüllt</th>
+                            <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="chk : ${elig.checks}">
+                            <td th:text="${chk.topicName} ?: '-'">-</td>
+                            <td th:text="${chk.categoryName} ?: '-'">-</td>
+                            <td>
+                                <span class="badge-level" th:switch="${chk.minimumLevel}">
+                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
+                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
+                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
+                                    <span th:case="*">-</span>
+                                </span>
+                            </td>
+                            <td>
+                                <span th:classappend="${chk.satisfied} ? ' check-status-ok' : ' check-status-missing'"
+                                      th:text="${chk.achievedCount} + ' / ' + ${chk.requiredCount}">1 / 3</span>
+                            </td>
+                            <td th:text="${chk.description} ?: '-'">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div th:if="${#maps.isEmpty(topicCategoryMap)}">
+            <p th:text="#{promotion.my.no.topics}">Keine Kategorien verfügbar.</p>
+        </div>
+
+        <div th:each="topic : ${topics}" class="eval-topic">
+            <div class="eval-topic-header" th:text="${topic.name}">Themenbereich</div>
+
+            <div class="eval-table-wrapper table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th th:text="#{promotion.my.category}">Kategorie</th>
+                            <th th:text="#{promotion.my.level}">Stufe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="category : ${topicCategoryMap[topic.id.toString()]}">
+                            <td th:text="${category.name}">Kategorie</td>
+                            <td>
+                                <th:block th:with="eval=${evaluationByCategoryId[category.id.toString()]}">
+                                    <span th:if="${eval != null and eval.assignedLevel != null}"
+                                          class="badge-level"
+                                          th:switch="${eval.assignedLevel}">
+                                        <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                        <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                        <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                                    </span>
+                                    <span th:unless="${eval != null and eval.assignedLevel != null}"
+                                          class="badge-none"
+                                          th:text="#{promotion.my.no.level}">Keine Stufe</span>
+                                </th:block>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+<th:block th:replace="~{fragments/toast :: toast}" />
+</body>
+</html>

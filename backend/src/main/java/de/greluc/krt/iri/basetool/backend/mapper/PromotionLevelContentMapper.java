@@ -1,0 +1,53 @@
+package de.greluc.krt.iri.basetool.backend.mapper;
+
+import de.greluc.krt.iri.basetool.backend.model.PromotionLevelContent;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
+
+/** Entity ↔ DTO mapper for {@link PromotionLevelContent}. */
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface PromotionLevelContentMapper {
+
+  /**
+   * Converts a {@link PromotionLevelContent} into its {@link PromotionLevelContentResponse} DTO,
+   * flattening the owning category's id and name so the client can render the rank-level
+   * expectation without a follow-up call.
+   *
+   * @param entity the managed level content to convert
+   * @return the response DTO mirroring the entity's fields
+   */
+  @Mapping(target = "categoryId", source = "category.id")
+  @Mapping(target = "categoryName", source = "category.name")
+  PromotionLevelContentResponse toResponse(PromotionLevelContent entity);
+
+  /**
+   * Builds a new {@link PromotionLevelContent} entity from a creation request. The {@code category}
+   * association is left unset and must be wired by the service layer.
+   *
+   * @param request validated payload describing the new level content
+   * @return a transient entity ready to be persisted
+   */
+  @Mapping(target = "category", ignore = true)
+  PromotionLevelContent toEntity(PromotionLevelContentCreateRequest request);
+
+  /**
+   * Copies the writable fields from a {@link PromotionLevelContentUpdateRequest} onto an existing
+   * managed {@link PromotionLevelContent}. Identity, audit, and association fields are deliberately
+   * ignored to preserve them across the update.
+   *
+   * @param entity the managed level content to mutate in place
+   * @param request validated payload carrying the new field values
+   */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "category", ignore = true)
+  void updateEntity(
+      @MappingTarget PromotionLevelContent entity, PromotionLevelContentUpdateRequest request);
+}
