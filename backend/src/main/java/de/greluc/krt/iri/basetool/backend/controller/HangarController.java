@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import de.greluc.krt.iri.basetool.backend.annotation.ApiDeprecation;
 import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
@@ -42,7 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * REST surface for the personal hangar (own ships), the squadron-wide overview, the admin per-user
- * hangar, and the fleetview CSV import.
+ * hangar, and the third-party ship-export JSON import (CCU Game Fleetview / HangarXPLOR Shiplist).
  *
  * <p>{@code /my-ships} reads the calling user's JWT to derive the owner id — never accepts it from
  * the URL — so a caller cannot view another user's hangar via this endpoint. The admin-only {@code
@@ -270,18 +271,44 @@ public class HangarController {
   }
 
   /**
-   * Imports a Fleetview CSV export. Parses the file via {@code HangarImportService} and creates one
-   * ship row per CSV line. The caller's JWT is the owner of the new rows.
+   * Imports a ship-export JSON file (CCU Game Fleetview or HangarXPLOR Shiplist — the format is
+   * auto-detected from the first array element). Parses the file via {@code HangarImportService}
+   * and creates only the missing rows so existing hangar contents are never lost or duplicated. The
+   * caller's JWT is the owner of the new rows.
    *
-   * @param file uploaded CSV file
-   * @return import summary (created / skipped / errored counts)
+   * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
+   * @param file uploaded JSON file
+   * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
+   */
+  @PostMapping("/import/ships")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional
+  public FleetviewImportResponseDto importShips(
+      @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
+    return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
+  }
+
+  /**
+   * Legacy path for the ship-import endpoint, kept for one year so existing automation does not
+   * break. Delegates to the same service as {@link #importShips(Jwt, MultipartFile)}; the response
+   * is identical. New clients should target {@code /api/v1/hangar/import/ships} which is
+   * format-neutral (the original {@code /import/fleetview} name predates HangarXPLOR support).
+   *
+   * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
+   * @param file uploaded JSON file
+   * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
+   * @deprecated use {@link #importShips(Jwt, MultipartFile)} via {@code
+   *     /api/v1/hangar/import/ships} instead — the {@code Sunset} and {@code Link} response headers
+   *     carry the same hint.
    */
   @PostMapping("/import/fleetview")
   @PreAuthorize("isAuthenticated()")
   @Transactional
+  @ApiDeprecation(sunset = "2027-05-14", replacement = "/api/v1/hangar/import/ships")
+  @Deprecated(since = "2026-05-14", forRemoval = true)
   public FleetviewImportResponseDto importFleetview(
       @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
-    return hangarImportService.importFleetview(userService.getUserIdFromJwt(jwt), file);
+    return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
   }
 
   /** Bulk reset of the {@code fitted} flag on every ship in the squadron. ADMIN/OFFICER-only. */

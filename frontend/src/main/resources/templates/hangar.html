@@ -532,7 +532,7 @@
                     const reqHeaders = { 'Accept': 'application/json' };
                     if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
 
-                    fetch('/hangar/import/fleetview', {
+                    fetch('/hangar/import/ships', {
                         method: 'POST',
                         body: formData,
                         headers: reqHeaders

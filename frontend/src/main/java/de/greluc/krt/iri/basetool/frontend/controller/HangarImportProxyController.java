@@ -20,11 +20,17 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the Fleetview JSON import endpoint.
+ * Frontend proxy for the third-party ship-export import endpoint. Accepts both CCU Game Fleetview
+ * and HangarXPLOR Shiplist JSON payloads; the backend auto-detects the format from the first array
+ * element.
  *
  * <p>Receives the multipart file from the browser, forwards it to the backend {@code POST
- * /api/v1/hangar/import/fleetview} via the authenticated {@link WebClient} (which automatically
+ * /api/v1/hangar/import/ships} via the authenticated {@link WebClient} (which automatically
  * attaches the OAuth2 token), and returns the backend response as-is to the browser.
+ *
+ * <p>The {@code /hangar/import/fleetview} path is retained as a deprecated alias that forwards to
+ * the same backend endpoint, so any cached browser script or bookmark continues to work until the
+ * sunset date communicated by the backend's {@code Sunset} response header.
  */
 @RestController
 @RequestMapping("/hangar/import")
@@ -35,19 +41,49 @@ public class HangarImportProxyController {
   private final WebClient webClient;
 
   /**
-   * Proxies a Fleetview JSON file upload from the browser to the backend import endpoint.
+   * Proxies a ship-export JSON file upload from the browser to the backend import endpoint.
    *
-   * @param file the uploaded {@code fleetview.json} file
-   * @return the backend {@code FleetviewImportResponseDto} as a raw JSON map
+   * @param file the uploaded JSON file (Fleetview or HangarXPLOR Shiplist)
+   * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map
+   */
+  @PostMapping(value = "/ships", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<Map<?, ?>> importShips(@RequestParam("file") @NotNull MultipartFile file) {
+    return forwardImport(file, "/api/v1/hangar/import/ships");
+  }
+
+  /**
+   * Legacy path retained for browser scripts and bookmarks that still target the old Fleetview-only
+   * endpoint. Forwards to the same backend endpoint as {@link #importShips(MultipartFile)}.
+   *
+   * @param file the uploaded JSON file
+   * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map
+   * @deprecated use {@code POST /hangar/import/ships} — this path keeps working until the backend's
+   *     sunset date but new code should target the format-neutral path directly.
    */
   @PostMapping(value = "/fleetview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
+  @Deprecated(since = "2026-05-14", forRemoval = true)
   public ResponseEntity<Map<?, ?>> importFleetview(
       @RequestParam("file") @NotNull MultipartFile file) {
+    return forwardImport(file, "/api/v1/hangar/import/fleetview");
+  }
+
+  /**
+   * Shared multipart-forwarding plumbing for both the canonical and the legacy path. Handles the
+   * file body re-wrap, error translation from {@link WebClientResponseException} to a matching
+   * {@link ResponseStatusException}, and the unexpected-error fallback.
+   *
+   * @param file uploaded multipart file
+   * @param backendPath relative path on the backend (without host) to forward to
+   * @return the backend response unchanged
+   */
+  private @NotNull ResponseEntity<Map<?, ?>> forwardImport(
+      @NotNull MultipartFile file, @NotNull String backendPath) {
     try {
       byte[] bytes = file.getBytes();
       String originalFilename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : "fleetview.json";
+          file.getOriginalFilename() != null ? file.getOriginalFilename() : "shiplist.json";
 
       MultipartBodyBuilder builder = new MultipartBodyBuilder();
       builder
@@ -64,7 +100,7 @@ public class HangarImportProxyController {
       Map<?, ?> result =
           webClient
               .post()
-              .uri("/api/v1/hangar/import/fleetview")
+              .uri(backendPath)
               .contentType(MediaType.MULTIPART_FORM_DATA)
               .body(BodyInserters.fromMultipartData(builder.build()))
               .retrieve()
@@ -73,13 +109,12 @@ public class HangarImportProxyController {
 
       return ResponseEntity.ok(result);
     } catch (WebClientResponseException e) {
-      log.warn(
-          "Fleetview import proxy: backend returned {} — {}", e.getStatusCode(), e.getMessage());
+      log.warn("Hangar import proxy: backend returned {} — {}", e.getStatusCode(), e.getMessage());
       throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
     } catch (ResponseStatusException e) {
       throw e;
     } catch (Exception e) {
-      log.error("Fleetview import proxy: unexpected error", e);
+      log.error("Hangar import proxy: unexpected error", e);
       throw new ResponseStatusException(
           org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
           "An unexpected error occurred during import.");

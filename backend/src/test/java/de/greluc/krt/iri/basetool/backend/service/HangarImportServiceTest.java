@@ -16,6 +16,7 @@ import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+/**
+ * Pure Mockito unit tests for {@link HangarImportService}. The contract under test:
+ *
+ * <ul>
+ *   <li>Exact case-insensitive matches are imported.
+ *   <li>Hyphen/whitespace drift between the Fleetview export and the canonical UEX ship-type name
+ *       is absorbed by the normalised fallback (e.g. {@code "L21 Wolf"} matches {@code "L-21
+ *       Wolf"}).
+ *   <li>Unmatched entries surface in {@code skippedShips} with their original casing, deduplicated
+ *       case-insensitively.
+ *   <li>Hangar count never exceeds the JSON count: {@code max(0, jsonCount - hangarCount)}
+ *       additional ships are created per distinct ship type.
+ *   <li>Surplus ships already in the hangar are never deleted.
+ *   <li>Empty file / unparseable JSON / unknown user surface as the expected exceptions for the
+ *       controller's HTTP-status mapping.
+ * </ul>
+ */
 @ExtendWith(MockitoExtension.class)
 class HangarImportServiceTest {
 
@@ -70,15 +88,13 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("135c")).thenReturn(Optional.of(type135c));
-    when(shipTypeRepository.findByNameIgnoreCase("zeus mk ii mr"))
-        .thenReturn(Optional.of(typeZeus));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type135c, typeZeus));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type135c.getId())).thenReturn(0L);
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, typeZeus.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(2);
@@ -112,14 +128,12 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("135c")).thenReturn(Optional.of(type135c));
-    when(shipTypeRepository.findByNameIgnoreCase("unknown alien ship"))
-        .thenReturn(Optional.empty());
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type135c));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type135c.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(1);
@@ -152,12 +166,12 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("aurora mr")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(3);
@@ -189,12 +203,12 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("aurora mr")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(1L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(2);
@@ -226,11 +240,11 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("aurora mr")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(3L);
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(0);
@@ -262,11 +276,11 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("aurora mr")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(5L);
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then
     assertThat(result.importedCount()).isEqualTo(0);
@@ -303,8 +317,7 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("vulture")).thenReturn(Optional.of(typeA));
-    when(shipTypeRepository.findByNameIgnoreCase("aurora mr")).thenReturn(Optional.of(typeB));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(typeA, typeB));
     // Hangar: 2× vulture (JSON only has 1 → surplus, no creation), 1× aurora mr (JSON has 3 → 2
     // more)
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, typeA.getId())).thenReturn(2L);
@@ -312,7 +325,7 @@ class HangarImportServiceTest {
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    FleetviewImportResponseDto result = hangarImportService.importFleetview(userId, file);
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
     // Then: 0 vulture created (surplus), 2 aurora mr created
     assertThat(result.importedCount()).isEqualTo(2);
@@ -341,12 +354,12 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("vulture")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    hangarImportService.importFleetview(userId, file);
+    hangarImportService.importShips(userId, file);
 
     // Then
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -374,17 +387,534 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(shipTypeRepository.findByNameIgnoreCase("890 jump")).thenReturn(Optional.of(type));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
-    hangarImportService.importFleetview(userId, file);
+    hangarImportService.importShips(userId, file);
 
     // Then
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
     assertThat(captor.getValue().getName()).isEqualTo("Stella Aeterna");
+  }
+
+  // -------------------------------------------------------------------------
+  // Tolerant matching: case-only difference (regression of the original
+  // findByNameIgnoreCase semantics under the new index)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_caseOnlyDifference_stillMatches() {
+    // Given: DB has "atls", JSON uses uppercase "ATLS"
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("atls");
+
+    String json =
+        """
+        [{"name":"ATLS","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Tolerant matching: hyphen in DB, no hyphen in JSON
+  // ("L-21 Wolf" canonical vs "L21 Wolf" in the export)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_hyphenInDbNotInJson_stillMatchesViaNormalisation() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType wolf = shipTypeWithName("L-21 Wolf");
+
+    String json =
+        """
+        [{"name":"L21 Wolf","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Tolerant matching: hyphen in JSON, no hyphen in DB (reverse direction)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_hyphenInJsonNotInDb_stillMatchesViaNormalisation() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType wolf = shipTypeWithName("L21 Wolf");
+
+    String json =
+        """
+        [{"name":"L-21 Wolf","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Tolerant matching: two JSON spellings of the same ship aggregate to one
+  // ShipType and the duplicate-count semantics keep working.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_twoSpellingsSameShip_aggregateToSameType() {
+    // Given: DB canonical "L-21 Wolf", JSON contains BOTH the hyphenated and
+    // the un-hyphenated form — both should resolve to the same ShipType so
+    // the import counts them together (one create, not two).
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType wolf = shipTypeWithName("L-21 Wolf");
+
+    String json =
+        """
+        [
+          {"name":"L-21 Wolf","shipname":"","type":"ship"},
+          {"name":"L21 Wolf","shipname":"","type":"ship"}
+        ]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: 2 entries in JSON, both for the same canonical ShipType → 2 created
+    assertThat(result.importedCount()).isEqualTo(2);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    verify(shipRepository, times(2)).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Tolerant matching: extra whitespace and trailing punctuation in JSON
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_extraWhitespaceInJson_stillMatches() {
+    // Given: DB canonical "Cyclone-AA"; JSON variant "cyclone aa" with extra spaces
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType cyclone = shipTypeWithName("Cyclone-AA");
+
+    String json =
+        """
+        [{"name":"  cyclone   aa  ","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(cyclone));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, cyclone.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Skipped ships preserve original casing and dedupe case-insensitively
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_skippedList_preservesOriginalCasingAndDedupes() {
+    // Given: DB knows nothing; JSON has the same unknown ship in two casings
+    // plus one truly distinct unknown.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    String json =
+        """
+        [
+          {"name":"Fictional Ship","shipname":"","type":"ship"},
+          {"name":"fictional ship","shipname":"","type":"ship"},
+          {"name":"Another Unknown","shipname":"","type":"ship"}
+        ]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of());
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: 2 entries in skipped list (deduped on case), first-seen casing preserved
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(2);
+    assertThat(result.skippedShips()).containsExactly("Fictional Ship", "Another Unknown");
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Defensive: ShipType rows with blank names must not poison the lookup
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_shipTypeWithBlankName_isIgnoredInIndex() {
+    // Given: a stray ShipType with a blank name (data hygiene defect) sits next to
+    // the real one. The blank-name row must not match anything in the import.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType blank = shipTypeWithName("");
+    ShipType real = shipTypeWithName("135c");
+
+    String json =
+        """
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(blank, real));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, real.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage 3 (fv-tokens ⊆ uex-tokens, unique): fv name is a strict abbreviation
+  // of the canonical UEX name. Real-world cases verified against the live UEX
+  // /vehicles dump:
+  //   "A2 Hercules"          -> "A2 Hercules Starlifter"   (uex adds "Starlifter")
+  //   "Ares Inferno"         -> "Ares Inferno Starfighter" (uex adds "Starfighter")
+  //   "C8R Pisces"           -> "C8R Pisces Rescue"        (uex adds "Rescue")
+  //   "Aurora MR"            -> "Aurora Mk I MR"           (uex adds "Mk I" mid-name)
+  //   "Mercury"              -> "Mercury Star Runner"      (uex adds two suffix tokens)
+  //   "Nova"                 -> "Nova Tank"                (uex adds "Tank")
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_fvAbbreviatesUexCanonicalSuffix_resolvesUniquely() {
+    // Given: UEX canonical name is "A2 Hercules Starlifter"; fleetview ships only
+    // "A2 Hercules". Stage 3 should pick up the suffix-drift.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType hercules = shipTypeWithName("A2 Hercules Starlifter");
+    // Decoy: same hull family but different prefix token "C2" — must not match.
+    ShipType c2Hercules = shipTypeWithName("C2 Hercules Starlifter");
+
+    String json =
+        """
+        [{"name":"A2 Hercules","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, c2Hercules));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(hercules);
+  }
+
+  @Test
+  void importFleetview_fvAbbreviatesAuroraVariant_resolvesToMkI() {
+    // Given: UEX has all six Aurora Mk I sub-variants plus "Aurora Mk II".
+    // Fleetview shorthand "Aurora MR" must pick exactly "Aurora Mk I MR" — the
+    // only candidate whose tokens are a superset of {aurora, mr}.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType mkICl = shipTypeWithName("Aurora Mk I CL");
+    ShipType mkIEs = shipTypeWithName("Aurora Mk I ES");
+    ShipType mkILn = shipTypeWithName("Aurora Mk I LN");
+    ShipType mkILx = shipTypeWithName("Aurora Mk I LX");
+    ShipType mkIMr = shipTypeWithName("Aurora Mk I MR");
+    ShipType mkIIPlain = shipTypeWithName("Aurora Mk II");
+
+    String json =
+        """
+        [{"name":"Aurora MR","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll())
+        .thenReturn(List.of(mkICl, mkIEs, mkILn, mkILx, mkIMr, mkIIPlain));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, mkIMr.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(mkIMr);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage 3 token-set comparison is reordering-tolerant: "Pirate Gladius" in
+  // the fleetview matches UEX's canonical "Gladius Pirate" because the token
+  // sets are equal, even though the original token order differs.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_tokenReorderingMatches() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType plain = shipTypeWithName("Gladius");
+    ShipType pirate = shipTypeWithName("Gladius Pirate");
+    ShipType valiant = shipTypeWithName("Gladius Valiant");
+
+    String json =
+        """
+        [{"name":"Pirate Gladius","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, pirate.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: "Pirate Gladius" set == "Gladius Pirate" set → unique match.
+    // "Gladius" alone is uex⊆fv (Stage 4) but Stage 3 short-circuits because it
+    // already found exactly one fv⊆uex hit, so the bare "Gladius" does not steal
+    // the match.
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(pirate);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage 4 (uex-tokens ⊆ fv-tokens, unique): fv name is longer than UEX's
+  // canonical short form. Real-world case from the fleetview export:
+  //   "Ursa Rover" -> UEX "Ursa" (the Mk-I-era marketing name was dropped
+  //   when CIG repositioned the line; Fleetview still emits "Ursa Rover").
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_uexShorterThanFv_resolvesViaStage4() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType ursa = shipTypeWithName("Ursa");
+    ShipType ursaFortuna = shipTypeWithName("Ursa Fortuna");
+    ShipType ursaMedivac = shipTypeWithName("Ursa Medivac");
+
+    String json =
+        """
+        [{"name":"Ursa Rover","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(ursa, ursaFortuna, ursaMedivac));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ursa.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: only "Ursa" satisfies uex⊆fv ({ursa} ⊆ {ursa, rover}); "Ursa Fortuna"
+    // and "Ursa Medivac" fail because "fortuna"/"medivac" are not in {ursa, rover}.
+    assertThat(result.importedCount()).isEqualTo(1);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(ursa);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage 3 ambiguity must NOT fall through to Stage 4 — if the fv abbreviation
+  // is ambiguous between several Mk-suffix variants, the entry is left skipped
+  // so the user has to disambiguate, instead of silently picking the wrong one.
+  // Real-world case: "F7C-M Super Hornet" matches Mk I, Heartseeker Mk I, AND
+  // Mk II — all three contain {f7c, m, super, hornet} as a subset.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_stage3Ambiguous_skipsInsteadOfGuessing() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType mkI = shipTypeWithName("F7C-M Super Hornet Mk I");
+    ShipType heartseeker = shipTypeWithName("F7C-M Super Hornet Heartseeker Mk I");
+    ShipType mkII = shipTypeWithName("F7C-M Super Hornet Mk II");
+
+    String json =
+        """
+        [{"name":"F7C-M Super Hornet","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(mkI, heartseeker, mkII));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("F7C-M Super Hornet");
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage 4 must also be unambiguous — if multiple uex names are subsets of the
+  // fv token set, skip rather than guess. (Concocted scenario; the live UEX
+  // dump does not currently exhibit this, but the invariant should hold.)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_stage4Ambiguous_skipsInsteadOfGuessing() {
+    // Given: two ShipTypes, both subsets of the fv tokens — must not pick one.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType foo = shipTypeWithName("Foo");
+    ShipType bar = shipTypeWithName("Bar");
+
+    String json =
+        """
+        [{"name":"Foo Bar","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(foo, bar));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: both {foo} and {bar} are subsets of {foo, bar}; neither wins.
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("Foo Bar");
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Stage precedence: when a Stage-1 exact match exists, no later stage may
+  // override it. Regression guard for the case where a longer UEX name
+  // ALSO contains the exact fv tokens — Stage 1 must win.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importFleetview_exactMatchWinsOverTokenSubset() {
+    // Given: fv "Gladius" matches the bare "Gladius" exactly. The longer
+    // "Gladius Pirate" / "Gladius Valiant" must NOT be considered.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType plain = shipTypeWithName("Gladius");
+    ShipType pirate = shipTypeWithName("Gladius Pirate");
+    ShipType valiant = shipTypeWithName("Gladius Valiant");
+
+    String json =
+        """
+        [{"name":"Gladius","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, plain.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(plain);
   }
 
   // -------------------------------------------------------------------------
@@ -399,10 +929,8 @@ class HangarImportServiceTest {
         new MockMultipartFile("file", "fleetview.json", "application/json", new byte[0]);
 
     // When / Then
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> hangarImportService.importFleetview(userId, emptyFile));
+    assertThrows(
+        BadRequestException.class, () -> hangarImportService.importShips(userId, emptyFile));
   }
 
   // -------------------------------------------------------------------------
@@ -416,9 +944,7 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile("THIS IS NOT JSON");
 
     // When / Then
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class, () -> hangarImportService.importFleetview(userId, file));
+    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
   }
 
   // -------------------------------------------------------------------------
@@ -438,9 +964,428 @@ class HangarImportServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
     // When / Then
-    NotFoundException ex =
+    assertThrows(NotFoundException.class, () -> hangarImportService.importShips(userId, file));
+  }
+
+  // -------------------------------------------------------------------------
+  // HangarXPLOR Shiplist format: basic happy path. Same matcher pipeline as
+  // Fleetview, just a different parse layer. The probe field that triggers
+  // shiplist parsing is `pledge_id` on the first element.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistFormat_isAutoDetectedAndImported() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType polaris = shipTypeWithName("Polaris");
+
+    String shiplistJson =
+        """
+        [{
+          "ship_code":        "RSI_Polaris",
+          "ship_name":        "Polaris",
+          "manufacturer_code":"RSI",
+          "manufacturer_name":"Roberts Space Industries",
+          "lti":              true,
+          "name":             "Polaris",
+          "warbond":          false,
+          "entity_type":      "ship",
+          "pledge_id":        "44477114",
+          "pledge_name":      "Standalone Ship - STV",
+          "pledge_date":      "November 03, 2022",
+          "pledge_cost":      "$720.00 USD"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(polaris));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, polaris.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    verify(shipRepository).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist `lti: true` translates into insurance "LTI" on the new ship row.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistLtiTrue_setsLtiInsurance() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("Vulture");
+
+    String shiplistJson =
+        """
+        [{
+          "ship_code": "DRAK_Vulture",
+          "ship_name": "Vulture",
+          "lti":       true,
+          "name":      "Vulture",
+          "entity_type":"ship",
+          "pledge_id": "12345"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.LTI_INSURANCE);
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist `lti: false` falls back to the neutral default insurance ("0").
+  // We know it is *not* lifetime, but we do not know the month count, so the
+  // safe default applies.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistLtiFalse_fallsBackToDefaultInsurance() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("Avenger Stalker");
+
+    String shiplistJson =
+        """
+        [{
+          "ship_code": "AEGS_Avenger_Stalker",
+          "ship_name": "Avenger Stalker",
+          "lti":       false,
+          "name":      "Avenger Stalker",
+          "entity_type":"ship",
+          "pledge_id": "18705924"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.DEFAULT_INSURANCE);
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist `ship_name` that is genuinely different from `name` becomes the
+  // individual ship name on the imported row. Real-world example:
+  // ship_name="KRT Olymp" / name="600i Explorer".
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistCustomShipName_isSetAsIndividualName() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("600i Explorer");
+
+    String shiplistJson =
+        """
+        [{
+          "ship_code": "ORIG_600i",
+          "ship_name": "KRT Olymp",
+          "lti":       true,
+          "name":      "600i Explorer",
+          "entity_type":"ship",
+          "pledge_id": "29528209"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getName()).isEqualTo("KRT Olymp");
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist `ship_name` that is an abbreviation/echo of `name` is NOT used
+  // as an individual ship name — HangarXPLOR commonly emits ship_name="325a"
+  // for name="325a Fighter", which is just a redundant short label, not a
+  // custom name the user typed in.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistShipNameEchoesModelName_individualNameStaysNull() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("325a");
+
+    String shiplistJson =
+        """
+        [{
+          "ship_code": "ORIG_325a",
+          "ship_name": "325a",
+          "lti":       false,
+          "name":      "325a Fighter",
+          "entity_type":"ship",
+          "pledge_id": "18896001"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then: model name resolves via Stage 4 (uex subset of fv), individual name stays null
+    // because "325a" is a substring of normalised "325afighter".
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getName()).isNull();
+    assertThat(captor.getValue().getShipType()).isSameAs(type);
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist `entity_type != "ship"` (module / package / paint) is silently
+  // dropped at the parse step — never reaches the matcher, never shows up in
+  // skippedShips. Defensive against HangarXPLOR exporting non-ship rows.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistNonShipEntityType_isDroppedAtParseStep() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("Polaris");
+
+    String shiplistJson =
+        """
+        [
+          {
+            "ship_code": "RSI_Polaris",
+            "ship_name": "Polaris",
+            "lti":       true,
+            "name":      "Polaris",
+            "entity_type":"ship",
+            "pledge_id": "111"
+          },
+          {
+            "ship_code": "PAINT_FOO",
+            "ship_name": "Foo Paint",
+            "lti":       false,
+            "name":      "Foo Paint",
+            "entity_type":"paint",
+            "pledge_id": "222"
+          }
+        ]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: only the Polaris was created; the paint row never reached the matcher,
+    // so it is also NOT counted as skipped.
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    assertThat(result.skippedShips()).isEmpty();
+    verify(shipRepository, times(1)).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Format detection: the probe inspects the FIRST array element. Fleetview
+  // payloads (no pledge_id, no ship_code) must continue to parse correctly
+  // after the new shiplist branch was added.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetviewFormatStillRecognisedAfterShiplistAddition() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("135c");
+
+    String fleetviewJson =
+        """
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(fleetviewJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+  }
+
+  // -------------------------------------------------------------------------
+  // Format detection: JSON whose first element matches neither marker (no
+  // pledge_id/ship_code AND no shipname/type) → 400 with a clear message.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_unknownFormat_throws400() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    String mysteryJson =
+        """
+        [{"foo":"bar","baz":42}]
+        """;
+    MockMultipartFile file = multipartFile(mysteryJson);
+
+    // When / Then
+    BadRequestException ex =
         assertThrows(
-            NotFoundException.class, () -> hangarImportService.importFleetview(userId, file));
+            BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+    assertThat(ex.getMessage()).contains("Unknown ship-list format");
+  }
+
+  // -------------------------------------------------------------------------
+  // Format detection: root that is not a JSON array → 400.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_rootIsObjectNotArray_throws400() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    MockMultipartFile file =
+        multipartFile(
+            """
+            {"name":"135c","shipname":"","type":"ship"}
+            """);
+
+    // When / Then
+    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+  }
+
+  // -------------------------------------------------------------------------
+  // Format detection: empty array is accepted and yields 0 imports / 0 skips
+  // (degenerate but valid input — neither side of the parse branch fires).
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_emptyArray_returnsAllZero() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    MockMultipartFile file = multipartFile("[]");
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of());
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    assertThat(result.duplicateCount()).isEqualTo(0);
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Shiplist resolution exercise mirroring the real input/shiplist.json file:
+  // mixed exact + Stage 3 (Hercules token-reorder) + Stage 4 (Ursa Rover -> Ursa)
+  // + truly unmatched ("600i Exploration Module" -- no UEX equivalent) all in a
+  // single payload. Verifies the four-stage pipeline runs through the shiplist
+  // branch end-to-end.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_shiplistMixedResolution() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType hercules = shipTypeWithName("A2 Hercules Starlifter"); // Stage 3 reorder
+    ShipType ursa = shipTypeWithName("Ursa"); // Stage 4 (uex subset of fv)
+    ShipType polaris = shipTypeWithName("Polaris"); // Stage 1 exact
+
+    String shiplistJson =
+        """
+        [
+          { "ship_code":"RSI_Polaris", "ship_name":"Polaris",
+            "lti":true, "name":"Polaris", "entity_type":"ship", "pledge_id":"1" },
+          { "ship_code":"CRUS_Hercules_Starlifter_A2", "ship_name":"Hercules Starlifter A2",
+            "lti":true, "name":"Hercules Starlifter A2", "entity_type":"ship", "pledge_id":"2" },
+          { "ship_code":"RSI_Ursa", "ship_name":"Ursa",
+            "lti":false, "name":"Ursa Rover", "entity_type":"ship", "pledge_id":"3" },
+          { "ship_code":"ORIG_600i", "ship_name":"KRT Olymp",
+            "lti":true, "name":"600i Exploration Module", "entity_type":"ship", "pledge_id":"4" }
+        ]
+        """;
+    MockMultipartFile file = multipartFile(shiplistJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, ursa, polaris));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ursa.getId())).thenReturn(0L);
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, polaris.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(3);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("600i Exploration Module");
+    verify(shipRepository, times(3)).save(any(Ship.class));
   }
 
   // -------------------------------------------------------------------------
