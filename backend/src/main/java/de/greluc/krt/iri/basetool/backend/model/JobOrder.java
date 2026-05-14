@@ -33,6 +33,7 @@ import lombok.Setter;
 @Table(name = "job_order")
 public class JobOrder extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

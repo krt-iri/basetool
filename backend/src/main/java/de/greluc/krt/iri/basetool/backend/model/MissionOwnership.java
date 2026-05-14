@@ -44,6 +44,7 @@ import lombok.ToString;
 @ToString(exclude = {"mission", "owner"})
 public class MissionOwnership extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

@@ -24,6 +24,7 @@ import lombok.ToString;
 @AllArgsConstructor
 public class Ship extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

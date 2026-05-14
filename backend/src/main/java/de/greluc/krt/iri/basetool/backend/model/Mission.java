@@ -33,6 +33,7 @@ import org.hibernate.annotations.OptimisticLock;
 @ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries"})
 public class Mission extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

@@ -31,7 +31,9 @@ import org.jetbrains.annotations.Nullable;
 @AllArgsConstructor
 public class User extends AbstractEntity<UUID> {
 
-  @Id private UUID id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  private UUID id;
 
   @Override
   public boolean isNew() {

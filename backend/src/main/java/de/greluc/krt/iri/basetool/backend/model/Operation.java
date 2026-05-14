@@ -27,6 +27,7 @@ import lombok.ToString;
 @ToString(exclude = {"missions"})
 public class Operation extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

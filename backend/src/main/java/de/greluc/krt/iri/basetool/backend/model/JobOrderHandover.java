@@ -31,6 +31,7 @@ import lombok.Setter;
 @Table(name = "job_order_handover")
 public class JobOrderHandover extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

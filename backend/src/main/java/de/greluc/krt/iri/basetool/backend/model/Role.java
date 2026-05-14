@@ -26,6 +26,7 @@ import lombok.ToString;
 @AllArgsConstructor
 public class Role extends AbstractEntity<Long> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

@@ -27,6 +27,7 @@ import lombok.ToString;
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"material_id", "terminal_id"}))
 public class MaterialPrice extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

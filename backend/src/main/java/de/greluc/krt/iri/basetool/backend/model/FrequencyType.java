@@ -19,6 +19,7 @@ import lombok.ToString;
 @NoArgsConstructor
 public class FrequencyType extends AbstractEntity<UUID> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

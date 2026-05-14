@@ -20,6 +20,7 @@ import lombok.Setter;
 @Table(name = "system_setting")
 public class SystemSetting extends AbstractEntity<String> {
 
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @Column(name = "setting_key", nullable = false, unique = true)
   private String id;
