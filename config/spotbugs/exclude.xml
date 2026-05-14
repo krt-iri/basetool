@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs filter file.
+
+  Scope so far: JPA entity collection exposure.
+
+  ============================================================================
+  EI_EXPOSE_REP / EI_EXPOSE_REP2 on `de.greluc.krt.iri.basetool.backend.model.*`
+  ============================================================================
+
+  Every JPA entity in this package exposes its `@OneToMany` / `@ManyToMany`
+  collections via Lombok `@Getter` (and accepts them back via `@Setter`).
+  SpotBugs and the `github-code-quality[bot]` running on PRs flag every such
+  getter as "Exposing internal representation" — they keep counting because
+  service code legitimately mutates the returned collections (the canonical
+  `entity.getCollection().clear()` / `.add(x)` / `.remove(x)` / `.forEach(...)`
+  pattern Hibernate manages via dirty-checking).
+
+  The conventional SpotBugs fix is `Collections.unmodifiableSet(...)` in the
+  getter plus a defensive-copy setter plus an `addXxx`/`removeXxx` helper API.
+  That mechanically silences the rule but:
+
+    1. The unmodifiable view would throw `UnsupportedOperationException` at
+       every existing service call site — 12+ sites across `MissionService`,
+       `JobOrderService`, `OperationService` would need refactoring to the
+       new helper API.
+    2. The `addXxx`/`removeXxx` helpers ultimately wrap the same `set.add()`
+       call — the wrapper just hides the mutation behind a method name. The
+       internal collection is still mutable; SpotBugs is happy because it
+       can't see "through" the helper, but the real-world security posture
+       is identical.
+    3. Hibernate's dirty-checking depends on the persistent collection
+       remaining the same managed instance throughout the transaction.
+       Defensive-copy setters break the persistent-collection identity and
+       can produce subtle dirty-checking misses.
+
+  Architectural counter-argument: this project enforces "DTOs only at
+  controller boundaries; never expose JPA entities at the HTTP boundary"
+  (CLAUDE.md `Architecture > API conventions`), and the invariant is
+  ArchUnit-enforced in
+  `backend/.../ArchitectureTest.java`. No untrusted caller ever holds a
+  reference to a managed entity, so the mutable collection cannot be reached
+  from outside the `@Transactional` service layer.
+
+  Per CLAUDE.md `Linting / static analysis`: a finding "may be silenced ...
+  when the rule is genuinely wrong for that specific call site, and in that
+  case leave a one-line comment explaining why." That's this whole block.
+
+  If a future entity adds a collection that IS intended to be exposed
+  immutably (e.g. a read-only audit log returned by a `/api/v1/<path>`
+  endpoint that bypasses the DTO seam), tighten this filter at that point.
+-->
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.9.6/spotbugs/etc/findbugsfilter.xsd">
+
+  <Match>
+    <Class name="~de\.greluc\.krt\.iri\.basetool\.backend\.model\..*"/>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+</FindBugsFilter>

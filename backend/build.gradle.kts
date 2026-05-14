@@ -117,6 +117,10 @@ tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
   classDirs.from(sourceSets.main.get().output.classesDirs)
   auxClassPaths.from(sourceSets.main.get().compileClasspath)
+  // Suppress EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities — see the long
+  // architectural justification in the filter file. Keeps the bot's
+  // recurring per-commit re-flagging out of PR threads.
+  excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
   effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
   reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
   ignoreFailures = true
