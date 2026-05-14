@@ -1,6 +1,6 @@
 plugins {
   id("idea")
-  id("org.owasp.dependencycheck") version "12.2.0"
+  id("org.owasp.dependencycheck") version "12.2.2"
   // Pulled in with `apply false` so the PitestPluginExtension type is on the
   // root build script's classpath for the `subprojects { plugins.withId(...) }`
   // configuration block below. Each subproject still applies the plugin itself.
@@ -212,7 +212,7 @@ subprojects {
   }
 }
 
-// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.0. Aggregates over
+// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over
 // all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate stays
 // wide open (`failBuildOnCVSS = 11`) for the first iteration so the team
 // triages findings before the gate turns strict. The plugin's first invocation
