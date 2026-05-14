@@ -79,6 +79,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   Page<RefineryOrder> findAll(Pageable pageable);
 

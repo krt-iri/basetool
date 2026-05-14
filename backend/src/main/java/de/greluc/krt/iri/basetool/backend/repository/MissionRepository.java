@@ -32,6 +32,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findById(UUID id);
 
@@ -105,6 +106,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Page<Mission> findAll(Pageable pageable);
 

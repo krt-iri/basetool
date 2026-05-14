@@ -37,6 +37,7 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @NotNull
   @EntityGraph(attributePaths = {"permissions"})
   Page<Role> findAll(@NotNull Pageable pageable);

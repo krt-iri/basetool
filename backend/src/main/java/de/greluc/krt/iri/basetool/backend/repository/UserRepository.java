@@ -32,6 +32,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @NotNull
   @EntityGraph(attributePaths = {"roles", "roles.permissions"})
   Optional<User> findById(@NotNull UUID id);
@@ -86,6 +87,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @EntityGraph(attributePaths = {"roles"})
   Page<User> findAll(Pageable pageable);
 

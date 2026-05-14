@@ -32,6 +32,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers.items.material",
         "assignees"
       })
+  @Override
   Optional<JobOrder> findById(UUID id);
 
   /**

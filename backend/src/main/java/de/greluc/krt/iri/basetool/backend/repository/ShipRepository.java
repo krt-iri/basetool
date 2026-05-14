@@ -66,6 +66,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
+  @Override
   @EntityGraph(attributePaths = {"shipType", "location", "owner"})
   Page<Ship> findAll(Pageable pageable);
 
