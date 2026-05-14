@@ -22,8 +22,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Unit tests for {@link HangarImportProxyController}. The controller is a multipart-pass-through to
- * the backend Fleetview import endpoint. Coverage gaps before this test: the entire body — happy
- * path, every exception branch, and the filename-fallback when the upload has no original filename.
+ * two backend ship-import endpoints — the canonical {@code /api/v1/hangar/import/ships} and the
+ * deprecated alias {@code /api/v1/hangar/import/fleetview}. The deprecated alias forwards to the
+ * matching backend alias so existing automation does not break before the sunset date. Coverage:
+ * happy paths for both endpoints, every exception branch on the deprecated path (the shared
+ * forwarding plumbing means re-running each negative case for the new path would be redundant), and
+ * the filename-fallback when the upload has no original filename.
  *
  * <p>{@link MockWebServer} stands in for the backend so the real WebClient fluent chain (URI /
  * content-type / multipart body / bodyToMono) is exercised.
@@ -48,6 +52,40 @@ class HangarImportProxyControllerTest {
     } catch (Exception ignored) {
       // already shut down in tests that simulate a connection failure
     }
+  }
+
+  @Test
+  void importShips_happyPath_proxiesMultipartToCanonicalBackendPath() throws Exception {
+    // Given a backend that accepts the upload and replies with a JSON summary
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"importedCount\":5}"));
+
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "shiplist.json", "application/json", "[]".getBytes(StandardCharsets.UTF_8));
+
+    // When
+    ResponseEntity<Map<?, ?>> result = controller.importShips(file);
+
+    // Then
+    assertEquals(HttpStatus.OK, result.getStatusCode());
+    assertEquals(5, result.getBody().get("importedCount"));
+
+    // The new canonical proxy must hit the new backend path, NOT the deprecated alias.
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("POST", req.getMethod());
+    assertEquals("/api/v1/hangar/import/ships", req.getPath());
+    String contentType = req.getHeader("Content-Type");
+    assertNotNull(contentType);
+    assertTrue(
+        contentType.startsWith(MediaType.MULTIPART_FORM_DATA_VALUE),
+        "Content-Type must be multipart/form-data, was: " + contentType);
+    String body = req.getBody().readUtf8();
+    assertTrue(body.contains("filename=\"shiplist.json\""));
   }
 
   @Test
@@ -94,7 +132,7 @@ class HangarImportProxyControllerTest {
   }
 
   @Test
-  void importFleetview_withoutOriginalFilename_fallsBackToFleetviewJson() throws Exception {
+  void importFleetview_withoutOriginalFilename_fallsBackToShiplistJson() throws Exception {
     // Given a MultipartFile that returns null from getOriginalFilename().
     // MockMultipartFile normalises a null-constructor-arg into the empty
     // string ("") which the controller does NOT treat as "no filename",
@@ -117,13 +155,15 @@ class HangarImportProxyControllerTest {
     // When
     controller.importFleetview(file);
 
-    // Then — the fallback filename "fleetview.json" must be used so the
-    // backend's Content-Disposition parsing doesn't see an empty filename
+    // Then — the fallback filename "shiplist.json" must be used so the
+    // backend's Content-Disposition parsing doesn't see an empty filename.
+    // (The fallback is format-neutral now that the proxy handles both
+    // Fleetview and HangarXPLOR Shiplist uploads through the same plumbing.)
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertTrue(
-        req.getBody().readUtf8().contains("filename=\"fleetview.json\""),
-        "Filename fallback must default to 'fleetview.json' when the upload has no name");
+        req.getBody().readUtf8().contains("filename=\"shiplist.json\""),
+        "Filename fallback must default to 'shiplist.json' when the upload has no name");
   }
 
   @Test

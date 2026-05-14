@@ -113,6 +113,7 @@ public class SecurityConfig {
                 csrf.ignoringRequestMatchers(
                     "/missions/**",
                     "/operations/**",
+                    "/hangar/import/ships",
                     "/hangar/import/fleetview",
                     "/hangar/ships/all",
                     "/inventory/**"))

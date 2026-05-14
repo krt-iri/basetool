@@ -260,6 +260,8 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/hangar/ships/*")
                     .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/ships")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/fleetview")
                     .authenticated()
                     .requestMatchers("/api/v1/hangar/**")
