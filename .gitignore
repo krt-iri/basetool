@@ -48,3 +48,9 @@ Mining_Hub_V0.3.0.py
 .env
 .env.*
 !.env.example
+/frontend/logs/
+/backend/logs/
+/ToDo.md
+/.claude/worktrees/
+/input/
+/log.txt

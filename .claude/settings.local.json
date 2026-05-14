@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :backend:compileJava --no-daemon)",
+      "Bash(./gradlew :backend:compileJava :frontend:compileJava --no-daemon)",
+      "Bash(./gradlew :backend:test --no-daemon)",
+      "Bash(./gradlew :backend:test :frontend:test --no-daemon)",
+      "Bash(./gradlew :backend:test)",
+      "Bash(./gradlew :frontend:compileJava --no-daemon)",
+      "Bash(./gradlew :frontend:test --no-daemon)",
+      "Bash(./gradlew :frontend:test)",
+      "Bash(./gradlew checkstyleMain)",
+      "Bash(./gradlew spotlessApply checkstyleMain :backend:compileJava)",
+      "Bash(./gradlew spotlessApply checkstyleMain :frontend:compileJava)"
+    ]
+  }
+}
