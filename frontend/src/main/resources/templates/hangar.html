@@ -393,7 +393,7 @@
         if (addBtn) {
             addBtn.addEventListener('click', () => {
                 modalTitle.textContent = modal.getAttribute("data-title-add");
-                form.action = addBtn.getAttribute("data-action");
+                form.action = window.safeSameOriginUrl(addBtn.getAttribute("data-action"), form.action);
                 document.getElementById("ship-name").value = "";
                 document.getElementById("ship-type").value = "";
                 document.getElementById("ship-insurance").value = "";
@@ -409,7 +409,7 @@
         document.querySelectorAll(".edit-ship-btn").forEach(btn => {
             btn.addEventListener('click', () => {
                 modalTitle.textContent = modal.getAttribute("data-title-edit");
-                form.action = btn.getAttribute("data-action");
+                form.action = window.safeSameOriginUrl(btn.getAttribute("data-action"), form.action);
                 document.getElementById("ship-name").value = btn.getAttribute("data-name");
                 document.getElementById("ship-type").value = btn.getAttribute("data-type");
                 document.getElementById("ship-insurance").value = btn.getAttribute("data-ins");
@@ -435,7 +435,7 @@
         });
         
         modalDeleteBtn.addEventListener('click', () => {
-            deleteForm.action = modalDeleteBtn.getAttribute('data-action');
+            deleteForm.action = window.safeSameOriginUrl(modalDeleteBtn.getAttribute('data-action'), deleteForm.action);
             deleteModal.style.display = 'flex';
         });
         

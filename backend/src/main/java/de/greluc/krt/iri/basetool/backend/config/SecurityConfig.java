@@ -120,6 +120,14 @@ public class SecurityConfig {
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
 
     if (isTest) {
+      // CSRF is intentionally disabled in the `test` Spring profile so MockMvc
+      // tests can POST without first acquiring a CSRF cookie. The production
+      // path (the `else` branch below) keeps cookie-based CSRF enabled with
+      // explicit `ignoringRequestMatchers(...)` only for the JWT-bearer-token
+      // API endpoints under `/api/v1/**`, which are protected by JWT auth
+      // and have no session cookie to attack. The test profile is gated by
+      // Spring profile activation and is never enabled in deployed environments.
+      // lgtm[java/spring-disabled-csrf-protection]
       http.csrf(
           org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
               ::disable);

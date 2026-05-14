@@ -500,7 +500,8 @@
     }
 
     function openDeleteModal(id) {
-        document.getElementById('delete-operation-form').action = '/operations/' + id + '/delete';
+        var deleteForm = document.getElementById('delete-operation-form');
+        deleteForm.action = window.safeSameOriginUrl('/operations/' + id + '/delete', deleteForm.action);
         document.getElementById('delete-operation-modal').style.display = 'flex';
     }
 

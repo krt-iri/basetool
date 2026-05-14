@@ -67,7 +67,7 @@
         if (!modal || !form) return;
         var i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
-        form.action = btn.getAttribute('data-action') || form.action;
+        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         clearForm();
         modal.style.display = 'flex';
     }
@@ -76,7 +76,7 @@
         if (!modal || !form) return;
         var i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
-        form.action = btn.getAttribute('data-action') || form.action;
+        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         setField('id', btn.getAttribute('data-id'));
         setField('version', btn.getAttribute('data-version'));
         setField('name', btn.getAttribute('data-name'));
@@ -94,7 +94,7 @@
 
     function openDelete(btn) {
         if (!deleteModal || !deleteForm) return;
-        deleteForm.action = btn.getAttribute('data-action') || deleteForm.action;
+        deleteForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
         var msgEl = $('krt-pi-delete-message');
         var name = btn.getAttribute('data-name');
         if (msgEl && name) {

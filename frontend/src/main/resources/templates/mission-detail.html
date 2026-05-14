@@ -1408,7 +1408,7 @@
         if (eModal) {
             document.querySelectorAll('.edit-participant-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    eForm.action = this.getAttribute('data-action');
+                    eForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), eForm.action);
                     eForm.setAttribute('data-participant-id', this.getAttribute('data-participant-id') || '');
                     eJob.value = this.getAttribute('data-job');
                     if(ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
@@ -1569,7 +1569,7 @@
         if (deleteModal) {
             document.querySelectorAll('.delete-participant-btn, .delete-unit-btn, .delete-crew-btn, .delete-mission-btn, .delete-finance-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    deleteForm.action = this.getAttribute('data-action');
+                    deleteForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action);
                     // Paket 3C: propagate AJAX-capable sub-section metadata so the
                     // shared delete-confirm-form submit handler can route to the
                     // appropriate /ajax endpoint (no page reload, no parent-version bump).
@@ -1627,7 +1627,7 @@
         if (assignCrewModal) {
             document.querySelectorAll('.assign-crew-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    assignCrewForm.action = this.getAttribute('data-action');
+                    assignCrewForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), assignCrewForm.action);
                     // Paket 3C (Option c - Crew): propagate AJAX target + unit id so
                     // wireCrewAjax can route the submit through the /slim endpoint.
                     assignCrewForm.setAttribute('data-ajax-action', this.getAttribute('data-action-ajax') || '');
@@ -1643,7 +1643,7 @@
         if (editUnitModal) {
             document.querySelectorAll('.edit-unit-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    editUnitForm.action = this.getAttribute('data-action');
+                    editUnitForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), editUnitForm.action);
                     editUnitForm.setAttribute('data-unit-id', this.getAttribute('data-unit-id') || '');
                     editUnitName.value = this.getAttribute('data-name') || '';
                     const shiptypeVal = this.getAttribute('data-shiptype') || '';
@@ -1879,7 +1879,7 @@
         if (editCrewModal) {
             document.querySelectorAll('.edit-crew-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    editCrewForm.action = this.getAttribute('data-action');
+                    editCrewForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), editCrewForm.action);
                     // Paket 3C (Option c - Crew): store AJAX target + unit/crew ids on
                     // the shared edit-crew-form so wireCrewAjax can intercept the submit.
                     editCrewForm.setAttribute('data-ajax-action', this.getAttribute('data-action-ajax') || '');
@@ -2407,7 +2407,7 @@
     </script>
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
     function openEditFinanceModal(id, note, type, amount, version) {
-        document.getElementById('edit-finance-form').action = '/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update';
+        document.getElementById('edit-finance-form').action = window.safeSameOriginUrl('/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update', document.getElementById('edit-finance-form').action);
         document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
         document.getElementById('edit-finance-type').value = type;
         document.getElementById('edit-finance-amount').value = amount;

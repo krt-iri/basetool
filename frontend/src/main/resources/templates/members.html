@@ -189,7 +189,7 @@
         if (!confirmed) return;
 
         const form = document.getElementById('delete-user-form');
-        form.action = `/members/${userId}/delete`;
+        form.action = window.safeSameOriginUrl(`/members/${userId}/delete`, form.action);
         form.submit();
     }
 

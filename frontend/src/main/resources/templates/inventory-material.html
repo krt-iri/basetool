@@ -48,7 +48,7 @@
             
             <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
                 <label for="materialSelect" style="color: var(--color-primary); font-family: var(--font-headline); font-size: 0.8rem;">Anderes Material:</label>
-                <select id="materialSelect" class="material-select" onchange="if(this.value) window.location.href='/inventory/material/' + this.value">
+                <select id="materialSelect" class="material-select" onchange="var u = this.value ? window.safeSameOriginUrl('/inventory/material/' + this.value) : null; if(u) window.location.href = u">
                     <option th:each="mat : ${materials}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
                 </select>
             </div>
