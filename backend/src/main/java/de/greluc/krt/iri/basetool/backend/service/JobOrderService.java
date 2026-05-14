@@ -319,7 +319,12 @@ public class JobOrderService {
 
     activeOrders.remove(targetOrder);
 
-    int newIndex = newPriority - 1;
+    // The CodeQL `java/tainted-arithmetic` analyser flags `newPriority - 1` as a potential
+    // underflow because `newPriority` comes from a request DTO. The two `if`-branches below
+    // clamp `newIndex` into `[0, activeOrders.size()]` before it is used in the
+    // `activeOrders.add(newIndex, ...)` call on line 330, so the arithmetic is safe even
+    // for `Integer.MIN_VALUE`. The analyser doesn't recognise the clamp pair.
+    int newIndex = newPriority - 1; // lgtm[java/tainted-arithmetic] underflow clamped below
     if (newIndex < 0) {
       newIndex = 0;
     }
