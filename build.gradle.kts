@@ -196,7 +196,15 @@ subprojects {
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
       isEnforceCheck = true
       java {
-        googleJavaFormat().reflowLongStrings()
+        // google-java-format is pinned to a version that supports JDK 25.
+        // Spotless 7.0.4 bundles google-java-format 1.25.2, which reflects against
+        // `com.sun.tools.javac.util.Log$DeferredDiagnosticHandler.getDiagnostics()` —
+        // the return type of that method changed in JDK 25 (Queue -> Deque) and the
+        // reflection lookup explodes with `NoSuchMethodError`. CI runs JDK 25 Temurin
+        // (see `.github/workflows/ci.yml`), so the default version fails 767 files
+        // with `google-java-format(java.lang.NoSuchMethodError)`. 1.28.0 (the first
+        // release that targets the new signature) restores compatibility.
+        googleJavaFormat("1.28.0").reflowLongStrings()
         removeUnusedImports()
       }
     }
