@@ -1,26 +1,32 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.PersonalInventoryItem;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-import java.util.UUID;
-
 /**
- * Spring Data repository for {@link PersonalInventoryItem}. All non-admin lookups MUST
- * use one of the {@code *ByOwnerSub*} variants in order to enforce the multi-user data
- * isolation rule (see AGENTS.md "MULTI-USER DATA ISOLATION").
+ * Spring Data repository for {@link PersonalInventoryItem}. All non-admin lookups MUST use one of
+ * the {@code *ByOwnerSub*} variants in order to enforce the multi-user data isolation rule (see
+ * AGENTS.md "MULTI-USER DATA ISOLATION").
  */
 @Repository
-public interface PersonalInventoryItemRepository extends JpaRepository<PersonalInventoryItem, UUID> {
+public interface PersonalInventoryItemRepository
+    extends JpaRepository<PersonalInventoryItem, UUID> {
 
-    Page<PersonalInventoryItem> findAllByOwnerSub(String ownerSub, Pageable pageable);
+  /** Returns every entity matching the derived {@code findAllByOwnerSub} criteria. */
+  Page<PersonalInventoryItem> findAllByOwnerSub(String ownerSub, Pageable pageable);
 
-    Page<PersonalInventoryItem> findAllByOwnerSubAndNameContainingIgnoreCase(
-            String ownerSub, String nameFragment, Pageable pageable);
+  /**
+   * Returns every entity matching the derived {@code findAllByOwnerSubAndNameContainingIgnoreCase}
+   * criteria.
+   */
+  Page<PersonalInventoryItem> findAllByOwnerSubAndNameContainingIgnoreCase(
+      String ownerSub, String nameFragment, Pageable pageable);
 
-    Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
+  /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerSub}. */
+  Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
 }

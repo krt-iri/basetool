@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:dd75aafe-741d-4119-aa70-d89bf4d2fe51" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:d176fda8-408e-4692-8270-39661464b6c7" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-13T10:58:55Z</timestamp>
+    <timestamp>2026-05-14T13:19:36Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -183,27 +183,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.17.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar">
       <group>com.bucket4j</group>
       <name>bucket4j_jdk17-core</name>
-      <version>8.17.0</version>
+      <version>8.18.0</version>
       <description>Bucket4j core library</description>
       <hashes>
-        <hash alg="MD5">6454776736f97cded3502c388af51ea2</hash>
-        <hash alg="SHA-1">2c17ad65f4a05f1623b884cbf2ced3f9350e849a</hash>
-        <hash alg="SHA-256">4f92a49229137191fcdfac9c6502318f367b81073f8a54c2302c655d1d6a4f42</hash>
-        <hash alg="SHA-512">4944b0e2cc9fd025476fe52f4c232ca5e7c74e561ecb4902dd6cc001475e37c8d2bc17aade26f381b7ff64d194e929c53c70caf2b13628bff4b968919e0358b2</hash>
-        <hash alg="SHA-384">7d520a10a8b159d68641bd4003e254cdc47faadd633e4da6767cd03d362931194602254c78c54d6f5c896d29bc82c779</hash>
-        <hash alg="SHA3-384">d82e5a6887d82b45fb7de639b822a2f0c866b3fa200850b0c4f09a4328745e52e81b048b83eea19aea320dea0b00c3b2</hash>
-        <hash alg="SHA3-256">9bcd15d3aeaed76926c7720be3004c669d0b03a16ebe57b12f22cbd43ddbbf30</hash>
-        <hash alg="SHA3-512">af33c614bf726efdc2709f0bf3b537e3a8b501ab4685143d02fa714b1c52135759bc8817e372daba452d528290446a823ef489e8bb2be9418e9b917e39a568c8</hash>
+        <hash alg="MD5">6064eed2a4b5630f39cedaddca0b5102</hash>
+        <hash alg="SHA-1">13a366b2c45a5fbb92a5575e079a156261191c94</hash>
+        <hash alg="SHA-256">0ce8d0a942a498cea26006f74ae6fd1bed69527260dd3b8978df19fe16a26b85</hash>
+        <hash alg="SHA-512">cbce577ab345403c6864260c8e71ab2802c6a319136d57b14a1f492ac652a8b1be675adaed01b71538368517144dd36cd3ab32a1e96f9c95318cb3e14824db53</hash>
+        <hash alg="SHA-384">34f2399e7df2c7dd638839744a14c8d1bd0baf5381f6527a2a7b022f2cad6c632058c539a10f91e0e9067252caa908a2</hash>
+        <hash alg="SHA3-384">2a620a2c46f18ded908da3f42a0de12e1e89f6a1e61db83bc79668881eedb2e637a7ae2414167a8ca70e14310c7cedf9</hash>
+        <hash alg="SHA3-256">be66a0b57a6bb3b9ac2bbbd19f8d42b4b92ea4d3f4589d593b8394a2b63c6a8c</hash>
+        <hash alg="SHA3-512">e4cbb5609c653f6c6ad18c5c6a5b695f7ed0c0e1befaad5ed077f741050a22cf64be6ff34691ed22079dd14e30337c6cf6a8e3173a0dc873ce07aa9578a28a84</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.17.0?type=jar</purl>
+      <purl>pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="distribution">
@@ -533,19 +533,20 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar">
       <group>com.github.librepdf</group>
       <name>openpdf</name>
-      <version>2.0.3</version>
+      <version>3.0.4</version>
+      <description>Open and Free PDF library. It uses the new package name `org.openpdf`.</description>
       <hashes>
-        <hash alg="MD5">0c87ddb05e934db1ddcf824266172ae2</hash>
-        <hash alg="SHA-1">2dc1fc7eddda56b16621c912e8be60b85a8d305d</hash>
-        <hash alg="SHA-256">8dcc234a767557687b4eaa66f067de09d6e9bf8c8bc7003d606f230423fe7b5a</hash>
-        <hash alg="SHA-512">14c3a4553653a7b792b55104728bec806a5036fab94375aab86a3f9b6d1e4b967f6b70a43bfb0601e5bdf08cb6187a388861163e9c97a986a2903191953321e5</hash>
-        <hash alg="SHA-384">301d75e8c5e030496996eb3e96a3e6e804371e5c1c22dce515856824caeae4d9b53cfb0e17967cfe2d878c72d24faf6c</hash>
-        <hash alg="SHA3-384">786cf6e194306c53e1997a5a3039cf9b276c2b5d596190d4cc81283e85f67286132d77f8c8aeae66ba01237b8cb9e8f2</hash>
-        <hash alg="SHA3-256">e7fca1f9f59e0f6b2924527366e11bf45b7e8bad9554dc9c5bebd815b2c9eb6c</hash>
-        <hash alg="SHA3-512">1579b9a5d7d0b4aae3ce8171ed4779751ef46bda37713e05077c541c6b3bff0b763b20836876d17739f371e0aed80cbd5a505ff676a594edff0c68e24ae6c85f</hash>
+        <hash alg="MD5">9eb85871cd0e707dddaf9cf8d6561e2c</hash>
+        <hash alg="SHA-1">973d0c4427a43a94f83c8d3d62415553b6e247a5</hash>
+        <hash alg="SHA-256">838993e2be202e31ac9ba72305fb8c1f51165df51e4ca4f02e68d491436772ec</hash>
+        <hash alg="SHA-512">049e396613d3eef191ea2e5f39a1e6612e7c3fad83554743de2b102643da7dc1170df5033fa04b32ba799332ed1e234111c59d0cc9e7fd49a78db2e2801f4e7c</hash>
+        <hash alg="SHA-384">5bc5cfbdae5a19efa39696d9d216c862810f04435e978181813a573bef4dfb931e898178862afd38349f9e5c44b79475</hash>
+        <hash alg="SHA3-384">1d00bfefb9721ae9019001424da535d29c5cb1c37cb8a9e4c930e5dc715c5bc6634e26edd63a03548b6e832a238f8dff</hash>
+        <hash alg="SHA3-256">cef7a48e18910a73df54f946cbd9c05f9f47eeb8594d4a97c62320b493c4a8fe</hash>
+        <hash alg="SHA3-512">959ea5b907080acde930001dada3f5182a2a173c850fb21e5c4314a8a138bc843b9212bba43e1cd9cdcff858318521b77295d635b20dc7b0a3d6a3cb54bcfffc</hash>
       </hashes>
       <licenses>
         <license>
@@ -557,7 +558,7 @@ of Jackson components maintained by FasterXML.com</description>
           <url>https://www.mozilla.org/en-US/MPL/2.0/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar</purl>
+      <purl>pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -1228,21 +1229,21 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar">
       <publisher>TNG Technology Consulting GmbH</publisher>
       <group>com.tngtech.archunit</group>
       <name>archunit</name>
-      <version>1.3.2</version>
+      <version>1.4.2</version>
       <description>A Java architecture test library, to specify and assert architecture rules in plain Java - Module 'archunit'</description>
       <hashes>
-        <hash alg="MD5">e07bba27c042b98d3430d9d3a735ee49</hash>
-        <hash alg="SHA-1">688c4dd3e0ef7eb8b6225afbd530910d6c69bc35</hash>
-        <hash alg="SHA-256">e170d48f34e7167659fc58f53eb89b7c714ca6108e9a11164e60012ecf8119da</hash>
-        <hash alg="SHA-512">d71d61a3a420d1a409bb34f181092dad205d38d241b1401402a13d1b38afe9411c08d4f1fadb96e24dec2097e4398a13477ba622480abb6ae0be18c1703d0e25</hash>
-        <hash alg="SHA-384">f667e3f083f89cc71f54ceb3df41fd13c85d9751d290bba39aa2767dde5db73792f20e72713b750a93af15979c40224a</hash>
-        <hash alg="SHA3-384">1b6dda729cc8eb9eab517a47b0e305637bd84d4f2c47e63f049ce5b2715519352e5e298941dd453bd8eef8e1e799d2e7</hash>
-        <hash alg="SHA3-256">ad8ad9a30c2d05535ca37defa35de47d7816c573f427b9728ffc2b47bc1b32e0</hash>
-        <hash alg="SHA3-512">aff3fc7be315e6ff17d9bfa39d18038612cc942eb5361e55a1d90feb5fb9fe98104348aa09c0d9a13a88bffd8f59903e2d4ac8a7a563ee456e060711e0609462</hash>
+        <hash alg="MD5">956396ed98260153ffee39be34cb37e1</hash>
+        <hash alg="SHA-1">41efd6bf14ed4f016b3efbfc4cf73b88b1d4e0a7</hash>
+        <hash alg="SHA-256">6d8adf69a3f109ebe1b395764feb07f919e9e0e2ab5e2ea141d2e6251ba7d17f</hash>
+        <hash alg="SHA-512">591e336a7426fc6bc4abb22e590c98ae696d3a6bfa9a2a95f9da9c6bc5ac58fc4c05085072c033d0c00a46111587d789f56f9503b2bbc3001a34ce01ad1ccb8d</hash>
+        <hash alg="SHA-384">c52023aa464bb4cc4ebe41559a9a469a86e12df838af0b36f237fe321a218a85099cc1a24bd9b358e69c024e3301cef2</hash>
+        <hash alg="SHA3-384">a362253153db4b18857c8e14437134bed762a15239a8c3e384b4486876d73c00a08d59609a711276cc5079a7430bf663</hash>
+        <hash alg="SHA3-256">6b206714ada5b37e23217d471ed394c74fab6aa4c5df58deb14f8719ecbfba86</hash>
+        <hash alg="SHA3-512">ed5a521c0cfa8ae1463830dfe7703b42ce92975f8e0ebd76c2958943055ea3742dcca507a809c90de91b0b20b2420790cbe52b7779d35ec4a69ea28fa3205f7c</hash>
       </hashes>
       <licenses>
         <license>
@@ -1252,7 +1253,7 @@ of Jackson components maintained by FasterXML.com</description>
           <id>BSD-4-Clause</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar</purl>
+      <purl>pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -2312,20 +2313,20 @@ file comparators, endian transformation classes, and much more.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.43?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.47?type=jar">
       <group>io.swagger.core.v3</group>
       <name>swagger-annotations-jakarta</name>
-      <version>2.2.43</version>
+      <version>2.2.47</version>
       <description>swagger-annotations-jakarta</description>
       <hashes>
-        <hash alg="MD5">140abada4feb4f061b6e4af46c44ef59</hash>
-        <hash alg="SHA-1">0dbd40253251deabb7a628a54b4550dc4fb492f4</hash>
-        <hash alg="SHA-256">c45a39314d0d3d273c90515fa51daebd6327fb034d9bde9bb4f73f1f5a9687ce</hash>
-        <hash alg="SHA-512">8f7e5c57f988ad7e7fb845e3b0ca4c972fe5dd7c580234eaab39565becec7eb9c258146ff823a6f72411fd1a81fa3e8d3e59391e741489f0332215cc0e1e245a</hash>
-        <hash alg="SHA-384">c9b74be52af5e8201bff69ea816f17c3ea009dad55130b6b122a192a7a3e00e6031f5fe8b693630dfc0df8505a199536</hash>
-        <hash alg="SHA3-384">bfd30c0342d62fdec11e02a740a4a2802de5c5566162a4db52544742153eb9e7ff348f09ac404a6a65476efa8a6cc3f7</hash>
-        <hash alg="SHA3-256">fa78ee60ff7e132facfb3e5e010c22ce2114e38cc62d044e717d68548698ab71</hash>
-        <hash alg="SHA3-512">e000571b33d857e34eee1b8ca8187bc1265a21ac9e8b91a4c6051166c88d368bc5d86cf1045fcfc3d23011d18ff82b5a3c101db029c132c52add4a5cfd83e072</hash>
+        <hash alg="MD5">8f7db8b55fef3876354176584ffc7714</hash>
+        <hash alg="SHA-1">a4e49cd45a337ad6b9111c5e12b2573d39790051</hash>
+        <hash alg="SHA-256">9b30b319f1c31993e6128d22e12652be9a688589e30c67819ed84e95b96e7f88</hash>
+        <hash alg="SHA-512">a190c5701e029179ab8834615adfdc7d1349a393b266c3603895dc324cfaaa399441dcc24817e280ec5c8777f7857d8589aa8e6a6038fcbc94d0265193f7559d</hash>
+        <hash alg="SHA-384">978e02c3dd8a26fa1eb16540d7f9f873d8d345bebddb73f3ef2784cd004d5bc00e0c4ed978d4c3f278e9d4d6c3804f07</hash>
+        <hash alg="SHA3-384">12c5021f87ff156bf3935b1537d7a73a37430becfaa6ffe82b83e3f29d17c331eb55e6663dea452eeb655e21e1ba281e</hash>
+        <hash alg="SHA3-256">e480ee5ad276277f0f38ddac409c6946bdee3a4c45e020e26a753886be7b776e</hash>
+        <hash alg="SHA3-512">c10e8f74b3f84f8ec25c5a47b7fab36d4d8acd8e34d922a5bbc5d96ffcfa683e2d620b6abe65d94292346298c4b0cfcd5d3e3d7002c8d654e43c430b863e270e</hash>
       </hashes>
       <licenses>
         <license>
@@ -2333,26 +2334,26 @@ file comparators, endian transformation classes, and much more.</description>
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.43?type=jar</purl>
+      <purl>pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.47?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.43?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.47?type=jar">
       <group>io.swagger.core.v3</group>
       <name>swagger-core-jakarta</name>
-      <version>2.2.43</version>
+      <version>2.2.47</version>
       <description>swagger-core-jakarta</description>
       <hashes>
-        <hash alg="MD5">d02ddea75ba02aa9350e3892a0348a46</hash>
-        <hash alg="SHA-1">500566364be54e3556bcec28922a41ca5fcc7dcd</hash>
-        <hash alg="SHA-256">7919c677ad4df57a543c6e0531817435d78865cdffd691be08b85be52f4e422d</hash>
-        <hash alg="SHA-512">2e7659064db892a9bfc92daae7013fbce8dc9ea886d900185a61ffff374d267fb44caf72958f9306902b9888489760d073264613413d3ac017fa42596c587d95</hash>
-        <hash alg="SHA-384">518ef4e1ce5b61c41f7f875b37051f211f8f2f2408814de9e8af6da95159120e3b9b5158ccb2520a1cd9142ea6e0efcf</hash>
-        <hash alg="SHA3-384">1ce089b8916aaa558f3935cc148db05ef35795628eb70190253566058054394658c4e35a7087da4691445fac989a9039</hash>
-        <hash alg="SHA3-256">d40f1c39466c3dfad75aa15e59fc28c9210fd2f823cd32a11210ce894626419e</hash>
-        <hash alg="SHA3-512">73c5ea5acfd0ff4cb77fa3e7aeaa169d0fe5856d3b9e80a82c19e0a4f7789b79788b805e6596ea1e6b926ae0cd524a90d68c39151a3f946fd60d296c9f2e6f2d</hash>
+        <hash alg="MD5">eaecfbc9fd996954eb2a3cb16c058770</hash>
+        <hash alg="SHA-1">dfc9823d4661ab1caa06f55977e15af795d3328e</hash>
+        <hash alg="SHA-256">e63b78c1e5b049e6670ca9bb43c3f35cf362ecc08ac59a783994a6a732a7d7eb</hash>
+        <hash alg="SHA-512">77b74ff1784952bb11c174171e2cd90186603d29d2bd140c83cdf716a469a2f14f655e889050c971a4240d497390ab1228bdd4cb6f9ee8fad0cd2926933baf6b</hash>
+        <hash alg="SHA-384">cc1a043eec4c6d8094d876733f2cc36830895040426f5a1c516a16cf06bcf1778f5f7d9a15d2c94635be6cd869066058</hash>
+        <hash alg="SHA3-384">6ecf4280c9f77578166a790b33211162cadaf2489481520968480854657349d993b84a77c3c53b6663d7c45aa5317818</hash>
+        <hash alg="SHA3-256">3553a1e410d1ab35bc8a7d9aa85f51b709535b49a8b25cf3d3e1a28d88623e8f</hash>
+        <hash alg="SHA3-512">c2bd0e05b36928b080fcc42af1469f929439797e593d3cdabc5a2189b78edd81af057d3c5da2a41393e3b21e6aba2328bf3d2a9fa6a3d325c8dde27014b13c1f</hash>
       </hashes>
       <licenses>
         <license>
@@ -2360,26 +2361,26 @@ file comparators, endian transformation classes, and much more.</description>
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.43?type=jar</purl>
+      <purl>pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.47?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.43?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.47?type=jar">
       <group>io.swagger.core.v3</group>
       <name>swagger-models-jakarta</name>
-      <version>2.2.43</version>
+      <version>2.2.47</version>
       <description>swagger-models-jakarta</description>
       <hashes>
-        <hash alg="MD5">23d0d0c272c373049db225ddee7a3787</hash>
-        <hash alg="SHA-1">a68f7470eb763609878460272000f260eabc24dc</hash>
-        <hash alg="SHA-256">1cd638383e1b553030a0fd863010500f4de6d97ad5b3757108098df73f0c7e86</hash>
-        <hash alg="SHA-512">06254140a8535f68ac18ab141b0f2afa0899f5645ba5e164e408293bf90d73a030b049eb3881611f1bb606af4df01665627e80b1bf58117927cc468739b6316b</hash>
-        <hash alg="SHA-384">45aa886e1182a3f52c1f14029ac8b96acf27d49366991c84386616c6bdd6b5ea66742e0f537d7790e57fe7da8b994d4c</hash>
-        <hash alg="SHA3-384">46f8e089965b3e099a5a7939b22ea4df92eb6d276202c63c8d3393075141613a4abf762faa139027caff6f1543a60fe6</hash>
-        <hash alg="SHA3-256">4da9a20751dfe34d74fb5a1f2da7d329a32b8bc35e45c20d0256e0070d7c0dae</hash>
-        <hash alg="SHA3-512">95d5a90fc97648614469588dc804deceef319cb5c9bedbc0dd4a0adb8271f21c34caba066ca70d6273e21767696884a7ee4fdc57ae58db0633649856ce2826b2</hash>
+        <hash alg="MD5">5496b57f391b5dd816f21de5a1225b08</hash>
+        <hash alg="SHA-1">2234b19a2a855f70e33310c4339d872fca7d88fc</hash>
+        <hash alg="SHA-256">15d10f4f7eac1e02a8ff940b430c634fc9dfe08368a54dffa3216cc2dc811aa2</hash>
+        <hash alg="SHA-512">21d7709fa27e888d742987df6883042b95380fabf6a49ce3d176356fd765bb2686575132a2b25bd88d8701e587639eedd64f26cacfb7114cd0991c7cf9cbb96e</hash>
+        <hash alg="SHA-384">ca77514f5e2191019049bdcd995e8711f7d9031079ffdb7bd246015101c5e0f3ad70721ef47f6d61c0f1e66e80da6f0d</hash>
+        <hash alg="SHA3-384">919a8780c5286c8b419946986ae6723b3466c559f3a7ad482bf7a1c69336444b6225cbc14e55e1e69b504e94e3f8b458</hash>
+        <hash alg="SHA3-256">80a5dbba8c2968e9d491aa31afb33e520fec5645142ada2294e043c47087fa9c</hash>
+        <hash alg="SHA3-512">49e7e71af9c90e41487b76504b5a9955741802b87257df03b0cf6aceb781f49b5d7d5df198e4447675f8b9fb7f3c26a4ba0adde3379e19c6f11bba65231d8a72</hash>
       </hashes>
       <licenses>
         <license>
@@ -2387,7 +2388,7 @@ file comparators, endian transformation classes, and much more.</description>
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.43?type=jar</purl>
+      <purl>pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.47?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -2802,20 +2803,20 @@ file comparators, endian transformation classes, and much more.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar">
       <group>net.logstash.logback</group>
       <name>logstash-logback-encoder</name>
-      <version>8.0</version>
+      <version>9.0</version>
       <description>Provides logback encoders, layouts, and appenders to log in JSON and other formats supported by Jackson</description>
       <hashes>
-        <hash alg="MD5">c774c8e1c337b7eefcb0e591dec7b49f</hash>
-        <hash alg="SHA-1">73a2ae828d20f710be8439af3c1a53d21a62dc0f</hash>
-        <hash alg="SHA-256">81fcbde1b5a7d673d6c0d0d4f1e0f79b676f948e6b92b912e9e0b75097458bd3</hash>
-        <hash alg="SHA-512">0c7d56dad2204521f0f07fbae1193b9cdf4aa21f29dfbd34f65579ed4876a64ff9b2eba795aee49431580dc84ba60505ae4abe62367a735af257f62026a07925</hash>
-        <hash alg="SHA-384">e4c7688ee2ba99bca504226a56eb6f7cfb52fdcd7c725a141707f8fdadb6dec5d1b9ff7143c80b074a7c1ff824ec4108</hash>
-        <hash alg="SHA3-384">d4c0c8cd928b78f2b2a63a0156f4e5b28107b6887e3fc2886fa52a864d2fb3f8597dccdbc12cdc41f1fb89671c2bb427</hash>
-        <hash alg="SHA3-256">208a5707fb9bc90f4e0454aff3cc1f13d5d39c740436876f2ece785caa90ce3c</hash>
-        <hash alg="SHA3-512">f3b1d4a17ed17640b9f07085abe2311281ce000f4a6c1ea69d8649efb2a3b99595b2d1bf50d544b65e0927ee065b7eadc7a61e10553fcdee781788dcab991d3b</hash>
+        <hash alg="MD5">2fc7495427751780c3742330a4f11523</hash>
+        <hash alg="SHA-1">3a130930dcc447f399a491e85fdf3998685f1091</hash>
+        <hash alg="SHA-256">6b4b1157dcd4fdb59ce74d48330a08988725420f2fac2d882200c0cb3ffe0a7d</hash>
+        <hash alg="SHA-512">96b2d163d6cad4c4808fa4b7d3401946db970d4941e9144a4afa8ac7df0f61ea481e04478c805315c8f9f458efd05364b07d5655a8d55ce211fbeacc352ea0f0</hash>
+        <hash alg="SHA-384">0e734bc78618774a1a0baa18389c7881fd7f23850423d1e024a84cfac232272b7a1d0b4c55bf85861c0567babf1eb6d8</hash>
+        <hash alg="SHA3-384">5c5a8666462e2f1baeb50405df6d2772d6e63e626f49a3394e8dbb1fc465dbe47e57d3b1babd489386eb0806d40ef15b</hash>
+        <hash alg="SHA3-256">ba9190fb8985d4f3e08f3ddd901448d92d5692d78dae2f27177ad491056aa66f</hash>
+        <hash alg="SHA3-512">b0e0fa51e2e48bcaa9d320c0e2b7c733366bc370ade4c8a484ccc7e7a98fbb48a405795be61090b2fd89ad669ca4c14a54f0aea04c51918eba1fbb463f3efac8</hash>
       </hashes>
       <licenses>
         <license>
@@ -2826,7 +2827,7 @@ file comparators, endian transformation classes, and much more.</description>
           <url>https://opensource.org/license/mit/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar</purl>
+      <purl>pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -3995,51 +3996,51 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-core</name>
-      <version>12.3.0</version>
+      <version>12.6.1</version>
       <hashes>
-        <hash alg="MD5">a19382084bd080cb5e2522a45078e4ec</hash>
-        <hash alg="SHA-1">9e6740708ae9a5b7b9e8f014c36b72f160aa9b43</hash>
-        <hash alg="SHA-256">5605cfa3f0fe9b469b6f886510c010592aee4e2c05c49d639ebfbc1bd3c21255</hash>
-        <hash alg="SHA-512">c341e3cbc54792d9cf86b6b7d3eed3f8eb180e8d2b0d318591b6f4e048490092d8b26280d6cbea28cc3fccfabd8a5ed10b11bb496973c30ed0395bfc72b94906</hash>
-        <hash alg="SHA-384">1f129320b2a038b076d3208cc21a5c73209f1b6cc09a22b170c9ebd9e1fd6cd2982fb6bca90a44c8dbb6f2e4a521beaf</hash>
-        <hash alg="SHA3-384">94a6565253600985e1698cccaa374599bd0ffe96168e1aaf2197db9deb895992660587650e2acdb27a3891a4e66e4abb</hash>
-        <hash alg="SHA3-256">41c928804c54766ea258dac7a08ef81e720dd989e4fae533a9117518eaebffe7</hash>
-        <hash alg="SHA3-512">45565d391a085bd098bd7e1dce4120d0709bf8025af67f200f0c83798ca991a5dd01c605d90aa24338ad6ae611678465e27456c6c10a1ece10dfac4634a2ef38</hash>
+        <hash alg="MD5">f99fc5fa3f6a8b53ab3d784e53b82aae</hash>
+        <hash alg="SHA-1">d42fec034f4e56da4083dc1d5df55b0f470ad8c3</hash>
+        <hash alg="SHA-256">9a5b4be2e6193d4d42e954cae023c09c3f48cd933acb2d56c46945df08ff8a7e</hash>
+        <hash alg="SHA-512">de515533fb08953b983f3b3eb66c033fe00e82d1c70195d62c9b5b2bcc0fd7475b5db593692b74230bf220fa01737d33a477b6268f4d3be6d9f1e5939fa4b048</hash>
+        <hash alg="SHA-384">8b4d0f35d39c58b16775a89ccfc988c3c73301b69ae942aa3bd20ade4910e6e3391a7846ec2840409fe8397e0824428e</hash>
+        <hash alg="SHA3-384">dd2145e701c0a4581e95b5c85cfcf9f4d76b9eeb74048d8772e6fdc0fe89c5234f1f4760bb4a1fcc93b71904c0768597</hash>
+        <hash alg="SHA3-256">57cda60d2f430f959c8566726679e9b7f506df9d5015c0001d37c9fa3380e79c</hash>
+        <hash alg="SHA3-512">9bb6604e822a8810566521b2a6d776102120a0e91b6b1e124b64d37164a7bc8d5b4fc619f2d9180d58383ef68dfb6baee3b0802942bbf961d302ea816702fa34</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-postgresql</name>
-      <version>12.3.0</version>
+      <version>12.6.1</version>
       <hashes>
-        <hash alg="MD5">2b0ee7e99c8d03b0110292100d55028e</hash>
-        <hash alg="SHA-1">abdafe126898ef1ee9cd7fb81d4a458353d56f93</hash>
-        <hash alg="SHA-256">7b4e6453bbee0a7551acd2dfef7e0370eda01d5e1e8e85a934f85c8541927b25</hash>
-        <hash alg="SHA-512">0135b3fe7f2ce3e3a42e7c41c28bb857e4608a037daee1c37cf2c5ddf401ef12e21878351063187611b9ff2c1e5b627dfe7137faab6ea74b7c07434681234f77</hash>
-        <hash alg="SHA-384">ea7a658e4a2282f2911a4626a5f22b77ad41ea17f1fc461c37297be2c2bd7820ae413b9d97926f1313b3ad61d8b4b3ab</hash>
-        <hash alg="SHA3-384">84a6812e0517835b67f475c9fd06e5f15da1ddb93b1dac00f489d36b807a6860495d482abb4da6305d215cd29280064d</hash>
-        <hash alg="SHA3-256">e9a6124048d04483bc4960169da29e146afc72db89bbf474cd4df08db26f8c7b</hash>
-        <hash alg="SHA3-512">a78d043ef6d24da74a055ab6e969b2afc8bec83b3af7dba6b9ba02a71627c6275ae7190688dc22f513980e60c08cd01d17ec73c36a3eb57880300d0aff517a3c</hash>
+        <hash alg="MD5">b44fc20a5aaefa1ef5108b8515325a56</hash>
+        <hash alg="SHA-1">714930c5467b6426afa6647459e6c88eec0e412b</hash>
+        <hash alg="SHA-256">7679df22b77c47474d10db97531b3f9f2eab73ef3b1858f55d0e33c7883ffab0</hash>
+        <hash alg="SHA-512">c7ff42afdf3aca08b8745ff0fa8e5a23398ad20c93d93735984dcd9b7918912e71863b6eaaadd45170ea81d8744a5777998f45f23f07b4644b51129e14fd9fb4</hash>
+        <hash alg="SHA-384">137d0455095796e19109d2adc22731333c6b5cdf93883e23326b41df2aa8a66f5024cc3a674691b798d3b56d0651e6fb</hash>
+        <hash alg="SHA3-384">beb5b02562d6ef2131b1908a828db32dd449323591c94390bafb631b7ba1d1f23d66aaaacdd108f5a43d26f90c057c66</hash>
+        <hash alg="SHA3-256">4db6c03c786fef8649b185f0bebf21983332381f8accccb58db389e632cf3d74</hash>
+        <hash alg="SHA3-512">193a5ce4dab905c24224e11b3e915f4d184de844799b1ac423ec8c67e829b72cb027d00e722a1957c6c6cfe5c24b34fd08c8b230521e24a332190e572324af0f</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6250,76 +6251,76 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.3?type=jar">
       <group>org.springdoc</group>
       <name>springdoc-openapi-starter-common</name>
-      <version>3.0.2</version>
+      <version>3.0.3</version>
       <hashes>
-        <hash alg="MD5">f64a3de149c714cc742d73abd23888f1</hash>
-        <hash alg="SHA-1">2fecbcaa53ead093a694cd6317879f3b58346caf</hash>
-        <hash alg="SHA-256">3810f8b3f1dfb3fec1b37028b9e0620182bfafa2995f0aabc2b8bda5ed80c132</hash>
-        <hash alg="SHA-512">323a3130da6dd48480794a006acd7da329c73af9b9855cea039f2804c17db29ad4e8867195dc3035c3cc23b639d60bd12b42fa1f53501447d49d09a782a3e369</hash>
-        <hash alg="SHA-384">de60ffc098fe1a939f22e51ba1f0cf4a08ccf12b5bb6ec680b275a53cfe138ca0d352c7f74c4adecd92c9f2f334feacc</hash>
-        <hash alg="SHA3-384">1ac0395b62675b6500fad8f7122f216f028a898768ca40aca2cea1574002e6f50bce7a5f9f87b8911573c738372474ea</hash>
-        <hash alg="SHA3-256">06ad78650e9d4461ab511e2206a462c5f1d4f573b39257466747c6a4b2f9c313</hash>
-        <hash alg="SHA3-512">3bc345294cb82985171453e1d6f04fa14c2c9dcd3cb4da86788b28d531dd1565e81788aef3f662ccdbc4ac599f938c2d74e376f08970f2d1628de809e6d04260</hash>
+        <hash alg="MD5">8e3e30a18e13657c7ece289488c971eb</hash>
+        <hash alg="SHA-1">92c4dfa417bf276079bfe9de72ebf0961c72a2cf</hash>
+        <hash alg="SHA-256">a0b5a6a5384b4a36718fd7a69efbd48311fd5f404c96ce286a6c285c5d0038e6</hash>
+        <hash alg="SHA-512">57b0f84832f0069e48f86876edf71cfb90c6fba808ff6403f792c4a4fe3ef3e9c1efe6951c3aaebf48bd80c8d0c55216218014fbe0a53585c7685b648b304e69</hash>
+        <hash alg="SHA-384">7aad43f14ace7ac708ffea00f11a9b4feba92ec15af8ebb91c74a3c7b501bfd45f4ed22aa54243ebc37f79f13dd45aa8</hash>
+        <hash alg="SHA3-384">47e5f248e980f06d4c65d880ebbe91b9f0542ba8ba20789da16e95c4d5d5f2ca8f603f6df9947eb1f9a6f339681f67e2</hash>
+        <hash alg="SHA3-256">233c996a07c2e59ec8808322057928fe7f5693372c8dfc6d5d68646acf25bf34</hash>
+        <hash alg="SHA3-512">92b84dca1ad84ecd9d128eec95b12e0f46f55f7e42d231c7dc5a80eefa30c2e438f98dbe15d7983183c43c1fbb2e1f3c9ab269f68392fd5cd793a032293e65eb</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.2?type=jar</purl>
+      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.3?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar">
       <group>org.springdoc</group>
       <name>springdoc-openapi-starter-webmvc-api</name>
-      <version>3.0.2</version>
+      <version>3.0.3</version>
       <hashes>
-        <hash alg="MD5">e31dcd029ea81983caf3fb25e64f6e02</hash>
-        <hash alg="SHA-1">d303ea8773ee04b09cfd6d23ec63e2014a04ffbc</hash>
-        <hash alg="SHA-256">1ded576f60a5292c276dc3d1707cf9c24513dcc19f74ed8628ec0677e034209f</hash>
-        <hash alg="SHA-512">ca16728f82e41747112aa76d1fd662a56fbec5a31242336bbf2bc475a0c4b7d764c294a811caba5425b08989f8db4678dfad0a4bde79414e5dd0407446984b60</hash>
-        <hash alg="SHA-384">b094d928e971d38546203f02e862f446fb47ba4d938cc99a684d64b2091eba4a1d80b39f98db421d0be53181fdbad764</hash>
-        <hash alg="SHA3-384">14776fc86efeca8daa57f92984e1d93973c16577865eb20ca1828ad0747d16752ff3da1a217b3e24171bcb9d6eb5a4ae</hash>
-        <hash alg="SHA3-256">b86c25bfce7226124155db71950f3ab75453ab0d7c08a9977e5007f95ea64cab</hash>
-        <hash alg="SHA3-512">58a56113ec1946f90ad187423dacb9d3dff424eca0241baeb88b0e056cf24469d8ef12501919da2f2b3428d3bb64404758052ca33ad59f7ba4a3f1a8a4f8c9fa</hash>
+        <hash alg="MD5">4e18f6358d4261b0720bb92f3a1cb2e6</hash>
+        <hash alg="SHA-1">771990e842f24aca1a949bce86b3645d7bd8edc1</hash>
+        <hash alg="SHA-256">c7e0221797240037eaf20c834f2d03fabec3f26051bd7052be8bf169f2c02876</hash>
+        <hash alg="SHA-512">a64e148e362ddb74d8555e8899d142813c855bc0f5ef2b8d7c25763946bd1928cc3c897c56b8acf0a67b61875c90a3c7c2d1e70182835f646b90cb15b69d9007</hash>
+        <hash alg="SHA-384">63e8793872783a44cdfa628de044191ea11fa320ead901131f4e877f6c9b97d9ae7c0087220a31605972c992d3bb0da8</hash>
+        <hash alg="SHA3-384">9d77c255ce90418f4c6034fd43adb42cacf1186acb0bd0251885973bce98edecd73803a4370c1b100f4e92f1c6c97820</hash>
+        <hash alg="SHA3-256">1b609391091ae62e408807cceb8299105b8f04b01e7d56de9957dad169fb84d4</hash>
+        <hash alg="SHA3-512">9e7a26d03c115f3416c5869611cb622d58f7429c8e29632ed47d28e7505e628146feacbe3aba64dbb8ea82b5aaacaa0c4ab3325cdef8ba8395187db4fd98d1a8</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.2?type=jar</purl>
+      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar">
       <group>org.springdoc</group>
       <name>springdoc-openapi-starter-webmvc-ui</name>
-      <version>3.0.2</version>
+      <version>3.0.3</version>
       <hashes>
-        <hash alg="MD5">1a83af5916db838e83bbfbde456219ed</hash>
-        <hash alg="SHA-1">1738afcba73376b364b2c023b6142936078da5e4</hash>
-        <hash alg="SHA-256">59c678e4313f440ff173ce703db43d2f761a8159f6b7285604bd63e20a868169</hash>
-        <hash alg="SHA-512">18e02ce4d1ee97f30b1de0b0ca0e6c2f410af2110221214067f7f3365d53171a52c4fe0c454f07a9753fd535f044ce0071c65704c9a47d39241650804d5778ac</hash>
-        <hash alg="SHA-384">d7085137c42b8eca67a65383e42e7edc050cd66c1f2764538bd57d05b7fbd6b6ebd88fe7d235e4a9d03cdbe94a04f3df</hash>
-        <hash alg="SHA3-384">91c8ebc79cf6310ea7b55ca977f82f71d34c8ea197639f6a04e726ab193d43ffc738da3a0864f14c1f5779bb6f99c525</hash>
-        <hash alg="SHA3-256">9af9c81174f157140fac19fbda56da2b9cdecc717b75b06a456ef3fea881db30</hash>
-        <hash alg="SHA3-512">0ea0bf42010f0b3e003f77d4bab42406fa533480f61d21b8c6439ac11ac8bb5d51089062d71a416699713101354618a8155653109889933f25e11662e231a7a1</hash>
+        <hash alg="MD5">fc3102ffe8ff4d63d54dd031cd87df8a</hash>
+        <hash alg="SHA-1">7445824e3ce2baaf413ef2c8d2e95eafc894ab75</hash>
+        <hash alg="SHA-256">cdb30a903b5f98eb751f59614f38f807418f1efba639f6ede0b06de35449b8d2</hash>
+        <hash alg="SHA-512">97f5e7802a5fba281bb6075818156cde52706b6725dffe0008e9a252f40181069188cff6feb099b232cfb5c8d07383624d4d6ee14cbf9547631bc0fec449ebd1</hash>
+        <hash alg="SHA-384">389ad02f5cb4163323df599f49a5be4ad0447e6b6d88d63f585d3c4cf4b5bd6de863dcf601e9f782ffbef9c4208ad604</hash>
+        <hash alg="SHA3-384">ed3242fcf62e4096e9aee26076972ec68d6e1c25b093f7b1ebc7e05309e471233a2063ab95fb22c9581959d6a3c9bebf</hash>
+        <hash alg="SHA3-256">890a5f61abf8fac78e15e7e38dbc6b63afd3fec9888eb7f2593a6fe1cfdf7c09</hash>
+        <hash alg="SHA3-512">c3fa6165d44890919fbbc8fff5e07ea0d8fc1ee1a9e539cabea4840f63c4ba1a5923616ebf11e460f5010dc6c7fc48d2e9c9ceff38bcf4d360b0a8cb6f5d0338</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.2?type=jar</purl>
+      <purl>pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -9296,20 +9297,20 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.webjars/swagger-ui@5.32.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar">
       <group>org.webjars</group>
       <name>swagger-ui</name>
-      <version>5.32.0</version>
+      <version>5.32.2</version>
       <description>WebJar for Swagger UI</description>
       <hashes>
-        <hash alg="MD5">0cd07cba3e4541e316c0494a0cb19615</hash>
-        <hash alg="SHA-1">d04c7e3e5b8616813136fa36382a548751775528</hash>
-        <hash alg="SHA-256">c542227b75e703ffdc460254728799ed578b4e045bc7284de457aa1e48eca423</hash>
-        <hash alg="SHA-512">874ae884af4d22a52baf83868a0618121d37283f5de545539f0e25114e8dddf765afee068c390741e7649699aa3aecb5727c372dd68ed816c59116401c075387</hash>
-        <hash alg="SHA-384">382ce059980d76aaf556e11c3a80e30fadd767f25d12c8188cf08edf713d54acf965ef1183f004c2bb8784128a92b7c5</hash>
-        <hash alg="SHA3-384">2a02ab643a66b0ed84941fba31de37b8d185a43653eca599ee75d236e5866560916f81b7dde0ac72ec415fd98a103b6e</hash>
-        <hash alg="SHA3-256">6a584dce516b02d9ebdc9e9b6ee0646e698a6ec89ae7bc0df31f706357ca171d</hash>
-        <hash alg="SHA3-512">13cddb84847912e5b0dd44ad3a104a69073f36623ef420d9e446ddcef54d5b2c624014d97606975e10286ba54b6c15ab8182852e94e330c1f0f20c2b1dfcd77f</hash>
+        <hash alg="MD5">c0a4b73b7e478088b3f3aef172cc83a3</hash>
+        <hash alg="SHA-1">7ab64d00ba57cf2bbca5b64588f5fd540422351c</hash>
+        <hash alg="SHA-256">1db1386611b1f3d71cc8acc6a1898c3b514060ad01055bae904e24969d591ed0</hash>
+        <hash alg="SHA-512">9c64c727467584d8b747a2a1734aab0af80183d88b9607a367c73b86353b33a5b415def0843cf0a298aa59f5312f7e082af45fcbdbcfb260e01c296c18184854</hash>
+        <hash alg="SHA-384">8f6d0c532c84051e8d6f20d351c741cd35355018f9fe86b6e5f5276bf8068f976406fabb2ce043bb19ceed7cf8cefe2d</hash>
+        <hash alg="SHA3-384">c065cfc1fa1812b57edda97f17f0f588f1bf28aeee27a7477e48dbb30f43eb27504851a974c5492536977c0a4d03c3cc</hash>
+        <hash alg="SHA3-256">9af70b43efbec17b4a9eab1358ea0f4dc4e660e46a5d8c4a5ae5f588aaf053b1</hash>
+        <hash alg="SHA3-512">08df588c1fc0aafb4cf6dc340cb06b7b0edfd962c0a4f7953e14c65e3a09dfd78a0bf565aa316bde1070cc05602bd845faa4c0a17b3da2aa7c1aa3c21ef693c8</hash>
       </hashes>
       <licenses>
         <license>
@@ -9317,7 +9318,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.webjars/swagger-ui@5.32.0?type=jar</purl>
+      <purl>pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9564,7 +9565,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/ch.qos.logback/logback-core@1.5.32?type=jar"/>
     <dependency ref="pkg:maven/com.beust/jcommander@1.82?type=jar"/>
-    <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.17.0?type=jar"/>
+    <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.2?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.2?type=pom"/>
@@ -9602,7 +9603,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.github.docker-java/docker-java-transport@3.7.1?type=jar"/>
-    <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar"/>
+    <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar"/>
     <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar">
       <dependency ref="pkg:maven/com.google.code.findbugs/jsr305@3.0.2?type=jar"/>
       <dependency ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom"/>
@@ -9684,7 +9685,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>
-    <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar">
+    <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.vaadin.external.google/android-json@0.0.20131108.vaadin1?type=jar"/>
@@ -9699,18 +9700,18 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/commons-io/commons-io@2.20.0?type=jar"/>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
     <dependency ref="pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
-      <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.17.0?type=jar"/>
+      <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar"/>
-      <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.0.3?type=jar"/>
+      <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar"/>
       <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar"/>
-      <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.3.2?type=jar"/>
-      <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar"/>
+      <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar"/>
+      <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
       <dependency ref="pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
@@ -9724,7 +9725,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.projectlombok/lombok@1.18.46?type=jar"/>
       <dependency ref="pkg:maven/org.semver4j/semver4j@6.0.0?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-simple@2.0.17?type=jar"/>
-      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.2?type=jar"/>
+      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-devtools@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.0.6?type=jar"/>
@@ -9911,21 +9912,21 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"/>
       <dependency ref="pkg:maven/org.reactivestreams/reactive-streams@1.0.4?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.43?type=jar"/>
-    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.43?type=jar">
+    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.47?type=jar"/>
+    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.47?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar"/>
-      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.43?type=jar"/>
-      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.43?type=jar"/>
+      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.47?type=jar"/>
+      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.47?type=jar"/>
       <dependency ref="pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar"/>
       <dependency ref="pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.4?type=jar"/>
       <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.19.0?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
       <dependency ref="pkg:maven/org.yaml/snakeyaml@2.5?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.43?type=jar">
+    <dependency ref="pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.47?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
@@ -9944,8 +9945,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy-agent@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.bytebuddy/byte-buddy@1.17.8?type=jar"/>
     <dependency ref="pkg:maven/net.java.dev.jna/jna@5.18.1?type=jar"/>
-    <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0?type=jar">
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
+    <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar">
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/net.minidev/accessors-smart@2.6.0?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.7.1?type=jar"/>
@@ -10056,11 +10057,11 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar">
       <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar">
+    <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar">
       <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.2?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.3.0?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.3.0?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.6?type=jar">
       <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>
@@ -10260,21 +10261,21 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.slf4j/slf4j-simple@2.0.17?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.2?type=jar">
-      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.43?type=jar"/>
+    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.3?type=jar">
+      <dependency ref="pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.47?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-autoconfigure@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-jackson@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-validation@4.0.6?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.2?type=jar">
-      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.2?type=jar"/>
+    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar">
+      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.0.3?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-web-server@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-webmvc@4.0.6?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.2?type=jar">
-      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.2?type=jar"/>
-      <dependency ref="pkg:maven/org.webjars/swagger-ui@5.32.0?type=jar"/>
+    <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar">
+      <dependency ref="pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar"/>
+      <dependency ref="pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar"/>
       <dependency ref="pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@4.0.6?type=jar">
@@ -10682,7 +10683,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.rnorth.duct-tape/duct-tape@1.0.8?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.webjars/swagger-ui@5.32.0?type=jar"/>
+    <dependency ref="pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar"/>
     <dependency ref="pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar">
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"/>
     </dependency>

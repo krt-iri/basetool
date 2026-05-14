@@ -1,12 +1,24 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
+/** Operation JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -15,21 +27,22 @@ import java.util.UUID;
 @ToString(exclude = {"missions"})
 public class Operation extends AbstractEntity<UUID> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @Column(nullable = false)
-    private String name;
+  @Column(nullable = false)
+  private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+  @Column(columnDefinition = "TEXT")
+  private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private OperationStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private OperationStatus status;
 
-    @OneToMany(mappedBy = "operation")
-    @OrderBy("plannedStartTime DESC")
-    private Set<Mission> missions = new HashSet<>();
+  @OneToMany(mappedBy = "operation")
+  @OrderBy("plannedStartTime DESC")
+  private Set<Mission> missions = new HashSet<>();
 }

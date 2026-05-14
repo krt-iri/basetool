@@ -24,8 +24,8 @@ import lombok.ToString;
  *
  * <ul>
  *   <li>{@code Mission.owner} itself is marked with {@code @OptimisticLock(excluded = true)} so
- *       that changing the owner does NOT bump the parent {@code Mission.version} and therefore
- *       does not invalidate other users' open forms on the same mission.
+ *       that changing the owner does NOT bump the parent {@code Mission.version} and therefore does
+ *       not invalidate other users' open forms on the same mission.
  *   <li>To still prevent lost updates on concurrent owner changes, this entity maintains an own
  *       {@code @Version} counter on a 1:1 companion row keyed by {@code mission_id}.
  *   <li>Callers (service layer) change the owner transactionally via this entity and mirror the
@@ -35,7 +35,8 @@ import lombok.ToString;
 @Entity
 @Table(
     name = "mission_ownership",
-    uniqueConstraints = @UniqueConstraint(name = "uk_mission_ownership_mission", columnNames = "mission_id"))
+    uniqueConstraints =
+        @UniqueConstraint(name = "uk_mission_ownership_mission", columnNames = "mission_id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,15 +44,16 @@ import lombok.ToString;
 @ToString(exclude = {"mission", "owner"})
 public class MissionOwnership extends AbstractEntity<UUID> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @OneToOne
-    @JoinColumn(name = "mission_id", nullable = false, unique = true)
-    private Mission mission;
+  @OneToOne
+  @JoinColumn(name = "mission_id", nullable = false, unique = true)
+  private Mission mission;
 
-    @ManyToOne
-    @JoinColumn(name = "owner_id")
-    private User owner;
+  @ManyToOne
+  @JoinColumn(name = "owner_id")
+  private User owner;
 }

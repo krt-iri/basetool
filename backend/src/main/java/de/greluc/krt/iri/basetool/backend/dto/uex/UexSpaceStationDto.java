@@ -3,6 +3,11 @@ package de.greluc.krt.iri.basetool.backend.dto.uex;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 
+/**
+ * Inbound JSON record for UEX Corp's <code>/space_stations</code> endpoint. Mapped to the project's
+ * own {@code SpaceStation} entity by {@code UexUniverseSyncService}; downstream code consumes the
+ * entity, not this DTO.
+ */
 @Builder
 public record UexSpaceStationDto(
     @JsonProperty("is_available") Integer isAvailable,
@@ -40,9 +45,9 @@ public record UexSpaceStationDto(
     @JsonProperty("moon_name") String moonName,
     @JsonProperty("city_name") String cityName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("jurisdiction_name") String jurisdictionName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("jurisdiction_name") String jurisdictionName) {
+  /** Returns {@code true} iff UEX reports the space station as currently reachable in-game. */
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

@@ -1,15 +1,22 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
-import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import jakarta.persistence.EntityManager;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,152 +24,140 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class HangarServiceTest {
 
-    @Mock
-    private ShipRepository shipRepository;
-    @Mock
-    private ShipTypeRepository shipTypeRepository;
-    @Mock
-    private LocationRepository locationRepository;
-    @Mock
-    private MissionUnitRepository missionUnitRepository;
-    @Mock
-    private EntityManager entityManager;
+  @Mock private ShipRepository shipRepository;
+  @Mock private ShipTypeRepository shipTypeRepository;
+  @Mock private LocationRepository locationRepository;
+  @Mock private MissionUnitRepository missionUnitRepository;
+  @Mock private EntityManager entityManager;
 
-    @InjectMocks
-    private HangarService hangarService;
+  @InjectMocks private HangarService hangarService;
 
-    @Test
-    void testUpdateShipOptimisticLocking_ThrowsWhenVersionsDiffer() {
-        UUID userId = UUID.randomUUID();
-        UUID shipId = UUID.randomUUID();
-        
-        User owner = new User();
-        owner.setId(userId);
-        
-        Ship ship = new Ship();
-        ship.setId(shipId);
-        ship.setVersion(1L);
-        ship.setOwner(owner);
+  @Test
+  void testUpdateShipOptimisticLocking_ThrowsWhenVersionsDiffer() {
+    UUID userId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
 
-        when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    User owner = new User();
+    owner.setId(userId);
 
-        ShipRequestDto request = new ShipRequestDto(
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setVersion(1L);
+    ship.setOwner(owner);
+
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+
+    ShipRequestDto request =
+        new ShipRequestDto(
             "Test", UUID.randomUUID(), "LTI", null, false, 0L // different version
-        );
+            );
 
-        assertThrows(ObjectOptimisticLockingFailureException.class, () -> 
-            hangarService.updateShip(userId, shipId, request)
-        );
-    }
-    
-    // ---- deleteAllShipsForUser ----
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> hangarService.updateShip(userId, shipId, request));
+  }
 
-    @Test
-    void deleteAllShipsForUser_DeletesAllShipsAndUnlinksUnits() {
-        // Given
-        UUID userId = UUID.randomUUID();
-        UUID shipId1 = UUID.randomUUID();
-        UUID shipId2 = UUID.randomUUID();
+  // ---- deleteAllShipsForUser ----
 
-        Ship ship1 = new Ship();
-        ship1.setId(shipId1);
-        Ship ship2 = new Ship();
-        ship2.setId(shipId2);
+  @Test
+  void deleteAllShipsForUser_DeletesAllShipsAndUnlinksUnits() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    UUID shipId1 = UUID.randomUUID();
+    UUID shipId2 = UUID.randomUUID();
 
-        de.greluc.krt.iri.basetool.backend.model.MissionUnit unit = new de.greluc.krt.iri.basetool.backend.model.MissionUnit();
-        unit.setShip(ship1);
+    Ship ship1 = new Ship();
+    ship1.setId(shipId1);
+    Ship ship2 = new Ship();
+    ship2.setId(shipId2);
 
-        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
-        when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
-        when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
+    de.greluc.krt.iri.basetool.backend.model.MissionUnit unit =
+        new de.greluc.krt.iri.basetool.backend.model.MissionUnit();
+    unit.setShip(ship1);
 
-        // When
-        hangarService.deleteAllShipsForUser(userId);
+    when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
+    when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
+    when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
 
-        // Then
-        verify(missionUnitRepository, times(1)).save(unit);
-        assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
-        verify(entityManager, times(1)).flush();
-        verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
-    }
+    // When
+    hangarService.deleteAllShipsForUser(userId);
 
-    @Test
-    void deleteAllShipsForUser_NoShips_DoesNothing() {
-        // Given
-        UUID userId = UUID.randomUUID();
-        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of());
+    // Then
+    verify(missionUnitRepository, times(1)).save(unit);
+    assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
+    verify(entityManager, times(1)).flush();
+    verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
+  }
 
-        // When
-        hangarService.deleteAllShipsForUser(userId);
+  @Test
+  void deleteAllShipsForUser_NoShips_DoesNothing() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    when(shipRepository.findByOwnerId(userId)).thenReturn(List.of());
 
-        // Then
-        verify(missionUnitRepository, never()).findByShipId(any());
-        verify(shipRepository, never()).deleteAll(anyList());
-        verify(entityManager, never()).flush();
-    }
+    // When
+    hangarService.deleteAllShipsForUser(userId);
 
-    @Test
-    void deleteAllShipsForUser_OnlyDeletesOwnShips() {
-        // Given
-        UUID userId = UUID.randomUUID();
-        UUID otherUserId = UUID.randomUUID();
-        UUID shipId = UUID.randomUUID();
+    // Then
+    verify(missionUnitRepository, never()).findByShipId(any());
+    verify(shipRepository, never()).deleteAll(anyList());
+    verify(entityManager, never()).flush();
+  }
 
-        Ship ship = new Ship();
-        ship.setId(shipId);
+  @Test
+  void deleteAllShipsForUser_OnlyDeletesOwnShips() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
 
-        // Only ships of userId are returned by repository (user isolation guaranteed by query)
-        when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
-        when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
+    Ship ship = new Ship();
+    ship.setId(shipId);
 
-        // When
-        hangarService.deleteAllShipsForUser(userId);
+    // Only ships of userId are returned by repository (user isolation guaranteed by query)
+    when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
+    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
-        // Then
-        verify(shipRepository, times(1)).findByOwnerId(userId);
-        verify(shipRepository, never()).findByOwnerId(otherUserId);
-        verify(shipRepository, times(1)).deleteAll(List.of(ship));
-    }
+    // When
+    hangarService.deleteAllShipsForUser(userId);
 
-    @Test
-    void testUpdateShipOptimisticLocking_SucceedsWhenVersionsMatch() {
-        UUID userId = UUID.randomUUID();
-        UUID shipId = UUID.randomUUID();
-        UUID typeId = UUID.randomUUID();
-        
-        User owner = new User();
-        owner.setId(userId);
-        
-        Ship ship = new Ship();
-        ship.setId(shipId);
-        ship.setVersion(1L);
-        ship.setOwner(owner);
-        
-        ShipType type = new ShipType();
-        type.setId(typeId);
+    // Then
+    verify(shipRepository, times(1)).findByOwnerId(userId);
+    verify(shipRepository, never()).findByOwnerId(otherUserId);
+    verify(shipRepository, times(1)).deleteAll(List.of(ship));
+  }
 
-        when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
-        when(shipTypeRepository.findById(typeId)).thenReturn(Optional.of(type));
-        when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+  @Test
+  void testUpdateShipOptimisticLocking_SucceedsWhenVersionsMatch() {
+    UUID userId = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    UUID typeId = UUID.randomUUID();
 
-        ShipRequestDto request = new ShipRequestDto(
+    User owner = new User();
+    owner.setId(userId);
+
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setVersion(1L);
+    ship.setOwner(owner);
+
+    ShipType type = new ShipType();
+    type.setId(typeId);
+
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(shipTypeRepository.findById(typeId)).thenReturn(Optional.of(type));
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    ShipRequestDto request =
+        new ShipRequestDto(
             "Test", typeId, "LTI", null, false, 1L // matching version
-        );
+            );
 
-        hangarService.updateShip(userId, shipId, request);
-        
-        verify(shipRepository, times(1)).save(ship);
-    }
+    hangarService.updateShip(userId, shipId, request);
+
+    verify(shipRepository, times(1)).save(ship);
+  }
 }

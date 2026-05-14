@@ -1,10 +1,18 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
+/** Refining Method JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -13,22 +21,23 @@ import java.util.UUID;
 @AllArgsConstructor
 public class RefiningMethod extends AbstractEntity<UUID> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private String name;
+  @Column(nullable = false, unique = true)
+  private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+  @Column(columnDefinition = "TEXT")
+  private String description;
 
-    @Column(unique = true)
-    private String code;
+  @Column(unique = true)
+  private String code;
 
-    private Integer ratingYield;
+  private Integer ratingYield;
 
-    private Integer ratingCost;
+  private Integer ratingCost;
 
-    private Integer ratingSpeed;
+  private Integer ratingSpeed;
 }

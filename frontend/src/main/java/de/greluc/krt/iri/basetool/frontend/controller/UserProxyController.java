@@ -1,5 +1,9 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -7,26 +11,38 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 
-import java.util.List;
-import java.util.Map;
-
+/**
+ * Thin REST proxy for the user-autocomplete used by participant/owner pickers.
+ *
+ * <p>Browser-side JS calls land on {@code /users/search} (no {@code /api/} prefix because Spring
+ * Security treats this path as authenticated-only-by-default); the controller forwards to the
+ * backend {@code /api/v1/users/search} with the bearer token attached by {@link BackendApiClient}.
+ * The page size is hardcoded at 1000 and sorted by username — autocomplete lists are short, so a
+ * single page covers any realistic squadron.
+ */
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserProxyController {
 
-    private final BackendApiClient backendApiClient;
+  private final BackendApiClient backendApiClient;
 
-    @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> searchUsers(@RequestParam String query) {
-        PageResponse<Map<String, Object>> response = backendApiClient.get(
-                "/api/v1/users/search?query=" + query + "&size=1000&sort=username,asc",
-                new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {}
-        );
-        return response != null && response.content() != null ? response.content() : List.of();
-    }
+  /**
+   * Forwards the autocomplete query to the backend search endpoint and unwraps the page payload
+   * into a flat list. Empty list on backend failure or missing content — the autocomplete renders
+   * an empty result rather than surfacing the error.
+   *
+   * @param query free-text query to forward to the backend
+   * @return matching user records (raw JSON maps), never {@code null}
+   */
+  @GetMapping("/search")
+  @PreAuthorize("isAuthenticated()")
+  public List<Map<String, Object>> searchUsers(@RequestParam String query) {
+    PageResponse<Map<String, Object>> response =
+        backendApiClient.get(
+            "/api/v1/users/search?query=" + query + "&size=1000&sort=username,asc",
+            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    return response != null && response.content() != null ? response.content() : List.of();
+  }
 }

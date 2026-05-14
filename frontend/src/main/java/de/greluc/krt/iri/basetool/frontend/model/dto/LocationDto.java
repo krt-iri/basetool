@@ -2,11 +2,5 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
-public record LocationDto(
-        UUID id,
-        String name,
-        String description,
-        boolean hidden,
-        Long version
-) {
-}
+/** Data transfer record carrying Location payload. */
+public record LocationDto(UUID id, String name, String description, boolean hidden, Long version) {}

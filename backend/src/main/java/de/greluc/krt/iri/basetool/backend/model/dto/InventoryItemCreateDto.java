@@ -1,13 +1,13 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import de.greluc.krt.iri.basetool.backend.validation.QuantityAware;
+import de.greluc.krt.iri.basetool.backend.validation.ValidQuantityAmount;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-import de.greluc.krt.iri.basetool.backend.validation.QuantityAware;
-import de.greluc.krt.iri.basetool.backend.validation.ValidQuantityAmount;
-
+/** Data transfer record carrying Inventory Item Create payload. */
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
     UUID userId,
@@ -17,5 +17,5 @@ public record InventoryItemCreateDto(
     @NotNull Double amount,
     Boolean personal,
     UUID missionId,
-    UUID jobOrderId
-) implements QuantityAware {}
+    UUID jobOrderId)
+    implements QuantityAware {}

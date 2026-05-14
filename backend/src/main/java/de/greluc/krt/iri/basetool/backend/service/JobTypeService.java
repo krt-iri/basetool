@@ -8,6 +8,8 @@ import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionCrewRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -19,96 +21,178 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
-
+/**
+ * Cached CRUD service for the {@code job_type} reference table.
+ *
+ * <p>Job types form a tree (each row may have a parent); the {@code archetype} enum classifies the
+ * top-level family. Soft-delete via {@code active=false} rather than row removal so missions that
+ * reference a retired job type keep working. Case-insensitive uniqueness on name is enforced
+ * explicitly (with a localized 409 message) instead of relying on the DB unique index.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JobTypeService {
 
-    private final JobTypeRepository jobTypeRepository;
-    private final MissionCrewRepository missionCrewRepository;
-    private final MissionParticipantRepository missionParticipantRepository;
+  private final JobTypeRepository jobTypeRepository;
+  private final MissionCrewRepository missionCrewRepository;
+  private final MissionParticipantRepository missionParticipantRepository;
 
-    @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
-    public List<JobType> getJobTypes(@Nullable JobTypeArchetype archetype) {
-        if (archetype == null) {
-            return jobTypeRepository.findByActiveTrue();
-        }
-        return jobTypeRepository.findByArchetypeAndActiveTrue(archetype);
+  /**
+   * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
+   *
+   * @param archetype optional filter; null means "all active types"
+   * @return cached list
+   */
+  @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
+  public List<JobType> getJobTypes(@Nullable JobTypeArchetype archetype) {
+    if (archetype == null) {
+      return jobTypeRepository.findByActiveTrue();
+    }
+    return jobTypeRepository.findByArchetypeAndActiveTrue(archetype);
+  }
+
+  /**
+   * Paged variant for the admin list with an {@code includeInactive} flag for soft-deleted entries.
+   *
+   * @param archetype optional archetype filter
+   * @param pageable page request
+   * @param includeInactive true to include soft-deleted rows
+   * @return cached page
+   */
+  @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
+  public Page<JobType> getJobTypes(
+      @Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
+    if (archetype == null) {
+      return includeInactive
+          ? jobTypeRepository.findAll(pageable)
+          : jobTypeRepository.findByActiveTrue(pageable);
+    }
+    return includeInactive
+        ? jobTypeRepository.findByArchetype(archetype, pageable)
+        : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
+  }
+
+  /**
+   * Persists a new job type. Resolves the parent reference via id so the caller can pass a shallow
+   * parent (id-only stub from a DTO). Duplicate name throws {@link DuplicateEntityException} → 409.
+   *
+   * @param jobType transient entity
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the name collides with an existing row
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the supplied parent
+   *     id does not resolve
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public JobType createJobType(@NotNull JobType jobType) {
+    if (jobTypeRepository.existsByNameIgnoreCase(jobType.getName())) {
+      throw new DuplicateEntityException(
+          "A Job Type with the name '" + jobType.getName() + "' already exists.");
+    }
+    if (jobType.getParent() != null && jobType.getParent().getId() != null) {
+      JobType parent =
+          jobTypeRepository
+              .findById(jobType.getParent().getId())
+              .orElseThrow(
+                  () ->
+                      new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                          "Parent JobType not found"));
+      jobType.setParent(parent);
+    } else {
+      jobType.setParent(null);
+    }
+    return jobTypeRepository.save(jobType);
+  }
+
+  /**
+   * Updates an existing job type. Optimistic-lock check is explicit (the DTO carries the expected
+   * version), duplicate-name check excludes the row being edited so a self-rename is a no-op.
+   *
+   * @param id job type primary key
+   * @param jobTypeDto update payload
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the new name collides with a different row
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public JobType updateJobType(@NotNull UUID id, @NotNull JobTypeDto jobTypeDto) {
+    if (jobTypeRepository.existsByNameIgnoreCaseAndIdNot(jobTypeDto.name(), id)) {
+      throw new DuplicateEntityException(
+          "A Job Type with the name '" + jobTypeDto.name() + "' already exists.");
+    }
+    JobType jobType =
+        jobTypeRepository
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                        "JobType not found"));
+
+    if (jobType.getVersion() != null && !jobType.getVersion().equals(jobTypeDto.version())) {
+      throw new ObjectOptimisticLockingFailureException(JobType.class, id);
     }
 
-    @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
-    public Page<JobType> getJobTypes(@Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
-        if (archetype == null) {
-            return includeInactive ? jobTypeRepository.findAll(pageable) : jobTypeRepository.findByActiveTrue(pageable);
-        }
-        return includeInactive ? jobTypeRepository.findByArchetype(archetype, pageable) : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
+    jobType.setName(jobTypeDto.name());
+    jobType.setDescription(jobTypeDto.description());
+    jobType.setArchetype(jobTypeDto.archetype());
+    jobType.setLeadershipRole(jobTypeDto.isLeadershipRole());
+
+    if (jobTypeDto.parentId() != null) {
+      JobType parent =
+          jobTypeRepository
+              .findById(jobTypeDto.parentId())
+              .orElseThrow(
+                  () ->
+                      new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                          "Parent JobType not found"));
+      jobType.setParent(parent);
+    } else {
+      jobType.setParent(null);
     }
 
-    @Transactional
-    @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
-    public JobType createJobType(@NotNull JobType jobType) {
-        if (jobTypeRepository.existsByNameIgnoreCase(jobType.getName())) {
-            throw new DuplicateEntityException("A Job Type with the name '" + jobType.getName() + "' already exists.");
-        }
-        if (jobType.getParent() != null && jobType.getParent().getId() != null) {
-             JobType parent = jobTypeRepository.findById(jobType.getParent().getId())
-                 .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Parent JobType not found"));
-             jobType.setParent(parent);
-        } else {
-            jobType.setParent(null);
-        }
-        return jobTypeRepository.save(jobType);
-    }
+    return jobTypeRepository.save(jobType);
+  }
 
-    @Transactional
-    @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
-    public JobType updateJobType(@NotNull UUID id, @NotNull JobTypeDto jobTypeDto) {
-        if (jobTypeRepository.existsByNameIgnoreCaseAndIdNot(jobTypeDto.name(), id)) {
-            throw new DuplicateEntityException("A Job Type with the name '" + jobTypeDto.name() + "' already exists.");
-        }
-        JobType jobType = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
+  /**
+   * Soft-deletes a job type by flipping {@code active=false}. Hard delete would orphan every
+   * mission participant that still references the job type — the soft-delete keeps history usable.
+   *
+   * @param id job type primary key
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public void deleteJobType(@NotNull UUID id) {
+    JobType jobTypeToDeactivate =
+        jobTypeRepository
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                        "JobType not found"));
 
-        if (jobType.getVersion() != null && !jobType.getVersion().equals(jobTypeDto.version())) {
-            throw new ObjectOptimisticLockingFailureException(JobType.class, id);
-        }
+    jobTypeToDeactivate.setActive(false);
+    jobTypeRepository.save(jobTypeToDeactivate);
+  }
 
-        jobType.setName(jobTypeDto.name());
-        jobType.setDescription(jobTypeDto.description());
-        jobType.setArchetype(jobTypeDto.archetype());
-        jobType.setLeadershipRole(jobTypeDto.isLeadershipRole());
-        
-        if (jobTypeDto.parentId() != null) {
-            JobType parent = jobTypeRepository.findById(jobTypeDto.parentId())
-                    .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Parent JobType not found"));
-            jobType.setParent(parent);
-        } else {
-            jobType.setParent(null);
-        }
+  /**
+   * Reverses a soft-delete by flipping {@code active=true}. ADMIN-only at the controller layer.
+   *
+   * @param id job type primary key
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public void activateJobType(@NotNull UUID id) {
+    JobType jobTypeToActivate =
+        jobTypeRepository
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                        "JobType not found"));
 
-        return jobTypeRepository.save(jobType);
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
-    public void deleteJobType(@NotNull UUID id) {
-        JobType jobTypeToDeactivate = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
-
-        jobTypeToDeactivate.setActive(false);
-        jobTypeRepository.save(jobTypeToDeactivate);
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
-    public void activateJobType(@NotNull UUID id) {
-        JobType jobTypeToActivate = jobTypeRepository.findById(id)
-                .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("JobType not found"));
-
-        jobTypeToActivate.setActive(true);
-        jobTypeRepository.save(jobTypeToActivate);
-    }
+    jobTypeToActivate.setActive(true);
+    jobTypeRepository.save(jobTypeToActivate);
+  }
 }

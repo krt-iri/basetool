@@ -1,7 +1,4 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
-public record SystemSettingDto(
-        String id,
-        String value,
-        Long version
-) {}
+/** Data transfer record carrying System Setting payload. */
+public record SystemSettingDto(String id, String value, Long version) {}

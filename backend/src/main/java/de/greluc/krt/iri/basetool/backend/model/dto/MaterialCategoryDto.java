@@ -2,8 +2,5 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 
 import java.util.UUID;
 
-public record MaterialCategoryDto(
-        UUID id,
-        String name,
-        Long version
-) {}
+/** Data transfer record carrying Material Category payload. */
+public record MaterialCategoryDto(UUID id, String name, Long version) {}

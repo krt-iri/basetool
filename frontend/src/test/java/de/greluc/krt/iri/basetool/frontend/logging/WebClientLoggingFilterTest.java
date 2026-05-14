@@ -18,94 +18,99 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 class WebClientLoggingFilterTest {
 
-    private MockWebServer server;
-    private ListAppender<ILoggingEvent> appender;
-    private Logger logger;
-    private LoggingProperties props;
-    private WebClientLoggingFilter filter;
+  private MockWebServer server;
+  private ListAppender<ILoggingEvent> appender;
+  private Logger logger;
+  private LoggingProperties props;
+  private WebClientLoggingFilter filter;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        server = new MockWebServer();
-        server.start();
-        props = new LoggingProperties();
-        filter = new WebClientLoggingFilter(props);
-        logger = (Logger) LoggerFactory.getLogger(WebClientLoggingFilter.class);
-        appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(Level.INFO);
+  @BeforeEach
+  void setUp() throws Exception {
+    server = new MockWebServer();
+    server.start();
+    props = new LoggingProperties();
+    filter = new WebClientLoggingFilter(props);
+    logger = (Logger) LoggerFactory.getLogger(WebClientLoggingFilter.class);
+    appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.INFO);
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    logger.detachAppender(appender);
+    server.shutdown();
+    CorrelationContext.clear();
+  }
+
+  @Test
+  void propagatesCorrelationIdHeaderWhenPresent() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    CorrelationContext.set("cid-xyz");
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(filter.correlationIdPropagation())
+            .build();
+
+    wc.get().uri("/x").retrieve().toBodilessEntity().block();
+
+    RecordedRequest recorded = server.takeRequest();
+    assertThat(recorded.getHeader("X-Correlation-Id")).isEqualTo("cid-xyz");
+  }
+
+  @Test
+  void doesNotAddCorrelationIdHeaderWhenAbsent() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(filter.correlationIdPropagation())
+            .build();
+
+    wc.get().uri("/x").retrieve().toBodilessEntity().block();
+
+    RecordedRequest recorded = server.takeRequest();
+    assertThat(recorded.getHeader("X-Correlation-Id")).isNull();
+  }
+
+  @Test
+  void logsInfoLineOnFastSuccess() {
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(filter.callLogging())
+            .build();
+
+    wc.get().uri("/api/v1/ok").retrieve().toBodilessEntity().block();
+
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.INFO
+                    && e.getFormattedMessage().contains("GET")
+                    && e.getFormattedMessage().contains("/api/v1/ok")
+                    && e.getFormattedMessage().contains("-> 200"));
+  }
+
+  @Test
+  void escalatesToWarnOnServerError() {
+    server.enqueue(new MockResponse().setResponseCode(500).setBody(""));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(filter.callLogging())
+            .build();
+
+    try {
+      wc.get().uri("/api/v1/boom").retrieve().toBodilessEntity().block();
+    } catch (Exception ignored) {
+      // expected – 500 is mapped to WebClientResponseException
     }
 
-    @AfterEach
-    void tearDown() throws Exception {
-        logger.detachAppender(appender);
-        server.shutdown();
-        CorrelationContext.clear();
-    }
-
-    @Test
-    void propagatesCorrelationIdHeaderWhenPresent() throws Exception {
-        server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
-        CorrelationContext.set("cid-xyz");
-        WebClient wc = WebClient.builder()
-                .baseUrl(server.url("/").toString())
-                .filter(filter.correlationIdPropagation())
-                .build();
-
-        wc.get().uri("/x").retrieve().toBodilessEntity().block();
-
-        RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getHeader("X-Correlation-Id")).isEqualTo("cid-xyz");
-    }
-
-    @Test
-    void doesNotAddCorrelationIdHeaderWhenAbsent() throws Exception {
-        server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
-        WebClient wc = WebClient.builder()
-                .baseUrl(server.url("/").toString())
-                .filter(filter.correlationIdPropagation())
-                .build();
-
-        wc.get().uri("/x").retrieve().toBodilessEntity().block();
-
-        RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getHeader("X-Correlation-Id")).isNull();
-    }
-
-    @Test
-    void logsInfoLineOnFastSuccess() {
-        server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
-        WebClient wc = WebClient.builder()
-                .baseUrl(server.url("/").toString())
-                .filter(filter.callLogging())
-                .build();
-
-        wc.get().uri("/api/v1/ok").retrieve().toBodilessEntity().block();
-
-        assertThat(appender.list)
-                .anyMatch(e -> e.getLevel() == Level.INFO
-                        && e.getFormattedMessage().contains("GET")
-                        && e.getFormattedMessage().contains("/api/v1/ok")
-                        && e.getFormattedMessage().contains("-> 200"));
-    }
-
-    @Test
-    void escalatesToWarnOnServerError() {
-        server.enqueue(new MockResponse().setResponseCode(500).setBody(""));
-        WebClient wc = WebClient.builder()
-                .baseUrl(server.url("/").toString())
-                .filter(filter.callLogging())
-                .build();
-
-        try {
-            wc.get().uri("/api/v1/boom").retrieve().toBodilessEntity().block();
-        } catch (Exception ignored) {
-            // expected – 500 is mapped to WebClientResponseException
-        }
-
-        assertThat(appender.list)
-                .anyMatch(e -> e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("-> 500"));
-    }
+    assertThat(appender.list)
+        .anyMatch(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("-> 500"));
+  }
 }

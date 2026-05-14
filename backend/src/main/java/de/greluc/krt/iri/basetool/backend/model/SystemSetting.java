@@ -4,8 +4,13 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+/** System Setting JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -15,10 +20,11 @@ import lombok.*;
 @Table(name = "system_setting")
 public class SystemSetting extends AbstractEntity<String> {
 
-    @Id
-    @Column(name = "setting_key", nullable = false, unique = true)
-    private String id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @Column(name = "setting_key", nullable = false, unique = true)
+  private String id;
 
-    @Column(name = "setting_value", nullable = false)
-    private String value;
+  @Column(name = "setting_value", nullable = false)
+  private String value;
 }

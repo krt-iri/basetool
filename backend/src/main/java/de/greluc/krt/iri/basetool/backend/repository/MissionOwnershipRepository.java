@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** Spring Data repository for Mission Ownership. */
 public interface MissionOwnershipRepository extends JpaRepository<MissionOwnership, UUID> {
-    Optional<MissionOwnership> findByMissionId(UUID missionId);
+  /** Derived Spring-Data query - returns entities matching {@code MissionId}. */
+  Optional<MissionOwnership> findByMissionId(UUID missionId);
 }

@@ -1,5 +1,11 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -14,171 +20,172 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Unit tests for {@link HangarImportProxyController}. The controller is a
- * multipart-pass-through to the backend Fleetview import endpoint. Coverage
- * gaps before this test: the entire body — happy path, every exception
- * branch, and the filename-fallback when the upload has no original
- * filename.
+ * Unit tests for {@link HangarImportProxyController}. The controller is a multipart-pass-through to
+ * the backend Fleetview import endpoint. Coverage gaps before this test: the entire body — happy
+ * path, every exception branch, and the filename-fallback when the upload has no original filename.
  *
- * <p>{@link MockWebServer} stands in for the backend so the real WebClient
- * fluent chain (URI / content-type / multipart body / bodyToMono) is
- * exercised.
+ * <p>{@link MockWebServer} stands in for the backend so the real WebClient fluent chain (URI /
+ * content-type / multipart body / bodyToMono) is exercised.
  */
 class HangarImportProxyControllerTest {
 
-    private MockWebServer server;
-    private HangarImportProxyController controller;
+  private MockWebServer server;
+  private HangarImportProxyController controller;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        server = new MockWebServer();
-        server.start();
-        WebClient webClient = WebClient.builder()
-                .baseUrl(server.url("/").toString())
-                .build();
-        controller = new HangarImportProxyController(webClient);
+  @BeforeEach
+  void setUp() throws Exception {
+    server = new MockWebServer();
+    server.start();
+    WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
+    controller = new HangarImportProxyController(webClient);
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    try {
+      server.shutdown();
+    } catch (Exception ignored) {
+      // already shut down in tests that simulate a connection failure
     }
+  }
 
-    @AfterEach
-    void tearDown() throws Exception {
-        try {
-            server.shutdown();
-        } catch (Exception ignored) {
-            // already shut down in tests that simulate a connection failure
-        }
-    }
+  @Test
+  void importFleetview_happyPath_proxiesMultipartToBackend() throws Exception {
+    // Given a backend that accepts the upload and replies with a JSON summary
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"imported\":3,\"skipped\":1}"));
 
-    @Test
-    void importFleetview_happyPath_proxiesMultipartToBackend() throws Exception {
-        // Given a backend that accepts the upload and replies with a JSON summary
-        server.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody("{\"imported\":3,\"skipped\":1}"));
+    MultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "fleetview.json",
+            "application/json",
+            "{\"ships\":[]}".getBytes(StandardCharsets.UTF_8));
 
-        MultipartFile file = new MockMultipartFile(
-                "file", "fleetview.json", "application/json",
-                "{\"ships\":[]}".getBytes(StandardCharsets.UTF_8));
+    // When
+    ResponseEntity<Map<?, ?>> result = controller.importFleetview(file);
 
-        // When
-        ResponseEntity<Map<?, ?>> result = controller.importFleetview(file);
+    // Then
+    assertEquals(HttpStatus.OK, result.getStatusCode());
+    Map<?, ?> body = result.getBody();
+    assertNotNull(body);
+    assertEquals(3, body.get("imported"));
+    assertEquals(1, body.get("skipped"));
 
-        // Then
-        assertEquals(HttpStatus.OK, result.getStatusCode());
-        Map<?, ?> body = result.getBody();
-        assertNotNull(body);
-        assertEquals(3, body.get("imported"));
-        assertEquals(1, body.get("skipped"));
+    // The request must be a POST to /api/v1/hangar/import/fleetview with
+    // multipart content-type carrying the file under name "file".
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("POST", req.getMethod());
+    assertEquals("/api/v1/hangar/import/fleetview", req.getPath());
+    String contentType = req.getHeader("Content-Type");
+    assertNotNull(contentType);
+    assertTrue(
+        contentType.startsWith(MediaType.MULTIPART_FORM_DATA_VALUE),
+        "Content-Type must be multipart/form-data, was: " + contentType);
+    String body2 = req.getBody().readUtf8();
+    assertTrue(body2.contains("name=\"file\""));
+    assertTrue(body2.contains("filename=\"fleetview.json\""));
+    assertTrue(body2.contains("{\"ships\":[]}"));
+  }
 
-        // The request must be a POST to /api/v1/hangar/import/fleetview with
-        // multipart content-type carrying the file under name "file".
-        RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-        assertNotNull(req);
-        assertEquals("POST", req.getMethod());
-        assertEquals("/api/v1/hangar/import/fleetview", req.getPath());
-        String contentType = req.getHeader("Content-Type");
-        assertNotNull(contentType);
-        assertTrue(contentType.startsWith(MediaType.MULTIPART_FORM_DATA_VALUE),
-                "Content-Type must be multipart/form-data, was: " + contentType);
-        String body2 = req.getBody().readUtf8();
-        assertTrue(body2.contains("name=\"file\""));
-        assertTrue(body2.contains("filename=\"fleetview.json\""));
-        assertTrue(body2.contains("{\"ships\":[]}"));
-    }
+  @Test
+  void importFleetview_withoutOriginalFilename_fallsBackToFleetviewJson() throws Exception {
+    // Given a MultipartFile that returns null from getOriginalFilename().
+    // MockMultipartFile normalises a null-constructor-arg into the empty
+    // string ("") which the controller does NOT treat as "no filename",
+    // so we override the getter directly to force the real null branch.
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"imported\":0}"));
 
-    @Test
-    void importFleetview_withoutOriginalFilename_fallsBackToFleetviewJson() throws Exception {
-        // Given a MultipartFile that returns null from getOriginalFilename().
-        // MockMultipartFile normalises a null-constructor-arg into the empty
-        // string ("") which the controller does NOT treat as "no filename",
-        // so we override the getter directly to force the real null branch.
-        server.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody("{\"imported\":0}"));
-
-        MultipartFile file = new MockMultipartFile(
-                "file", "anything.json", "application/json",
-                "{}".getBytes(StandardCharsets.UTF_8)) {
-            @Override
-            public String getOriginalFilename() {
-                return null;
-            }
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "anything.json", "application/json", "{}".getBytes(StandardCharsets.UTF_8)) {
+          @Override
+          public String getOriginalFilename() {
+            return null;
+          }
         };
 
-        // When
-        controller.importFleetview(file);
+    // When
+    controller.importFleetview(file);
 
-        // Then — the fallback filename "fleetview.json" must be used so the
-        // backend's Content-Disposition parsing doesn't see an empty filename
-        RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-        assertNotNull(req);
-        assertTrue(req.getBody().readUtf8().contains("filename=\"fleetview.json\""),
-                "Filename fallback must default to 'fleetview.json' when the upload has no name");
-    }
+    // Then — the fallback filename "fleetview.json" must be used so the
+    // backend's Content-Disposition parsing doesn't see an empty filename
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertTrue(
+        req.getBody().readUtf8().contains("filename=\"fleetview.json\""),
+        "Filename fallback must default to 'fleetview.json' when the upload has no name");
+  }
 
-    @Test
-    void importFleetview_onBackend400_propagatesAsBadRequest() {
-        server.enqueue(new MockResponse().setResponseCode(400).setBody("Invalid JSON"));
+  @Test
+  void importFleetview_onBackend400_propagatesAsBadRequest() {
+    server.enqueue(new MockResponse().setResponseCode(400).setBody("Invalid JSON"));
 
-        MultipartFile file = new MockMultipartFile(
-                "file", "broken.json", "application/json", "garbage".getBytes(StandardCharsets.UTF_8));
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "broken.json", "application/json", "garbage".getBytes(StandardCharsets.UTF_8));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.importFleetview(file));
+    ResponseStatusException ex =
+        assertThrows(ResponseStatusException.class, () -> controller.importFleetview(file));
 
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-    }
+    assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+  }
 
-    @Test
-    void importFleetview_onBackend500_propagatesAs500() {
-        server.enqueue(new MockResponse().setResponseCode(500).setBody("boom"));
+  @Test
+  void importFleetview_onBackend500_propagatesAs500() {
+    server.enqueue(new MockResponse().setResponseCode(500).setBody("boom"));
 
-        MultipartFile file = new MockMultipartFile(
-                "file", "fleetview.json", "application/json", "{}".getBytes(StandardCharsets.UTF_8));
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "fleetview.json", "application/json", "{}".getBytes(StandardCharsets.UTF_8));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.importFleetview(file));
+    ResponseStatusException ex =
+        assertThrows(ResponseStatusException.class, () -> controller.importFleetview(file));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
-    }
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+  }
 
-    @Test
-    void importFleetview_onFileGetBytesIoException_wrapsAs500() {
-        // Given a MultipartFile whose getBytes() throws — simulating a torn upload.
-        MultipartFile broken = new MockMultipartFile("file", "x.json", "application/json", new byte[]{1, 2, 3}) {
-            @Override
-            public byte[] getBytes() throws IOException {
-                throw new IOException("disk full");
-            }
+  @Test
+  void importFleetview_onFileGetBytesIoException_wrapsAs500() {
+    // Given a MultipartFile whose getBytes() throws — simulating a torn upload.
+    MultipartFile broken =
+        new MockMultipartFile("file", "x.json", "application/json", new byte[] {1, 2, 3}) {
+          @Override
+          public byte[] getBytes() throws IOException {
+            throw new IOException("disk full");
+          }
         };
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.importFleetview(broken));
+    ResponseStatusException ex =
+        assertThrows(ResponseStatusException.class, () -> controller.importFleetview(broken));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode(),
-                "Generic IO failures must be wrapped as 500 — never leak through with raw stack trace");
-    }
+    assertEquals(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        ex.getStatusCode(),
+        "Generic IO failures must be wrapped as 500 — never leak through with raw stack trace");
+  }
 
-    @Test
-    void importFleetview_onConnectionFailure_wrapsAs500() throws Exception {
-        // Given — backend unreachable
-        server.shutdown();
+  @Test
+  void importFleetview_onConnectionFailure_wrapsAs500() throws Exception {
+    // Given — backend unreachable
+    server.shutdown();
 
-        MultipartFile file = new MockMultipartFile(
-                "file", "fleetview.json", "application/json", "{}".getBytes(StandardCharsets.UTF_8));
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "fleetview.json", "application/json", "{}".getBytes(StandardCharsets.UTF_8));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.importFleetview(file));
+    ResponseStatusException ex =
+        assertThrows(ResponseStatusException.class, () -> controller.importFleetview(file));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
-    }
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+  }
 }

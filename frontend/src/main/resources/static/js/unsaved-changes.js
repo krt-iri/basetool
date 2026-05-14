@@ -42,7 +42,19 @@ document.addEventListener("DOMContentLoaded", function () {
         
         // Exclude specific links that don't trigger normal navigation
         let href = a.getAttribute("href");
-        if (!href || href === "#" || href.startsWith("#") || a.target === "_blank" || a.href.startsWith("javascript:")) {
+        if (!href || href === "#" || href.startsWith("#") || a.target === "_blank") {
+            return;
+        }
+        // CodeQL js/incomplete-url-scheme-check: reject any URL scheme that can
+        // execute code if it ends up in `window.location.href` later in this
+        // handler. `javascript:` is the obvious one; `data:` (especially
+        // `data:text/html,...`) and `vbscript:` (legacy IE) round out the set.
+        // `.protocol` ends with ':' on resolved URLs ("javascript:" / "data:" /
+        // "vbscript:" / "http:" / "https:" / ...), which avoids the
+        // case-sensitivity and trim issues that a plain startsWith comparison
+        // on `a.href` has.
+        const protocol = (a.protocol || "").toLowerCase();
+        if (protocol === "javascript:" || protocol === "data:" || protocol === "vbscript:") {
             return;
         }
 
@@ -51,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Is it a download link or something we should ignore? We assume standard navigation.
             event.preventDefault();
             targetUrl = a.href;
-            
+
             if (modal) {
                 modal.style.display = "flex";
             }

@@ -1,10 +1,14 @@
 plugins {
   id("idea")
-  id("org.owasp.dependencycheck") version "12.2.0"
+  id("org.owasp.dependencycheck") version "12.2.2"
   // Pulled in with `apply false` so the PitestPluginExtension type is on the
   // root build script's classpath for the `subprojects { plugins.withId(...) }`
   // configuration block below. Each subproject still applies the plugin itself.
   id("info.solidsoft.pitest") version "1.19.0" apply false
+  // Same `apply false` pattern as pitest: declared here so SpotlessExtension is
+  // on the root build script's classpath for the strongly-typed configuration
+  // below. Each subproject applies the plugin itself.
+  id("com.diffplug.spotless") version "8.4.0" apply false
 }
 
 allprojects {
@@ -158,9 +162,11 @@ subprojects {
   // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
   // 13.4.2 release tag) which enforces 2-space indents, 100-char lines,
   // Google-style imports, naming conventions, Javadoc on public API, etc.
-  // Initial introduction is non-blocking (`ignoreFailures = true`,
-  // `maxWarnings = Int.MAX_VALUE`) so the existing codebase doesn't gate
-  // the build before the team has a chance to triage. Reports land under
+  //
+  // Phase 4 (this configuration): the gate is now STRICT.
+  // `ignoreFailures = false` + `maxWarnings = 0` mean any new Checkstyle
+  // warning or error fails `./gradlew check` — regressions are caught at
+  // CI / PR time instead of accumulating silently. Reports land under
   // `<subproject>/build/reports/checkstyle/{main,test}.html`. The test
   // source set scan is disabled — test code intentionally uses different
   // conventions (long method names with underscores, longer lines for
@@ -169,14 +175,44 @@ subprojects {
     extensions.configure<CheckstyleExtension>("checkstyle") {
       toolVersion = "13.4.2"
       configFile = rootProject.file("config/checkstyle/google_checks.xml")
-      isIgnoreFailures = true
-      maxWarnings = Int.MAX_VALUE
+      isIgnoreFailures = false
+      maxWarnings = 0
     }
     tasks.matching { it.name == "checkstyleTest" }.configureEach { enabled = false }
   }
+
+  // Spotless (com.diffplug.spotless). Auto-formats Java sources with
+  // google-java-format — same 2-space indent / 100-char width / Google import
+  // order that `config/checkstyle/google_checks.xml` enforces. Applying
+  // Spotless therefore resolves the bulk of Checkstyle's Indentation,
+  // LineLength, CustomImportOrder, AvoidStarImport, EmptyLineSeparator,
+  // OperatorWrap and WhitespaceAround warnings in a single pass.
+  //
+  // Phase 4 (this configuration): `enforceCheck = true` wires `spotlessCheck`
+  // into `./gradlew check` so any unformatted file fails the build. Run
+  // `./gradlew spotlessApply` locally before pushing to auto-fix; CI then
+  // re-runs `spotlessCheck` to verify the diff is clean.
+  plugins.withId("com.diffplug.spotless") {
+    extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
+      isEnforceCheck = true
+      java {
+        // google-java-format is pinned to a version that supports JDK 25.
+        // Older google-java-format (the default bundled by earlier Spotless
+        // releases) reflects against
+        // `com.sun.tools.javac.util.Log$DeferredDiagnosticHandler.getDiagnostics()` —
+        // the return type of that method changed in JDK 25 (Queue -> Deque) and the
+        // reflection lookup explodes with `NoSuchMethodError`. CI runs JDK 25 Temurin
+        // (see `.github/workflows/ci.yml`), so without an explicit pin the spotless
+        // task fails 767 files with `google-java-format(java.lang.NoSuchMethodError)`.
+        // 1.35.0 targets the new JDK 25 javac signature.
+        googleJavaFormat("1.35.0").reflowLongStrings()
+        removeUnusedImports()
+      }
+    }
+  }
 }
 
-// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.0. Aggregates over
+// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over
 // all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate stays
 // wide open (`failBuildOnCVSS = 11`) for the first iteration so the team
 // triages findings before the gate turns strict. The plugin's first invocation

@@ -3,6 +3,11 @@ package de.greluc.krt.iri.basetool.backend.dto.uex;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 
+/**
+ * Inbound JSON record for UEX Corp's <code>/terminals</code> endpoint. Mapped to the project's own
+ * {@code Terminal} entity by {@code UexUniverseSyncService}; downstream code consumes the entity,
+ * not this DTO.
+ */
 @Builder
 public record UexTerminalDto(
     @JsonProperty("is_available") Integer isAvailable,
@@ -25,9 +30,9 @@ public record UexTerminalDto(
     @JsonProperty("outpost_name") String outpostName,
     @JsonProperty("city_name") String cityName,
     @JsonProperty("faction_name") String factionName,
-    @JsonProperty("company_name") String companyName
-) {
-    public Boolean checkIsAvailableLive() {
-        return isAvailableLive != null && isAvailableLive == 1;
-    }
+    @JsonProperty("company_name") String companyName) {
+  /** Returns {@code true} iff UEX reports the terminal as currently reachable in-game. */
+  public Boolean checkIsAvailableLive() {
+    return isAvailableLive != null && isAvailableLive == 1;
+  }
 }

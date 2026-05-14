@@ -2,5 +2,5 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 
-public record UpdatePayoutPreferenceRequest(PayoutPreference preference) {
-}
+/** Inbound request payload for the Update Payout Preference operation. */
+public record UpdatePayoutPreferenceRequest(PayoutPreference preference) {}

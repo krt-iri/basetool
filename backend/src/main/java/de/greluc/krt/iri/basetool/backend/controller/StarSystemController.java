@@ -1,62 +1,113 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
-import de.greluc.krt.iri.basetool.backend.model.StarSystem;
-import de.greluc.krt.iri.basetool.backend.model.dto.StarSystemDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.mapper.StarSystemMapper;
+import de.greluc.krt.iri.basetool.backend.model.StarSystem;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.iri.basetool.backend.service.StarSystemService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
-import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the star-system reference table. UEX owns the bulk of the data; this controller
+ * adds the admin-mutable CRUD for systems UEX doesn't know about yet.
+ */
 @RestController
 @RequestMapping("/api/v1/star-systems")
 @RequiredArgsConstructor
 @Transactional
 public class StarSystemController {
 
-    private final StarSystemService starSystemService;
-    private final StarSystemMapper starSystemMapper;
+  private final StarSystemService starSystemService;
+  private final StarSystemMapper starSystemMapper;
 
-    @GetMapping
-    public PageResponse<StarSystemDto> getAllStarSystems(@RequestParam(required = false) Integer page,
-                                                      @RequestParam(required = false) Integer size,
-                                                      @RequestParam(required = false) String sort) {
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-        Page<StarSystem> p = starSystemService.getAllStarSystems(pageable);
-        List<StarSystemDto> content = p.getContent().stream().map(starSystemMapper::toDto).toList();
-        return new PageResponse<>(content, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
-    }
+  /**
+   * Returns paged star-system DTOs.
+   *
+   * @return paged star-system DTOs
+   */
+  @GetMapping
+  public PageResponse<StarSystemDto> getAllStarSystems(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
+    Page<StarSystem> p = starSystemService.getAllStarSystems(pageable);
+    List<StarSystemDto> content = p.getContent().stream().map(starSystemMapper::toDto).toList();
+    return new PageResponse<>(
+        content,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
 
-    @GetMapping("/{id}")
-    public StarSystemDto getStarSystem(@PathVariable @NotNull UUID id) {
-        return starSystemMapper.toDto(starSystemService.getStarSystem(id));
-    }
+  /**
+   * Returns the star-system DTO.
+   *
+   * @param id star system id
+   * @return the star-system DTO
+   */
+  @GetMapping("/{id}")
+  public StarSystemDto getStarSystem(@PathVariable @NotNull UUID id) {
+    return starSystemMapper.toDto(starSystemService.getStarSystem(id));
+  }
 
-    @PostMapping
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
-        return starSystemMapper.toDto(starSystemService.createStarSystem(starSystemMapper.toEntity(starSystem)));
-    }
+  /**
+   * Creates a star system manually. Duplicate name (case-insensitive) → 409.
+   *
+   * @param starSystem create payload
+   * @return the persisted DTO
+   */
+  @PostMapping
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
+    return starSystemMapper.toDto(
+        starSystemService.createStarSystem(starSystemMapper.toEntity(starSystem)));
+  }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public StarSystemDto updateStarSystem(@PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
-        return starSystemMapper.toDto(starSystemService.updateStarSystem(id, starSystemMapper.toEntity(starSystem)));
-    }
+  /**
+   * Updates name + description of a star system. UEX-imported metadata is untouched.
+   *
+   * @param id star system id
+   * @param starSystem update payload
+   * @return the persisted DTO
+   */
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public StarSystemDto updateStarSystem(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
+    return starSystemMapper.toDto(
+        starSystemService.updateStarSystem(id, starSystemMapper.toEntity(starSystem)));
+  }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public void deleteStarSystem(@PathVariable @NotNull UUID id) {
-        starSystemService.deleteStarSystem(id);
-    }
+  /**
+   * Deletes a star system. Rejected when any location still references the system.
+   *
+   * @param id star system id
+   */
+  @DeleteMapping("/{id}")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public void deleteStarSystem(@PathVariable @NotNull UUID id) {
+    starSystemService.deleteStarSystem(id);
+  }
 }

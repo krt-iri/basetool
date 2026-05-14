@@ -4,11 +4,21 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+/**
+ * Static Thymeleaf page controller for the terms of service ({@code /terms}). Renders a fixed
+ * template without backend data.
+ */
 @Controller
 public class TermsController {
 
-    @GetMapping("/terms")
-    public String showTerms(Model model) {
-        return "terms";
-    }
+  /**
+   * Returns the {@code terms} view name.
+   *
+   * @param model Thymeleaf model (unused; the template is static)
+   * @return the {@code terms} view name
+   */
+  @GetMapping("/terms")
+  public String showTerms(Model model) {
+    return "terms";
+  }
 }

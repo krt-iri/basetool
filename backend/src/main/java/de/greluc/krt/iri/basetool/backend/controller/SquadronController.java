@@ -7,61 +7,108 @@ import de.greluc.krt.iri.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.backend.service.SquadronService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST surface for the squadron reference table. Mutations are OFFICER/ADMIN; activate is
+ * ADMIN-only.
+ */
 @RestController
 @RequestMapping("/api/v1/squadrons")
 @RequiredArgsConstructor
 @Transactional
 public class SquadronController {
 
-    private static final Set<String> ALLOWED_SORT = Set.of("name", "shorthand", "id");
+  private static final Set<String> ALLOWED_SORT = Set.of("name", "shorthand", "id");
 
-    private final SquadronService squadronService;
-    private final SquadronMapper squadronMapper;
+  private final SquadronService squadronService;
+  private final SquadronMapper squadronMapper;
 
-    @GetMapping
-    public PageResponse<SquadronDto> getAllSquadrons(@RequestParam(required = false) Integer page,
-                                                     @RequestParam(required = false) Integer size,
-                                                     @RequestParam(required = false) String sort,
-                                                     @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
-        Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
-        Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
-        List<SquadronDto> content = p.getContent().stream().map(squadronMapper::toDto).toList();
-        return new PageResponse<>(content, p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages(), PaginationUtil.toSortStrings(p.getSort()));
-    }
+  /**
+   * Paged list with {@code includeInactive} for the admin view.
+   *
+   * @return paged squadron DTOs
+   */
+  @GetMapping
+  public PageResponse<SquadronDto> getAllSquadrons(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
+    Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
+    List<SquadronDto> content = p.getContent().stream().map(squadronMapper::toDto).toList();
+    return new PageResponse<>(
+        content,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
 
-    @PostMapping
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
-        return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
-    }
+  /**
+   * Creates a new squadron. Duplicate name → 409.
+   *
+   * @param squadron create payload
+   * @return the persisted DTO
+   */
+  @PostMapping
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
+    return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
+  }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public SquadronDto updateSquadron(@PathVariable @NotNull UUID id, @RequestBody @Valid SquadronDto squadron) {
-        return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
-    }
+  /**
+   * Updates a squadron. Carries optimistic-lock version in the DTO body.
+   *
+   * @param id squadron id
+   * @param squadron update payload
+   * @return the persisted DTO
+   */
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public SquadronDto updateSquadron(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronDto squadron) {
+    return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
+  }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
-    public void deleteSquadron(@PathVariable @NotNull UUID id) {
-        squadronService.deleteSquadron(id);
-    }
+  /**
+   * Soft-deletes a squadron.
+   *
+   * @param id squadron id
+   */
+  @DeleteMapping("/{id}")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public void deleteSquadron(@PathVariable @NotNull UUID id) {
+    squadronService.deleteSquadron(id);
+  }
 
-    @PostMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public void activateSquadron(@PathVariable @NotNull UUID id) {
-        squadronService.activateSquadron(id);
-    }
+  /**
+   * Reverses a soft-delete. ADMIN-only.
+   *
+   * @param id squadron id
+   */
+  @PostMapping("/{id}/activate")
+  @PreAuthorize("hasRole('ADMIN')")
+  public void activateSquadron(@PathVariable @NotNull UUID id) {
+    squadronService.activateSquadron(id);
+  }
 }

@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
+/** Data transfer record carrying Material payload. */
 public record MaterialDto(
     UUID id,
     Integer idCommodity,
@@ -17,5 +18,4 @@ public record MaterialDto(
     @JsonProperty("isVolatileTime") Boolean isVolatileTime,
     @JsonProperty("isManualRawMaterial") Boolean isManualRawMaterial,
     @JsonProperty("isJobOrder") Boolean isJobOrder,
-    Long version
-) {}
+    Long version) {}

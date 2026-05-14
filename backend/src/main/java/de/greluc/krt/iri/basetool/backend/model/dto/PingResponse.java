@@ -1,14 +1,8 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.time.Instant;
 
+/** Outbound response payload for the Ping operation. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record PingResponse(
-        String status,
-        String version,
-        String message,
-        Instant timestamp
-) {
-}
+public record PingResponse(String status, String version, String message, Instant timestamp) {}

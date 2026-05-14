@@ -1,7 +1,15 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,143 +24,160 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.util.Set;
-import java.util.UUID;
-
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class MissionUnitCrewTest {
 
-    @Autowired
-    private WebApplicationContext context;
+  @Autowired private WebApplicationContext context;
 
-    private MockMvc mockMvc;
+  private MockMvc mockMvc;
 
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private MissionRepository missionRepository;
-    @Autowired
-    private ShipRepository shipRepository;
-    @Autowired
-    private ShipTypeRepository shipTypeRepository;
-    @Autowired
-    private JobTypeRepository jobTypeRepository;
-    @Autowired
-    private SquadronRepository squadronRepository;
+  @Autowired private UserRepository userRepository;
+  @Autowired private MissionRepository missionRepository;
+  @Autowired private ShipRepository shipRepository;
+  @Autowired private ShipTypeRepository shipTypeRepository;
+  @Autowired private JobTypeRepository jobTypeRepository;
+  @Autowired private SquadronRepository squadronRepository;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
-    private User officerUser;
-    private Mission mission;
-    private Ship ship;
-    private MissionUnit unit;
-    private JobType crewJob;
+  private User officerUser;
+  private Mission mission;
+  private Ship ship;
+  private MissionUnit unit;
+  private JobType crewJob;
 
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-        officerUser = new User();
-        officerUser.setId(UUID.randomUUID());
-        officerUser.setUsername("officer_crew");
-        userRepository.save(officerUser);
+    officerUser = new User();
+    officerUser.setId(UUID.randomUUID());
+    officerUser.setUsername("officer_crew");
+    userRepository.save(officerUser);
 
-        ShipType shipType = new ShipType();
-        shipType.setName("Test Type");
-        shipType.setManufacturer(null); // Assuming manufacturer is optional or I need to check
-        shipTypeRepository.save(shipType);
+    ShipType shipType = new ShipType();
+    shipType.setName("Test Type");
+    shipType.setManufacturer(null); // Assuming manufacturer is optional or I need to check
+    shipTypeRepository.save(shipType);
 
-        ship = new Ship();
-        ship.setName("Test Ship Crew");
-        ship.setOwner(officerUser);
-        ship.setShipType(shipType);
-        ship.setInsurance("LTI");
-        shipRepository.save(ship);
+    ship = new Ship();
+    ship.setName("Test Ship Crew");
+    ship.setOwner(officerUser);
+    ship.setShipType(shipType);
+    ship.setInsurance("LTI");
+    shipRepository.save(ship);
 
-        mission = new Mission();
-        mission.setName("Test Mission Crew");
-        mission.setStatus("PLANNED");
-        mission = missionRepository.save(mission);
+    mission = new Mission();
+    mission.setName("Test Mission Crew");
+    mission.setStatus("PLANNED");
+    mission = missionRepository.save(mission);
 
-        unit = new MissionUnit();
-        unit.setMission(mission);
-        unit.setShipType(shipType);
-        unit.setShip(ship);
-        unit.setName("Test Unit");
-        mission.getAssignedUnits().add(unit);
-        mission = missionRepository.save(mission);
-        // Refresh unit ID
-        unit = mission.getAssignedUnits().iterator().next();
+    unit = new MissionUnit();
+    unit.setMission(mission);
+    unit.setShipType(shipType);
+    unit.setShip(ship);
+    unit.setName("Test Unit");
+    mission.getAssignedUnits().add(unit);
+    mission = missionRepository.save(mission);
+    // Refresh unit ID
+    unit = mission.getAssignedUnits().iterator().next();
 
-        crewJob = new JobType();
-        crewJob.setName("Gunner");
-        crewJob.setArchetype(JobTypeArchetype.CREW);
-        jobTypeRepository.save(crewJob);
-        
-        Squadron sq = new Squadron();
-        sq.setName("Test Sq");
-        sq.setShorthand("TSQ");
-        squadronRepository.save(sq);
-    }
+    crewJob = new JobType();
+    crewJob.setName("Gunner");
+    crewJob.setArchetype(JobTypeArchetype.CREW);
+    jobTypeRepository.save(crewJob);
 
-    @Test
-    void testAssignGuestAsCrew() throws Exception {
-        // 1. Add Guest Participant
-        Squadron sq = squadronRepository.findAll().iterator().next();
-        String joinJson = String.format("{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\", \"desiredJobTypeId\": \"%s\", \"squadronId\": \"%s\"}", crewJob.getId(), sq.getId());
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/participants/add")
+    Squadron sq = new Squadron();
+    sq.setName("Test Sq");
+    sq.setShorthand("TSQ");
+    squadronRepository.save(sq);
+  }
+
+  @Test
+  void testAssignGuestAsCrew() throws Exception {
+    // 1. Add Guest Participant
+    Squadron sq = squadronRepository.findAll().iterator().next();
+    String joinJson =
+        String.format(
+            "{\"guestName\": \"Guest Pilot\", \"comment\": \"Joining\", \"desiredJobTypeId\":"
+                + " \"%s\", \"squadronId\": \"%s\"}",
+            crewJob.getId(), sq.getId());
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(joinJson))
-                .andExpect(status().isOk());
+        .andExpect(status().isOk());
 
-        Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
-        MissionParticipant participant = updatedMission.getParticipants().stream()
-                .filter(p -> "Guest Pilot".equals(p.getGuestName()))
-                .findFirst().orElseThrow();
+    Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
+    MissionParticipant participant =
+        updatedMission.getParticipants().stream()
+            .filter(p -> "Guest Pilot".equals(p.getGuestName()))
+            .findFirst()
+            .orElseThrow();
 
-        // 2. Assign Guest as Crew
-        String assignJson = String.format("{\"participantId\": \"%s\", \"jobTypeIds\": [\"%s\"]}", 
-                participant.getId(), crewJob.getId());
+    // 2. Assign Guest as Crew
+    String assignJson =
+        String.format(
+            "{\"participantId\": \"%s\", \"jobTypeIds\": [\"%s\"]}",
+            participant.getId(), crewJob.getId());
 
-        mockMvc.perform(post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE")))
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(assignJson))
-                .andExpect(status().isOk());
-        
-        // Verify
-        updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
-        MissionUnit updatedUnit = updatedMission.getAssignedUnits().stream().filter(u -> u.getId().equals(unit.getId())).findFirst().orElseThrow();
-        org.junit.jupiter.api.Assertions.assertEquals(1, updatedUnit.getCrew().size());
-        org.junit.jupiter.api.Assertions.assertEquals("Guest Pilot", updatedUnit.getCrew().iterator().next().getParticipant().getGuestName());
-    }
+        .andExpect(status().isOk());
 
-    @Test
-    void testGetAllShips_Officer_Allowed() throws Exception {
-        mockMvc.perform(get("/api/v1/hangar/ships")
-                .with(jwt().jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"), new SimpleGrantedAuthority("USER_MANAGE"), new SimpleGrantedAuthority("MISSION_MANAGE"), new SimpleGrantedAuthority("HANGAR_MANAGE"), new SimpleGrantedAuthority("REFINERY_MANAGE"), new SimpleGrantedAuthority("HANGAR_READ"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.name == 'Test Ship Crew')]").exists());
-    }
+    // Verify
+    updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
+    MissionUnit updatedUnit =
+        updatedMission.getAssignedUnits().stream()
+            .filter(u -> u.getId().equals(unit.getId()))
+            .findFirst()
+            .orElseThrow();
+    org.junit.jupiter.api.Assertions.assertEquals(1, updatedUnit.getCrew().size());
+    org.junit.jupiter.api.Assertions.assertEquals(
+        "Guest Pilot", updatedUnit.getCrew().iterator().next().getParticipant().getGuestName());
+  }
 
-    @Test
-    void testGetAllShips_Guest_Forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/hangar/ships")) // Anonymous
-                .andExpect(status().isUnauthorized()); // Or Forbidden depending on config, usually Unauthorized if no JWT
-    }
+  @Test
+  void testGetAllShips_Officer_Allowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/ships")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_READ"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[?(@.name == 'Test Ship Crew')]").exists());
+  }
+
+  @Test
+  void testGetAllShips_Guest_Forbidden() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/hangar/ships")) // Anonymous
+        .andExpect(
+            status()
+                .isUnauthorized()); // Or Forbidden depending on config, usually Unauthorized if no
+    // JWT
+  }
 }

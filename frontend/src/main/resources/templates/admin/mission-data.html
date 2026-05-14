@@ -341,7 +341,7 @@
 
         if (sqAddBtn) {
             sqAddBtn.onclick = function() {
-                sqForm.action = this.getAttribute('data-action');
+                sqForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), sqForm.action);
                 sqTitle.innerText = '[[#{admin.squadron.create}]]';
                 document.getElementById('sq-name').value = '';
                 document.getElementById('sq-shorthand').value = '';
@@ -354,7 +354,7 @@
         document.querySelectorAll('.edit-squadron-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = this.getAttribute('data-id');
-                sqForm.action = this.getAttribute('data-action');
+                sqForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), sqForm.action);
                 sqTitle.innerText = '[[#{admin.edit}]]';
                 document.getElementById('sq-name').value = this.getAttribute('data-name');
                 document.getElementById('sq-shorthand').value = this.getAttribute('data-shorthand');
@@ -391,7 +391,7 @@
 
         if (jtAddBtn) {
             jtAddBtn.onclick = function() {
-                jtForm.action = this.getAttribute('data-action');
+                jtForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), jtForm.action);
                 jtTitle.innerText = '[[#{admin.job_type.create}]]';
                 document.getElementById('jt-name').value = '';
                 document.getElementById('jt-desc').value = '';
@@ -406,7 +406,7 @@
         document.querySelectorAll('.edit-jobtype-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = this.getAttribute('data-id');
-                jtForm.action = this.getAttribute('data-action');
+                jtForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), jtForm.action);
                 jtTitle.innerText = '[[#{admin.edit}]]';
                 document.getElementById('jt-name').value = this.getAttribute('data-name');
                 document.getElementById('jt-desc').value = this.getAttribute('data-desc');
@@ -430,7 +430,7 @@
 
         if (ftAddBtn) {
             ftAddBtn.onclick = function() {
-                ftForm.action = this.getAttribute('data-action');
+                ftForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), ftForm.action);
                 ftTitle.innerText = '[[#{admin.frequency_type.create}]]';
                 document.getElementById('ft-name').value = '';
                 document.getElementById('ft-desc').value = '';
@@ -442,7 +442,7 @@
         document.querySelectorAll('.edit-freqtype-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = this.getAttribute('data-id');
-                ftForm.action = this.getAttribute('data-action');
+                ftForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), ftForm.action);
                 ftTitle.innerText = '[[#{admin.edit}]]';
                 document.getElementById('ft-name').value = this.getAttribute('data-name');
                 document.getElementById('ft-desc').value = this.getAttribute('data-desc');
@@ -466,7 +466,7 @@
         if (deleteModal) {
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    deleteForm.action = this.getAttribute('data-action');
+                    deleteForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action);
                     deleteModal.style.display = 'flex';
                 });
             });

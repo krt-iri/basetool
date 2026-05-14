@@ -1,7 +1,4 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
-public record SquadronShipDetailDto(
-    String ownerName,
-    String locationName,
-    boolean fitted
-) {}
+/** Data transfer record carrying Squadron Ship Detail payload. */
+public record SquadronShipDetailDto(String ownerName, String locationName, boolean fitted) {}

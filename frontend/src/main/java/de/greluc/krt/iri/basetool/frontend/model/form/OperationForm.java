@@ -1,8 +1,4 @@
 package de.greluc.krt.iri.basetool.frontend.model.form;
 
-public record OperationForm(
-    String name,
-    String description,
-    String status,
-    Long version
-) {}
+/** Form-binding object for Operation input. */
+public record OperationForm(String name, String description, String status, Long version) {}

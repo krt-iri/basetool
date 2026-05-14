@@ -3,10 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * Request DTO for updating the delivered status of an inventory item.
- * Includes the version field for optimistic locking.
+ * Request DTO for updating the delivered status of an inventory item. Includes the version field
+ * for optimistic locking.
  */
-public record UpdateDeliveredRequest(
-        @NotNull Boolean delivered,
-        @NotNull Long version
-) {}
+public record UpdateDeliveredRequest(@NotNull Boolean delivered, @NotNull Long version) {}

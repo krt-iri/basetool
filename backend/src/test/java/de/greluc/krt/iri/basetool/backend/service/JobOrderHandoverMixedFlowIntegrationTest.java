@@ -1,5 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
@@ -15,6 +19,9 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,180 +29,184 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
- * Mixed-flow regression test covering the partial-handover path that must NOT be broken
- * by the optimistic-locking fix in {@link JobOrderHandoverService}.
+ * Mixed-flow regression test covering the partial-handover path that must NOT be broken by the
+ * optimistic-locking fix in {@link JobOrderHandoverService}.
  *
  * <p>Scenario (MEMBER + LOGISTIKER, two required materials):
+ *
  * <ol>
- *   <li>First handover: material A is delivered in full, material B only partially &rArr;
- *       JobOrder must remain OPEN/IN_PROGRESS, material A counter at 0, material B
- *       counter still &gt; 0, inventory rows reflect the deduction.</li>
- *   <li>Second handover: the remaining amount of material B is delivered &rArr;
- *       JobOrder is COMPLETED, no {@code ObjectOptimisticLockingFailureException}.</li>
+ *   <li>First handover: material A is delivered in full, material B only partially &rArr; JobOrder
+ *       must remain OPEN/IN_PROGRESS, material A counter at 0, material B counter still &gt; 0,
+ *       inventory rows reflect the deduction.
+ *   <li>Second handover: the remaining amount of material B is delivered &rArr; JobOrder is
+ *       COMPLETED, no {@code ObjectOptimisticLockingFailureException}.
  * </ol>
  *
  * <p>This guards three concerns at once:
+ *
  * <ul>
- *   <li>partial deliveries still work (no regression of the bugfix),</li>
- *   <li>the deferred {@code unlinkJobOrderMaterial} bulk update only runs for fully
- *       fulfilled materials, never for partially fulfilled ones,</li>
- *   <li>a follow-up handover that finally completes the order still triggers the
- *       {@code completeJobOrderWithinTransaction} path correctly.</li>
+ *   <li>partial deliveries still work (no regression of the bugfix),
+ *   <li>the deferred {@code unlinkJobOrderMaterial} bulk update only runs for fully fulfilled
+ *       materials, never for partially fulfilled ones,
+ *   <li>a follow-up handover that finally completes the order still triggers the {@code
+ *       completeJobOrderWithinTransaction} path correctly.
  * </ul>
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class JobOrderHandoverMixedFlowIntegrationTest {
 
-    @Autowired private JobOrderHandoverService jobOrderHandoverService;
-    @Autowired private JobOrderRepository jobOrderRepository;
-    @Autowired private InventoryItemRepository inventoryItemRepository;
-    @Autowired private MaterialRepository materialRepository;
-    @Autowired private LocationRepository locationRepository;
-    @Autowired private UserRepository userRepository;
-    @Autowired private TransactionTemplate transactionTemplate;
+  @Autowired private JobOrderHandoverService jobOrderHandoverService;
+  @Autowired private JobOrderRepository jobOrderRepository;
+  @Autowired private InventoryItemRepository inventoryItemRepository;
+  @Autowired private MaterialRepository materialRepository;
+  @Autowired private LocationRepository locationRepository;
+  @Autowired private UserRepository userRepository;
+  @Autowired private TransactionTemplate transactionTemplate;
 
-    private record Fixture(UUID jobOrderId, UUID invItem1Id, UUID invItem2Id) {}
+  private record Fixture(UUID jobOrderId, UUID invItem1Id, UUID invItem2Id) {}
 
-    private Fixture prepareFixture() {
-        return transactionTemplate.execute(status -> {
-            User user = new User();
-            user.setId(UUID.randomUUID());
-            user.setUsername("logistiker-" + UUID.randomUUID());
-            userRepository.save(user);
+  private Fixture prepareFixture() {
+    return transactionTemplate.execute(
+        status -> {
+          User user = new User();
+          user.setId(UUID.randomUUID());
+          user.setUsername("logistiker-" + UUID.randomUUID());
+          userRepository.save(user);
 
-            Location location = new Location();
-            location.setName("Hub-" + UUID.randomUUID());
-            location = locationRepository.save(location);
+          Location location = new Location();
+          location.setName("Hub-" + UUID.randomUUID());
+          location = locationRepository.save(location);
 
-            Material aslarite = new Material();
-            aslarite.setName("Aslarite-" + UUID.randomUUID());
-            aslarite.setType(MaterialType.RAW);
-            aslarite = materialRepository.save(aslarite);
+          Material aslarite = new Material();
+          aslarite.setName("Aslarite-" + UUID.randomUUID());
+          aslarite.setType(MaterialType.RAW);
+          aslarite = materialRepository.save(aslarite);
 
-            Material ouratite = new Material();
-            ouratite.setName("Ouratite-" + UUID.randomUUID());
-            ouratite.setType(MaterialType.RAW);
-            ouratite = materialRepository.save(ouratite);
+          Material ouratite = new Material();
+          ouratite.setName("Ouratite-" + UUID.randomUUID());
+          ouratite.setType(MaterialType.RAW);
+          ouratite = materialRepository.save(ouratite);
 
-            JobOrder jobOrder = JobOrder.builder()
-                    .squadron("KARTELL")
-                    .handle("requester")
-                    .status(JobOrderStatus.OPEN)
-                    .build();
+          JobOrder jobOrder =
+              JobOrder.builder()
+                  .squadron("KARTELL")
+                  .handle("requester")
+                  .status(JobOrderStatus.OPEN)
+                  .build();
 
-            JobOrderMaterial m1 = JobOrderMaterial.builder()
-                    .material(aslarite)
-                    .minQuality(700)
-                    .amount(1.8)
-                    .build();
-            JobOrderMaterial m2 = JobOrderMaterial.builder()
-                    .material(ouratite)
-                    .minQuality(800)
-                    .amount(5.7)
-                    .build();
-            jobOrder.addMaterial(m1);
-            jobOrder.addMaterial(m2);
-            jobOrder = jobOrderRepository.save(jobOrder);
+          JobOrderMaterial m1 =
+              JobOrderMaterial.builder().material(aslarite).minQuality(700).amount(1.8).build();
+          JobOrderMaterial m2 =
+              JobOrderMaterial.builder().material(ouratite).minQuality(800).amount(5.7).build();
+          jobOrder.addMaterial(m1);
+          jobOrder.addMaterial(m2);
+          jobOrder = jobOrderRepository.save(jobOrder);
 
-            InventoryItem inv1 = new InventoryItem();
-            inv1.setUser(user);
-            inv1.setLocation(location);
-            inv1.setMaterial(aslarite);
-            inv1.setQuality(800);
-            inv1.setAmount(1.835);
-            inv1.setJobOrder(jobOrder);
-            inv1 = inventoryItemRepository.save(inv1);
+          InventoryItem inv1 = new InventoryItem();
+          inv1.setUser(user);
+          inv1.setLocation(location);
+          inv1.setMaterial(aslarite);
+          inv1.setQuality(800);
+          inv1.setAmount(1.835);
+          inv1.setJobOrder(jobOrder);
+          inv1 = inventoryItemRepository.save(inv1);
 
-            InventoryItem inv2 = new InventoryItem();
-            inv2.setUser(user);
-            inv2.setLocation(location);
-            inv2.setMaterial(ouratite);
-            inv2.setQuality(900);
-            inv2.setAmount(5.730999999999999);
-            inv2.setJobOrder(jobOrder);
-            inv2 = inventoryItemRepository.save(inv2);
+          InventoryItem inv2 = new InventoryItem();
+          inv2.setUser(user);
+          inv2.setLocation(location);
+          inv2.setMaterial(ouratite);
+          inv2.setQuality(900);
+          inv2.setAmount(5.730999999999999);
+          inv2.setJobOrder(jobOrder);
+          inv2 = inventoryItemRepository.save(inv2);
 
-            return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
+          return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
         });
-    }
+  }
 
-    @Test
-    @WithMockUser(username = "logistiker", roles = {"MEMBER", "LOGISTIKER"})
-    void mixedFullAndPartialHandover_keepsOrderOpen_thenSecondHandoverCompletesIt() {
-        Fixture f = prepareFixture();
+  @Test
+  @WithMockUser(
+      username = "logistiker",
+      roles = {"MEMBER", "LOGISTIKER"})
+  void mixedFullAndPartialHandover_keepsOrderOpen_thenSecondHandoverCompletesIt() {
+    Fixture f = prepareFixture();
 
-        // Step 1: deliver Aslarite fully (1.8) + Ouratite partially (2.0 of 5.7 required)
-        JobOrderHandoverCreateDto firstDto = new JobOrderHandoverCreateDto(
-                Instant.now(),
-                "swing-by",
-                "KARTELL",
-                List.of(
-                        new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8),
-                        new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0)
-                )
-        );
-        jobOrderHandoverService.createHandover(f.jobOrderId(), firstDto);
+    // Step 1: deliver Aslarite fully (1.8) + Ouratite partially (2.0 of 5.7 required)
+    JobOrderHandoverCreateDto firstDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(),
+            "swing-by",
+            "KARTELL",
+            List.of(
+                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8),
+                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0)));
+    jobOrderHandoverService.createHandover(f.jobOrderId(), firstDto);
 
-        Material ouratiteRef = transactionTemplate.execute(status -> {
-            JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
-            assertNotEquals(JobOrderStatus.COMPLETED, reloaded.getStatus(),
-                    "JobOrder must NOT be COMPLETED while a material is still partially open");
+    Material ouratiteRef =
+        transactionTemplate.execute(
+            status -> {
+              JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+              assertNotEquals(
+                  JobOrderStatus.COMPLETED,
+                  reloaded.getStatus(),
+                  "JobOrder must NOT be COMPLETED while a material is still partially open");
 
-            Material ouratiteFromMaterials = null;
-            for (JobOrderMaterial m : reloaded.getMaterials()) {
+              Material ouratiteFromMaterials = null;
+              for (JobOrderMaterial m : reloaded.getMaterials()) {
                 if (m.getAmount() <= 0.0001) {
-                    // Aslarite — fully fulfilled
-                    continue;
+                  // Aslarite — fully fulfilled
+                  continue;
                 }
                 // Ouratite — must still have ~3.7 open
-                assertEquals(3.7, m.getAmount(), 0.0001,
-                        "Ouratite remaining amount must reflect the partial handover");
+                assertEquals(
+                    3.7,
+                    m.getAmount(),
+                    0.0001,
+                    "Ouratite remaining amount must reflect the partial handover");
                 ouratiteFromMaterials = m.getMaterial();
-            }
+              }
 
-            // Inventory must reflect both deductions
-            InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElse(null);
-            // Aslarite inventory remaining 0.035 — kept (not deleted) because > 0.0001
-            assertTrue(inv1 != null, "Aslarite inventory row must still exist (remaining 0.035)");
-            assertEquals(0.035, inv1.getAmount(), 0.0001);
+              // Inventory must reflect both deductions
+              InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElse(null);
+              // Aslarite inventory remaining 0.035 — kept (not deleted) because > 0.0001
+              assertTrue(inv1 != null, "Aslarite inventory row must still exist (remaining 0.035)");
+              assertEquals(0.035, inv1.getAmount(), 0.0001);
 
-            InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
-            assertEquals(3.730999999999999, inv2.getAmount(), 0.0001);
+              InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
+              assertEquals(3.730999999999999, inv2.getAmount(), 0.0001);
 
-            return ouratiteFromMaterials;
+              return ouratiteFromMaterials;
+            });
+    assertTrue(ouratiteRef != null, "Ouratite material must still be open after partial handover");
+
+    // Step 2: deliver the remaining 3.7 of Ouratite — must complete the order
+    JobOrderHandoverCreateDto secondDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(),
+            "swing-by",
+            "KARTELL",
+            List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7)));
+    jobOrderHandoverService.createHandover(f.jobOrderId(), secondDto);
+
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+          assertEquals(
+              JobOrderStatus.COMPLETED,
+              reloaded.getStatus(),
+              "JobOrder must be COMPLETED after the final partial handover");
+          for (JobOrderMaterial m : reloaded.getMaterials()) {
+            assertTrue(
+                m.getAmount() <= 0.0001,
+                "All required materials must be fulfilled after final handover, but "
+                    + m.getMaterial().getName()
+                    + " is still "
+                    + m.getAmount());
+          }
+          InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
+          assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);
         });
-        assertTrue(ouratiteRef != null, "Ouratite material must still be open after partial handover");
-
-        // Step 2: deliver the remaining 3.7 of Ouratite — must complete the order
-        JobOrderHandoverCreateDto secondDto = new JobOrderHandoverCreateDto(
-                Instant.now(),
-                "swing-by",
-                "KARTELL",
-                List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7))
-        );
-        jobOrderHandoverService.createHandover(f.jobOrderId(), secondDto);
-
-        transactionTemplate.executeWithoutResult(status -> {
-            JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
-            assertEquals(JobOrderStatus.COMPLETED, reloaded.getStatus(),
-                    "JobOrder must be COMPLETED after the final partial handover");
-            for (JobOrderMaterial m : reloaded.getMaterials()) {
-                assertTrue(m.getAmount() <= 0.0001,
-                        "All required materials must be fulfilled after final handover, but "
-                                + m.getMaterial().getName() + " is still " + m.getAmount());
-            }
-            InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
-            assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);
-        });
-    }
+  }
 }

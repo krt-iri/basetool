@@ -4,13 +4,12 @@ import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
 import java.time.Instant;
 import java.util.UUID;
 
+/** Data transfer record carrying Operation payload. */
 public record OperationDto(
-        UUID id,
-        String name,
-        String description,
-        OperationStatus status,
-        Long version,
-        Instant createdAt,
-        Instant updatedAt
-) {
-}
+    UUID id,
+    String name,
+    String description,
+    OperationStatus status,
+    Long version,
+    Instant createdAt,
+    Instant updatedAt) {}

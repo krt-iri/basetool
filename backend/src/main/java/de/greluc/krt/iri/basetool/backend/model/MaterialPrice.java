@@ -1,12 +1,23 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
+/** Material Price JPA entity. */
 @Entity
 @Getter
 @Setter
@@ -16,27 +27,28 @@ import java.util.UUID;
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"material_id", "terminal_id"}))
 public class MaterialPrice extends AbstractEntity<UUID> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "material_id", nullable = false)
-    private Material material;
+  @ManyToOne(optional = false)
+  @JoinColumn(name = "material_id", nullable = false)
+  private Material material;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "terminal_id", nullable = false)
-    private Terminal terminal;
+  @ManyToOne(optional = false)
+  @JoinColumn(name = "terminal_id", nullable = false)
+  private Terminal terminal;
 
-    private BigDecimal priceBuy;
-    private BigDecimal priceSell;
+  private BigDecimal priceBuy;
+  private BigDecimal priceSell;
 
-    private Integer scuBuy;
-    private Integer scuSell;
-    private Integer scuSellStock;
+  private Integer scuBuy;
+  private Integer scuSell;
+  private Integer scuSellStock;
 
-    private Boolean statusBuy;
-    private Boolean statusSell;
+  private Boolean statusBuy;
+  private Boolean statusSell;
 
-    private Instant dateModified;
+  private Instant dateModified;
 }

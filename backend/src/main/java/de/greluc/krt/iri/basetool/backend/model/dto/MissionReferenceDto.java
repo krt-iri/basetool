@@ -3,9 +3,5 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import java.time.Instant;
 import java.util.UUID;
 
-public record MissionReferenceDto(
-        UUID id,
-        String name,
-        String status,
-        Instant plannedStartTime
-) {}
+/** Data transfer record carrying Mission Reference payload. */
+public record MissionReferenceDto(UUID id, String name, String status, Instant plannedStartTime) {}

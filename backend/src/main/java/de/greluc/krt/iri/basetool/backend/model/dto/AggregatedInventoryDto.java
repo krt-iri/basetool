@@ -1,7 +1,4 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
-public record AggregatedInventoryDto(
-    MaterialDto material,
-    Double quality,
-    Double amount
-) {}
+/** Data transfer record carrying Aggregated Inventory payload. */
+public record AggregatedInventoryDto(MaterialDto material, Double quality, Double amount) {}

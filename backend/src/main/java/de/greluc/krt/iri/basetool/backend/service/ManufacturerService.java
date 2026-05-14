@@ -1,11 +1,10 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
-import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.iri.basetool.backend.exception.EntityInUseException;
+import de.greluc.krt.iri.basetool.backend.config.CacheConfig;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.iri.basetool.backend.config.CacheConfig;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.annotation.CacheEvict;
@@ -15,36 +14,69 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
-
+/**
+ * Read service plus visibility toggle for the manufacturer catalog.
+ *
+ * <p>The catalog itself is owned by {@link UexManufacturerService}; this service exposes the cached
+ * read surface used by every page that needs a manufacturer dropdown, plus the admin-only {@code
+ * hidden} flag flip. Cache is the {@code manufacturers} cache from {@link CacheConfig} — 2-minute
+ * write-expire, evicted on any visibility change.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ManufacturerService {
 
-    private final ManufacturerRepository manufacturerRepository;
-    private final ShipTypeRepository shipTypeRepository;
+  private final ManufacturerRepository manufacturerRepository;
+  private final ShipTypeRepository shipTypeRepository;
 
-    @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
-    public Page<Manufacturer> getAllManufacturers(@NotNull Pageable pageable, boolean includeHidden) {
-        if (includeHidden) {
-            return manufacturerRepository.findAll(pageable);
-        }
-        return manufacturerRepository.findByHiddenFalse(pageable);
+  /**
+   * Returns a paged manufacturer list. {@code includeHidden=true} bypasses the {@code hidden=false}
+   * filter — used by the admin page so admins can un-hide entries.
+   *
+   * @param pageable page request (whitelisted sort fields applied by the controller)
+   * @param includeHidden true to include manufacturers marked hidden
+   * @return cached page result
+   */
+  @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
+  public Page<Manufacturer> getAllManufacturers(@NotNull Pageable pageable, boolean includeHidden) {
+    if (includeHidden) {
+      return manufacturerRepository.findAll(pageable);
     }
+    return manufacturerRepository.findByHiddenFalse(pageable);
+  }
 
-    @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
-    public Manufacturer getManufacturer(@NotNull UUID id) {
-        return manufacturerRepository.findById(id)
-            .orElseThrow(() -> new de.greluc.krt.iri.basetool.backend.exception.NotFoundException("Manufacturer not found"));
-    }
+  /**
+   * Looks up a single manufacturer by id.
+   *
+   * @param id manufacturer primary key
+   * @return the manufacturer
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no manufacturer
+   *     matches
+   */
+  @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
+  public Manufacturer getManufacturer(@NotNull UUID id) {
+    return manufacturerRepository
+        .findById(id)
+        .orElseThrow(
+            () ->
+                new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                    "Manufacturer not found"));
+  }
 
-    @Transactional
-    @CacheEvict(cacheNames = CacheConfig.MANUFACTURERS_CACHE, allEntries = true)
-    public Manufacturer updateManufacturerVisibility(@NotNull UUID id, boolean hidden) {
-        Manufacturer manufacturer = getManufacturer(id);
-        manufacturer.setHidden(hidden);
-        return manufacturerRepository.save(manufacturer);
-    }
+  /**
+   * Flips the {@code hidden} flag on a manufacturer. Evicts the full manufacturer cache so the next
+   * read sees the new state immediately.
+   *
+   * @param id manufacturer primary key
+   * @param hidden new flag value
+   * @return the persisted manufacturer
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.MANUFACTURERS_CACHE, allEntries = true)
+  public Manufacturer updateManufacturerVisibility(@NotNull UUID id, boolean hidden) {
+    Manufacturer manufacturer = getManufacturer(id);
+    manufacturer.setHidden(hidden);
+    return manufacturerRepository.save(manufacturer);
+  }
 }

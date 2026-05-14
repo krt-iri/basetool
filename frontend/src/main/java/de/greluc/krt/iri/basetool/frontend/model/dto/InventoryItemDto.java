@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
+/** Data transfer record carrying Inventory Item payload. */
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,
@@ -15,5 +16,4 @@ public record InventoryItemDto(
     UUID missionId,
     String missionName,
     String note,
-    Long version
-) {}
+    Long version) {}

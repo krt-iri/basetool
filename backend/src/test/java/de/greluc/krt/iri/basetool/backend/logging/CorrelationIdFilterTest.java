@@ -22,114 +22,113 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 /**
  * Verifies the MDC contract of {@link CorrelationIdFilter}:
+ *
  * <ul>
- *   <li>inbound correlation id header is honoured and echoed back</li>
- *   <li>missing header produces a fresh UUID</li>
- *   <li>unsafe inbound values are rejected to prevent log injection</li>
- *   <li>JWT {@code sub} is exposed via the {@code userId} MDC key</li>
- *   <li>MDC is cleared in {@code finally} to avoid thread leakage</li>
+ *   <li>inbound correlation id header is honoured and echoed back
+ *   <li>missing header produces a fresh UUID
+ *   <li>unsafe inbound values are rejected to prevent log injection
+ *   <li>JWT {@code sub} is exposed via the {@code userId} MDC key
+ *   <li>MDC is cleared in {@code finally} to avoid thread leakage
  * </ul>
  */
 class CorrelationIdFilterTest {
 
-    private final LoggingProperties props = new LoggingProperties();
-    private final CorrelationIdFilter filter = new CorrelationIdFilter(props);
+  private final LoggingProperties props = new LoggingProperties();
+  private final CorrelationIdFilter filter = new CorrelationIdFilter(props);
 
-    @AfterEach
-    void tearDown() {
-        MDC.clear();
-        SecurityContextHolder.clearContext();
-    }
+  @AfterEach
+  void tearDown() {
+    MDC.clear();
+    SecurityContextHolder.clearContext();
+  }
 
-    @Test
-    void missingHeader_ShouldGenerateUuidAndEchoBack() throws ServletException, IOException {
-        // Given
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicReference<String> mdcDuringChain = new AtomicReference<>();
-        FilterChain chain = (req, res) ->
-                mdcDuringChain.set(MDC.get(props.getCorrelationIdMdcKey()));
+  @Test
+  void missingHeader_ShouldGenerateUuidAndEchoBack() throws ServletException, IOException {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<String> mdcDuringChain = new AtomicReference<>();
+    FilterChain chain = (req, res) -> mdcDuringChain.set(MDC.get(props.getCorrelationIdMdcKey()));
 
-        // When
-        filter.doFilter(request, response, chain);
+    // When
+    filter.doFilter(request, response, chain);
 
-        // Then
-        String echoed = response.getHeader(props.getCorrelationIdHeader());
-        assertThat(echoed).isNotBlank();
-        assertThat(echoed).hasSize(36); // UUID length with dashes
-        assertThat(mdcDuringChain.get()).isEqualTo(echoed);
-        // MDC cleaned up in finally
-        assertThat(MDC.get(props.getCorrelationIdMdcKey())).isNull();
-    }
+    // Then
+    String echoed = response.getHeader(props.getCorrelationIdHeader());
+    assertThat(echoed).isNotBlank();
+    assertThat(echoed).hasSize(36); // UUID length with dashes
+    assertThat(mdcDuringChain.get()).isEqualTo(echoed);
+    // MDC cleaned up in finally
+    assertThat(MDC.get(props.getCorrelationIdMdcKey())).isNull();
+  }
 
-    @Test
-    void inboundHeader_ShouldBeReused() throws ServletException, IOException {
-        // Given
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
-        request.addHeader(props.getCorrelationIdHeader(), "req-abc-123");
-        MockHttpServletResponse response = new MockHttpServletResponse();
+  @Test
+  void inboundHeader_ShouldBeReused() throws ServletException, IOException {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
+    request.addHeader(props.getCorrelationIdHeader(), "req-abc-123");
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-        // When
-        filter.doFilter(request, response, (req, res) -> {});
+    // When
+    filter.doFilter(request, response, (req, res) -> {});
 
-        // Then
-        assertThat(response.getHeader(props.getCorrelationIdHeader())).isEqualTo("req-abc-123");
-    }
+    // Then
+    assertThat(response.getHeader(props.getCorrelationIdHeader())).isEqualTo("req-abc-123");
+  }
 
-    @Test
-    void unsafeInboundHeader_ShouldBeReplacedWithUuid() throws ServletException, IOException {
-        // Given: CR/LF injection attempt
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-        request.addHeader(props.getCorrelationIdHeader(), "abc\ninjected: evil");
-        MockHttpServletResponse response = new MockHttpServletResponse();
+  @Test
+  void unsafeInboundHeader_ShouldBeReplacedWithUuid() throws ServletException, IOException {
+    // Given: CR/LF injection attempt
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    request.addHeader(props.getCorrelationIdHeader(), "abc\ninjected: evil");
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-        // When
-        filter.doFilter(request, response, (req, res) -> {});
+    // When
+    filter.doFilter(request, response, (req, res) -> {});
 
-        // Then
-        String echoed = response.getHeader(props.getCorrelationIdHeader());
-        assertThat(echoed).doesNotContain("\n", "injected");
-        assertThat(echoed).hasSize(36);
-    }
+    // Then
+    String echoed = response.getHeader(props.getCorrelationIdHeader());
+    assertThat(echoed).doesNotContain("\n", "injected");
+    assertThat(echoed).hasSize(36);
+  }
 
-    @Test
-    void authenticatedRequest_ShouldPlaceJwtSubIntoMdc() throws ServletException, IOException {
-        // Given
-        Jwt jwt = mock(Jwt.class);
-        when(jwt.getSubject()).thenReturn("user-sub-42");
-        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt);
-        SecurityContextHolder.getContext().setAuthentication(auth);
+  @Test
+  void authenticatedRequest_ShouldPlaceJwtSubIntoMdc() throws ServletException, IOException {
+    // Given
+    Jwt jwt = mock(Jwt.class);
+    when(jwt.getSubject()).thenReturn("user-sub-42");
+    JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt);
+    SecurityContextHolder.getContext().setAuthentication(auth);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicReference<String> userIdDuringChain = new AtomicReference<>();
-        FilterChain chain = (req, res) ->
-                userIdDuringChain.set(MDC.get(props.getUserIdMdcKey()));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<String> userIdDuringChain = new AtomicReference<>();
+    FilterChain chain = (req, res) -> userIdDuringChain.set(MDC.get(props.getUserIdMdcKey()));
 
-        // When
-        filter.doFilter(request, response, chain);
+    // When
+    filter.doFilter(request, response, chain);
 
-        // Then
-        assertThat(userIdDuringChain.get()).isEqualTo("user-sub-42");
-        assertThat(MDC.get(props.getUserIdMdcKey())).isNull();
-    }
+    // Then
+    assertThat(userIdDuringChain.get()).isEqualTo("user-sub-42");
+    assertThat(MDC.get(props.getUserIdMdcKey())).isNull();
+  }
 
-    @Test
-    void unauthenticatedRequest_ShouldExposeAnonymousUserId() throws ServletException, IOException {
-        // Given: non-JWT principal (e.g. anonymous filter)
-        SecurityContextHolder.getContext().setAuthentication(
-                new AnonymousAuthenticationToken(
-                        "key", "anon",
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicReference<String> userIdDuringChain = new AtomicReference<>();
+  @Test
+  void unauthenticatedRequest_ShouldExposeAnonymousUserId() throws ServletException, IOException {
+    // Given: non-JWT principal (e.g. anonymous filter)
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new AnonymousAuthenticationToken(
+                "key", "anon", java.util.List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<String> userIdDuringChain = new AtomicReference<>();
 
-        // When
-        filter.doFilter(request, response,
-                (req, res) -> userIdDuringChain.set(MDC.get(props.getUserIdMdcKey())));
+    // When
+    filter.doFilter(
+        request, response, (req, res) -> userIdDuringChain.set(MDC.get(props.getUserIdMdcKey())));
 
-        // Then
-        assertThat(userIdDuringChain.get()).isEqualTo("anonymous");
-    }
+    // Then
+    assertThat(userIdDuringChain.get()).isEqualTo("anonymous");
+  }
 }

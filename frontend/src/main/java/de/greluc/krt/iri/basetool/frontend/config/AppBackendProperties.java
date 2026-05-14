@@ -7,13 +7,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+/** Type-safe App Backend configuration properties. */
 @Data
 @Configuration
 @Validated
 @ConfigurationProperties(prefix = "app")
 public class AppBackendProperties {
-    /** Base URL of the backend API used by the frontend. */
-    @NotBlank
-    @URL
-    private String backendUrl;
+  /** Base URL of the backend API used by the frontend. */
+  @NotBlank @URL private String backendUrl;
 }

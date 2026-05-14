@@ -13,6 +13,12 @@ import de.greluc.krt.iri.basetool.backend.repository.CityRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpaceStationRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -23,30 +29,24 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-
 /**
  * Domain service for the Personal Inventory feature.
  *
  * <p>Two parallel APIs:
+ *
  * <ul>
- *     <li>{@code *Own*} – owner-scoped, used by the user-facing controller. Every read
- *         and write goes through {@code findByIdAndOwnerSub} to enforce data isolation
- *         (see AGENTS.md "MULTI-USER DATA ISOLATION").</li>
- *     <li>{@code *ForUser*} – admin-scoped, used by the admin controller. The admin can
- *         load and modify items belonging to any user; method security on the controller
- *         (and a separate URL prefix) restricts this to {@code ROLE_ADMIN}.</li>
+ *   <li>{@code *Own*} – owner-scoped, used by the user-facing controller. Every read and write goes
+ *       through {@code findByIdAndOwnerSub} to enforce data isolation (see AGENTS.md "MULTI-USER
+ *       DATA ISOLATION").
+ *   <li>{@code *ForUser*} – admin-scoped, used by the admin controller. The admin can load and
+ *       modify items belonging to any user; method security on the controller (and a separate URL
+ *       prefix) restricts this to {@code ROLE_ADMIN}.
  * </ul>
  *
- * <p>Optimistic locking follows the project convention established in
- * {@code AnnouncementService} / {@code HangarService}: the inbound DTO carries the last
- * seen {@code version}; on mismatch, an {@link ObjectOptimisticLockingFailureException}
- * is raised explicitly so the global handler maps it to HTTP 409.
+ * <p>Optimistic locking follows the project convention established in {@code AnnouncementService} /
+ * {@code HangarService}: the inbound DTO carries the last seen {@code version}; on mismatch, an
+ * {@link ObjectOptimisticLockingFailureException} is raised explicitly so the global handler maps
+ * it to HTTP 409.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,187 +54,296 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class PersonalInventoryItemService {
 
-    /**
-     * Whitelist of sort properties accepted on list endpoints. Restricting this prevents
-     * unstable sorting and information disclosure via arbitrary sort keys (see AGENTS.md
-     * "Pagination & Sorting").
-     */
-    public static final Set<String> SORTABLE_FIELDS = Set.of(
-            "id", "name", "quantity", "locationNameSnapshot", "createdAt", "updatedAt"
-    );
+  /**
+   * Whitelist of sort properties accepted on list endpoints. Restricting this prevents unstable
+   * sorting and information disclosure via arbitrary sort keys (see AGENTS.md "Pagination &
+   * Sorting").
+   */
+  public static final Set<String> SORTABLE_FIELDS =
+      Set.of("id", "name", "quantity", "locationNameSnapshot", "createdAt", "updatedAt");
 
-    public static final String DEFAULT_SORT_FIELD = "updatedAt";
+  public static final String DEFAULT_SORT_FIELD = "updatedAt";
 
-    private final PersonalInventoryItemRepository repository;
-    private final PersonalInventoryItemMapper mapper;
-    private final CityRepository cityRepository;
-    private final SpaceStationRepository spaceStationRepository;
+  private final PersonalInventoryItemRepository repository;
+  private final PersonalInventoryItemMapper mapper;
+  private final CityRepository cityRepository;
+  private final SpaceStationRepository spaceStationRepository;
 
-    // ---------------------------------------------------------------------------------
-    // Owner-scoped API
-    // ---------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // Owner-scoped API
+  // ---------------------------------------------------------------------------------
 
-    public Page<PersonalInventoryItemResponse> listOwn(@NotNull String ownerSub,
-                                                      @Nullable String query,
-                                                      @NotNull Pageable pageable) {
-        Page<PersonalInventoryItem> page = (query == null || query.isBlank())
-                ? repository.findAllByOwnerSub(ownerSub, pageable)
-                : repository.findAllByOwnerSubAndNameContainingIgnoreCase(ownerSub, query.trim(), pageable);
-        return page.map(mapper::toResponse);
-    }
+  /**
+   * Owner-scoped paged list. Every row is filtered by {@code ownerSub} so a caller can never see
+   * another user's items even if they craft the query parameters.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param query optional case-insensitive substring filter on the item name
+   * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
+   * @return paged response DTOs
+   */
+  public Page<PersonalInventoryItemResponse> listOwn(
+      @NotNull String ownerSub, @Nullable String query, @NotNull Pageable pageable) {
+    Page<PersonalInventoryItem> page =
+        (query == null || query.isBlank())
+            ? repository.findAllByOwnerSub(ownerSub, pageable)
+            : repository.findAllByOwnerSubAndNameContainingIgnoreCase(
+                ownerSub, query.trim(), pageable);
+    return page.map(mapper::toResponse);
+  }
 
-    public PersonalInventoryItemResponse getOwn(@NotNull String ownerSub, @NotNull UUID id) {
-        return mapper.toResponse(loadOwn(ownerSub, id));
-    }
+  /**
+   * Owner-scoped lookup of a single item. Returns 404 if the id is unknown OR if the item belongs
+   * to a different user (the two cases are deliberately indistinguishable in the response so a
+   * caller cannot probe for other users' item ids).
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @return response DTO
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   */
+  public PersonalInventoryItemResponse getOwn(@NotNull String ownerSub, @NotNull UUID id) {
+    return mapper.toResponse(loadOwn(ownerSub, id));
+  }
 
-    @Transactional
-    public PersonalInventoryItemResponse createOwn(@NotNull String ownerSub,
-                                                   @NotNull PersonalInventoryItemCreateRequest request) {
-        String snapshot = resolveLocationName(request.locationType(), request.locationUexId());
-        PersonalInventoryItem entity = mapper.toEntity(request);
-        entity.setOwnerSub(ownerSub);
-        entity.setLocationNameSnapshot(snapshot);
-        PersonalInventoryItem saved = repository.save(entity);
-        log.info("Created personal inventory item id={} for ownerSub={}", saved.getId(), ownerSub);
-        return mapper.toResponse(saved);
-    }
+  /**
+   * Creates an item owned by the caller. The location name is resolved against the local UEX mirror
+   * and stored as a snapshot so a future UEX rename of the city/station does not silently change
+   * the displayed location.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param request create payload
+   * @return the persisted DTO
+   */
+  @Transactional
+  public PersonalInventoryItemResponse createOwn(
+      @NotNull String ownerSub, @NotNull PersonalInventoryItemCreateRequest request) {
+    String snapshot = resolveLocationName(request.locationType(), request.locationUexId());
+    PersonalInventoryItem entity = mapper.toEntity(request);
+    entity.setOwnerSub(ownerSub);
+    entity.setLocationNameSnapshot(snapshot);
+    PersonalInventoryItem saved = repository.save(entity);
+    log.info("Created personal inventory item id={} for ownerSub={}", saved.getId(), ownerSub);
+    return mapper.toResponse(saved);
+  }
 
-    @Transactional
-    public PersonalInventoryItemResponse updateOwn(@NotNull String ownerSub,
-                                                   @NotNull UUID id,
-                                                   @NotNull PersonalInventoryItemUpdateRequest request) {
-        PersonalInventoryItem entity = loadOwn(ownerSub, id);
-        return applyUpdate(entity, request);
-    }
+  /**
+   * Updates an owner-scoped item with explicit optimistic-lock check. Re-resolves the location
+   * snapshot only when the location reference actually changed.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  public PersonalInventoryItemResponse updateOwn(
+      @NotNull String ownerSub,
+      @NotNull UUID id,
+      @NotNull PersonalInventoryItemUpdateRequest request) {
+    PersonalInventoryItem entity = loadOwn(ownerSub, id);
+    return applyUpdate(entity, request);
+  }
 
-    @Transactional
-    public void deleteOwn(@NotNull String ownerSub, @NotNull UUID id) {
-        PersonalInventoryItem entity = loadOwn(ownerSub, id);
-        repository.delete(entity);
-        log.info("Deleted personal inventory item id={} for ownerSub={}", id, ownerSub);
-    }
+  /**
+   * Deletes an owner-scoped item. 404 for unknown id / cross-owner attempts.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id item primary key
+   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   */
+  @Transactional
+  public void deleteOwn(@NotNull String ownerSub, @NotNull UUID id) {
+    PersonalInventoryItem entity = loadOwn(ownerSub, id);
+    repository.delete(entity);
+    log.info("Deleted personal inventory item id={} for ownerSub={}", id, ownerSub);
+  }
 
-    // ---------------------------------------------------------------------------------
-    // Admin-scoped API – callers MUST be guarded by @PreAuthorize("hasRole('ADMIN')")
-    // on the controller layer. The service does NOT re-check the role; it trusts its
-    // controller binding to keep this method out of reach of regular users.
-    // ---------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // Admin-scoped API – callers MUST be guarded by @PreAuthorize("hasRole('ADMIN')")
+  // on the controller layer. The service does NOT re-check the role; it trusts its
+  // controller binding to keep this method out of reach of regular users.
+  // ---------------------------------------------------------------------------------
 
-    public Page<PersonalInventoryItemResponse> listForUser(@NotNull String targetSub,
-                                                           @Nullable String query,
-                                                           @NotNull Pageable pageable) {
-        return listOwn(targetSub, query, pageable);
-    }
+  /**
+   * Admin-scoped list. Identical implementation to {@link #listOwn} — the {@code targetSub}
+   * supplies the filter — but exposed under a separate name so the controller boundary is
+   * unambiguous: admins call this, regular users never can.
+   *
+   * @param targetSub Keycloak {@code sub} of the user being inspected
+   * @param query optional name filter
+   * @param pageable page request
+   * @return paged response DTOs
+   */
+  public Page<PersonalInventoryItemResponse> listForUser(
+      @NotNull String targetSub, @Nullable String query, @NotNull Pageable pageable) {
+    return listOwn(targetSub, query, pageable);
+  }
 
-    @Transactional
-    public PersonalInventoryItemResponse createForUser(@NotNull String targetSub,
-                                                       @NotNull PersonalInventoryItemCreateRequest request) {
-        return createOwn(targetSub, request);
-    }
+  /**
+   * Admin-scoped create. Delegates to {@link #createOwn}; the controller layer is responsible for
+   * enforcing the ADMIN role.
+   *
+   * @param targetSub Keycloak {@code sub} of the user to create the item for
+   * @param request create payload
+   * @return the persisted DTO
+   */
+  @Transactional
+  public PersonalInventoryItemResponse createForUser(
+      @NotNull String targetSub, @NotNull PersonalInventoryItemCreateRequest request) {
+    return createOwn(targetSub, request);
+  }
 
-    @Transactional
-    public PersonalInventoryItemResponse updateForUser(@NotNull UUID id,
-                                                      @NotNull PersonalInventoryItemUpdateRequest request) {
-        PersonalInventoryItem entity = repository.findById(id).orElseThrow(
+  /**
+   * Admin-scoped update. Unlike {@link #updateOwn} this lookups the row by id alone — admins are
+   * trusted to know which item they're editing. Optimistic-lock check still applies.
+   *
+   * @param id item primary key
+   * @param request update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the item id is unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  public PersonalInventoryItemResponse updateForUser(
+      @NotNull UUID id, @NotNull PersonalInventoryItemUpdateRequest request) {
+    PersonalInventoryItem entity =
+        repository
+            .findById(id)
+            .orElseThrow(
                 () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
-        return applyUpdate(entity, request);
-    }
+    return applyUpdate(entity, request);
+  }
 
-    @Transactional
-    public void deleteForUser(@NotNull UUID id) {
-        PersonalInventoryItem entity = repository.findById(id).orElseThrow(
+  /**
+   * Admin-scoped delete. Resolves by id alone; logs the owner sub at INFO so the audit trail shows
+   * which user's data was removed by which admin call.
+   *
+   * @param id item primary key
+   * @throws EntityNotFoundException when the item id is unknown
+   */
+  @Transactional
+  public void deleteForUser(@NotNull UUID id) {
+    PersonalInventoryItem entity =
+        repository
+            .findById(id)
+            .orElseThrow(
                 () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
-        repository.delete(entity);
-        log.info("Admin deleted personal inventory item id={} ownerSub={}", id, entity.getOwnerSub());
+    repository.delete(entity);
+    log.info("Admin deleted personal inventory item id={} ownerSub={}", id, entity.getOwnerSub());
+  }
+
+  // ---------------------------------------------------------------------------------
+  // UEX location lookup – uses the locally synced UEX mirror (City / SpaceStation)
+  // ---------------------------------------------------------------------------------
+
+  /**
+   * Combined search across the locally synced UEX cities and space stations. Returns at most {@code
+   * limit} entries, alphabetically sorted by name.
+   */
+  public List<UexLocationDto> searchLocations(@Nullable String query, int limit) {
+    String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+    final int cap = Math.max(1, Math.min(limit, 2000));
+
+    List<UexLocationDto> hits = new java.util.ArrayList<>();
+    for (City c : cityRepository.findAll()) {
+      if (c.getIdCity() == null || c.getName() == null) {
+        continue;
+      }
+      if (!needle.isEmpty() && !c.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+        continue;
+      }
+      hits.add(
+          new UexLocationDto(
+              c.getIdCity(),
+              PersonalInventoryLocationType.CITY,
+              c.getName(),
+              c.getStarSystemName(),
+              c.getPlanetName()));
     }
-
-    // ---------------------------------------------------------------------------------
-    // UEX location lookup – uses the locally synced UEX mirror (City / SpaceStation)
-    // ---------------------------------------------------------------------------------
-
-    /**
-     * Combined search across the locally synced UEX cities and space stations.
-     * Returns at most {@code limit} entries, alphabetically sorted by name.
-     */
-    public List<UexLocationDto> searchLocations(@Nullable String query, int limit) {
-        String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        int cap = Math.max(1, Math.min(limit, 2000));
-
-        List<UexLocationDto> hits = new java.util.ArrayList<>();
-        for (City c : cityRepository.findAll()) {
-            if (c.getIdCity() == null || c.getName() == null) continue;
-            if (!needle.isEmpty() && !c.getName().toLowerCase(Locale.ROOT).contains(needle)) continue;
-            hits.add(new UexLocationDto(
-                    c.getIdCity(),
-                    PersonalInventoryLocationType.CITY,
-                    c.getName(),
-                    c.getStarSystemName(),
-                    c.getPlanetName()));
-        }
-        for (SpaceStation s : spaceStationRepository.findAll()) {
-            if (s.getIdSpaceStation() == null || s.getName() == null) continue;
-            if (!needle.isEmpty() && !s.getName().toLowerCase(Locale.ROOT).contains(needle)) continue;
-            hits.add(new UexLocationDto(
-                    s.getIdSpaceStation(),
-                    PersonalInventoryLocationType.SPACE_STATION,
-                    s.getName(),
-                    s.getStarSystemName(),
-                    null));
-        }
-        hits.sort(Comparator.comparing(UexLocationDto::name, Comparator.nullsLast(String::compareToIgnoreCase)));
-        return hits.size() > cap ? hits.subList(0, cap) : hits;
+    for (SpaceStation s : spaceStationRepository.findAll()) {
+      if (s.getIdSpaceStation() == null || s.getName() == null) {
+        continue;
+      }
+      if (!needle.isEmpty() && !s.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+        continue;
+      }
+      hits.add(
+          new UexLocationDto(
+              s.getIdSpaceStation(),
+              PersonalInventoryLocationType.SPACE_STATION,
+              s.getName(),
+              s.getStarSystemName(),
+              null));
     }
+    hits.sort(
+        Comparator.comparing(
+            UexLocationDto::name, Comparator.nullsLast(String::compareToIgnoreCase)));
+    return hits.size() > cap ? hits.subList(0, cap) : hits;
+  }
 
-    // ---------------------------------------------------------------------------------
-    // Internal helpers
-    // ---------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------------
 
-    @NotNull
-    private PersonalInventoryItem loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
-        return repository.findByIdAndOwnerSub(id, ownerSub).orElseThrow(() -> {
-            log.warn("Access denied or not found: ownerSub={} requested id={}", ownerSub, id);
-            return new EntityNotFoundException("PersonalInventoryItem not found: " + id);
-        });
+  @NotNull
+  private PersonalInventoryItem loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
+    return repository
+        .findByIdAndOwnerSub(id, ownerSub)
+        .orElseThrow(
+            () -> {
+              log.warn("Access denied or not found: ownerSub={} requested id={}", ownerSub, id);
+              return new EntityNotFoundException("PersonalInventoryItem not found: " + id);
+            });
+  }
+
+  @NotNull
+  private PersonalInventoryItemResponse applyUpdate(
+      @NotNull PersonalInventoryItem entity, @NotNull PersonalInventoryItemUpdateRequest request) {
+    // Manual optimistic-lock check; mirrored from AnnouncementService convention.
+    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
+      throw new ObjectOptimisticLockingFailureException(
+          PersonalInventoryItem.class, entity.getId());
     }
+    // Re-resolve the location snapshot if the location reference changed.
+    boolean locationChanged =
+        !Objects.equals(entity.getLocationUexId(), request.locationUexId())
+            || !Objects.equals(entity.getLocationType(), request.locationType());
+    String snapshot =
+        locationChanged
+            ? resolveLocationName(request.locationType(), request.locationUexId())
+            : entity.getLocationNameSnapshot();
 
-    @NotNull
-    private PersonalInventoryItemResponse applyUpdate(@NotNull PersonalInventoryItem entity,
-                                                     @NotNull PersonalInventoryItemUpdateRequest request) {
-        // Manual optimistic-lock check; mirrored from AnnouncementService convention.
-        if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
-            throw new ObjectOptimisticLockingFailureException(PersonalInventoryItem.class, entity.getId());
-        }
-        // Re-resolve the location snapshot if the location reference changed.
-        boolean locationChanged = !Objects.equals(entity.getLocationUexId(), request.locationUexId())
-                || !Objects.equals(entity.getLocationType(), request.locationType());
-        String snapshot = locationChanged
-                ? resolveLocationName(request.locationType(), request.locationUexId())
-                : entity.getLocationNameSnapshot();
+    mapper.updateEntity(entity, request);
+    entity.setLocationNameSnapshot(snapshot);
+    PersonalInventoryItem saved = repository.save(entity);
+    log.info(
+        "Updated personal inventory item id={} ownerSub={}", saved.getId(), saved.getOwnerSub());
+    return mapper.toResponse(saved);
+  }
 
-        mapper.updateEntity(entity, request);
-        entity.setLocationNameSnapshot(snapshot);
-        PersonalInventoryItem saved = repository.save(entity);
-        log.info("Updated personal inventory item id={} ownerSub={}", saved.getId(), saved.getOwnerSub());
-        return mapper.toResponse(saved);
-    }
-
-    /**
-     * Resolves the human-readable name of a UEX location from the local mirror.
-     * Throws {@link EntityNotFoundException} (→ HTTP 404 via the global handler) if the
-     * referenced location does not exist – this prevents creating dangling references.
-     */
-    @NotNull
-    private String resolveLocationName(@NotNull PersonalInventoryLocationType type,
-                                       @NotNull Integer uexId) {
-        return switch (type) {
-            case CITY -> cityRepository.findByIdCity(uexId)
-                    .map(City::getName)
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "UEX city not found: id=" + uexId));
-            case SPACE_STATION -> spaceStationRepository.findByIdSpaceStation(uexId)
-                    .map(SpaceStation::getName)
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "UEX space station not found: id=" + uexId));
-        };
-    }
+  /**
+   * Resolves the human-readable name of a UEX location from the local mirror. Throws {@link
+   * EntityNotFoundException} (→ HTTP 404 via the global handler) if the referenced location does
+   * not exist – this prevents creating dangling references.
+   */
+  @NotNull
+  private String resolveLocationName(
+      @NotNull PersonalInventoryLocationType type, @NotNull Integer uexId) {
+    return switch (type) {
+      case CITY ->
+          cityRepository
+              .findByIdCity(uexId)
+              .map(City::getName)
+              .orElseThrow(() -> new EntityNotFoundException("UEX city not found: id=" + uexId));
+      case SPACE_STATION ->
+          spaceStationRepository
+              .findByIdSpaceStation(uexId)
+              .map(SpaceStation::getName)
+              .orElseThrow(
+                  () -> new EntityNotFoundException("UEX space station not found: id=" + uexId));
+    };
+  }
 }
