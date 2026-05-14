@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:3703b4ee-dc2a-4d8d-a39d-3558878d86e6" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:c594beff-d208-4a5f-8501-7d94a9e25ba8" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-14T12:05:38Z</timestamp>
+    <timestamp>2026-05-14T12:13:35Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -533,19 +533,20 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@2.2.5?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar">
       <group>com.github.librepdf</group>
       <name>openpdf</name>
-      <version>2.2.5</version>
+      <version>3.0.4</version>
+      <description>Open and Free PDF library. It uses the new package name `org.openpdf`.</description>
       <hashes>
-        <hash alg="MD5">354af7d5cf93157e4bf9f8af995406df</hash>
-        <hash alg="SHA-1">f7e44d276200175f248b75ef299e5aaaa29dbd88</hash>
-        <hash alg="SHA-256">3d280540273edc46400fa7888737ba5f53ad4a6a7f33223409f5a2a41bd2e048</hash>
-        <hash alg="SHA-512">49306832117364d51424181f3aabc0bb2ce15080a85d48b6f4c842cff1241b00011404680cca12d659057455d620f96e1fc788f165c797e3b6a2f7b0aaafcf43</hash>
-        <hash alg="SHA-384">cb337b5aae7da5d7464df5845e2443d0d3c19ebe698e3b9e4b7b95359f23129264e673bbbd429c08a25a720b70246f5b</hash>
-        <hash alg="SHA3-384">d2087917330b97a752f2ff436bca50291253e3604992b25aeb4e21c5c1e63ae3a50342cd6f3a43b82f0d68dc4679f207</hash>
-        <hash alg="SHA3-256">c83c51aeb071ce737ea33fc2dbf546519d31df88be3035b695d3228c89b5baed</hash>
-        <hash alg="SHA3-512">05c12770b7e9f95470c2800e7b04acde71ab3faecf20832324699f7247f4419a48539d4725b84f421fdc5eaecfc8849a588a0d4e4a82f62b17c2a9a7799bdc32</hash>
+        <hash alg="MD5">9eb85871cd0e707dddaf9cf8d6561e2c</hash>
+        <hash alg="SHA-1">973d0c4427a43a94f83c8d3d62415553b6e247a5</hash>
+        <hash alg="SHA-256">838993e2be202e31ac9ba72305fb8c1f51165df51e4ca4f02e68d491436772ec</hash>
+        <hash alg="SHA-512">049e396613d3eef191ea2e5f39a1e6612e7c3fad83554743de2b102643da7dc1170df5033fa04b32ba799332ed1e234111c59d0cc9e7fd49a78db2e2801f4e7c</hash>
+        <hash alg="SHA-384">5bc5cfbdae5a19efa39696d9d216c862810f04435e978181813a573bef4dfb931e898178862afd38349f9e5c44b79475</hash>
+        <hash alg="SHA3-384">1d00bfefb9721ae9019001424da535d29c5cb1c37cb8a9e4c930e5dc715c5bc6634e26edd63a03548b6e832a238f8dff</hash>
+        <hash alg="SHA3-256">cef7a48e18910a73df54f946cbd9c05f9f47eeb8594d4a97c62320b493c4a8fe</hash>
+        <hash alg="SHA3-512">959ea5b907080acde930001dada3f5182a2a173c850fb21e5c4314a8a138bc843b9212bba43e1cd9cdcff858318521b77295d635b20dc7b0a3d6a3cb54bcfffc</hash>
       </hashes>
       <licenses>
         <license>
@@ -557,7 +558,7 @@ of Jackson components maintained by FasterXML.com</description>
           <url>https://www.mozilla.org/en-US/MPL/2.0/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.librepdf/openpdf@2.2.5?type=jar</purl>
+      <purl>pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -9602,7 +9603,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.github.docker-java/docker-java-transport@3.7.1?type=jar"/>
-    <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.2.5?type=jar"/>
+    <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar"/>
     <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar">
       <dependency ref="pkg:maven/com.google.code.findbugs/jsr305@3.0.2?type=jar"/>
       <dependency ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom"/>
@@ -9702,7 +9703,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar"/>
-      <dependency ref="pkg:maven/com.github.librepdf/openpdf@2.2.5?type=jar"/>
+      <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar"/>
       <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar"/>
