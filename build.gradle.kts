@@ -202,9 +202,10 @@ subprojects {
         // the return type of that method changed in JDK 25 (Queue -> Deque) and the
         // reflection lookup explodes with `NoSuchMethodError`. CI runs JDK 25 Temurin
         // (see `.github/workflows/ci.yml`), so the default version fails 767 files
-        // with `google-java-format(java.lang.NoSuchMethodError)`. 1.28.0 (the first
-        // release that targets the new signature) restores compatibility.
-        googleJavaFormat("1.28.0").reflowLongStrings()
+        // with `google-java-format(java.lang.NoSuchMethodError)`. 1.35.0 is the
+        // current release that targets the new signature and tracks the latest
+        // formatter changes.
+        googleJavaFormat("1.35.0").reflowLongStrings()
         removeUnusedImports()
       }
     }
