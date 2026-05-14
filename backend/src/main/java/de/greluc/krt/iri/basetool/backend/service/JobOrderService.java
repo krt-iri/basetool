@@ -319,18 +319,17 @@ public class JobOrderService {
 
     activeOrders.remove(targetOrder);
 
-    // The CodeQL `java/tainted-arithmetic` analyser flags `newPriority - 1` as a potential
-    // underflow because `newPriority` comes from a request DTO. The two `if`-branches below
-    // clamp `newIndex` into `[0, activeOrders.size()]` before it is used in the
-    // `activeOrders.add(newIndex, ...)` call on line 330, so the arithmetic is safe even
-    // for `Integer.MIN_VALUE`. The analyser doesn't recognise the clamp pair.
-    int newIndex = newPriority - 1; // lgtm[java/tainted-arithmetic] underflow clamped below
-    if (newIndex < 0) {
-      newIndex = 0;
-    }
-    if (newIndex > activeOrders.size()) {
-      newIndex = activeOrders.size();
-    }
+    // Clamp `newPriority` BEFORE the subtraction so the arithmetic operates on
+    // already-sanitised input. `newPriority` is sourced from a request DTO; doing
+    // `newPriority - 1` directly and clamping afterwards (the previous shape) trips
+    // CodeQL's `java/tainted-arithmetic` rule — it walks the taint into the `- 1`
+    // expression and doesn't recognise the post-hoc `if (newIndex < 0)` clamp as a
+    // sanitiser. `Math.max(...)` / `Math.min(...)` ARE recognised as sanitisers, so
+    // pre-clamping `newPriority` into `[1, activeOrders.size() + 1]` makes the
+    // subsequent `- 1` safe by construction (result is in `[0, activeOrders.size()]`,
+    // exactly the contract the call site below expects).
+    int clampedPriority = Math.max(1, Math.min(activeOrders.size() + 1, newPriority));
+    int newIndex = clampedPriority - 1;
 
     activeOrders.add(newIndex, targetOrder);
 
