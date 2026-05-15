@@ -55,13 +55,13 @@
 
     <!-- Squadrons Section -->
     <div class="hud-box data-section mt-2" id="squadrons-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'squadrons-box')">
+        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box">
             <h2 th:text="#{admin.mission_data.squadrons}" style="margin: 0;">Staffeln</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}" onchange="document.getElementById('squadron-filter-form').submit();">
+                    <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}" data-trigger="submit-form-by-id" data-form-id="squadron-filter-form">
                     <label for="includeInactiveSquadrons" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-squadron-btn" class="btn" th:data-action="@{/admin/mission-data/squadrons}" th:text="#{admin.squadron.create}">Neue Staffel</button>
@@ -113,13 +113,13 @@
 
     <!-- JobTypes Section -->
     <div class="hud-box data-section mt-2" id="jobtypes-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'jobtypes-box')">
+        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
             <h2 th:text="#{admin.mission_data.job_types}" style="margin: 0;">Aufgabenwünsche</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/admin/mission-data}" method="get" id="filter-form" class="no-track" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}" onchange="document.getElementById('filter-form').submit();">
+                    <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}" data-trigger="submit-form-by-id" data-form-id="filter-form">
                     <label for="includeInactiveJobTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-jobtype-btn" class="btn" th:data-action="@{/admin/mission-data/job-types}" th:text="#{admin.job_type.create}">Neuer Job</button>
@@ -175,13 +175,13 @@
 
     <!-- FrequencyTypes Section -->
     <div class="hud-box data-section mt-2" id="freqtypes-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" onclick="toggleBox(event, 'freqtypes-box')">
+        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box">
             <h2 th:text="#{admin.mission_data.frequency_types}" style="margin: 0;">Frequenztypen</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
-                    <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}" onchange="document.getElementById('freqtype-filter-form').submit();">
+                    <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}" data-trigger="submit-form-by-id" data-form-id="freqtype-filter-form">
                     <label for="includeInactiveFrequencyTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-freqtype-btn" class="btn" th:data-action="@{/admin/mission-data/frequency-types}" th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</button>
@@ -585,6 +585,19 @@
     document.addEventListener('DOMContentLoaded', () => {
         setupDragAndDrop('freq-table-body', '/admin/mission-data/frequency-types/reorder');
     });
+
+    // CSP-safe delegated bindings (replaces onclick="toggleBox(event, '<box>')" and
+    // onchange="document.getElementById('<form>').submit();" inline handlers).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'mission-data-toggle-box', function (el, event) {
+            toggleBox(event, el.getAttribute('data-box-id'));
+        });
+    }
+    // Note: the three filter-form checkboxes now use the global submit-form-by-id handler
+    // from common-handlers.js (which submits a form by id when the checkbox changes — wired
+    // for the `click` event there but also covers checkbox `change` via the change-listener
+    // counterpart below, ensuring keyboard activation still submits the filter form).
+    // Triggered via data-trigger="submit-form-by-id" data-form-id="…" on the checkbox.
 </script>
 </body>
 </html>

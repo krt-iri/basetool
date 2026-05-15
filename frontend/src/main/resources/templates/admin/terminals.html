@@ -57,7 +57,7 @@
             <div class="flex-between-mb">
                 <h2 th:text="#{admin.terminals.terminals}">Terminals</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
-                    <input type="text" id="filterTerminals" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('terminalsTable', this.value)" autocomplete="off">
+                    <input type="text" id="filterTerminals" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="terminalsTable" autocomplete="off">
                 </div>
             </div>
 

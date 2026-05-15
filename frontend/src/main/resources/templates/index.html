@@ -37,12 +37,12 @@
     <div class="grid-auto-cards mt-2">
     <!-- Info Section -->
     <div sec:authorize="isAuthenticated()" class="hud-box" th:if="${announcement}">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; cursor: pointer;" id="info-header" onclick="toggleInfo()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; cursor: pointer;" id="info-header" data-trigger="index-toggle-info">
              <div style="display:flex; align-items:center; gap: 0.5rem;">
                  <span id="info-toggle-icon" th:text="${unreadAnnouncement ? '▼' : '▶'}">▼</span>
                  <h2 th:text="#{info.title}" style="margin:0;">Information</h2>
              </div>
-             <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" style="margin:0;" onclick="event.stopPropagation();">
+             <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" style="margin:0;" data-trigger="stop-propagation">
                  <input type="hidden" name="id" th:value="${announcement.id}" />
                  <button type="submit" class="btn" th:text="#{info.mark_read}">Als gelesen markieren</button>
              </form>
@@ -88,8 +88,15 @@
         }
     }
 
+    // CSP-safe delegated binding (replaces the historical onclick="toggleInfo()" inline handler
+    // on #info-header — the form-inside-the-header keeps event-propagation isolated via the
+    // shared `stop-propagation` action declared on its `data-trigger` attribute).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'index-toggle-info', toggleInfo);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        
+
         // Markdown Render
         const infoContent = document.getElementById('info-content');
         if (infoContent && window.marked) {

@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:6d337a55-80e5-46f8-84e9-9ff1a64166d3",
+  "serialNumber" : "urn:uuid:2c66720b-1607-44df-acaa-9c024635212c",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-14T20:23:06Z",
+    "timestamp" : "2026-05-15T20:27:00Z",
     "tools" : {
       "components" : [
         {
@@ -466,6 +466,63 @@
           "url" : "https://github.com/FasterXML/jackson-databind"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar",
+      "group" : "com.fasterxml.jackson.datatype",
+      "name" : "jackson-datatype-jsr310",
+      "version" : "2.21.2",
+      "description" : "Add-on module to support JSR-310 (Java 8 Date & Time API) data types.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "6687c3b16dbc8c1f25536d1888d0822a"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "65b0cef8d997561541b7db6bbb1f6d42913b60e0"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "a083d57cd1c4a28fefcc6bd071740779eb7fc1c22a3c1b40451b5477c443f02f"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "f82a57f7bcd13051e358c9f296ed7b6cd33ddd39b70f655644425d7de5c01672106715f767993d7cb689efd1d5cf62070884e05e0b281178664cc879c76e7cf1"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "fcc9843f2edba8967804919ce8f32a43c8f0bbdf5912786efb475a1f0ccf9ed1a00d5138a656b24d02f21c1f7827a249"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "4eb968169fc1c67d5ab3bbb24220e2704a7717ecdd136969c5fc592f133409315f35ba469371d7421accac61b160e130"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "5124918ece7931d2c3b8df169d99d75012153bc9350b471cc5ae3e55fe5553f3"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "4e0575fe8524c507cc8adcc9882d250a42f6f22f45c01749b861d7ec9da92cc8199c5a9ecc15229be428ffa6b1f29bb259ecb1308690af4cca2c27e80ab10688"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -17185,6 +17242,15 @@
       ]
     },
     {
+      "ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar",
+      "dependsOn" : [
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.2?type=pom"
+      ]
+    },
+    {
       "ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.21.2?type=pom",
       "dependsOn" : [ ]
     },
@@ -17392,6 +17458,7 @@
       "ref" : "pkg:maven/de.greluc.krt.iri.basetool/frontend@0.0.1-SNAPSHOT?project_path=%3Afrontend",
       "dependsOn" : [
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar",
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar",

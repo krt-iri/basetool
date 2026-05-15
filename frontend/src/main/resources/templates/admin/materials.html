@@ -98,7 +98,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
-                    <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" onkeyup="filterTable('materialsTable', this.value)" autocomplete="off">
+                    <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
                 </div>
             </div>
 
@@ -126,32 +126,32 @@
                             </div>
                             <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
                                 <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
-                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" onchange="updateMaterial(this)" style="margin-right: 0.25rem;" />
+                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
                                 </label>
                             </div>
                             <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
                                 <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
-                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" onchange="updateMaterial(this)" style="margin-right: 0.25rem;" />
+                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.job_order}">Auftrag</span>
                                 </label>
                             </div>
                         </td>
                         <td>
-                            <select name="quantityType" data-update-type="QUANTITY_TYPE" onchange="updateMaterial(this)" style="width: 100%;">
+                            <select name="quantityType" data-update-type="QUANTITY_TYPE" data-trigger="admin-materials-update" style="width: 100%;">
                                 <option value="SCU" th:text="#{admin.materials.quantityType.scu}" th:selected="${mat.quantityType == 'SCU' || mat.quantityType == null}">SCU</option>
                                 <option value="PIECE" th:text="#{admin.materials.quantityType.piece}" th:selected="${mat.quantityType == 'PIECE'}">Stück</option>
                             </select>
                         </td>
                         <td>
-                            <select name="categoryId" data-update-type="CATEGORY" onchange="updateMaterial(this)" style="width: 100%;">
+                            <select name="categoryId" data-update-type="CATEGORY" data-trigger="admin-materials-update" style="width: 100%;">
                                 <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
                                 <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
                             </select>
                         </td>
                         <td>
                             <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
-                                <select sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" name="refinedMaterialId" data-update-type="REFINED" onchange="updateMaterial(this)" style="width: 100%;">
+                                <select sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" style="width: 100%;">
                                     <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
                                     <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                 </select>
@@ -279,6 +279,13 @@
         .finally(() => {
             selectElement.disabled = false;
         });
+    }
+
+    // CSP-safe delegated binding (replaces onchange="updateMaterial(this)" inline handlers
+    // on all the per-row checkboxes / selects). The page-local filterTable function picked
+    // up by the global filter-table common-handler stays unchanged.
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'admin-materials-update', function (el) { updateMaterial(el); });
     }
 </script>
 </body>

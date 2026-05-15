@@ -94,11 +94,11 @@
         </div>
 
         <div class="form-group" style="position: relative;">
-            <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" onkeyup="filterMaterials()" autocomplete="off">
+            <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" data-trigger="materials-filter" autocomplete="off">
         </div>
 
         <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
-            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-gray-4); padding: 0.5rem 1rem;" onclick="toggleKindGroup(this)">
+            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-gray-4); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
                 <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
                 <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
             </div>
@@ -195,6 +195,13 @@
         } else {
             noResults.style.display = "none";
         }
+    }
+
+    // CSP-safe delegated bindings (replace the historical onkeyup="filterMaterials()" and
+    // onclick="toggleKindGroup(this)" inline handlers).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('keyup', 'materials-filter', filterMaterials);
+        window.krtEvents.on('click', 'materials-toggle-kind', function (el) { toggleKindGroup(el); });
     }
 </script>
 </body>

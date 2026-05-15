@@ -3,14 +3,18 @@ package de.greluc.krt.iri.basetool.frontend;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.io.IOException;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.test.context.ActiveProfiles;
@@ -45,6 +49,8 @@ class WebClientResilienceTest {
   private static MockWebServer server;
 
   @Autowired private WebClient publicWebClient;
+
+  @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -138,5 +144,38 @@ class WebClientResilienceTest {
     int after = server.getRequestCount();
     assertTrue(duration < 2000, "Call should time out quickly");
     assertTrue(after >= before + 1, "A request should have been attempted");
+  }
+
+  /**
+   * Verifies that the unconditional {@code TimeLimiterOperator} in {@link
+   * de.greluc.krt.iri.basetool.frontend.config.WebClientConfig#resilienceFilter} also fires on
+   * state-changing HTTP verbs. The reactive operator wraps every outbound call regardless of
+   * method, so a hanging upstream on POST/PUT/DELETE/PATCH must fail fast — symmetric to the
+   * GET-only {@link #timeLimiter_ShouldTimeoutSlowResponses()}. The {@code backendApi} circuit
+   * breaker is reset before each iteration so an earlier test that tripped it cannot short-circuit
+   * the call ahead of the time limiter and mask the timeout assertion.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
+  void timeLimiter_ShouldTimeoutSlowResponses_OnWriteVerbs(String method) {
+    circuitBreakerRegistry.circuitBreaker("backendApi").reset();
+    int before = server.getRequestCount();
+    long start = System.currentTimeMillis();
+    try {
+      publicWebClient
+          .method(HttpMethod.valueOf(method))
+          .uri("/api/v1/slow")
+          .retrieve()
+          .bodyToMono(String.class)
+          .block();
+      fail("Expected timeout for " + method + " due to slow response");
+    } catch (Exception ignored) {
+      // Either TimeLimiter fires (TimeoutException) or the WebClient-level response timeout —
+      // both are acceptable fast-fail outcomes; the assertion below checks duration, not type.
+    }
+    long duration = System.currentTimeMillis() - start;
+    int after = server.getRequestCount();
+    assertTrue(duration < 2000, method + " should time out quickly, took " + duration + "ms");
+    assertTrue(after >= before + 1, "A " + method + " request should have been attempted");
   }
 }

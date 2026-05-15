@@ -85,19 +85,19 @@
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
-                        <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                        <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten (aUEC)</label>
                         <input type="number" id="otherExpenses" th:field="*{otherExpenses}" min="0" step="1"
                                th:title="#{refineryorder.form.otherExpenses.help}"
-                               th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                               th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
-                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" oninput="updateProfitPreview()">
+                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -117,7 +117,7 @@
                                 <input type="date" class="date-part" th:readonly="${!canEdit}">
                                 <input type="time" class="time-part" th:readonly="${!canEdit}">
                             </div>
-                            <button th:if="${canEdit}" type="button" class="btn btn-secondary" onclick="setStartedAtNow()" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button th:if="${canEdit}" type="button" class="btn btn-secondary" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>
                     </div>
                     
@@ -171,7 +171,7 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
-                        <select id="refiningMethodId" th:field="*{refiningMethodId}" onchange="updateMethodRatings()" th:disabled="${!canEdit}">
+                        <select id="refiningMethodId" th:field="*{refiningMethodId}" data-trigger="rod-update-method" th:disabled="${!canEdit}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="method : ${methods}" th:value="${method.id}" th:text="${method.name}" 
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
@@ -195,17 +195,17 @@
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
                     <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
-                    <button th:if="${canEdit}" type="button" class="btn btn-secondary" onclick="addMaterialRow()" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
+                    <button th:if="${canEdit}" type="button" class="btn btn-secondary" data-trigger="rod-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
                 </div>
                 
                 <div id="materials-container">
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-bg-dark-gray); margin-bottom: 1rem; position: relative;">
-                        <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-secondary remove-btn" onclick="removeMaterialRow(this)" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                        <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rod-remove-material" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
                         
                         <div class="material-row">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required onchange="updateOutputMaterial(this)" th:disabled="${!canEdit}">
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
@@ -227,7 +227,7 @@
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
-                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" oninput="calcScu(this.getAttribute('data-index'))" th:readonly="${!canEdit}">
+                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" th:readonly="${!canEdit}">
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -250,7 +250,7 @@
                     <button type="submit" form="refineryOrderMainForm" class="btn" th:text="#{orders.create.save}">Speichern</button>
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
-                    <button type="button" class="btn" onclick="openStoreModal()" th:text="#{refineryorder.action.store}">Einlagern</button>
+                    <button type="button" class="btn" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
                     <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" style="margin: 0;">
                         <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
                     </form>
@@ -264,15 +264,15 @@
         <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h2 style="margin: 0; color: var(--color-primary); font-family: var(--font-headline); text-transform: uppercase;" th:text="#{refineryorder.action.store}">Einlagern</h2>
-                <span class="close" onclick="closeStoreModal()" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
+                <span class="close" data-trigger="rod-close-store" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
             </div>
             
-            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerText='WIRD GESPEICHERT...';">
+            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
                 <div id="storeItemsContainer">
                     <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
                         <div class="flex-between-mb">
                             <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
-                            <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" onclick="duplicateStoreItem(this)" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
+                            <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
                         
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
@@ -325,7 +325,7 @@
                 
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
                     <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeStoreModal()" th:text="#{orders.create.cancel}">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
                 </div>
             </form>
         </div>
@@ -658,6 +658,32 @@
         preview.classList.toggle('text-danger', profit < 0); preview.classList.toggle('text-muted', profit >= 0);
     }
     document.addEventListener('DOMContentLoaded', updateProfitPreview);
+
+    // CSP-safe delegated bindings (replaces the 14 inline on*= handlers above — preserves the
+    // input/change/submit semantics so the page behaves identically to the prior version).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
+        window.krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
+        window.krtEvents.on('change', 'rod-update-method', updateMethodRatings);
+        window.krtEvents.on('click', 'rod-add-material', addMaterialRow);
+        window.krtEvents.on('click', 'rod-remove-material', function (el) { removeMaterialRow(el); });
+        window.krtEvents.on('change', 'rod-update-output', function (el) { updateOutputMaterial(el); });
+        window.krtEvents.on('input', 'rod-calc-scu', function (el) {
+            calcScu(el.getAttribute('data-index'));
+        });
+        window.krtEvents.on('click', 'rod-open-store', openStoreModal);
+        window.krtEvents.on('click', 'rod-close-store', closeStoreModal);
+        window.krtEvents.on('click', 'rod-duplicate-store', function (el) { duplicateStoreItem(el); });
+        window.krtEvents.on('submit', 'rod-disable-submit', function (el) {
+            // Disable the submit button + relabel it so a double-click does not file the form twice
+            // (the old inline onsubmit handler did the same thing).
+            var btn = el.querySelector('button[type=submit]');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'WIRD GESPEICHERT...';
+            }
+        });
+    }
 </script>
 </body>
 </html>

@@ -76,7 +76,7 @@
                 <div class="flex-between-mb">
                     <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;">Preise und Terminals</h2>
                     <div class="form-group" style="margin: 0; position: relative;">
-                        <input type="text" id="terminalFilter" placeholder="Terminal suchen..." onkeyup="filterTerminals()" autocomplete="off">
+                        <input type="text" id="terminalFilter" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
                     </div>
                 </div>
                 
@@ -84,19 +84,19 @@
                 <table class="data-table" id="priceTable">
                     <thead>
                         <tr>
-                            <th class="sortable-header" onclick="sortTable(0)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="0" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
                                 <div style="display: flex; align-items: center; justify-content: flex-start;">
                                     <span th:text="#{materials.detail.th.terminal}">Terminal</span>
                                     <span class="sort-icon" id="sort-icon-0" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
                                 </div>
                             </th>
-                            <th class="sortable-header" onclick="sortTable(1)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="1" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
                                 <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceBuy}">Einkaufspreis</span>
                                     <span class="sort-icon" id="sort-icon-1" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
                                 </div>
                             </th>
-                            <th class="sortable-header" onclick="sortTable(2)" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="2" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
                                 <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceSell}">Verkaufspreis</span>
                                     <span class="sort-icon" id="sort-icon-2" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
@@ -234,6 +234,15 @@
                 noResults.style.display = "none";
             }
         }
+    }
+
+    // CSP-safe delegated bindings (replaces onkeyup="filterTerminals()" and
+    // onclick="sortTable(N)" inline handlers).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('keyup', 'material-detail-filter-terminals', filterTerminals);
+        window.krtEvents.on('click', 'material-detail-sort', function (el) {
+            sortTable(parseInt(el.getAttribute('data-sort-column'), 10));
+        });
     }
 </script>
 </body>

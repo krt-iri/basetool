@@ -17,15 +17,23 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * WebClient wrapper for the backend REST API. Centralises the resilience chain (Resilience4j Retry,
- * CircuitBreaker, bulkhead, timeout - see {@link
- * de.greluc.krt.iri.basetool.frontend.config.WebClientConfig}), turns RFC-7807 problem responses
- * into {@link BackendServiceException}, and exposes typed convenience overloads for every HTTP
- * verb. {@code getCached(...)} layers Spring Cache on top using {@link
- * CacheConfig#STATIC_DATA_CACHE}.
+ * WebClient wrapper for the backend REST API. Centralises RFC-7807 problem-response parsing into
+ * {@link BackendServiceException} and exposes typed convenience overloads for every HTTP verb.
+ * {@code getCached(...)} layers Spring Cache on top using {@link CacheConfig#STATIC_DATA_CACHE}.
+ *
+ * <p><b>Resilience layering.</b> Every outbound call — regardless of HTTP verb — already passes
+ * through the {@link de.greluc.krt.iri.basetool.frontend.config.WebClientConfig#resilienceFilter
+ * WebClient filter chain}, which applies the operators bulkhead → time limiter → retry (only on
+ * idempotent verbs GET/HEAD/OPTIONS/TRACE, never on writes) → circuit breaker against the {@code
+ * backendApi} Resilience4j instance. The filter-level {@link
+ * io.github.resilience4j.timelimiter.TimeLimiter} therefore covers POST/PUT/PATCH/DELETE the same
+ * way it covers GET — there is no timeout gap on state-changing calls. The method-level
+ * {@code @Retry}/{@code @CircuitBreaker} annotations below layer a second, AOP-level resilience
+ * pass on top, on the separate {@code backend} Resilience4j instance, so the call is wrapped twice;
+ * the filter alone is what guards against a hanging upstream thread.
  *
  * <p>Page controllers should call into this client and let {@link
- * de.greluc.krt.iri.basetool.frontend.exception.GlobalExceptionHandler} surface failures - do not
+ * de.greluc.krt.iri.basetool.frontend.exception.GlobalExceptionHandler} surface failures — do not
  * catch {@link BackendServiceException} on the call site.
  */
 @Service

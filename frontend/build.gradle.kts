@@ -25,6 +25,13 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-webflux")
   // Jackson databind for RFC7807 Problem+JSON parsing in BackendServiceException
   implementation("com.fasterxml.jackson.core:jackson-databind")
+  // Jackson JSR-310 module — required by ThymeleafJavaScriptSerializerConfig so
+  // [[${dto}]] inline expressions can render objects carrying java.time.* fields
+  // (Instant/OffsetDateTime/LocalDateTime). Thymeleaf 3.1.x ships its own Jackson
+  // ObjectMapper without modules, and Spring Boot 4 has moved its primary mapper to
+  // Jackson 3 (tools.jackson.core), so neither path brings JSR-310 transitively for
+  // the Jackson 2 (com.fasterxml) instance Thymeleaf still uses internally.
+  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
@@ -46,7 +53,7 @@ dependencies {
   
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
-  compileOnly("org.jetbrains:annotations:_")
+  compileOnly(libs.jetbrains.annotations)
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
   
