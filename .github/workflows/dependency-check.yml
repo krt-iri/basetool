@@ -55,7 +55,7 @@ jobs:
           cache-read-only: false
 
       - name: Cache NVD feed
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.gradle/dependency-check-data
           key: nvd-${{ runner.os }}-${{ github.run_id }}
