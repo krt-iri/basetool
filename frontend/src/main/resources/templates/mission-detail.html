@@ -388,7 +388,7 @@
                         <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
                     <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
-                            onclick="setNowToInput('actualStartTime')"
+                            data-trigger="mission-set-now" data-input-id="actualStartTime"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
                 </div>
                 <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
@@ -403,7 +403,7 @@
                         <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
                     <button type="button" class="btn btn-secondary btn-sm" th:text="#{general.now}"
-                            onclick="setNowToInput('actualEndTime')"
+                            data-trigger="mission-set-now" data-input-id="actualEndTime"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
                 </div>
                 <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
@@ -433,7 +433,7 @@
                                     <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer wählen --</option>
                                     <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}" th:selected="${mission.owner != null and u.id == mission.owner.id}"></option>
                                 </select>
-                                <button type="button" class="btn" onclick="changeMissionOwner()" th:text="#{general.save}">Speichern</button>
+                                <button type="button" class="btn" data-trigger="mission-change-owner" th:text="#{general.save}">Speichern</button>
                             </div>
                         </div>
                     </div>
@@ -445,7 +445,7 @@
                                 <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1); margin-right: 0.5rem;">Manager Name</span>
                                 <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-dept-combat);" 
                                         th:data-manager-id="${manager.id}"
-                                        onclick="removeMissionManager(this.getAttribute('data-manager-id'))">&times;</button>
+                                        data-trigger="mission-remove-manager">&times;</button>
                             </div>
                             <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" style="color: var(--color-gray-3);">Keine</span>
                         </div>
@@ -455,7 +455,7 @@
                                 <option value="" th:text="#{mission.manager.select}">-- Manager wählen --</option>
                                 <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
                             </select>
-                            <button type="button" class="btn" onclick="addMissionManager()" th:text="#{general.add}">Hinzufügen</button>
+                            <button type="button" class="btn" data-trigger="mission-add-manager" th:text="#{general.add}">Hinzufügen</button>
                         </div>
                     </div>
                 </div>
@@ -614,7 +614,7 @@
                      style="border-color: var(--color-gray-3);">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 0.5rem; gap: 2rem; white-space: nowrap;">
                         <div class="flex-gap-sm">
-                            <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" onclick="toggleUnit(this.getAttribute('data-target'), this)" th:title="#{general.toggle}">
+                            <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" data-trigger="mission-toggle-unit" th:title="#{general.toggle}">
                                 <span class="unit-toggle-icon" style="display:inline-block; width:1em; color:var(--color-primary); font-weight:bold;">-</span>
                                 <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif;">Unit Name</strong>
                                 <span th:if="${unit.shipType != null}" th:text="' - ' + ${unit.shipType.name}" style="color: var(--color-gray-1); margin-left: 0.25rem;"> - ShipType</span>
@@ -736,7 +736,7 @@
                                                 th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}" 
                                                 th:data-participant-id="${p?.id}"
                                                 th:data-original-value="${p?.payoutPreference?.name()}"
-                                                onchange="updatePayoutPreference(this)"
+                                                data-trigger="mission-update-payout"
                                                 th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and p.user.id.toString() != #authentication.name and !mission.canEdit)}">
                                             <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
                                             <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
@@ -766,7 +766,7 @@
                         <span th:text="${#numbers.formatDecimal(financeSum, 1, 'NONE', 2, 'COMMA')}">0,00</span> aUEC
                     </h3>
                     <div class="mb-1">
-                        <button class="btn btn-small" onclick="document.getElementById('finance-modal').style.display='flex';" th:text="#{mission.finance.add}">Neuer Eintrag</button>
+                        <button class="btn btn-small" data-trigger="open-modal-display" data-modal-id="finance-modal" th:text="#{mission.finance.add}">Neuer Eintrag</button>
                     </div>
                     <div class="table-responsive">
                         <table th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
@@ -797,7 +797,7 @@
                                                     th:data-type="${entry.type}"
                                                     th:data-amount="${entry.amount}"
                                                     th:data-version="${entry.version}"
-                                                    onclick="openEditFinanceModal(this.getAttribute('data-id'), this.getAttribute('data-note'), this.getAttribute('data-type'), this.getAttribute('data-amount'), this.getAttribute('data-version'))"
+                                                    data-trigger="mission-open-edit-finance"
                                                     th:text="#{members.edit}">Bearbeiten</button>
                                             
                                             <!-- Delete button -->
@@ -1195,7 +1195,7 @@
     <!-- Add Finance Entry Modal -->
     <div id="finance-modal" class="modal" th:style="${openModal == 'finance-entry-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}">
         <div class="modal-content hud-box">
-            <span class="close-finance-modal close-modal" onclick="document.getElementById('finance-modal').style.display='none';">&times;</span>
+            <span class="close-finance-modal close-modal" data-trigger="close-modal-display" data-modal-id="finance-modal">&times;</span>
             <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzufügen</h2>
             <form th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
                 <div class="form-group">
@@ -1237,7 +1237,7 @@
     <!-- Edit Finance Entry Modal -->
     <div id="edit-finance-entry-modal" class="modal" th:style="${openModal == 'edit-finance-entry-modal' ? 'display:flex;' : 'display:none;'}" sec:authorize="isAuthenticated()" th:if="${!isNew}">
         <div class="modal-content hud-box">
-            <span class="close-edit-finance-modal close-modal" onclick="document.getElementById('edit-finance-entry-modal').style.display='none';">&times;</span>
+            <span class="close-edit-finance-modal close-modal" data-trigger="close-modal-display" data-modal-id="edit-finance-entry-modal">&times;</span>
             <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
             <form id="edit-finance-form" method="post" th:action="${modalAction != null && openModal == 'edit-finance-entry-modal'} ? ${modalAction} : @{/missions}">
                 <input type="hidden" id="edit-finance-version" name="version">
@@ -2481,6 +2481,35 @@
         setupShipFilter("add-unit-shiptype", "add-unit-ship");
         setupShipFilter("edit-unit-shiptype", "edit-unit-ship");
     });
+
+    // CSP-safe delegated bindings (replaces the 11 inline on*= handlers on the mission detail
+    // page — open/close finance modals fall through to the global *-modal-display common
+    // handlers, the rest call into page-local functions defined above).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'mission-set-now', function (el) {
+            setNowToInput(el.getAttribute('data-input-id'));
+        });
+        window.krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
+        window.krtEvents.on('click', 'mission-remove-manager', function (el) {
+            removeMissionManager(el.getAttribute('data-manager-id'));
+        });
+        window.krtEvents.on('click', 'mission-add-manager', addMissionManager);
+        window.krtEvents.on('click', 'mission-toggle-unit', function (el) {
+            toggleUnit(el.getAttribute('data-target'), el);
+        });
+        window.krtEvents.on('change', 'mission-update-payout', function (el) {
+            updatePayoutPreference(el);
+        });
+        window.krtEvents.on('click', 'mission-open-edit-finance', function (el) {
+            openEditFinanceModal(
+                el.getAttribute('data-id'),
+                el.getAttribute('data-note'),
+                el.getAttribute('data-type'),
+                el.getAttribute('data-amount'),
+                el.getAttribute('data-version')
+            );
+        });
+    }
 </script>
 <!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
 <script th:src="@{/js/mission-subresource.js}" defer th:attr="nonce=${cspNonce}"></script>

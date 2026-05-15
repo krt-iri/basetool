@@ -42,18 +42,24 @@ public class SecurityConfig {
   private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
   private final CspNonceFilter cspNonceFilter;
 
+  // CSP migration milestone: the ~200 inline event-handler attributes (onclick="…",
+  // onchange="…", onsubmit="…", oninput="…", onkeyup="…") that historically pinned us to a
+  // {@code script-src-attr 'unsafe-inline'} allowance have been moved to delegated handlers
+  // via the {@code data-trigger}-based dispatcher in {@code event-delegation.js} +
+  // {@code common-handlers.js} and per-page {@code krtEvents.on(...)} bindings in template
+  // {@code <script th:attr="nonce=${cspNonce}">} blocks. With zero inline {@code on*=}
+  // attributes remaining in the templates ({@code grep} verified), the policy drops
+  // {@code script-src-attr} entirely — the directive defaults to {@code 'none'} when omitted
+  // (CSP3 spec, MDN <a href=
+  // "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src-attr"
+  // >script-src-attr</a>), which slams the door on stored-XSS via a future template that
+  // accidentally re-introduces an inline event handler. {@code <script>} elements stay
+  // nonce-gated through {@code script-src} below — unchanged.
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
           + "img-src 'self' data:; font-src 'self' data:; "
           + "style-src 'self' 'unsafe-inline'; "
-          + "script-src 'nonce-%s' 'strict-dynamic' https:; "
-          // The templates carry ~200 inline event-handler attributes (onclick="…",
-          // onsubmit="…", …). Nonces and 'strict-dynamic' do NOT cover those (they
-          // only cover <script> elements). Until those are migrated to addEventListener
-          // we keep them runnable via a separate, narrowly-scoped script-src-attr
-          // directive. Inline <script> elements remain strictly nonce-gated by the
-          // line above - the XSS surface that matters most is unaffected.
-          + "script-src-attr 'unsafe-inline'";
+          + "script-src 'nonce-%s' 'strict-dynamic' https:";
 
   private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
     return (request, response) -> {

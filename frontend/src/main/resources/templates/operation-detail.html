@@ -285,7 +285,7 @@
                 <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
                     <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" style="margin-right: auto;" th:text="#{general.delete}"
                             th:data-id="${operation.id}"
-                            onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
+                            data-trigger="operation-open-delete">Delete</button>
                     <button th:if="${canEdit}" type="submit" form="operation-form" class="btn" th:text="#{general.save}">Save</button>
                     <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Back</a>
                 </div>
@@ -388,7 +388,7 @@
                             <div th:id="'mission-fin-header-' + ${msnFin.missionId}"
                                  class="operation-mission-fin-header"
                                  th:data-mission-id="${msnFin.missionId}"
-                                 onclick="toggleMissionFinances(this.getAttribute('data-mission-id'))">
+                                 data-trigger="operation-toggle-mission-finances">
                                 <strong style="color: var(--color-primary);" th:text="${msnFin.missionName}">Mission Name</strong>
                                 <span>
                                     <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
@@ -448,7 +448,7 @@
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
             <div class="mt-2-flex-gap">
                 <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('delete-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
             </div>
         </form>
     </div>
@@ -535,6 +535,17 @@
             }
         });
     });
+
+    // CSP-safe delegated bindings (replace onclick="openDeleteModal(...)" and
+    // onclick="toggleMissionFinances(...)" inline handlers).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'operation-open-delete', function (el) {
+            openDeleteModal(el.getAttribute('data-id'));
+        });
+        window.krtEvents.on('click', 'operation-toggle-mission-finances', function (el) {
+            toggleMissionFinances(el.getAttribute('data-mission-id'));
+        });
+    }
 </script>
 </body>
 </html>

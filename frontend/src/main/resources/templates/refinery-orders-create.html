@@ -88,19 +88,19 @@
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
-                        <input type="number" id="expenses" th:field="*{expenses}" min="0" oninput="updateProfitPreview()">
+                        <input type="number" id="expenses" th:field="*{expenses}" min="0" data-trigger="rfc-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten (aUEC)</label>
                         <input type="number" id="otherExpenses" th:field="*{otherExpenses}" min="0" step="1"
                                th:title="#{refineryorder.form.otherExpenses.help}"
-                               oninput="updateProfitPreview()">
+                               data-trigger="rfc-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
-                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" oninput="updateProfitPreview()">
+                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" data-trigger="rfc-update-profit">
                     </div>
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -120,7 +120,7 @@
                                 <input type="date" class="date-part">
                                 <input type="time" class="time-part">
                             </div>
-                            <button type="button" class="btn btn-secondary" onclick="setStartedAtNow()" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button type="button" class="btn btn-secondary" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>
                     </div>
                     
@@ -174,7 +174,7 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
-                        <select id="refiningMethodId" th:field="*{refiningMethodId}" onchange="updateMethodRatings()">
+                        <select id="refiningMethodId" th:field="*{refiningMethodId}" data-trigger="rfc-update-method">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="method : ${methods}" th:value="${method.id}" th:text="${method.name}" 
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
@@ -198,17 +198,17 @@
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
                     <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
-                    <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
+                    <button type="button" class="btn btn-secondary" data-trigger="rfc-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
                 </div>
                 
                 <div id="materials-container">
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem; position: relative;">
-                        <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" onclick="removeMaterialRow(this)" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                        <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
                         
                         <div class="material-row">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required onchange="updateOutputMaterial(this)">
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rfc-update-output">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
@@ -230,7 +230,7 @@
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
-                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" oninput="calcScu(this.getAttribute('data-index'))">
+                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rfc-calc-scu">
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -500,6 +500,21 @@
         preview.classList.toggle('text-danger', profit < 0); preview.classList.toggle('text-muted', profit >= 0);
     }
     document.addEventListener('DOMContentLoaded', updateProfitPreview);
+
+    // CSP-safe delegated bindings (replaces the nine inline on*= handlers above — preserves
+    // the input/change semantics so the profit-preview / material-output / scu calculations
+    // re-run on the same DOM events as before).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
+        window.krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
+        window.krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
+        window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);
+        window.krtEvents.on('click', 'rfc-remove-material', function (el) { removeMaterialRow(el); });
+        window.krtEvents.on('change', 'rfc-update-output', function (el) { updateOutputMaterial(el); });
+        window.krtEvents.on('input', 'rfc-calc-scu', function (el) {
+            calcScu(el.getAttribute('data-index'));
+        });
+    }
 </script>
 </body>
 </html>

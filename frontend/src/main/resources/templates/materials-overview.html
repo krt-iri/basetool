@@ -166,17 +166,17 @@
             <div class="form-group">
                 <label th:text="#{filter.material}">Material filtern</label>
                 <div class="multi-select-container" id="materialFilterContainer">
-                    <div class="multi-select-header" onclick="toggleMultiSelect('materialOptions')" th:data-all="#{filter.material.all}" th:data-selected="#{filter.selected}" id="materialHeader">
+                    <div class="multi-select-header" data-trigger="mo-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.material.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                         <span class="selected-text" id="materialSelectedText" th:text="#{filter.material.all}">Alle Materialien</span>
                     </div>
                     <div class="multi-select-options" id="materialOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="matAll" value="ALL" checked onchange="toggleSelectAll('matAll', 'matCheck', 'materialHeader'); filterMatrix();">
+                            <input type="checkbox" id="matAll" value="ALL" checked data-trigger="mo-toggle-all" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
                         </label>
                         <label class="multi-select-option" th:each="mat : ${materialNames}">
                             <span th:text="${mat}">Material</span>
-                            <input type="checkbox" class="matCheck" th:value="${mat}" checked onchange="updateSelectState('matAll', 'matCheck', 'materialHeader'); filterMatrix();">
+                            <input type="checkbox" class="matCheck" th:value="${mat}" checked data-trigger="mo-update-state" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
                         </label>
                     </div>
                 </div>
@@ -184,27 +184,27 @@
             <div class="form-group">
                 <label th:text="#{filter.system}">System filtern</label>
                 <div class="multi-select-container" id="systemFilterContainer">
-                    <div class="multi-select-header" onclick="toggleMultiSelect('systemOptions')" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
+                    <div class="multi-select-header" data-trigger="mo-toggle-multi" data-multi-target="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
                         <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
                     </div>
                     <div class="multi-select-options" id="systemOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked onchange="toggleSelectAll('sysAll', 'sysCheck', 'systemHeader'); filterMatrix();">
+                            <input type="checkbox" id="sysAll" value="ALL" checked data-trigger="mo-toggle-all" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                         <label class="multi-select-option" th:each="sys : ${starSystems}">
                             <span th:text="${sys}">System</span>
-                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked onchange="updateSelectState('sysAll', 'sysCheck', 'systemHeader'); filterMatrix();">
+                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked data-trigger="mo-update-state" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                     </div>
                 </div>
             </div>
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
-                <input type="checkbox" id="filterLoadingDock" onchange="filterMatrix()">
+                <input type="checkbox" id="filterLoadingDock" data-trigger="mo-filter">
                 <label for="filterLoadingDock" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasLoadingDock}">Hat Loading Dock</label>
             </div>
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
-                <input type="checkbox" id="filterAutoLoad" onchange="filterMatrix()">
+                <input type="checkbox" id="filterAutoLoad" data-trigger="mo-filter">
                 <label for="filterAutoLoad" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
             </div>
         </div>
@@ -229,7 +229,7 @@
                 </thead>
                 <tbody>
                     <th:block th:each="entry : ${rowsByKind}">
-                        <tr class="row-kind" th:data-kind="${entry.key}" style="background-color: var(--color-gray-4); cursor: pointer;" onclick="toggleKindGroupMatrix(this)">
+                        <tr class="row-kind" th:data-kind="${entry.key}" style="background-color: var(--color-gray-4); cursor: pointer;" data-trigger="mo-toggle-kind">
                             <td th:colspan="${terminals.size() + 1}" style="font-weight: bold; color: var(--color-primary); font-family: var(--font-headline); padding-left: 1rem; text-align: left;">
                                 <span class="toggle-icon" style="display: inline-block; width: 1.5rem; text-align: center;">−</span>
                                 <span th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kind</span>
@@ -390,6 +390,27 @@ function updateSelectedText(checkboxes, headerId) {
             });
             if (icon) icon.textContent = '+';
         }
+    }
+
+    // CSP-safe delegated bindings (replace nine inline on*= handlers — the multi-call onchange
+    // patterns from before are reproduced verbatim inside the registered callbacks so the
+    // ordering of toggleSelectAll/updateSelectState followed by filterMatrix is preserved).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'mo-toggle-multi', function (el) {
+            toggleMultiSelect(el.getAttribute('data-multi-target'));
+        });
+        window.krtEvents.on('change', 'mo-toggle-all', function (el) {
+            toggleSelectAll(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
+            filterMatrix();
+        });
+        window.krtEvents.on('change', 'mo-update-state', function (el) {
+            updateSelectState(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
+            filterMatrix();
+        });
+        window.krtEvents.on('change', 'mo-filter', filterMatrix);
+        window.krtEvents.on('click', 'mo-toggle-kind', function (el) {
+            toggleKindGroupMatrix(el);
+        });
     }
 </script>
 </body>

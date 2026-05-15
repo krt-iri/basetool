@@ -25,7 +25,7 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" onclick="document.getElementById('edit-modal').style.display='flex'">Bearbeiten</button>
+            <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" style="margin: 0;">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>
@@ -70,7 +70,7 @@
                     <!-- DEBUG: LOGISTICIAN check passed -->
                     <select id="status-select"
                             name="status"
-                            onchange="updateStatus(this)"
+                            data-trigger="od-update-status"
                             th:data-order-id="${order.id}"
                             th:data-version="${order.version}"
                             style="background-color: var(--color-gray-4); color: white; border: 1px solid var(--color-gray-3);">
@@ -101,7 +101,7 @@
                 th:data-order-id="${order.id}"
                 th:data-material-id="${mat.material.id}"
                 th:data-amount-type="${mat.material.quantityType}"
-                onclick="toggleInventory(this)"
+                data-trigger="od-toggle-inventory"
                 style="cursor: pointer;">
                 <td th:text="${mat.material.name}"></td>
                 <td th:text="${mat.minQuality}"></td>
@@ -162,7 +162,7 @@
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn" style="background-color: var(--color-primary); color: #000; min-height: 44px;" th:text="#{orders.detail.handover}" onclick="openHandoverModal()">Übergabe protokollieren</button>
+            <button type="button" class="btn" style="background-color: var(--color-primary); color: #000; min-height: 44px;" th:text="#{orders.detail.handover}" data-trigger="od-open-handover">Übergabe protokollieren</button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn" style="background-color: var(--color-gray-3); color: var(--color-text); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
         </div>
 
@@ -203,7 +203,7 @@
                                     th:data-handover-time="${ho.handoverTime}"
                                     th:title="#{orders.handover.report.download}"
                                     th:text="#{orders.handover.report.download}"
-                                    onclick="downloadHandoverReport(this)">Übergabeprotokoll herunterladen</button>
+                                    data-trigger="od-download-report">Übergabeprotokoll herunterladen</button>
                         </td>
                     </tr>
                     </tbody>
@@ -215,7 +215,7 @@
 
 <div sec:authorize="hasRole('LOGISTICIAN')" id="edit-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" onclick="document.getElementById('edit-modal').style.display='none'">&times;</button>
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
         <form th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
@@ -261,7 +261,7 @@
             <button type="button" id="add-material-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="edit-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="submit" class="btn" th:text="#{orders.detail.save}">Speichern</button>
             </div>
         </form>
@@ -273,8 +273,8 @@
         <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif; text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h3>
         <p style="margin-bottom: 2rem; font-family: 'Lato', sans-serif; font-weight: 300; line-height: 1.6;" th:text="#{orders.status.warning.body}">Wenn Sie den Status auf Abgeschlossen oder Abgelehnt setzen, werden alle verknüpften Lagereinträge vom Auftrag getrennt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
         <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary" style="min-height: 44px; min-width: 120px;" onclick="cancelStatusChange()" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
-            <button type="button" class="btn" style="min-height: 44px; min-width: 120px; background-color: var(--color-primary); color: #000; font-weight: 700;" onclick="confirmStatusChange()" th:text="#{orders.status.warning.confirm}">Bestätigen</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 44px; min-width: 120px;" data-trigger="od-cancel-status" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
+            <button type="button" class="btn" style="min-height: 44px; min-width: 120px; background-color: var(--color-primary); color: #000; font-weight: 700;" data-trigger="od-confirm-status" th:text="#{orders.status.warning.confirm}">Bestätigen</button>
         </div>
     </div>
 </div>
@@ -284,8 +284,8 @@
         <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
         <p style="margin-bottom: 2rem;" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
         <div style="display: flex; gap: 1rem; justify-content: center;">
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('material-delete-confirm-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
-            <button type="button" class="btn btn-outline-danger" onclick="confirmRemoveMaterial()" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
+            <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="material-delete-confirm-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn-outline-danger" data-trigger="od-confirm-remove-material" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
         </div>
     </div>
 </div>
@@ -293,7 +293,7 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="handover-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" onclick="document.getElementById('handover-modal').style.display='none'">&times;</button>
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
         <form th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
@@ -323,15 +323,15 @@
             <div id="handover-items-container">
             </div>
 
-            <button type="button" id="add-handover-item-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" onclick="addHandoverItemRow()" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
+            <button type="button" id="add-handover-item-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" data-trigger="od-add-handover-item" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('handover-modal').style.display='none'" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-secondary"
                         style="min-height: 44px;"
                         th:text="#{orders.handover.report.preview}"
                         th:data-order-id="${order.id}"
-                        onclick="previewHandoverReport(this)">Vorschau als PDF</button>
+                        data-trigger="od-preview-handover">Vorschau als PDF</button>
                 <button type="submit" class="btn" th:text="#{orders.detail.save}">Speichern</button>
             </div>
         </form>
@@ -408,7 +408,7 @@
                 <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
             </div>
             <div>
-                <button type="button" class="btn btn-outline-danger" style="padding: 0.5rem;" onclick="this.parentElement.parentElement.remove(); updateHandoverIndexes();">Entfernen</button>
+                <button type="button" class="btn btn-outline-danger" style="padding: 0.5rem;" data-trigger="od-remove-handover-row">Entfernen</button>
             </div>
         `;
         const sel = row.querySelector('select');
@@ -899,9 +899,9 @@
                 const quantity = (item.amount !== null ? item.amount.toFixed(3) : '0.000') + ' ' + (amountType ? amountType : '');
                 const csrfTokenValue = document.querySelector('meta[name="_csrf"]')?.content || '';
                 const unlinkCell = IS_LOGISTICIAN ? `
-                                        <td onclick="event.stopPropagation()">
+                                        <td data-trigger="stop-propagation">
                                             <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" style="margin: 0;"
-                                                  onsubmit="this.querySelector('button[type=submit]').disabled=true;">
+                                                  data-trigger="od-disable-submit">
                                                 <input type="hidden" name="_csrf" value="${escapeAttr(csrfTokenValue)}">
                                                 <button type="submit" class="btn btn-outline-danger"
                                                         style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
@@ -937,6 +937,36 @@
                 </td>
             `;
         }
+    }
+
+    // CSP-safe delegated bindings (replaces the 18 inline on*= handlers in this template).
+    // Modal open/close on style.display still uses the global open-modal-display /
+    // close-modal-display common-handlers; the rest call into page-local functions defined
+    // in this script and the inline script higher up.
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'od-update-status', function (el) { updateStatus(el); });
+        window.krtEvents.on('click', 'od-toggle-inventory', function (el) { toggleInventory(el); });
+        window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
+        window.krtEvents.on('click', 'od-download-report', function (el) { downloadHandoverReport(el); });
+        window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
+        window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
+        window.krtEvents.on('click', 'od-confirm-remove-material', function () {
+            if (typeof window.confirmRemoveMaterial === 'function') window.confirmRemoveMaterial();
+        });
+        window.krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
+        window.krtEvents.on('click', 'od-preview-handover', function (el) { previewHandoverReport(el); });
+        window.krtEvents.on('click', 'od-remove-handover-row', function (el) {
+            // Mirrors the historical inline `this.parentElement.parentElement.remove();
+            // updateHandoverIndexes();` — climb two parents to reach the handover row, drop it,
+            // re-index so the remaining rows keep contiguous form field names.
+            var row = el.parentElement && el.parentElement.parentElement;
+            if (row) row.remove();
+            if (typeof updateHandoverIndexes === 'function') updateHandoverIndexes();
+        });
+        window.krtEvents.on('submit', 'od-disable-submit', function (el) {
+            var btn = el.querySelector('button[type=submit]');
+            if (btn) btn.disabled = true;
+        });
     }
 </script>
 </body>

@@ -99,7 +99,7 @@
 
     <div class="hud-box mt-2">
         <div style="margin-bottom:1rem;">
-            <button class="btn" onclick="openCreateTopicModal()" th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
+            <button class="btn" data-trigger="pt-open-create-topic" th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
         </div>
 
         <div th:if="${#lists.isEmpty(topics)}">
@@ -213,8 +213,8 @@
             <input id="ct-sort" class="form-input" type="number" value="0">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-create-topic')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="createTopic()" th:text="#{promotion.admin.topics.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pt-save-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -238,8 +238,8 @@
             <input id="et-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-edit-topic')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="updateTopic()" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pt-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -251,8 +251,8 @@
         <p th:text="#{promotion.admin.topics.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
         <input id="dt-id" type="hidden">
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-delete-topic')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" onclick="deleteTopic()" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-delete-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn-danger" data-trigger="pt-delete-topic" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
         </div>
     </div>
 </div>
@@ -275,8 +275,8 @@
             <input id="cc-sort" class="form-input" type="number" value="0">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-create-category')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="createCategory()" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pt-save-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -301,8 +301,8 @@
             <input id="ec-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-edit-category')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="updateCategory()" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pt-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -314,8 +314,8 @@
         <p th:text="#{promotion.admin.category.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
         <input id="dc-id" type="hidden">
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-delete-category')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" onclick="deleteCategory()" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-delete-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn-danger" data-trigger="pt-delete-category" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
         </div>
     </div>
 </div>
@@ -447,6 +447,21 @@ function saveLevelContentInline(btn) {
             if (typeof showToast === 'function') showToast(MSG_SAVED, 'success');
         });
     }
+}
+
+// CSP-safe delegated bindings (replaces the 13 inline on*= handlers above). The pre-existing
+// generic `document.addEventListener('click', ...)` global dispatcher higher up still drives
+// the row-level edit/delete buttons by class (.btn-edit-topic / .btn-delete-topic / etc.) —
+// the bindings below only cover the modal action buttons that historically had per-button
+// inline handlers.
+if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+    window.krtEvents.on('click', 'pt-open-create-topic', openCreateTopicModal);
+    window.krtEvents.on('click', 'pt-save-topic', createTopic);
+    window.krtEvents.on('click', 'pt-update-topic', updateTopic);
+    window.krtEvents.on('click', 'pt-delete-topic', deleteTopic);
+    window.krtEvents.on('click', 'pt-save-category', createCategory);
+    window.krtEvents.on('click', 'pt-update-category', updateCategory);
+    window.krtEvents.on('click', 'pt-delete-category', deleteCategory);
 }
 /*]]>*/
 </script>

@@ -60,7 +60,7 @@
     <div class="hud-box mt-2">
 
         <div sec:authorize="hasRole('MISSION_MANAGER')" style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-            <button type="button" class="btn" th:text="#{operation.create}" onclick="document.getElementById('create-operation-modal').style.display='flex'">Create New</button>
+            <button type="button" class="btn" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
         </div>
 
         <div class="table-responsive">
@@ -82,7 +82,7 @@
                             <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
                             <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
                                     th:data-id="${op.id}"
-                                    onclick="openDeleteModal(this.getAttribute('data-id'))">Delete</button>
+                                    data-trigger="operations-open-delete">Delete</button>
                         </td>
                     </tr>
                 </tbody>
@@ -120,7 +120,7 @@
                 </div>
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{general.save}">Save</button>
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('create-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="create-operation-modal" th:text="#{general.cancel}">Cancel</button>
                 </div>
             </form>
         </div>
@@ -134,7 +134,7 @@
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('delete-operation-modal').style.display='none'" th:text="#{general.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
                 </div>
             </form>
         </div>
@@ -145,6 +145,13 @@
         var deleteForm = document.getElementById('delete-operation-form');
         deleteForm.action = window.safeSameOriginUrl('/operations/' + id + '/delete', deleteForm.action);
         document.getElementById('delete-operation-modal').style.display = 'flex';
+    }
+
+    // CSP-safe delegated binding (replaces onclick="openDeleteModal(this.getAttribute('data-id'))").
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'operations-open-delete', function (el) {
+            openDeleteModal(el.getAttribute('data-id'));
+        });
     }
 </script>
 </body>

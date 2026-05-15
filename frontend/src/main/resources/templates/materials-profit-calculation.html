@@ -183,7 +183,7 @@
         <div class="filter-container">
             <div class="filter-group">
                 <label for="shipSelect" th:text="#{profit.filter.ship}">Schiff wählen</label>
-                <select id="shipSelect" onchange="updateProfitCalculation()">
+                <select id="shipSelect" data-trigger="profit-update">
                     <option value="" th:text="#{profit.filter.ship.placeholder}">-- Schiff wählen --</option>
                     <option th:each="ship : ${shipTypes}" 
                             th:value="${ship.id}" 
@@ -195,17 +195,17 @@
             <div class="filter-group">
                 <label th:text="#{profit.filter.systems}">Systeme einschränken</label>
                 <div class="multi-select-container" id="systemFilterContainer">
-                    <div class="multi-select-header" onclick="toggleMultiSelect('systemOptions')" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
+                    <div class="multi-select-header" data-trigger="profit-toggle-multi" data-multi-target="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
                         <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
                     </div>
                     <div class="multi-select-options" id="systemOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked onchange="toggleSelectAll('sysAll', 'sysCheck', 'systemHeader'); updateProfitCalculation();">
+                            <input type="checkbox" id="sysAll" value="ALL" checked data-trigger="profit-toggle-all" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                         <label class="multi-select-option" th:each="sys : ${starSystems}">
                             <span th:text="${sys}">System</span>
-                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked onchange="updateSelectState('sysAll', 'sysCheck', 'systemHeader'); updateProfitCalculation();">
+                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked data-trigger="profit-update-state" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                     </div>
                 </div>
@@ -223,43 +223,43 @@
             <table id="resultsTable" class="matrix-table" data-sort-col="0" data-sort-dir="asc">
                 <thead>
                     <tr>
-                        <th class="sortable-header" onclick="sortTable(0)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="0" title="Klicken zum Sortieren">
                             <div style="display: flex; align-items: center; justify-content: flex-start;">
                                 <span th:text="#{profit.col.material}">Material</span>
                                 <span class="sort-icon" id="sort-icon-0" style="color: var(--color-primary);">▲</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(1)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="1" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.min_buy}">Einkauf (min)</span>
                                 <span class="sort-icon" id="sort-icon-1">↕</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(2)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="2" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.max_sell}">Verkauf (max)</span>
                                 <span class="sort-icon" id="sort-icon-2">↕</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(3)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="3" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.profit_scu}">Gewinn / SCU</span>
                                 <span class="sort-icon" id="sort-icon-3">↕</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(4)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="4" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.margin}">Marge (%)</span>
                                 <span class="sort-icon" id="sort-icon-4">↕</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(5)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="5" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.load_cost}">Ladungskosten</span>
                                 <span class="sort-icon" id="sort-icon-5">↕</span>
                             </div>
                         </th>
-                        <th class="sortable-header" onclick="sortTable(6)" title="Klicken zum Sortieren">
+                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="6" title="Klicken zum Sortieren">
                             <div class="flex-end">
                                 <span th:text="#{profit.col.total_profit}">Max Profit</span>
                                 <span class="sort-icon" id="sort-icon-6">↕</span>
@@ -512,6 +512,27 @@
             updateProfitCalculation();
         }
     });
+
+    // CSP-safe delegated bindings (replace the eleven inline on*= handlers above —
+    // ship-select onchange, multi-select toggle, two "toggle-all + recompute" change patterns
+    // on the system filter, and the seven sortable-header onclick handlers).
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'profit-update', updateProfitCalculation);
+        window.krtEvents.on('click', 'profit-toggle-multi', function (el) {
+            toggleMultiSelect(el.getAttribute('data-multi-target'));
+        });
+        window.krtEvents.on('change', 'profit-toggle-all', function (el) {
+            toggleSelectAll(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
+            updateProfitCalculation();
+        });
+        window.krtEvents.on('change', 'profit-update-state', function (el) {
+            updateSelectState(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
+            updateProfitCalculation();
+        });
+        window.krtEvents.on('click', 'profit-sort', function (el) {
+            sortTable(parseInt(el.getAttribute('data-sort-column'), 10));
+        });
+    }
 </script>
 </body>
 </html>

@@ -93,7 +93,7 @@
                             <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
                                 <select class="level-select"
                                         th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''}"
-                                        onchange="saveEvaluation(this)">
+                                        data-trigger="promotion-save-evaluation">
                                     <option value="" th:text="#{promotion.manage.level.none}"
                                             th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
                                     <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"
@@ -177,6 +177,14 @@
             _savingInProgress = false;
             setAllSelectsDisabled(false);
         });
+    }
+
+    // CSP-safe delegated binding (replaces the historical onchange="saveEvaluation(this)"
+    // inline handler on every .level-select — that flow now relies on the page's
+    // data-trigger="promotion-save-evaluation" attribute so the global CSP can drop
+    // script-src-attr 'unsafe-inline').
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'promotion-save-evaluation', saveEvaluation);
     }
     /*]]>*/
 </script>

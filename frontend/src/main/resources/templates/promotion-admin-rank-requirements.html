@@ -96,7 +96,7 @@
 
     <div class="hud-box mt-2">
         <div style="margin-bottom:1rem;">
-            <button class="btn" onclick="openCreateModal()" th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
+            <button class="btn" data-trigger="rr-open-create" th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
         </div>
 
         <div th:if="${#lists.isEmpty(requirements)}">
@@ -213,8 +213,8 @@
             <textarea id="cr-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-create')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="createRequirement()" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-create" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="rr-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -269,8 +269,8 @@
             <textarea id="er-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-edit')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="updateRequirement()" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-edit" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="rr-update" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -282,8 +282,8 @@
         <p th:text="#{promotion.admin.ranks.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
         <input id="dr-id" type="hidden">
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-delete')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" onclick="deleteRequirement()" th:text="#{promotion.admin.ranks.delete}">LÃ¶schen</button>
+            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-delete" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn-danger" data-trigger="rr-delete" th:text="#{promotion.admin.ranks.delete}">LÃ¶schen</button>
         </div>
     </div>
 </div>
@@ -399,6 +399,17 @@ function updateRequirement() {
 function deleteRequirement() {
     var id = document.getElementById('dr-id').value;
     apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete'); setTimeout(function() { window.location.reload(); }, 800); });
+}
+
+// CSP-safe delegated bindings (replace the historical onclick="…()" inline handlers on the
+// open/create/update/delete buttons — close buttons use the global close-modal handler from
+// common-handlers.js which performs the same .classList.remove('active') step that the
+// page-local closeModal does).
+if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+    window.krtEvents.on('click', 'rr-open-create', openCreateModal);
+    window.krtEvents.on('click', 'rr-create', createRequirement);
+    window.krtEvents.on('click', 'rr-update', updateRequirement);
+    window.krtEvents.on('click', 'rr-delete', deleteRequirement);
 }
 /*]]>*/
 </script>
