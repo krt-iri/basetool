@@ -115,7 +115,7 @@ class JobOrderServiceTest {
   @Test
   void createJobOrder_ShouldCalculateStockAndReturnDto() {
     // Given
-    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
 
@@ -150,9 +150,9 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void createJobOrder_ShouldAlwaysSetMinQualityTo750() {
-    // Given — DTO carries 750 (the only valid value), service must persist exactly 750
-    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 10.0);
+  void createJobOrder_ShouldAlwaysSetMinQualityTo700() {
+    // Given — DTO carries 700 (the only valid value), service must persist exactly 700
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
 
@@ -173,15 +173,15 @@ class JobOrderServiceTest {
     // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — the saved JobOrder must have minQuality == 750 on every material
+    // Then — the saved JobOrder must have minQuality == 700 on every material
     verify(jobOrderRepository)
-        .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == 750)));
+        .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == 700)));
   }
 
   @Test
   void createJobOrder_MaterialNotFound_ShouldThrowException() {
     // Given
-    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
 
@@ -374,7 +374,7 @@ class JobOrderServiceTest {
   void updateJobOrder_OptimisticLockingFailure_ShouldThrowException() {
     // Given
     jobOrder.setVersion(2L);
-    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 750, 50.0);
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto("Alpha", "Tester", List.of(updateMat), 1L); // version mismatch
 
@@ -396,7 +396,7 @@ class JobOrderServiceTest {
     Material newMaterial = new Material();
     newMaterial.setId(newMaterialId);
 
-    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 750, 50.0);
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 700, 50.0);
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto("Beta", "NewTester", List.of(updateMat), null);
 

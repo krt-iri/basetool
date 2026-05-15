@@ -135,7 +135,7 @@
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="750" max="750" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
+                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
                         </div>
                     </div>
                 </div>
@@ -267,7 +267,7 @@
                 <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
             </div>
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="number" name="materials[${materialIndex}].minQuality" value="750" step="1" min="750" max="750" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
+                <input type="number" name="materials[${materialIndex}].minQuality" value="700" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
             </div>
         `;
         

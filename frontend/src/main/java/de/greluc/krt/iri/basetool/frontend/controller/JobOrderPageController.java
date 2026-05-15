@@ -295,7 +295,7 @@ public class JobOrderPageController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 750, m.getAmount()))
+              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 700, m.getAmount()))
               .collect(Collectors.toList());
 
       if (materials.isEmpty()) {
@@ -398,7 +398,7 @@ public class JobOrderPageController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 750, m.getAmount()))
+              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 700, m.getAmount()))
               .collect(Collectors.toList());
 
       if (materials.isEmpty()) {
