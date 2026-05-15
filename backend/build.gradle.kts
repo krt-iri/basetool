@@ -67,11 +67,11 @@ dependencies {
 
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
-  compileOnly("org.jetbrains:annotations:_")
+  compileOnly(libs.jetbrains.annotations)
   // PDF generation
-  implementation("com.github.librepdf:openpdf:_")
+  implementation(libs.openpdf.core)
   // Ensure MapStruct understands Lombok-generated accessors
-  annotationProcessor("org.projectlombok:lombok-mapstruct-binding:_")
+  annotationProcessor(libs.lombok.mapstruct.binding)
 
   developmentOnly("org.springframework.boot:spring-boot-devtools")
 
