@@ -1064,4 +1064,30 @@ class InventoryItemServiceTest {
         AccessDeniedException.class,
         () -> inventoryItemService.updateDelivered(itemId, request, otherUserId, false));
   }
+
+  @Test
+  void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
+    // Given
+    when(inventoryItemRepository.deleteAllNonPersonal()).thenReturn(42);
+
+    // When
+    int removed = inventoryItemService.deleteAllGlobalInventory();
+
+    // Then
+    assertEquals(42, removed);
+    verify(inventoryItemRepository).deleteAllNonPersonal();
+  }
+
+  @Test
+  void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
+    // Given
+    when(inventoryItemRepository.deleteAllNonPersonal()).thenReturn(0);
+
+    // When
+    int removed = inventoryItemService.deleteAllGlobalInventory();
+
+    // Then
+    assertEquals(0, removed);
+    verify(inventoryItemRepository).deleteAllNonPersonal();
+  }
 }

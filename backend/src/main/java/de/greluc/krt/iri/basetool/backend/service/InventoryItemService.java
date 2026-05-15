@@ -714,6 +714,28 @@ public class InventoryItemService {
   }
 
   /**
+   * Removes every non-personal inventory item from the database — the admin "globales Lager leeren"
+   * action. Personal entries ({@code personal = true}) are kept on purpose: they belong to
+   * individual users and live outside the squadron's shared stock.
+   *
+   * <p>Implemented as a single bulk {@code DELETE} via {@link
+   * InventoryItemRepository#deleteAllNonPersonal()}. The previously load-bearing FK {@code
+   * job_order_handover_item.inventory_item_id} was dropped in migration {@code V64} (handover rows
+   * snapshot the material data directly), so no pre-cleanup of dependent rows is needed and no
+   * {@code @Modifying(clearAutomatically = true)} loop is required — the operation is a one-shot
+   * bulk statement that does not collide with any sibling-aggregate {@code @Version}.
+   *
+   * @return number of inventory rows deleted (0 if the global inventory was already empty)
+   */
+  @Transactional
+  public int deleteAllGlobalInventory() {
+    log.info("Bulk delete of global inventory requested");
+    int removed = inventoryItemRepository.deleteAllNonPersonal();
+    log.info("Bulk delete of global inventory completed: {} item(s) removed", removed);
+    return removed;
+  }
+
+  /**
    * Bulk-checkout: removes all inventory items with the given IDs that belong to the authenticated
    * user. Associations to JobOrders and Missions are cleared on the managed entities inside the
    * loop (no @Modifying bulk-update inside the loop). The actual deleteAllById call happens after

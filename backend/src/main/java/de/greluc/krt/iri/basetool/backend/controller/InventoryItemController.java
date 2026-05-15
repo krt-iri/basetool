@@ -29,6 +29,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -329,5 +330,29 @@ public class InventoryItemController {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     return inventoryItemService.updateInventoryItem(
         id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
+  }
+
+  /**
+   * Admin-only: removes every non-personal inventory item ("globales Lager leeren"). Personal
+   * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither {@code
+   * OFFICER} nor {@code LOGISTICIAN} can trigger the squadron-wide wipe.
+   *
+   * @return 204 No Content
+   */
+  @Operation(
+      summary = "Delete all global inventory",
+      description =
+          "Removes every non-personal inventory item (the shared squadron stock). Personal"
+              + " entries (personal = true) remain untouched. Admin-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "All global inventory items removed"),
+    @ApiResponse(responseCode = "401", description = "Not authenticated"),
+    @ApiResponse(responseCode = "403", description = "Caller is not an admin")
+  })
+  @DeleteMapping("/all")
+  @PreAuthorize("hasRole('ADMIN')")
+  public org.springframework.http.ResponseEntity<Void> deleteAllGlobalInventory() {
+    inventoryItemService.deleteAllGlobalInventory();
+    return org.springframework.http.ResponseEntity.noContent().build();
   }
 }
