@@ -27,46 +27,66 @@
     var on = window.krtEvents.on;
 
     /**
-     * Strict whitelist regex for same-origin path URLs. Matches a string that:
-     * starts with {@code '/'}, the second character is anything except {@code '/'} or
-     * {@code '\\'} (rejects protocol-relative {@code //attacker} and Windows UNC), and the
-     * remainder contains no whitespace, angle brackets, or quotes (rejects HTML / JS
-     * meta-characters). Capture group 1 holds the entire match, used at the navigation sink
-     * instead of the raw DOM input so the value entering the sink is a string produced by the
-     * regex match operation — the canonical CodeQL-recognised sanitizer for
-     * {@code js/xss-through-dom}.
+     * Strict whitelist regex for same-origin path URLs. Matches a string that starts with
+     * {@code '/'}, whose second character is neither {@code '/'} nor {@code '\\'} (rejects
+     * protocol-relative {@code //attacker} and Windows UNC {@code /\\share}), and whose
+     * remainder contains no whitespace, angle brackets, quotes, or backticks (HTML/JS
+     * meta-characters). Capture groups split the input into path / search / hash so each part
+     * can be assigned to the corresponding {@link HTMLAnchorElement} setter, which validates
+     * its argument structurally and cannot be tricked into changing the URL's scheme.
      */
-    var SAFE_PATH_REGEX = /^(\/[^\/\\][^\s<>"'`]*)$/;
+    var SAFE_PATH_REGEX = /^(\/[^\/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
 
     /**
-     * Navigate to the URL in {@code data-href}. Validates against {@link SAFE_PATH_REGEX} and
-     * passes the regex match result (not the raw attribute) to {@code location.assign}, so the
-     * value at the sink is the regex-derived match string. Rejects {@code javascript:},
-     * {@code data:}, third-party hosts, and HTML meta-characters.
+     * Navigate to a same-origin path safely. Sets {@code pathname} / {@code search} /
+     * {@code hash} on a freshly-created {@code <a>} anchored at the current origin, then reads
+     * back the validated {@code href} for navigation. The {@link HTMLAnchorElement.pathname},
+     * {@link HTMLAnchorElement.search}, and {@link HTMLAnchorElement.hash} setters are
+     * structurally narrower than {@code location.href}: they can only mutate their respective
+     * URL components, so even if the regex check were somehow bypassed they could never change
+     * the scheme to {@code javascript:} (the structural-safety pattern from the CodeQL
+     * {@code js/xss-through-dom} docs — analogue of {@code $.find} versus {@code $()}).
+     *
+     * @param raw  the candidate URL string (typically a {@code data-*} attribute value)
+     * @return {@code true} if navigation was triggered, {@code false} if the input was
+     *     rejected (caller may then leave the default-action in place)
+     */
+    function navigateSafe(raw) {
+        if (typeof raw !== 'string') return false;
+        var match = SAFE_PATH_REGEX.exec(raw);
+        if (!match) return false;
+        var a = document.createElement('a');
+        a.href = window.location.origin;
+        a.pathname = match[1];
+        if (match[2]) a.search = match[2];
+        if (match[3]) a.hash = match[3];
+        if (a.origin !== window.location.origin) return false;
+        window.location.assign(a.href);
+        return true;
+    }
+
+    /**
+     * Navigate to the URL in {@code data-href}. Delegated to {@link navigateSafe} so the
+     * actual navigation sink only ever receives a URL re-built from the structural
+     * {@link HTMLAnchorElement} setters.
      */
     on('click', 'navigate-href', function (el, event) {
-        var raw = el.getAttribute('data-href');
-        if (typeof raw !== 'string') return;
-        var match = SAFE_PATH_REGEX.exec(raw);
-        if (!match) return;
-        event.preventDefault();
-        window.location.assign(match[1]);
+        if (navigateSafe(el.getAttribute('data-href'))) {
+            event.preventDefault();
+        }
     });
 
     /**
      * Navigate to a URL templated against the selected value. Element declares
      * {@code data-url-template} containing a {@code {value}} placeholder; the placeholder is
-     * substituted with the input's URL-encoded current value, then the result is
-     * regex-matched and only the match-derived string reaches the navigation sink.
+     * substituted with the input's URL-encoded current value, then handed to
+     * {@link navigateSafe} for the structural same-origin guard.
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
         var template = el.getAttribute('data-url-template');
         if (!template) return;
-        var built = template.replace('{value}', encodeURIComponent(el.value));
-        var match = SAFE_PATH_REGEX.exec(built);
-        if (!match) return;
-        window.location.assign(match[1]);
+        navigateSafe(template.replace('{value}', encodeURIComponent(el.value)));
     });
 
     /**
