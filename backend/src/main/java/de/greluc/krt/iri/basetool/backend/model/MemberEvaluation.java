@@ -17,6 +17,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 /**
  * Stores the evaluation level assigned to a member (identified by JWT {@code sub}) for a specific
@@ -27,11 +28,16 @@ import lombok.Setter;
 @Table(name = "member_evaluation")
 @Getter
 @Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class MemberEvaluation extends AbstractEntity<UUID> {
 
+  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
+  // generated {@code getId()} so CodeQL recognises this method as the {@code Persistable.getId()}
+  // implementation.
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
@@ -39,6 +45,10 @@ public class MemberEvaluation extends AbstractEntity<UUID> {
   @Column(name = "user_id", nullable = false, length = 64)
   private String userId;
 
+  // Excluded from {@code @ToString} because the LAZY parent association would either trigger a
+  // LazyInitializationException outside a Hibernate session or recurse back through
+  // category.levelContents and the topic's reverse children.
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "category_id", nullable = false)
   private PromotionCategory category;

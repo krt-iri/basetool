@@ -425,7 +425,6 @@ function deleteCategory() {
     apiCall('/api/proxy/promotion/categories/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete-category'); setTimeout(function() { window.location.reload(); }, 800); });
 }
 function saveLevelContentInline(btn) {
-    var row = btn.closest('div[data-level]') || btn.parentElement;
     // find the textarea in the same row container
     var container = btn.parentElement;
     var textarea = container.querySelector('textarea.lc-textarea');

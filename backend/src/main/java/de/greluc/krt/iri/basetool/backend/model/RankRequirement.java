@@ -17,6 +17,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
 /**
  * Defines the requirements for a promotion from one rank to another. Both {@link #topic} and {@link
@@ -26,11 +27,16 @@ import lombok.Setter;
 @Table(name = "rank_requirement")
 @Getter
 @Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class RankRequirement extends AbstractEntity<UUID> {
 
+  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
+  // generated {@code getId()} so CodeQL recognises this method as the {@code Persistable.getId()}
+  // implementation.
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
@@ -41,10 +47,16 @@ public class RankRequirement extends AbstractEntity<UUID> {
   @Column(name = "to_rank", nullable = false)
   private int toRank;
 
+  // Excluded from {@code @ToString} because the LAZY association would either trigger a
+  // LazyInitializationException outside a Hibernate session or recurse back through
+  // topic.categories.
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "topic_id")
   private PromotionTopic topic;
 
+  // Excluded from {@code @ToString} for the same lazy/recursion reasons as {@link #topic}.
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")
   private PromotionCategory category;
