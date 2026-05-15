@@ -211,4 +211,17 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "jobOrder", "user", "location"})
   @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
+
+  /**
+   * Bulk-deletes every non-personal inventory item (the "globales Lager" stock). Personal rows
+   * ({@code personal = true}) are explicitly left untouched so the admin "clear global inventory"
+   * action does not nuke individual users' private entries. The {@code job_order_handover_item ->
+   * inventory_item} FK was removed in {@code V64} (the handover row already snapshots the relevant
+   * material data), so a single bulk-delete is safe — no pre-cleanup loop is required.
+   *
+   * @return number of deleted rows
+   */
+  @Modifying
+  @Query("DELETE FROM InventoryItem i WHERE i.personal = false")
+  int deleteAllNonPersonal();
 }
