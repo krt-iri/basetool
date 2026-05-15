@@ -122,6 +122,10 @@
         <div class="actions-bar">
             <a th:href="@{/inventory}" class="btn btn-secondary">&laquo; Zurück zur Staffelübersicht</a>
             <a sec:authorize="hasRole('LOGISTICIAN')" th:href="@{/inventory/input(source='admin')}" class="btn" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
+            <button sec:authorize="hasRole('ADMIN')" type="button" id="delete-all-global-inventory-btn" class="btn btn-danger"
+                    th:text="#{inventory.deleteAll.btn}"
+                    th:data-error-failed="#{inventory.deleteAll.error.failed}"
+                    th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
             
             <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
@@ -448,6 +452,17 @@
             <button type="button" class="btn" style="min-height: 44px;" onclick="saveNote()" th:text="#{inventory.note.save}">Speichern</button>
             <button type="button" class="btn btn-secondary" style="min-height: 44px;" onclick="removeNote()" th:text="#{inventory.note.remove}">Entfernen</button>
             <button type="button" class="btn btn-secondary" style="min-height: 44px; margin-left: auto;" onclick="closeNoteModal()" th:text="#{inventory.note.cancel}">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<div sec:authorize="hasRole('ADMIN')" id="delete-all-global-inventory-modal" class="modal" style="display:none; z-index: 3300;">
+    <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+        <h2 th:text="#{inventory.deleteAll.modal.title}" style="margin-top:0;">Globales Lager leeren</h2>
+        <p th:text="#{inventory.deleteAll.modal.body}" style="margin-bottom: 2rem;">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
+        <div class="flex-center-gap">
+            <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
         </div>
     </div>
 </div>
@@ -1022,6 +1037,61 @@
             modal.style.display = "none";
         }
     }
+
+    // ---- Delete All Global Inventory (Admin) ----
+    (function() {
+        const deleteBtn = document.getElementById('delete-all-global-inventory-btn');
+        const modal = document.getElementById('delete-all-global-inventory-modal');
+        const confirmBtn = document.getElementById('delete-all-global-inventory-confirm-btn');
+        const cancelBtn = document.getElementById('delete-all-global-inventory-cancel-btn');
+
+        if (!deleteBtn || !modal || !confirmBtn || !cancelBtn) return;
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        deleteBtn.addEventListener('click', function() {
+            modal.style.display = 'flex';
+        });
+
+        cancelBtn.addEventListener('click', closeModal);
+
+        window.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        confirmBtn.addEventListener('click', function() {
+            confirmBtn.disabled = true;
+            cancelBtn.disabled = true;
+
+            fetch('/inventory/all', { method: 'DELETE', credentials: 'same-origin' })
+                .then(function(resp) {
+                    if (!resp.ok) {
+                        throw new Error(resp.status);
+                    }
+                    closeModal();
+                    if (typeof showInventoryToast === 'function') {
+                        showInventoryToast('success', deleteBtn.getAttribute('data-success'));
+                    }
+                    setTimeout(function() { window.location.reload(); }, 600);
+                })
+                .catch(function(err) {
+                    closeModal();
+                    const errMsg = deleteBtn.getAttribute('data-error-failed')
+                        + (err && err.message ? ' (' + err.message + ')' : '');
+                    if (typeof showInventoryToast === 'function') {
+                        showInventoryToast('error', errMsg);
+                    }
+                })
+                .finally(function() {
+                    confirmBtn.disabled = false;
+                    cancelBtn.disabled = false;
+                });
+        });
+    })();
 
     async function updateInventoryAssociation(selectElement) {
         const id = selectElement.getAttribute('data-id');
