@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
@@ -57,13 +58,17 @@ public class KeycloakHealthIndicator implements HealthIndicator {
   /**
    * Production constructor used by Spring; resolves the issuer URI from {@code
    * spring.security.oauth2.resourceserver.jwt.issuer-uri} and builds a {@link RestClient} with the
-   * indicator-specific timeouts.
+   * indicator-specific timeouts. {@link Autowired} is required because the class declares a second
+   * (package-private, test-only) constructor; without it Spring 4+'s constructor-selection logic
+   * falls back to a non-existent default constructor and fails at startup with {@code
+   * NoSuchMethodException: <init>()}.
    *
    * @param issuerUri the Keycloak realm issuer URI (e.g. {@code
    *     https://keycloak.example/realms/iri}) resolved from {@code
    *     spring.security.oauth2.resourceserver.jwt.issuer-uri}; the discovery document path is
    *     appended verbatim
    */
+  @Autowired
   public KeycloakHealthIndicator(
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
     this(issuerUri, CONNECT_TIMEOUT, READ_TIMEOUT);

@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.lang.reflect.Constructor;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -12,6 +14,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
@@ -171,5 +174,34 @@ class BackendHealthIndicatorTest {
         "/actuator/health/readiness",
         req.getPath(),
         "trailing slash on BACKEND_URL must not propagate to the probe path");
+  }
+
+  // ─── Spring constructor-selection guard ─────────────────────────────────
+
+  @Test
+  void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
+    // Regression guard: the indicator declares TWO constructors -- the production
+    // AppBackendProperties one and a package-private test-only one with explicit Duration
+    // parameters. Spring 4+ refuses to auto-select between multiple constructors and falls back
+    // to a no-arg default; without that, it aborts startup with
+    // `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired marker on the
+    // production constructor; the test below asserts that marker survives any future refactor.
+    long autowiredCtors =
+        Arrays.stream(BackendHealthIndicator.class.getDeclaredConstructors())
+            .filter(ctor -> ctor.isAnnotationPresent(Autowired.class))
+            .count();
+    assertEquals(
+        1L,
+        autowiredCtors,
+        "exactly one constructor must carry @Autowired so Spring can disambiguate between the "
+            + "production constructor and the visible-for-testing constructor; otherwise the prod "
+            + "context fails to start with 'No default constructor found'");
+
+    Constructor<?>[] all = BackendHealthIndicator.class.getDeclaredConstructors();
+    assertEquals(
+        2,
+        all.length,
+        "this regression test assumes exactly two constructors -- if a third is added, revisit "
+            + "the @Autowired contract");
   }
 }

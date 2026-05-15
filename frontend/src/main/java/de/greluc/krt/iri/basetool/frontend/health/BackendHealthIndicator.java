@@ -8,6 +8,7 @@ import java.time.Duration;
 import javax.net.ssl.SSLContext;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
@@ -71,11 +72,15 @@ public class BackendHealthIndicator implements HealthIndicator {
    * Production constructor used by Spring; resolves the backend base URL from {@link
    * AppBackendProperties} and builds a {@link RestClient} with indicator-specific timeouts and the
    * same trust-all SSL context the application's {@code WebClient} uses against the backend's
-   * self-signed certificate.
+   * self-signed certificate. {@link Autowired} is required because the class declares a second
+   * (package-private, test-only) constructor; without it Spring 4+'s constructor-selection logic
+   * falls back to a non-existent default constructor and fails at startup with {@code
+   * NoSuchMethodException: <init>()}.
    *
    * @param backendProperties type-safe binding of the {@code app.backend-url} property; the
    *     readiness probe path is appended verbatim to {@link AppBackendProperties#getBackendUrl()}
    */
+  @Autowired
   public BackendHealthIndicator(AppBackendProperties backendProperties) {
     this(backendProperties.getBackendUrl(), CONNECT_TIMEOUT, READ_TIMEOUT);
   }
