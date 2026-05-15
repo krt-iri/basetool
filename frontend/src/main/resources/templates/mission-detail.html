@@ -783,8 +783,8 @@
                                 <tr th:each="entry : ${financeEntries}">
                                     <td th:text="${entry.participant != null ? (entry.participant.user != null ? entry.participant.user.effectiveName : entry.participant.guestName) : '-'}">Nutzer</td>
                                     <td>
-                                        <span th:if="${entry.type == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #4CAF50;">Einnahme</span>
-                                        <span th:if="${entry.type == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
+                                        <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #4CAF50;">Einnahme</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
                                     </td>
                                     <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
                                     <td th:text="${entry.note}">Notiz</td>
