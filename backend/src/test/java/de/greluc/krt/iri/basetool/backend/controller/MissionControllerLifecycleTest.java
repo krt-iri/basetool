@@ -1,0 +1,712 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.iri.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest;
+import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import de.greluc.krt.iri.basetool.backend.service.UserService;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+/**
+ * Pure-Mockito unit tests for the parts of {@link MissionController} that the existing {@code
+ * MissionControllerSecurityTest} (role gates) and {@code MissionControllerSlimEndpointsTest} (slim
+ * sub-resource endpoints + RSVP branches) do NOT touch:
+ *
+ * <ul>
+ *   <li><b>Guest redaction</b> in {@code getMissionById} / {@code getNextMission} — {@link
+ *       MissionController#cleanupMissionForGuest} is the only path that controls what leaves the
+ *       API for an anonymous viewer. Pinning the redaction (owner, managers, inventory, refinery
+ *       orders cleared; canEdit/canManageManagers forced to false; participant + nested user
+ *       redactions; sub-mission redactions) protects the multi-user-data-isolation guarantee in
+ *       CLAUDE.md.
+ *   <li><b>Guest access blocks</b>: internal missions → 403, completed/cancelled missions → 403 (a
+ *       past mission must not leak its participant list to a public viewer).
+ *   <li><b>Anonymous list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
+ *       silently restrict guests to {@code PLANNED}+{@code ACTIVE} non-internal missions. The
+ *       "guest passes a forbidden status" path returns an empty page (not 403) so the UI degrades
+ *       silently.
+ *   <li><b>Section patches</b> ({@code patchMissionCore}, {@code patchMissionSchedule}, {@code
+ *       patchMissionFlags}) unpack each request record into the service's positional argument list.
+ *       The argument order is the spot where a copy-paste during refactor would silently swap
+ *       fields (e.g. {@code name} and {@code description}).
+ *   <li><b>Versioned owner change</b> — {@code updateMissionOwner} forwards the ownership-aggregate
+ *       version, not the parent {@code Mission.version}. Mixing those up reintroduces the bug that
+ *       the dedicated aggregate was created to solve.
+ * </ul>
+ */
+@ExtendWith(MockitoExtension.class)
+class MissionControllerLifecycleTest {
+
+  @Mock private MissionService missionService;
+  @Mock private UserService userService;
+  @Mock private MissionMapper missionMapper;
+  @Mock private UserMapper userMapper;
+  @Mock private MissionSecurityService missionSecurityService;
+
+  @InjectMocks private MissionController controller;
+
+  private static Jwt jwt(String sub) {
+    return Jwt.withTokenValue("token")
+        .header("alg", "RS256")
+        .subject(sub)
+        .claim("sub", sub)
+        .build();
+  }
+
+  /**
+   * Build a representative MissionDto that exercises every field {@link
+   * MissionController#cleanupMissionForGuest} touches. This is the canary input for the redaction
+   * assertions further down: every "internal" or "leaks-PII" field is intentionally populated so
+   * the cleanup pass has something to strip.
+   */
+  private static MissionDto fullMissionDto(UUID id) {
+    UserReferenceDto owner =
+        new UserReferenceDto(
+            UUID.randomUUID(), "owner.handle", "Owner Display", "Owner Effective", 12);
+    UserReferenceDto manager =
+        new UserReferenceDto(
+            UUID.randomUUID(), "manager.handle", "Manager Display", "Manager Effective", 5);
+    UserDto user =
+        new UserDto(
+            UUID.randomUUID(),
+            "alice",
+            "Alice Display",
+            "Alice Effective",
+            "Alice",
+            "Anderson",
+            "alice@example.com",
+            12,
+            "internal description",
+            Set.of("ROLE_SQUADRON_MEMBER"),
+            Set.of("MISSION_READ"),
+            UUID.randomUUID(),
+            true,
+            false,
+            true,
+            1L,
+            java.time.LocalDate.of(2024, 1, 1));
+    MissionParticipantDto participant =
+        new MissionParticipantDto(
+            UUID.randomUUID(), user, null, null, null, null, "comment", null, null, null, 1L);
+    return new MissionDto(
+        id,
+        "Op Foxglove",
+        "internal description",
+        "https://example.com/cal",
+        "PLANNED",
+        Instant.parse("2026-05-01T10:00:00Z"),
+        Instant.parse("2026-05-01T12:00:00Z"),
+        null,
+        Instant.parse("2026-05-01T14:00:00Z"),
+        null,
+        false,
+        Set.of(participant),
+        List.of(),
+        List.of(),
+        Set.of(),
+        List.of(),
+        List.of(),
+        null,
+        owner,
+        Set.of(manager),
+        true,
+        true,
+        9L,
+        1,
+        1);
+  }
+
+  // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
+
+  @Test
+  void getAllMissions_authenticatedCaller_seesEverything() {
+    Mission m = new Mission();
+    MissionListDto listDto =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Op",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            1L);
+    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
+    when(missionService.getAllMissions(any(Pageable.class))).thenReturn(page);
+    when(missionMapper.toListDto(m)).thenReturn(listDto);
+
+    PageResponse<MissionListDto> result =
+        controller.getAllMissions(0, 20, null, () -> "alice"); // non-null Principal
+
+    assertThat(result.content()).containsExactly(listDto);
+    verify(missionService).getAllMissions(any(Pageable.class));
+    // Authenticated callers must NOT go through the anonymous-search filter — pin the fact that
+    // searchMissions is never invoked.
+    verify(missionService, never())
+        .searchMissions(any(), any(), any(), any(), any(), any(), any(Pageable.class));
+  }
+
+  @Test
+  void getAllMissions_anonymousCaller_restrictedToPlannedAndActiveNonInternal() {
+    Mission m = new Mission();
+    MissionListDto listDto =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Op",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            1L);
+    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
+    when(missionService.searchMissions(
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(null),
+            any(Pageable.class)))
+        .thenReturn(page);
+    when(missionMapper.toListDto(m)).thenReturn(listDto);
+
+    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null, null);
+
+    // Anonymous callers MUST be silently restricted to PLANNED+ACTIVE non-internal missions —
+    // this is the only place where the "guests do not see completed/cancelled/internal" rule is
+    // enforced on the list endpoint. Pin the exact argument shape so a refactor that "simplifies"
+    // the anonymous branch cannot silently widen the guest view.
+    assertThat(result.content()).containsExactly(listDto);
+    verify(missionService)
+        .searchMissions(
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(null),
+            any(Pageable.class));
+  }
+
+  // ── GET /api/v1/missions/search (anonymous filtering / empty-after-filter) ──
+
+  @Test
+  void searchMissions_anonymous_emptyAfterFilter_returnsEmptyPageWithoutHittingService() {
+    PageResponse<MissionListDto> result =
+        controller.searchMissions(
+            null,
+            null,
+            null,
+            List.of("COMPLETED"),
+            null,
+            0,
+            20,
+            null,
+            null); // guest wants COMPLETED
+
+    // Guest passed a status that is not in the allow-list. The controller MUST return an empty
+    // page (not 403, not "everything-anyway") and MUST NOT hit the service — pinning this
+    // protects the "UI degrades silently for guests" contract. A regression that falls through
+    // to the service would either leak completed missions OR fail with NPE on the empty filter.
+    assertThat(result.content()).isEmpty();
+    assertThat(result.totalElements()).isZero();
+    verify(missionService, never())
+        .searchMissions(any(), any(), any(), any(), any(), any(), any(Pageable.class));
+  }
+
+  @Test
+  void searchMissions_anonymous_statusFilterIntersectedWithAllowList() {
+    Mission m = new Mission();
+    MissionListDto listDto =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Op",
+            null,
+            null,
+            "ACTIVE",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            1L);
+    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
+    when(missionService.searchMissions(
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(List.of("ACTIVE")),
+            eq(false),
+            eq(null),
+            any(Pageable.class)))
+        .thenReturn(page);
+    when(missionMapper.toListDto(m)).thenReturn(listDto);
+
+    PageResponse<MissionListDto> result =
+        controller.searchMissions(
+            null, null, null, List.of("ACTIVE", "COMPLETED"), null, 0, 20, null, null);
+
+    // Guest passed ["ACTIVE", "COMPLETED"]; intersection with the allow-list ["PLANNED","ACTIVE"]
+    // is ["ACTIVE"]. Pin the intersection result — a refactor that swapped intersect for union
+    // would leak COMPLETED missions to anonymous viewers.
+    assertThat(result.content()).containsExactly(listDto);
+    verify(missionService)
+        .searchMissions(
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(List.of("ACTIVE")),
+            eq(false),
+            eq(null),
+            any(Pageable.class));
+  }
+
+  @Test
+  void searchMissions_authenticated_passesStatusFilterVerbatim() {
+    Mission m = new Mission();
+    MissionListDto listDto =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Op",
+            null,
+            null,
+            "COMPLETED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            1L);
+    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
+    Instant start = Instant.parse("2026-04-01T00:00:00Z");
+    Instant end = Instant.parse("2026-06-01T00:00:00Z");
+    UUID operationId = UUID.randomUUID();
+    when(missionService.searchMissions(
+            eq("foo"),
+            eq(start),
+            eq(end),
+            eq(List.of("COMPLETED")),
+            eq(null), // not 'false' — authenticated callers see internals too
+            eq(operationId),
+            any(Pageable.class)))
+        .thenReturn(page);
+    when(missionMapper.toListDto(m)).thenReturn(listDto);
+
+    PageResponse<MissionListDto> result =
+        controller.searchMissions(
+            "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null, () -> "alice");
+
+    assertThat(result.content()).containsExactly(listDto);
+    verify(missionService)
+        .searchMissions(
+            eq("foo"),
+            eq(start),
+            eq(end),
+            eq(List.of("COMPLETED")),
+            eq(null),
+            eq(operationId),
+            any(Pageable.class));
+  }
+
+  // ── GET /api/v1/missions/{id} (guest blocks + redaction) ─────────────
+
+  @Test
+  void getMissionById_authenticatedCaller_returnsFullDtoUnchanged() {
+    UUID id = UUID.randomUUID();
+    Mission entity = new Mission();
+    MissionDto full = fullMissionDto(id);
+    when(missionService.getMissionById(id)).thenReturn(entity);
+    when(missionMapper.toDto(entity)).thenReturn(full);
+
+    MissionDto result = controller.getMissionById(id, () -> "alice");
+
+    // Authenticated caller — owner/managers/PII flow through unchanged. Pin the "isSameAs" so a
+    // future change that ALWAYS goes through cleanupMissionForGuest (e.g. as a "safety net")
+    // would surface here as a different identity.
+    assertThat(result).isSameAs(full);
+  }
+
+  @Test
+  void getMissionById_guest_internalMission_throws403() {
+    UUID id = UUID.randomUUID();
+    Mission internal = new Mission();
+    internal.setIsInternal(true);
+    internal.setStatus("PLANNED");
+    when(missionService.getMissionById(id)).thenReturn(internal);
+
+    try {
+      controller.getMissionById(id, null);
+      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
+    } catch (AccessDeniedException expected) {
+      // ok
+    }
+
+    // Critical: the mapper MUST NOT be called for forbidden guest reads, otherwise an exception
+    // inside the mapper would leak data via the exception message in some edge case.
+    verify(missionMapper, never()).toDto(any(Mission.class));
+  }
+
+  @Test
+  void getMissionById_guest_completedMission_throws403() {
+    UUID id = UUID.randomUUID();
+    Mission completed = new Mission();
+    completed.setIsInternal(false);
+    completed.setStatus("COMPLETED");
+    when(missionService.getMissionById(id)).thenReturn(completed);
+
+    try {
+      controller.getMissionById(id, null);
+      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
+    } catch (AccessDeniedException expected) {
+      // ok
+    }
+    verify(missionMapper, never()).toDto(any(Mission.class));
+  }
+
+  @Test
+  void getMissionById_guest_cancelledMission_throws403() {
+    UUID id = UUID.randomUUID();
+    Mission cancelled = new Mission();
+    cancelled.setIsInternal(false);
+    cancelled.setStatus("CANCELLED");
+    when(missionService.getMissionById(id)).thenReturn(cancelled);
+
+    try {
+      controller.getMissionById(id, null);
+      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
+    } catch (AccessDeniedException expected) {
+      // ok
+    }
+    verify(missionMapper, never()).toDto(any(Mission.class));
+  }
+
+  @Test
+  void getMissionById_guest_planned_returnsRedactedDto() {
+    UUID id = UUID.randomUUID();
+    Mission planned = new Mission();
+    planned.setIsInternal(false);
+    planned.setStatus("PLANNED");
+    MissionDto full = fullMissionDto(id);
+    when(missionService.getMissionById(id)).thenReturn(planned);
+    when(missionMapper.toDto(planned)).thenReturn(full);
+
+    MissionDto result = controller.getMissionById(id, null);
+
+    // The redaction contract — every assertion here pins one PII / internal-state field that
+    // cleanupMissionForGuest is supposed to strip. Anyone changing this method MUST update the
+    // test, which is the entire point.
+    assertThat(result).isNotNull();
+    assertThat(result.owner()).isNull();
+    assertThat(result.managers()).isNull();
+    assertThat(result.canEdit()).isFalse();
+    assertThat(result.canManageManagers()).isFalse();
+    assertThat(result.inventoryEntries()).isEmpty();
+    assertThat(result.refineryOrders()).isEmpty();
+
+    // Nested-participant redaction: the user must lose firstName/lastName/email/description/
+    // roles/permissions/announcementWatermark/joinDate. Username + displayName + rank stay
+    // (public callsign tuple).
+    MissionParticipantDto participant = result.participants().iterator().next();
+    UserDto cleanedUser = participant.user();
+    assertThat(cleanedUser.firstName()).isNull();
+    assertThat(cleanedUser.lastName()).isNull();
+    assertThat(cleanedUser.email()).isNull();
+    assertThat(cleanedUser.description()).isNull();
+    assertThat(cleanedUser.roles()).isNull();
+    assertThat(cleanedUser.permissions()).isNull();
+    assertThat(cleanedUser.lastReadAnnouncementId()).isNull();
+    assertThat(cleanedUser.joinDate()).isNull();
+    assertThat(cleanedUser.isLogistician()).isFalse();
+    assertThat(cleanedUser.isMissionManager()).isFalse();
+    assertThat(cleanedUser.username()).isEqualTo("alice");
+    assertThat(cleanedUser.displayName()).isEqualTo("Alice Display");
+    assertThat(cleanedUser.rank()).isEqualTo(12);
+  }
+
+  // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────
+
+  @Test
+  void getNextMission_noMission_returns204() {
+    when(missionService.getNextMission(false)).thenReturn(Optional.empty());
+
+    ResponseEntity<MissionDto> response = controller.getNextMission(null);
+
+    assertThat(response.getStatusCode().value()).isEqualTo(204);
+    assertThat(response.getBody()).isNull();
+  }
+
+  @Test
+  void getNextMission_guest_allowInternalIsFalse_andResponseRedacted() {
+    UUID id = UUID.randomUUID();
+    Mission upcoming = new Mission();
+    MissionDto full = fullMissionDto(id);
+    when(missionService.getNextMission(false)).thenReturn(Optional.of(upcoming));
+    when(missionMapper.toDto(upcoming)).thenReturn(full);
+
+    ResponseEntity<MissionDto> response = controller.getNextMission(null);
+
+    // allowInternal=false MUST be passed to the service when caller is anonymous — otherwise the
+    // service might surface an internal mission that the cleanup pass would only blank out a
+    // few fields of. Pin both the boolean AND the post-cleanup redacted owner.
+    verify(missionService).getNextMission(false);
+    assertThat(response.getStatusCode().value()).isEqualTo(200);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().owner()).isNull();
+  }
+
+  @Test
+  void getNextMission_authenticated_allowInternalIsTrue_andDtoUnchanged() {
+    UUID id = UUID.randomUUID();
+    Mission upcoming = new Mission();
+    MissionDto full = fullMissionDto(id);
+    when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
+    when(missionMapper.toDto(upcoming)).thenReturn(full);
+
+    ResponseEntity<MissionDto> response = controller.getNextMission(() -> "alice");
+
+    assertThat(response.getStatusCode().value()).isEqualTo(200);
+    assertThat(response.getBody()).isSameAs(full);
+  }
+
+  // ── POST /api/v1/missions/{id}/join ──────────────────────────────────
+
+  @Test
+  void joinMission_resolvesCallerFromJwt_andDelegatesToService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(missionId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(missionService.addParticipant(missionId, callerId)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.joinMission(jwt, missionId);
+
+    // The self-enroll shortcut MUST resolve the caller from the JWT — never accept a userId
+    // from the URL/body. Pin the captured argument to the JWT-derived id.
+    assertThat(result).isSameAs(dto);
+    verify(missionService).addParticipant(missionId, callerId);
+  }
+
+  // ── PATCH /api/v1/missions/{id}/core ─────────────────────────────────
+
+  @Test
+  void patchMissionCore_unpacksRequestRecordInDocumentedArgumentOrder() {
+    UUID id = UUID.randomUUID();
+    PatchMissionCoreRequest request =
+        new PatchMissionCoreRequest("New name", "New description", "https://cal", "PLANNED", 5L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.updateCoreSection(
+            id, "New name", "New description", "https://cal", "PLANNED", 5L))
+        .thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.patchMissionCore(id, request);
+
+    // The five-arg positional service call is the spot where a copy-paste during refactor would
+    // silently swap name and description (both Strings). The verify-call pins the EXACT argument
+    // order so a regression surfaces here instead of in production data.
+    assertThat(result).isSameAs(dto);
+    verify(missionService)
+        .updateCoreSection(id, "New name", "New description", "https://cal", "PLANNED", 5L);
+  }
+
+  // ── PATCH /api/v1/missions/{id}/schedule ─────────────────────────────
+
+  @Test
+  void patchMissionSchedule_unpacksAllFiveTimestampsAndVersion() {
+    UUID id = UUID.randomUUID();
+    Instant meeting = Instant.parse("2026-05-01T09:00:00Z");
+    Instant plannedStart = Instant.parse("2026-05-01T10:00:00Z");
+    Instant plannedEnd = Instant.parse("2026-05-01T12:00:00Z");
+    Instant actualStart = Instant.parse("2026-05-01T10:05:00Z");
+    Instant actualEnd = Instant.parse("2026-05-01T12:10:00Z");
+    PatchMissionScheduleRequest request =
+        new PatchMissionScheduleRequest(
+            meeting, plannedStart, plannedEnd, actualStart, actualEnd, 3L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.updateScheduleSection(
+            id, meeting, plannedStart, plannedEnd, actualStart, actualEnd, 3L))
+        .thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.patchMissionSchedule(id, request);
+
+    // The five Instant fields are functionally interchangeable from a type perspective — only
+    // their positional order distinguishes them. Verify-call pins it. (Notice: ALL timestamps
+    // are UTC Instants per CLAUDE.md — the test does not mix LocalDateTime in.)
+    assertThat(result).isSameAs(dto);
+    verify(missionService)
+        .updateScheduleSection(id, meeting, plannedStart, plannedEnd, actualStart, actualEnd, 3L);
+  }
+
+  // ── PATCH /api/v1/missions/{id}/flags ────────────────────────────────
+
+  @Test
+  void patchMissionFlags_unpacksIsInternalAndVersion() {
+    UUID id = UUID.randomUUID();
+    PatchMissionFlagsRequest request = new PatchMissionFlagsRequest(true, 2L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.updateFlagsSection(id, true, 2L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.patchMissionFlags(id, request);
+
+    assertThat(result).isSameAs(dto);
+    verify(missionService).updateFlagsSection(id, true, 2L);
+  }
+
+  // ── PUT /api/v1/missions/{id}/owner (versioned) ──────────────────────
+
+  @Test
+  void updateMissionOwner_forwardsOwnershipAggregateVersion_notMissionVersion() {
+    UUID id = UUID.randomUUID();
+    UUID newOwnerId = UUID.randomUUID();
+    // The version here is the *ownership* aggregate version, NOT Mission.version. A test that
+    // accidentally pinned Mission.version (e.g. 9L from the fullMissionDto helper) would silently
+    // mask a regression where the controller forwards the wrong version. Use a deliberately
+    // distinct value (42L) that is unlike anything else in the test setup.
+    UpdateMissionOwnerRequest request = new UpdateMissionOwnerRequest(newOwnerId, 42L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.updateMissionOwner(id, newOwnerId, 42L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.updateMissionOwner(id, request);
+
+    assertThat(result).isSameAs(dto);
+    verify(missionService).updateMissionOwner(id, newOwnerId, 42L);
+  }
+
+  // ── PUT /api/v1/missions/{id}/owner/{userId} (legacy) ────────────────
+
+  @Test
+  void setMissionOwnerLegacy_doesNotForwardAnyVersion() {
+    UUID id = UUID.randomUUID();
+    UUID newOwnerId = UUID.randomUUID();
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.setMissionOwner(id, newOwnerId)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.setMissionOwnerLegacy(id, newOwnerId);
+
+    // The legacy endpoint deliberately has NO version field — that is the exact reason the
+    // {@code /owner} version-checked endpoint exists alongside it. Pin the (mission-id,
+    // user-id) two-arg shape so a future "let's add a version param to be safe" change to the
+    // legacy endpoint surfaces here as a compile error.
+    assertThat(result).isSameAs(dto);
+    verify(missionService).setMissionOwner(id, newOwnerId);
+    verify(missionService, never()).updateMissionOwner(any(), any(), any());
+  }
+
+  // ── GET /api/v1/missions/{id}/participants/unassigned ────────────────
+
+  @Test
+  void getUnassignedParticipants_mapsServiceListThroughMapper() {
+    UUID id = UUID.randomUUID();
+    MissionParticipant raw = new MissionParticipant();
+    MissionParticipantDto dto =
+        new MissionParticipantDto(
+            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L);
+    when(missionService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
+    when(missionMapper.toDto(raw)).thenReturn(dto);
+
+    List<MissionParticipantDto> result = controller.getUnassignedParticipants(id);
+
+    assertThat(result).containsExactly(dto);
+    verify(missionMapper).toDto(raw);
+  }
+
+  // ── createSubMission delegates through the entity round-trip ─────────
+
+  @Test
+  void createSubMission_roundTripsMissionDtoThroughMapperEntityServiceAndBack() {
+    UUID parentId = UUID.randomUUID();
+    MissionDto submissionDto = fullMissionDto(UUID.randomUUID());
+    Mission parsedEntity = new Mission();
+    Mission persistedParent = new Mission();
+    MissionDto parentDto = fullMissionDto(parentId);
+    when(missionMapper.toEntity(submissionDto)).thenReturn(parsedEntity);
+    when(missionService.addSubMission(parentId, parsedEntity)).thenReturn(persistedParent);
+    when(missionMapper.toDto(persistedParent)).thenReturn(parentDto);
+
+    MissionDto result = controller.createSubMission(parentId, submissionDto);
+
+    // The DTO→entity→service→DTO round-trip is the canonical "no JPA entity at boundary"
+    // contract. Pinning the call sequence (toEntity → addSubMission → toDto) guarantees a
+    // future refactor that "optimises" the round-trip by passing the DTO straight through
+    // would break here — and that is exactly the regression the ArchUnit rule cannot catch
+    // statically.
+    assertThat(result).isSameAs(parentDto);
+    verify(missionMapper).toEntity(submissionDto);
+    verify(missionService).addSubMission(parentId, parsedEntity);
+    verify(missionMapper).toDto(persistedParent);
+  }
+
+  // ── DELETE /api/v1/missions/{id} ─────────────────────────────────────
+
+  @Test
+  void deleteMission_returns204_andDelegatesToService() {
+    UUID id = UUID.randomUUID();
+
+    ResponseEntity<Void> response = controller.deleteMission(id);
+
+    assertThat(response.getStatusCode().value()).isEqualTo(204);
+    verify(missionService).deleteMission(id);
+  }
+}
