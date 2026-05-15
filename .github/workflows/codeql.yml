@@ -137,9 +137,23 @@ jobs:
       # JUnit suite + Checkstyle + SpotBugs + JaCoCo, which the dedicated
       # `ci.yml` already does — duplicating that here would just burn
       # runner minutes without adding extraction value.
+      #
+      # `--no-build-cache` is load-bearing: CodeQL's Java extractor traces
+      # `javac` via `LD_PRELOAD` and only records source it sees the compiler
+      # process. When the Gradle build cache (populated by the main-branch
+      # CodeQL run, read-only on PR branches per the `setup-gradle` config
+      # above) serves `compileJava`/`compileTestJava` as `FROM-CACHE` — which
+      # happens on every PR that does not touch any Java file — `javac` is
+      # never invoked, the tracer captures nothing, and the analyze step
+      # fails with "CodeQL could not process any code written in
+      # Java/Kotlin". Disabling the build cache here forces actual
+      # compilation each run so the tracer always has events to record.
+      # Gradle's task-output up-to-date check (which lives on disk per
+      # workspace, not in the shared cache) is unaffected, but CI workspaces
+      # are ephemeral so every run effectively does a clean compile anyway.
       - name: Compile Java sources for extraction
         if: matrix.language == 'java-kotlin'
-        run: ./gradlew compileJava compileTestJava --stacktrace
+        run: ./gradlew compileJava compileTestJava --no-build-cache --stacktrace
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
