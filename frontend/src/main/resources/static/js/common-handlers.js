@@ -27,32 +27,16 @@
     var on = window.krtEvents.on;
 
     /**
-     * Local same-origin path sanitiser. Mirrors {@link window.safeSameOriginUrl} but is defined
-     * in the same scope as the {@code window.location.href} sinks below so CodeQL's
-     * {@code js/xss-through-dom} interprocedural analysis can see the explicit
-     * {@code charAt(0) === '/'} sanitizer and prove the data flow safe. Without an in-scope
-     * sanitizer the helper-via-{@code window} indirection is treated as an unsanitised flow.
-     *
-     * Accepts: a non-empty string whose first char is {@code '/'} and whose second char is
-     * neither {@code '/'} nor {@code '\\'} (rejects {@code //attacker} and {@code \\\\share}).
-     * Returns the input unchanged on success, {@code null} on rejection.
-     */
-    function sanitizePath(raw) {
-        if (typeof raw !== 'string' || raw.length < 2) return null;
-        if (raw.charAt(0) !== '/') return null;
-        var second = raw.charAt(1);
-        if (second === '/' || second === '\\') return null;
-        return raw;
-    }
-
-    /**
-     * Navigate to the URL in {@code data-href}. Sanitised by {@link sanitizePath} so an
-     * attacker-controlled absolute URL on a third-party origin cannot redirect the user out
-     * of the application — the same defense the legacy inline handlers used.
+     * Navigate to the URL in {@code data-href}. The inline {@code startsWith('/')} guard plus
+     * the protocol-relative {@code //} / Windows {@code /\} rejection is the CodeQL-recognised
+     * sanitizer for {@code js/xss-through-dom}; it must live directly at the {@code location.href}
+     * sink because CodeQL's interprocedural analysis does not track a sanitizer through a helper
+     * whose successful branch returns its tainted input verbatim.
      */
     on('click', 'navigate-href', function (el, event) {
-        var url = sanitizePath(el.getAttribute('data-href'));
-        if (!url) return;
+        var url = el.getAttribute('data-href');
+        if (typeof url !== 'string' || url.length < 2) return;
+        if (!url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return;
         event.preventDefault();
         window.location.href = url;
     });
@@ -60,15 +44,17 @@
     /**
      * Navigate to a URL templated against the selected value. Element declares
      * {@code data-url-template} containing a {@code {value}} placeholder; the placeholder is
-     * substituted with the input's URL-encoded current value, and the resulting path is
-     * sanitised through {@link sanitizePath}.
+     * substituted with the input's URL-encoded current value. Same inline same-origin guard as
+     * {@code navigate-href} — kept inline rather than extracted so CodeQL recognises the
+     * sanitizer at the {@code location.href} sink.
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
         var template = el.getAttribute('data-url-template');
         if (!template) return;
-        var url = sanitizePath(template.replace('{value}', encodeURIComponent(el.value)));
-        if (!url) return;
+        var url = template.replace('{value}', encodeURIComponent(el.value));
+        if (typeof url !== 'string' || url.length < 2) return;
+        if (!url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return;
         window.location.href = url;
     });
 
