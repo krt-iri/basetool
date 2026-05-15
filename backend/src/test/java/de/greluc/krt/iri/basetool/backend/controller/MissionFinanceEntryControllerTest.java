@@ -29,11 +29,11 @@ import org.springframework.data.domain.Sort;
 /**
  * Pure-Mockito unit tests for {@link MissionFinanceEntryController}. The controller's split
  * URL-space (reads are mission-scoped under {@code /missions/{missionId}/finance-entries}, writes
- * are entry-scoped under {@code /finance-entries/{entryId}}) is the easy-to-regress part: a
- * future refactor that moves the create endpoint to {@code /missions/{missionId}/finance-entries}
- * (it sounds natural!) would break the deliberate {@code permitAll()} carve-out for guest
- * participants recording their own payouts. Tests pin the existing route topology by asserting
- * each handler's pass-through to its specific service method.
+ * are entry-scoped under {@code /finance-entries/{entryId}}) is the easy-to-regress part: a future
+ * refactor that moves the create endpoint to {@code /missions/{missionId}/finance-entries} (it
+ * sounds natural!) would break the deliberate {@code permitAll()} carve-out for guest participants
+ * recording their own payouts. Tests pin the existing route topology by asserting each handler's
+ * pass-through to its specific service method.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionFinanceEntryControllerTest {
@@ -43,8 +43,7 @@ class MissionFinanceEntryControllerTest {
   @InjectMocks private MissionFinanceEntryController controller;
 
   private static MissionFinanceEntryDto entry(UUID missionId, FinanceType type, BigDecimal amount) {
-    return new MissionFinanceEntryDto(
-        UUID.randomUUID(), missionId, null, "note", type, amount, 1L);
+    return new MissionFinanceEntryDto(UUID.randomUUID(), missionId, null, "note", type, amount, 1L);
   }
 
   @Test
@@ -54,9 +53,7 @@ class MissionFinanceEntryControllerTest {
     MissionFinanceEntryDto b = entry(missionId, FinanceType.EXPENSE, new BigDecimal("250.00"));
     Page<MissionFinanceEntryDto> page =
         new PageImpl<>(
-            List.of(a, b),
-            PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")),
-            2);
+            List.of(a, b), PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")), 2);
     when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(page);
 
     PageResponse<MissionFinanceEntryDto> result =

@@ -10,10 +10,10 @@ import java.util.UUID;
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
     @NotNull
-        @Min(750)
-        @Max(750)
+        @Min(700)
+        @Max(700)
         @Schema(
-            description = "Minimale Qualität, wird serverseitig fest auf 750 gesetzt",
-            example = "750")
+            description = "Minimale Qualität, wird serverseitig fest auf 700 gesetzt",
+            example = "700")
         Integer minQuality,
     @NotNull @Min(0) Double amount) {}

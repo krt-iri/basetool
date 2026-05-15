@@ -3,73 +3,77 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{promotion.admin.topics.title} + ' - ' + #{app.title}">Themenbereiche verwalten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
+    <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
     <style>
         .admin-topic-card {
-            background: #141414;
-            border: 1px solid #333;
-            margin-bottom: 1.5rem;
-            padding: 1rem 1.25rem;
+            background: var(--color-bg-dark-gray);
+            border: 1px solid var(--color-gray-3);
+            margin-bottom: 1rem;
         }
-        .admin-topic-header {
+        .admin-topic-card > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 0.75rem 1rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 0.5rem;
+            background-color: var(--color-gray-4);
+            border-bottom: 1px solid var(--color-gray-3);
+        }
+        .admin-topic-card > summary::-webkit-details-marker { display: none; }
+        .admin-topic-card > summary::before {
+            content: '+';
+            color: var(--color-primary);
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 0.5rem;
+        }
+        .admin-topic-card[open] > summary::before { content: '\2212'; }
+        .admin-topic-name {
+            font-family: 'Lato', sans-serif;
+            font-weight: 700;
+            color: var(--color-primary);
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .admin-topic-body {
+            padding: 1rem;
+        }
+        .admin-topic-description {
+            font-size: 0.85rem;
+            color: var(--color-gray-2);
             margin-bottom: 0.75rem;
         }
-        .admin-topic-name {
-            font-family: 'Ethnocentric', sans-serif;
-            text-transform: uppercase;
-            color: var(--color-primary);
-            font-size: 1rem;
-            letter-spacing: 0.08em;
-        }
         .admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .category-list { margin-top: 0.75rem; padding-left: 1rem; border-left: 2px solid #333; }
-        .category-item {
+
+        .category-list {
+            margin-top: 0.5rem;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.4rem 0;
-            border-bottom: 1px solid #222;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 0.5rem;
         }
-        .category-item:last-child { border-bottom: none; }
-        .modal-overlay {
-            display: none; position: fixed; z-index: 1000;
-            left: 0; top: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
+
+        .category-actions-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
         }
-        .modal-overlay.active { display: flex; align-items: center; justify-content: center; }
-        .modal-box {
-            background: #141414;
-            border: 1px solid var(--color-primary);
-            padding: 2rem;
-            width: 90%;
-            max-width: 480px;
-            box-shadow: 0 0 20px rgba(231,126,35,0.3);
+        .category-summary-name {
+            font-size: 0.9rem;
+            color: var(--color-gray-1);
+            font-weight: 600;
+            flex: 1;
         }
-        .modal-title {
-            font-family: 'Ethnocentric', sans-serif;
-            text-transform: uppercase;
-            color: var(--color-primary);
-            font-size: 1rem;
-            margin-bottom: 1.25rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        .form-label { display: block; font-size: 0.85rem; color: var(--color-gray-2); margin-bottom: 0.3rem; }
-        .form-input {
-            width: 100%; background: var(--color-gray-5); border: 1px solid #444;
-            color: var(--color-gray-1); padding: 0.5rem 0.75rem; font-size: 0.9rem;
-            box-sizing: border-box;
-        }
-        .form-input:focus { border-color: var(--color-primary); outline: none; }
-        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; flex-wrap: wrap; }
+
         @media (max-width: 768px) {
-            .admin-topic-header { flex-direction: column; align-items: flex-start; }
             .btn { min-height: 44px; }
+            .admin-topic-card > summary { flex-direction: column; align-items: flex-start; }
         }
     </style>
     </th:block>
@@ -98,106 +102,193 @@
     </div>
 
     <div class="hud-box mt-2">
-        <div style="margin-bottom:1rem;">
-            <button class="btn" data-trigger="pt-open-create-topic" th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
+        <!-- Save-all banner: only visible while ≥1 textarea is dirty. -->
+        <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
+            <span>
+                <span class="pa-save-all-count" id="pa-save-all-count">0</span>
+                <span th:text="#{promotion.admin.topics.save.all.label}">ungespeicherte Änderungen</span>
+            </span>
+            <button type="button"
+                    class="btn pa-btn-tiny"
+                    data-trigger="pa-save-all"
+                    th:text="#{promotion.admin.topics.save.all}">Alle speichern</button>
+            <button type="button"
+                    class="btn btn-secondary pa-btn-tiny"
+                    data-trigger="pa-discard-all"
+                    th:text="#{promotion.admin.topics.discard.all}">Verwerfen</button>
+        </div>
+
+        <div class="pa-toolbar">
+            <button type="button"
+                    class="btn"
+                    data-trigger="pa-open-create-topic"
+                    th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
+            <div class="pa-spacer"></div>
+            <button type="button"
+                    class="btn btn-secondary pa-btn-tiny"
+                    data-trigger="pa-expand-all-topics"
+                    th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
+            <button type="button"
+                    class="btn btn-secondary pa-btn-tiny"
+                    data-trigger="pa-collapse-all-topics"
+                    th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
         </div>
 
         <div th:if="${#lists.isEmpty(topics)}">
             <p th:text="#{promotion.admin.topics.no.topics}">Keine Themenbereiche vorhanden.</p>
         </div>
 
-        <div th:each="topic : ${topics}" class="admin-topic-card">
-            <div class="admin-topic-header">
-                <span class="admin-topic-name" th:text="${topic.name}" style="font-family:'Lato',sans-serif;font-weight:700;">Themenbereich</span>
+        <details th:each="topic,topicIter : ${topics}"
+                 class="admin-topic-card"
+                 th:attr="data-pa-topic-id=${topic.id},
+                          data-pa-topic-sort=${topic.sortOrder},
+                          data-pa-topic-version=${topic.version},
+                          data-pa-topic-index=${topicIter.index},
+                          data-pa-topic-last=${topicIter.last}">
+            <summary>
+                <span class="admin-topic-name">
+                    <span th:text="${topic.name}">Themenbereich</span>
+                    <span class="pa-sort-controls" th:if="${#lists.size(topics) gt 1}">
+                        <button type="button"
+                                class="pa-sort-btn"
+                                data-trigger="pa-move-topic-up"
+                                th:attr="data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.up}"
+                                th:disabled="${topicIter.first}">&#x25B2;</button>
+                        <button type="button"
+                                class="pa-sort-btn"
+                                data-trigger="pa-move-topic-down"
+                                th:attr="data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.down}"
+                                th:disabled="${topicIter.last}">&#x25BC;</button>
+                    </span>
+                </span>
                 <div class="admin-actions">
-                    <button class="btn btn-edit-topic"
-                            th:data-id="${topic.id}"
-                            th:data-name="${topic.name}"
-                            th:data-description="${topic.description}"
-                            th:data-sort="${topic.sortOrder}"
-                            th:data-version="${topic.version}"
+                    <button class="btn pa-btn-tiny"
+                            data-trigger="pa-edit-topic"
+                            th:attr="data-pa-id=${topic.id},
+                                     data-pa-name=${topic.name},
+                                     data-pa-description=${topic.description},
+                                     data-pa-sort=${topic.sortOrder},
+                                     data-pa-version=${topic.version}"
                             th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                    <button class="btn btn-danger btn-delete-topic"
-                            th:data-id="${topic.id}"
+                    <button class="btn btn-danger pa-btn-tiny"
+                            data-trigger="pa-delete-topic"
+                            th:attr="data-pa-id=${topic.id},data-pa-name=${topic.name}"
                             th:text="#{promotion.admin.topics.delete}">Löschen</button>
-                    <button class="btn btn-create-category"
-                            th:data-topic-id="${topic.id}"
+                    <button class="btn pa-btn-tiny"
+                            data-trigger="pa-open-create-category"
+                            th:attr="data-pa-topic-id=${topic.id}"
                             th:text="#{promotion.admin.topics.category.new}">Neue Kategorie</button>
                 </div>
-            </div>
-            <p th:if="${topic.description}" th:text="${topic.description}" style="font-size:0.85rem;color:var(--color-gray-2);margin-bottom:0.5rem;"></p>
+            </summary>
+            <div class="admin-topic-body">
+                <p th:if="${topic.description}"
+                   class="admin-topic-description"
+                   th:text="${topic.description}"></p>
 
-            <div class="category-list" th:if="${topicCategoryMap[topic.id.toString()] != null and not #lists.isEmpty(topicCategoryMap[topic.id.toString()])}">
-                <div th:each="cat : ${topicCategoryMap[topic.id.toString()]}" class="category-item" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:0.5rem;">
-                        <span th:text="${cat.name}" style="font-size:0.9rem;color:var(--color-gray-1);font-weight:600;">Kategorie</span>
-                        <div class="admin-actions">
-                            <button class="btn btn-edit-category"
-                                    th:data-id="${cat.id}"
-                                    th:data-name="${cat.name}"
-                                    th:data-description="${cat.description}"
-                                    th:data-sort="${cat.sortOrder}"
-                                    th:data-version="${cat.version}"
-                                    th:data-topic-id="${topic.id}"
-                                    th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                            <button class="btn btn-danger btn-delete-category"
-                                    th:data-id="${cat.id}"
-                                    th:text="#{promotion.admin.topics.delete}">Löschen</button>
+                <div class="category-list"
+                     th:if="${topicCategoryMap[topic.id.toString()] != null and not #lists.isEmpty(topicCategoryMap[topic.id.toString()])}">
+                    <details th:each="cat,catIter : ${topicCategoryMap[topic.id.toString()]}"
+                             class="pa-category-card"
+                             th:attr="data-pa-category-id=${cat.id},
+                                      data-pa-category-version=${cat.version},
+                                      data-pa-category-index=${catIter.index}">
+                        <summary>
+                            <span class="pa-sort-controls" th:if="${#lists.size(topicCategoryMap[topic.id.toString()]) gt 1}">
+                                <button type="button"
+                                        class="pa-sort-btn"
+                                        data-trigger="pa-move-cat-up"
+                                        th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.up}"
+                                        th:disabled="${catIter.first}">&#x25B2;</button>
+                                <button type="button"
+                                        class="pa-sort-btn"
+                                        data-trigger="pa-move-cat-down"
+                                        th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.down}"
+                                        th:disabled="${catIter.last}">&#x25BC;</button>
+                            </span>
+                            <span class="category-summary-name" th:text="${cat.name}">Kategorie</span>
+                            <div class="admin-actions">
+                                <button class="btn pa-btn-tiny"
+                                        data-trigger="pa-edit-category"
+                                        th:attr="data-pa-id=${cat.id},
+                                                 data-pa-name=${cat.name},
+                                                 data-pa-description=${cat.description},
+                                                 data-pa-sort=${cat.sortOrder},
+                                                 data-pa-version=${cat.version},
+                                                 data-pa-topic-id=${topic.id}"
+                                        th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
+                                <button class="btn btn-danger pa-btn-tiny"
+                                        data-trigger="pa-delete-category"
+                                        th:attr="data-pa-id=${cat.id},data-pa-name=${cat.name}"
+                                        th:text="#{promotion.admin.topics.delete}">Löschen</button>
+                            </div>
+                        </summary>
+                        <div class="pa-category-body">
+                            <th:block th:with="contents=${categoryContentMap[cat.id.toString()]}">
+                                <!-- Stufe A -->
+                                <div class="pa-level-row"
+                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_A'].isEmpty() ? contents.?[level == 'LEVEL_A'][0] : null}">
+                                    <span class="pa-level-label" th:text="#{promotion.level.a}">Stufe A</span>
+                                    <textarea class="form-input pa-level-textarea lc-textarea"
+                                              data-trigger="pa-level-dirty"
+                                              th:attr="data-category-id=${cat.id},
+                                                       data-level='LEVEL_A',
+                                                       data-lc-id=${lc != null ? lc.id : ''},
+                                                       data-lc-version=${lc != null ? lc.version : ''},
+                                                       data-original=${lc != null ? lc.description : ''}"
+                                              th:text="${lc != null ? lc.description : ''}"
+                                              rows="2"
+                                              maxlength="2000"></textarea>
+                                    <button class="btn pa-level-save"
+                                            data-trigger="pa-save-level-content"
+                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                </div>
+                                <!-- Stufe B -->
+                                <div class="pa-level-row"
+                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_B'].isEmpty() ? contents.?[level == 'LEVEL_B'][0] : null}">
+                                    <span class="pa-level-label" th:text="#{promotion.level.b}">Stufe B</span>
+                                    <textarea class="form-input pa-level-textarea lc-textarea"
+                                              data-trigger="pa-level-dirty"
+                                              th:attr="data-category-id=${cat.id},
+                                                       data-level='LEVEL_B',
+                                                       data-lc-id=${lc != null ? lc.id : ''},
+                                                       data-lc-version=${lc != null ? lc.version : ''},
+                                                       data-original=${lc != null ? lc.description : ''}"
+                                              th:text="${lc != null ? lc.description : ''}"
+                                              rows="2"
+                                              maxlength="2000"></textarea>
+                                    <button class="btn pa-level-save"
+                                            data-trigger="pa-save-level-content"
+                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                </div>
+                                <!-- Stufe C -->
+                                <div class="pa-level-row"
+                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_C'].isEmpty() ? contents.?[level == 'LEVEL_C'][0] : null}">
+                                    <span class="pa-level-label" th:text="#{promotion.level.c}">Stufe C</span>
+                                    <textarea class="form-input pa-level-textarea lc-textarea"
+                                              data-trigger="pa-level-dirty"
+                                              th:attr="data-category-id=${cat.id},
+                                                       data-level='LEVEL_C',
+                                                       data-lc-id=${lc != null ? lc.id : ''},
+                                                       data-lc-version=${lc != null ? lc.version : ''},
+                                                       data-original=${lc != null ? lc.description : ''}"
+                                              th:text="${lc != null ? lc.description : ''}"
+                                              rows="2"
+                                              maxlength="2000"></textarea>
+                                    <button class="btn pa-level-save"
+                                            data-trigger="pa-save-level-content"
+                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                </div>
+                            </th:block>
                         </div>
-                    </div>
-                    <!-- Stufeninhalte inline -->
-                    <div th:with="contents=${categoryContentMap[cat.id.toString()]}" style="width:100%;margin-top:0.5rem;display:flex;flex-direction:column;gap:0.4rem;">
-                        <!-- Stufe A -->
-                        <div th:with="lc=${contents != null and !contents.?[level == 'LEVEL_A'].isEmpty() ? contents.?[level == 'LEVEL_A'][0] : null}"
-                             style="display:flex;align-items:flex-start;gap:0.5rem;background:var(--color-bg-2,#1a1a1a);border:1px solid #333;border-radius:4px;padding:0.4rem 0.6rem;">
-                            <span th:text="#{promotion.level.a}" style="color:var(--color-orange,#E77E23);font-weight:700;font-size:0.8rem;min-width:52px;padding-top:0.35rem;">Stufe A</span>
-                            <textarea class="form-input lc-textarea"
-                                      th:data-category-id="${cat.id}"
-                                      data-level="LEVEL_A"
-                                      th:data-lc-id="${lc != null ? lc.id : ''}"
-                                      th:data-lc-version="${lc != null ? lc.version : ''}"
-                                      th:text="${lc != null ? lc.description : ''}"
-                                      rows="2" maxlength="2000"
-                                      style="flex:1;font-size:0.85rem;resize:vertical;min-height:44px;"></textarea>
-                            <button class="btn btn-save-level-content" style="font-size:0.8rem;padding:0.3rem 0.7rem;align-self:flex-start;" th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
-                        </div>
-                        <!-- Stufe B -->
-                        <div th:with="lc=${contents != null and !contents.?[level == 'LEVEL_B'].isEmpty() ? contents.?[level == 'LEVEL_B'][0] : null}"
-                             style="display:flex;align-items:flex-start;gap:0.5rem;background:var(--color-bg-2,#1a1a1a);border:1px solid #333;border-radius:4px;padding:0.4rem 0.6rem;">
-                            <span th:text="#{promotion.level.b}" style="color:var(--color-orange,#E77E23);font-weight:700;font-size:0.8rem;min-width:52px;padding-top:0.35rem;">Stufe B</span>
-                            <textarea class="form-input lc-textarea"
-                                      th:data-category-id="${cat.id}"
-                                      data-level="LEVEL_B"
-                                      th:data-lc-id="${lc != null ? lc.id : ''}"
-                                      th:data-lc-version="${lc != null ? lc.version : ''}"
-                                      th:text="${lc != null ? lc.description : ''}"
-                                      rows="2" maxlength="2000"
-                                      style="flex:1;font-size:0.85rem;resize:vertical;min-height:44px;"></textarea>
-                            <button class="btn btn-save-level-content" style="font-size:0.8rem;padding:0.3rem 0.7rem;align-self:flex-start;" th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
-                        </div>
-                        <!-- Stufe C -->
-                        <div th:with="lc=${contents != null and !contents.?[level == 'LEVEL_C'].isEmpty() ? contents.?[level == 'LEVEL_C'][0] : null}"
-                             style="display:flex;align-items:flex-start;gap:0.5rem;background:var(--color-bg-2,#1a1a1a);border:1px solid #333;border-radius:4px;padding:0.4rem 0.6rem;">
-                            <span th:text="#{promotion.level.c}" style="color:var(--color-orange,#E77E23);font-weight:700;font-size:0.8rem;min-width:52px;padding-top:0.35rem;">Stufe C</span>
-                            <textarea class="form-input lc-textarea"
-                                      th:data-category-id="${cat.id}"
-                                      data-level="LEVEL_C"
-                                      th:data-lc-id="${lc != null ? lc.id : ''}"
-                                      th:data-lc-version="${lc != null ? lc.version : ''}"
-                                      th:text="${lc != null ? lc.description : ''}"
-                                      rows="2" maxlength="2000"
-                                      style="flex:1;font-size:0.85rem;resize:vertical;min-height:44px;"></textarea>
-                            <button class="btn btn-save-level-content" style="font-size:0.8rem;padding:0.3rem 0.7rem;align-self:flex-start;" th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
-                        </div>
-                    </div>
+                    </details>
                 </div>
             </div>
-        </div>
+        </details>
     </div>
 </main>
 
 <!-- Create Topic Modal -->
-<div id="modal-create-topic" class="modal-overlay">
+<div id="modal-create-topic" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.topics.modal.create.title}">Neuen Themenbereich anlegen</div>
         <div class="form-group">
@@ -211,16 +302,17 @@
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="ct-sort" class="form-input" type="number" value="0">
+            <span class="form-hint" th:text="#{promotion.admin.topics.sort.hint}">Niedrigere Werte erscheinen weiter oben. Die Position kann später per Pfeiltasten in der Liste angepasst werden.</span>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pt-save-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
     </div>
 </div>
 
 <!-- Edit Topic Modal -->
-<div id="modal-edit-topic" class="modal-overlay">
+<div id="modal-edit-topic" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.topics.modal.edit.title}">Themenbereich bearbeiten</div>
         <input id="et-id" type="hidden">
@@ -238,27 +330,14 @@
             <input id="et-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pt-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Topic Modal -->
-<div id="modal-delete-topic" class="modal-overlay">
-    <div class="modal-box">
-        <div class="modal-title" th:text="#{promotion.admin.topics.modal.delete.title}">Themenbereich lÃ¶schen</div>
-        <p th:text="#{promotion.admin.topics.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
-        <input id="dt-id" type="hidden">
-        <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-delete-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" data-trigger="pt-delete-topic" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
+            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pa-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>
 
 <!-- Create Category Modal -->
-<div id="modal-create-category" class="modal-overlay">
+<div id="modal-create-category" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.category.modal.create.title}">Neue Kategorie anlegen</div>
         <input id="cc-topic-id" type="hidden">
@@ -275,14 +354,14 @@
             <input id="cc-sort" class="form-input" type="number" value="0">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pt-save-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
     </div>
 </div>
 
 <!-- Edit Category Modal -->
-<div id="modal-edit-category" class="modal-overlay">
+<div id="modal-edit-category" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.category.modal.edit.title}">Kategorie bearbeiten</div>
         <input id="ec-id" type="hidden">
@@ -301,21 +380,8 @@
             <input id="ec-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pt-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Category Modal -->
-<div id="modal-delete-category" class="modal-overlay">
-    <div class="modal-box">
-        <div class="modal-title" th:text="#{promotion.admin.category.modal.delete.title}">Kategorie lÃ¶schen</div>
-        <p th:text="#{promotion.admin.category.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
-        <input id="dc-id" type="hidden">
-        <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="close-modal" data-modal-id="modal-delete-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" data-trigger="pt-delete-category" th:text="#{promotion.admin.topics.delete}">LÃ¶schen</button>
+            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="pa-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -323,147 +389,396 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-/*<![CDATA[*/
-var MSG_SAVED = /*[[#{promotion.admin.topics.saved}]]*/ 'Saved';
-var MSG_DELETED = /*[[#{promotion.admin.topics.deleted}]]*/ 'Deleted';
-var MSG_ERROR = /*[[#{promotion.admin.topics.error}]]*/ 'Error';
-var MSG_ERROR_DELETE = /*[[#{promotion.admin.topics.error.delete}]]*/ 'Error';
-var MSG_CONFLICT = /*[[#{promotion.admin.topics.conflict}]]*/ 'Conflict';
+    /*<![CDATA[*/
+    var MSG_SAVED         = /*[[#{promotion.admin.topics.saved}]]*/ 'Saved';
+    var MSG_DELETED       = /*[[#{promotion.admin.topics.deleted}]]*/ 'Deleted';
+    var MSG_ERROR         = /*[[#{promotion.admin.topics.error}]]*/ 'Error';
+    var MSG_ERROR_DELETE  = /*[[#{promotion.admin.topics.error.delete}]]*/ 'Error';
+    var MSG_CONFLICT      = /*[[#{promotion.admin.topics.conflict}]]*/ 'Conflict';
+    var MSG_DELETE_TOPIC_TITLE   = /*[[#{promotion.admin.topics.modal.delete.title}]]*/ 'Delete topic?';
+    var MSG_DELETE_TOPIC_MSG     = /*[[#{promotion.admin.topics.modal.delete.confirm}]]*/ 'Delete this topic?';
+    var MSG_DELETE_CATEGORY_TITLE = /*[[#{promotion.admin.category.modal.delete.title}]]*/ 'Delete category?';
+    var MSG_DELETE_CATEGORY_MSG   = /*[[#{promotion.admin.category.modal.delete.confirm}]]*/ 'Delete this category?';
+    var MSG_OK            = /*[[#{general.confirm}]]*/ 'OK';
+    var MSG_CANCEL        = /*[[#{general.cancel}]]*/ 'Cancel';
+    var MSG_DIRTY_LEAVE   = /*[[#{promotion.admin.topics.dirty.leave}]]*/ 'You have unsaved changes. Leave anyway?';
 
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function toastSuccess(msg) { if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg); }
+    function toastError(msg)   { if (window.showFrontendErrorToast)   window.showFrontendErrorToast(msg); }
 
-document.addEventListener('click', function(e) {
-    var btn = e.target.closest('button');
-    if (!btn) return;
-    if (btn.classList.contains('btn-edit-topic')) {
-        openEditTopicModal(btn.dataset.id, btn.dataset.name, btn.dataset.description, btn.dataset.sort, btn.dataset.version);
-    } else if (btn.classList.contains('btn-delete-topic')) {
-        openDeleteTopicModal(btn.dataset.id);
-    } else if (btn.classList.contains('btn-create-category')) {
-        openCreateCategoryModal(btn.dataset.topicId);
-    } else if (btn.classList.contains('btn-edit-category')) {
-        openEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.description, btn.dataset.sort, btn.dataset.version, btn.dataset.topicId);
-    } else if (btn.classList.contains('btn-delete-category')) {
-        openDeleteCategoryModal(btn.dataset.id);
-    } else if (btn.classList.contains('btn-save-level-content')) {
-        saveLevelContentInline(btn);
-    }
-});
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function openModal(id)  { document.getElementById(id).classList.add('active'); }
 
-function openCreateTopicModal() { openModal('modal-create-topic'); }
-function openEditTopicModal(id, name, desc, sort, version) {
-    document.getElementById('et-id').value = id;
-    document.getElementById('et-version').value = version;
-    document.getElementById('et-name').value = name;
-    document.getElementById('et-desc').value = desc || '';
-    document.getElementById('et-sort').value = sort;
-    openModal('modal-edit-topic');
-}
-function openDeleteTopicModal(id) {
-    document.getElementById('dt-id').value = id;
-    openModal('modal-delete-topic');
-}
-function openCreateCategoryModal(topicId) {
-    document.getElementById('cc-topic-id').value = topicId;
-    openModal('modal-create-category');
-}
-function openEditCategoryModal(id, name, desc, sort, version, topicId) {
-    document.getElementById('ec-id').value = id;
-    document.getElementById('ec-version').value = version;
-    document.getElementById('ec-topic-id').value = topicId;
-    document.getElementById('ec-name').value = name;
-    document.getElementById('ec-desc').value = desc || '';
-    document.getElementById('ec-sort').value = sort;
-    openModal('modal-edit-category');
-}
-function openDeleteCategoryModal(id) {
-    document.getElementById('dc-id').value = id;
-    openModal('modal-delete-category');
-}
+    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
 
-function getCsrfToken() { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
-
-function apiCall(url, method, body, onSuccess) {
-    var headers = { 'Content-Type': 'application/json' };
-    headers[getCsrfHeader()] = getCsrfToken();
-    fetch(url, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined })
-    .then(function(r) {
-        if (r.status === 409) { if (typeof showToast === 'function') showToast(MSG_CONFLICT, 'warning'); setTimeout(function() { window.location.reload(); }, 1500); return null; }
-        if (!r.ok) { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); return null; }
-        return r.status === 204 ? {} : r.json();
-    })
-    .then(function(data) { if (data !== null && data !== undefined) { onSuccess(data); } })
-    .catch(function() { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); });
-}
-
-function createTopic() {
-    var body = { name: document.getElementById('ct-name').value, description: document.getElementById('ct-desc').value || null, sortOrder: parseInt(document.getElementById('ct-sort').value) || 0 };
-    apiCall('/api/proxy/promotion/topics', 'POST', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-create-topic'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function updateTopic() {
-    var id = document.getElementById('et-id').value;
-    var body = { version: parseInt(document.getElementById('et-version').value), name: document.getElementById('et-name').value, description: document.getElementById('et-desc').value || null, sortOrder: parseInt(document.getElementById('et-sort').value) || 0 };
-    apiCall('/api/proxy/promotion/topics/' + id, 'PUT', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-edit-topic'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function deleteTopic() {
-    var id = document.getElementById('dt-id').value;
-    apiCall('/api/proxy/promotion/topics/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete-topic'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function createCategory() {
-    var body = { topicId: document.getElementById('cc-topic-id').value, name: document.getElementById('cc-name').value, description: document.getElementById('cc-desc').value || null, sortOrder: parseInt(document.getElementById('cc-sort').value) || 0 };
-    apiCall('/api/proxy/promotion/categories', 'POST', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-create-category'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function updateCategory() {
-    var id = document.getElementById('ec-id').value;
-    var body = { version: parseInt(document.getElementById('ec-version').value), topicId: document.getElementById('ec-topic-id').value, name: document.getElementById('ec-name').value, description: document.getElementById('ec-desc').value || null, sortOrder: parseInt(document.getElementById('ec-sort').value) || 0 };
-    apiCall('/api/proxy/promotion/categories/' + id, 'PUT', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-edit-category'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function deleteCategory() {
-    var id = document.getElementById('dc-id').value;
-    apiCall('/api/proxy/promotion/categories/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete-category'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function saveLevelContentInline(btn) {
-    // find the textarea in the same row container
-    var container = btn.parentElement;
-    var textarea = container.querySelector('textarea.lc-textarea');
-    if (!textarea) return;
-    var categoryId = textarea.dataset.categoryId;
-    var level = textarea.dataset.level;
-    var lcId = textarea.dataset.lcId;
-    var lcVersion = textarea.dataset.lcVersion;
-    var description = textarea.value;
-    if (lcId && lcId !== '') {
-        var body = { version: parseInt(lcVersion) || 0, categoryId: categoryId, level: level, description: description };
-        apiCall('/api/proxy/promotion/level-contents/' + lcId, 'PUT', body, function(data) {
-            if (data && data.version !== undefined) { textarea.dataset.lcVersion = data.version; }
-            if (typeof showToast === 'function') showToast(MSG_SAVED, 'success');
-        });
-    } else {
-        var body = { categoryId: categoryId, level: level, description: description };
-        apiCall('/api/proxy/promotion/level-contents', 'POST', body, function(data) {
-            if (data && data.id) { textarea.dataset.lcId = data.id; textarea.dataset.lcVersion = data.version; }
-            if (typeof showToast === 'function') showToast(MSG_SAVED, 'success');
+    function apiCall(url, method, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        headers[getCsrfHeader()] = getCsrfToken();
+        return fetch(url, {
+            method: method,
+            headers: headers,
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (r) {
+            if (r.status === 409) {
+                toastError(MSG_CONFLICT);
+                setTimeout(function () { window.location.reload(); }, 1500);
+                return null;
+            }
+            if (!r.ok) {
+                toastError(MSG_ERROR);
+                return null;
+            }
+            return r.status === 204 ? {} : r.json();
+        }).catch(function () {
+            toastError(MSG_ERROR);
+            return null;
         });
     }
-}
 
-// CSP-safe delegated bindings (replaces the 13 inline on*= handlers above). The pre-existing
-// generic `document.addEventListener('click', ...)` global dispatcher higher up still drives
-// the row-level edit/delete buttons by class (.btn-edit-topic / .btn-delete-topic / etc.) —
-// the bindings below only cover the modal action buttons that historically had per-button
-// inline handlers.
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'pt-open-create-topic', openCreateTopicModal);
-    window.krtEvents.on('click', 'pt-save-topic', createTopic);
-    window.krtEvents.on('click', 'pt-update-topic', updateTopic);
-    window.krtEvents.on('click', 'pt-delete-topic', deleteTopic);
-    window.krtEvents.on('click', 'pt-save-category', createCategory);
-    window.krtEvents.on('click', 'pt-update-category', updateCategory);
-    window.krtEvents.on('click', 'pt-delete-category', deleteCategory);
-}
-/*]]>*/
+    // ----------------------------------------------------------------------
+    // Topic CRUD
+    // ----------------------------------------------------------------------
+    function openCreateTopicModal() {
+        document.getElementById('ct-name').value = '';
+        document.getElementById('ct-desc').value = '';
+        document.getElementById('ct-sort').value = 0;
+        openModal('modal-create-topic');
+    }
+    function openEditTopicModal(btn) {
+        document.getElementById('et-id').value      = btn.getAttribute('data-pa-id');
+        document.getElementById('et-version').value = btn.getAttribute('data-pa-version');
+        document.getElementById('et-name').value    = btn.getAttribute('data-pa-name');
+        document.getElementById('et-desc').value    = btn.getAttribute('data-pa-description') || '';
+        document.getElementById('et-sort').value    = btn.getAttribute('data-pa-sort');
+        openModal('modal-edit-topic');
+    }
+    function createTopic() {
+        var body = {
+            name: document.getElementById('ct-name').value,
+            description: document.getElementById('ct-desc').value || null,
+            sortOrder: parseInt(document.getElementById('ct-sort').value, 10) || 0
+        };
+        apiCall('/api/proxy/promotion/topics', 'POST', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-create-topic');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+    function updateTopic() {
+        var id = document.getElementById('et-id').value;
+        var body = {
+            version: parseInt(document.getElementById('et-version').value, 10),
+            name: document.getElementById('et-name').value,
+            description: document.getElementById('et-desc').value || null,
+            sortOrder: parseInt(document.getElementById('et-sort').value, 10) || 0
+        };
+        apiCall('/api/proxy/promotion/topics/' + id, 'PUT', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-edit-topic');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+    function deleteTopic(btn) {
+        var id   = btn.getAttribute('data-pa-id');
+        var name = btn.getAttribute('data-pa-name') || '';
+        var fn = window.showKrtConfirm;
+        if (typeof fn !== 'function') return;
+        fn(MSG_DELETE_TOPIC_TITLE, MSG_DELETE_TOPIC_MSG.replace('{name}', name), MSG_OK, MSG_CANCEL).then(function (ok) {
+            if (!ok) return;
+            apiCall('/api/proxy/promotion/topics/' + id, 'DELETE', null).then(function (data) {
+                if (!data) return;
+                toastSuccess(MSG_DELETED);
+                setTimeout(function () { window.location.reload(); }, 600);
+            });
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Category CRUD
+    // ----------------------------------------------------------------------
+    function openCreateCategoryModal(btn) {
+        document.getElementById('cc-topic-id').value = btn.getAttribute('data-pa-topic-id');
+        document.getElementById('cc-name').value = '';
+        document.getElementById('cc-desc').value = '';
+        document.getElementById('cc-sort').value = 0;
+        openModal('modal-create-category');
+    }
+    function openEditCategoryModal(btn) {
+        document.getElementById('ec-id').value       = btn.getAttribute('data-pa-id');
+        document.getElementById('ec-version').value  = btn.getAttribute('data-pa-version');
+        document.getElementById('ec-topic-id').value = btn.getAttribute('data-pa-topic-id');
+        document.getElementById('ec-name').value     = btn.getAttribute('data-pa-name');
+        document.getElementById('ec-desc').value     = btn.getAttribute('data-pa-description') || '';
+        document.getElementById('ec-sort').value     = btn.getAttribute('data-pa-sort');
+        openModal('modal-edit-category');
+    }
+    function createCategory() {
+        var body = {
+            topicId: document.getElementById('cc-topic-id').value,
+            name: document.getElementById('cc-name').value,
+            description: document.getElementById('cc-desc').value || null,
+            sortOrder: parseInt(document.getElementById('cc-sort').value, 10) || 0
+        };
+        apiCall('/api/proxy/promotion/categories', 'POST', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-create-category');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+    function updateCategory() {
+        var id = document.getElementById('ec-id').value;
+        var body = {
+            version: parseInt(document.getElementById('ec-version').value, 10),
+            topicId: document.getElementById('ec-topic-id').value,
+            name: document.getElementById('ec-name').value,
+            description: document.getElementById('ec-desc').value || null,
+            sortOrder: parseInt(document.getElementById('ec-sort').value, 10) || 0
+        };
+        apiCall('/api/proxy/promotion/categories/' + id, 'PUT', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-edit-category');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+    function deleteCategory(btn) {
+        var id   = btn.getAttribute('data-pa-id');
+        var name = btn.getAttribute('data-pa-name') || '';
+        var fn = window.showKrtConfirm;
+        if (typeof fn !== 'function') return;
+        fn(MSG_DELETE_CATEGORY_TITLE, MSG_DELETE_CATEGORY_MSG.replace('{name}', name), MSG_OK, MSG_CANCEL).then(function (ok) {
+            if (!ok) return;
+            apiCall('/api/proxy/promotion/categories/' + id, 'DELETE', null).then(function (data) {
+                if (!data) return;
+                toastSuccess(MSG_DELETED);
+                setTimeout(function () { window.location.reload(); }, 600);
+            });
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Sort: up/down arrows (T4)
+    // ----------------------------------------------------------------------
+    // We do not have a swap endpoint; instead we PUT both the moved item and
+    // its neighbour with their sortOrder values swapped. After both PUTs the
+    // page reloads to pick up the new server state. Sequential, not parallel,
+    // so a 409 on either call surfaces cleanly via apiCall.
+    function fetchTopic(id) {
+        return fetch('/api/proxy/promotion/topics/' + id, {
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.ok ? r.json() : null; });
+    }
+    function fetchCategory(id) {
+        return fetch('/api/proxy/promotion/categories/' + id, {
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.ok ? r.json() : null; });
+    }
+    function swapSort(currentCard, otherCard, putUrl, dataAttrPrefix) {
+        var currentSort   = parseInt(currentCard.getAttribute(dataAttrPrefix + '-sort'), 10);
+        var otherSort     = parseInt(otherCard.getAttribute(dataAttrPrefix + '-sort'), 10);
+        if (!Number.isFinite(currentSort) || !Number.isFinite(otherSort)) return Promise.resolve(null);
+        var currentId      = currentCard.getAttribute(dataAttrPrefix + '-id');
+        var otherId        = otherCard.getAttribute(dataAttrPrefix + '-id');
+        var currentVersion = parseInt(currentCard.getAttribute(dataAttrPrefix + '-version'), 10);
+        var otherVersion   = parseInt(otherCard.getAttribute(dataAttrPrefix + '-version'), 10);
+        if (currentSort === otherSort) {
+            // Tie-break: shift the other one out of the way so the values
+            // become distinct, then swap. Avoids a deadlock state.
+            otherSort = currentSort + (otherCard.compareDocumentPosition(currentCard) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+        }
+        var fetcher = dataAttrPrefix === 'data-pa-topic' ? fetchTopic : fetchCategory;
+        // PUT requires the full DTO; we re-fetch the bodies so we don't have
+        // to mirror every field of the original payload into the page.
+        return Promise.all([fetcher(currentId), fetcher(otherId)]).then(function (bodies) {
+            if (!bodies[0] || !bodies[1]) { toastError(MSG_ERROR); return null; }
+            bodies[0].sortOrder = otherSort;
+            bodies[0].version   = currentVersion;
+            bodies[1].sortOrder = currentSort;
+            bodies[1].version   = otherVersion;
+            return apiCall(putUrl + '/' + currentId, 'PUT', bodies[0]).then(function (r1) {
+                if (!r1) return null;
+                return apiCall(putUrl + '/' + otherId, 'PUT', bodies[1]);
+            });
+        });
+    }
+    function findAdjacentSibling(card, direction) {
+        var sel = card.tagName.toLowerCase();
+        var siblings = card.parentElement.querySelectorAll(':scope > ' + sel);
+        var arr = Array.from(siblings);
+        var idx = arr.indexOf(card);
+        var target = direction === 'up' ? arr[idx - 1] : arr[idx + 1];
+        return target || null;
+    }
+    function moveTopic(btn, direction) {
+        var card = btn.closest('.admin-topic-card');
+        var other = findAdjacentSibling(card, direction);
+        if (!other) return;
+        swapSort(card, other, '/api/proxy/promotion/topics', 'data-pa-topic').then(function (r) {
+            if (r === null) return;
+            toastSuccess(MSG_SAVED);
+            setTimeout(function () { window.location.reload(); }, 400);
+        });
+    }
+    function moveCategory(btn, direction) {
+        var card = btn.closest('.pa-category-card');
+        var other = findAdjacentSibling(card, direction);
+        if (!other) return;
+        swapSort(card, other, '/api/proxy/promotion/categories', 'data-pa-category').then(function (r) {
+            if (r === null) return;
+            toastSuccess(MSG_SAVED);
+            setTimeout(function () { window.location.reload(); }, 400);
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Level-content inline save + dirty tracking (T2 + T3)
+    // ----------------------------------------------------------------------
+    var paDirtyTextareas = new Set();
+
+    function paUpdateSaveAllBanner() {
+        var banner = document.getElementById('pa-save-all-banner');
+        var count  = document.getElementById('pa-save-all-count');
+        if (!banner || !count) return;
+        var n = paDirtyTextareas.size;
+        count.textContent = String(n);
+        banner.classList.toggle('visible', n > 0);
+    }
+    function paMarkDirty(textarea) {
+        var original = textarea.getAttribute('data-original') || '';
+        var dirty = textarea.value !== original;
+        textarea.classList.toggle('pa-dirty', dirty);
+        if (dirty) paDirtyTextareas.add(textarea); else paDirtyTextareas.delete(textarea);
+        paUpdateSaveAllBanner();
+    }
+    function paSaveLevelContent(textarea) {
+        var categoryId = textarea.getAttribute('data-category-id');
+        var level      = textarea.getAttribute('data-level');
+        var lcId       = textarea.getAttribute('data-lc-id');
+        var lcVersion  = textarea.getAttribute('data-lc-version');
+        var description = textarea.value;
+        var p;
+        if (lcId) {
+            var body = {
+                version: parseInt(lcVersion, 10) || 0,
+                categoryId: categoryId,
+                level: level,
+                description: description
+            };
+            p = apiCall('/api/proxy/promotion/level-contents/' + lcId, 'PUT', body);
+        } else {
+            p = apiCall('/api/proxy/promotion/level-contents', 'POST', {
+                categoryId: categoryId,
+                level: level,
+                description: description
+            });
+        }
+        return p.then(function (data) {
+            if (!data) return null;
+            if (data.id) textarea.setAttribute('data-lc-id', data.id);
+            if (data.version !== undefined) textarea.setAttribute('data-lc-version', String(data.version));
+            textarea.setAttribute('data-original', description);
+            textarea.classList.remove('pa-dirty');
+            paDirtyTextareas.delete(textarea);
+            paUpdateSaveAllBanner();
+            return data;
+        });
+    }
+    function paSaveLevelContentFromButton(btn) {
+        var row = btn.closest('.pa-level-row');
+        if (!row) return;
+        var textarea = row.querySelector('textarea.lc-textarea');
+        if (!textarea) return;
+        paSaveLevelContent(textarea).then(function (data) {
+            if (data) toastSuccess(MSG_SAVED);
+        });
+    }
+    function paSaveAll() {
+        var snapshot = Array.from(paDirtyTextareas);
+        if (snapshot.length === 0) return;
+        // Sequential — one failure stops the chain so the user can fix the
+        // root cause before further saves go out.
+        var chain = Promise.resolve(true);
+        snapshot.forEach(function (ta) {
+            chain = chain.then(function (alive) {
+                if (!alive) return false;
+                return paSaveLevelContent(ta).then(function (data) { return data !== null; });
+            });
+        });
+        chain.then(function () { toastSuccess(MSG_SAVED); });
+    }
+    function paDiscardAll() {
+        var fn = window.showKrtConfirm;
+        if (typeof fn !== 'function') return;
+        fn(MSG_DELETE_TOPIC_TITLE, MSG_DIRTY_LEAVE, MSG_OK, MSG_CANCEL).then(function (ok) {
+            if (!ok) return;
+            paDirtyTextareas.forEach(function (ta) {
+                ta.value = ta.getAttribute('data-original') || '';
+                ta.classList.remove('pa-dirty');
+            });
+            paDirtyTextareas.clear();
+            paUpdateSaveAllBanner();
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Bulk expand/collapse on the topic cards
+    // ----------------------------------------------------------------------
+    function paToggleAllTopics(open) {
+        document.querySelectorAll('.admin-topic-card').forEach(function (d) { d.open = open; });
+    }
+
+    // beforeunload guard: warn the admin if they navigate away with unsaved
+    // textareas. The native dialog is the only allowed pre-navigation prompt;
+    // showKrtConfirm cannot intercept it.
+    window.addEventListener('beforeunload', function (e) {
+        if (paDirtyTextareas.size > 0) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        }
+    });
+
+    // ----------------------------------------------------------------------
+    // Wiring
+    // ----------------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
+            window.krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
+            window.krtEvents.on('click', 'pa-delete-topic', deleteTopic);
+            window.krtEvents.on('click', 'pa-open-create-category', openCreateCategoryModal);
+            window.krtEvents.on('click', 'pa-edit-category', openEditCategoryModal);
+            window.krtEvents.on('click', 'pa-delete-category', deleteCategory);
+
+            window.krtEvents.on('click', 'pa-create-topic', createTopic);
+            window.krtEvents.on('click', 'pa-update-topic', updateTopic);
+            window.krtEvents.on('click', 'pa-create-category', createCategory);
+            window.krtEvents.on('click', 'pa-update-category', updateCategory);
+
+            window.krtEvents.on('click', 'pa-close-modal', function (btn) {
+                var id = btn.getAttribute('data-pa-modal');
+                if (id) closeModal(id);
+            });
+
+            window.krtEvents.on('click', 'pa-move-topic-up',   function (btn) { moveTopic(btn, 'up'); });
+            window.krtEvents.on('click', 'pa-move-topic-down', function (btn) { moveTopic(btn, 'down'); });
+            window.krtEvents.on('click', 'pa-move-cat-up',     function (btn) { moveCategory(btn, 'up'); });
+            window.krtEvents.on('click', 'pa-move-cat-down',   function (btn) { moveCategory(btn, 'down'); });
+
+            window.krtEvents.on('input',  'pa-level-dirty', paMarkDirty);
+            window.krtEvents.on('click',  'pa-save-level-content', paSaveLevelContentFromButton);
+            window.krtEvents.on('click',  'pa-save-all', paSaveAll);
+            window.krtEvents.on('click',  'pa-discard-all', paDiscardAll);
+
+            window.krtEvents.on('click',  'pa-expand-all-topics',   function () { paToggleAllTopics(true); });
+            window.krtEvents.on('click',  'pa-collapse-all-topics', function () { paToggleAllTopics(false); });
+        }
+    });
+    /*]]>*/
 </script>
 </body>
 </html>

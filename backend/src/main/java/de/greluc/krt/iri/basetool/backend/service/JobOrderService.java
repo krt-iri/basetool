@@ -55,12 +55,12 @@ public class JobOrderService {
   /**
    * Default minimum quality assigned to every {@link
    * de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial} when a job order is created or
-   * updated without an explicit minimum on the wire. 750 is the conventional refining-grade floor
+   * updated without an explicit minimum on the wire. 700 is the conventional refining-grade floor
    * used across the squadron's existing orders; it is hard-coded for now so the value lives in code
    * review rather than in a database row that can drift silently. If the squadron starts adjusting
    * this per order, promote it to a {@code SystemSetting} entry.
    */
-  private static final int MIN_QUALITY_DEFAULT = 750;
+  private static final int MIN_QUALITY_DEFAULT = 700;
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;

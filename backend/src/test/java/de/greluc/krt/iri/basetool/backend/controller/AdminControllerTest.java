@@ -32,10 +32,10 @@ import org.springframework.data.domain.Sort;
 /**
  * Pure-Mockito unit tests for {@link AdminController}. The controller is small but each endpoint
  * touches a different MapStruct mapper — the role/user-DTO conversion is the spot where an
- * accidental copy-paste during a future refactor would silently leak a JPA entity through the
- * REST boundary (the ArchUnit rule catches the static return type but not the entity *inside*
- * the mapper output). These tests pin the explicit toDto-call on the response path so the
- * conversion stays in place.
+ * accidental copy-paste during a future refactor would silently leak a JPA entity through the REST
+ * boundary (the ArchUnit rule catches the static return type but not the entity *inside* the mapper
+ * output). These tests pin the explicit toDto-call on the response path so the conversion stays in
+ * place.
  */
 @ExtendWith(MockitoExtension.class)
 class AdminControllerTest {
@@ -49,8 +49,23 @@ class AdminControllerTest {
 
   private static UserDto userDto(UUID id) {
     return new UserDto(
-        id, "username", null, "Effective", null, null, null, 1, null, java.util.Set.of(),
-        java.util.Set.of(), null, false, false, true, 1L, null);
+        id,
+        "username",
+        null,
+        "Effective",
+        null,
+        null,
+        null,
+        1,
+        null,
+        java.util.Set.of(),
+        java.util.Set.of(),
+        null,
+        false,
+        false,
+        true,
+        1L,
+        null);
   }
 
   // ── /api/v1/admin/roles ───────────────────────────────────────────────
@@ -63,9 +78,7 @@ class AdminControllerTest {
     RoleDto dtoB = new RoleDto(2L, "OFFICER", "Officer role", Set.of(), 1L);
     Page<Role> page =
         new PageImpl<>(
-            List.of(roleA, roleB),
-            PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name")),
-            2);
+            List.of(roleA, roleB), PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name")), 2);
     when(roleService.getAllRoles(any(Pageable.class))).thenReturn(page);
     when(roleMapper.toDto(roleA)).thenReturn(dtoA);
     when(roleMapper.toDto(roleB)).thenReturn(dtoB);
@@ -139,8 +152,8 @@ class AdminControllerTest {
             12, "Test description", "Display name", 3L, joinDate);
     User updated = new User();
     UserDto dto = userDto(userId);
-    when(userService.updateUserAttributes(userId, 12, "Test description", "Display name", 3L,
-            joinDate))
+    when(userService.updateUserAttributes(
+            userId, 12, "Test description", "Display name", 3L, joinDate))
         .thenReturn(updated);
     when(userMapper.toDto(updated)).thenReturn(dto);
 

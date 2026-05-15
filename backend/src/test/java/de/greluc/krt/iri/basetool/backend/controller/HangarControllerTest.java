@@ -39,14 +39,14 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Pure-Mockito unit tests for {@link HangarController}. Two non-pass-through behaviours are
- * pinned in detail: (1) the {@code /my-ships} family derives the owner from the JWT via
- * {@code UserService.getUserIdFromJwt} — the test confirms that derived id, never a URL-supplied
- * one, reaches the service (the controller's core data-isolation guarantee for personal-hangar
- * endpoints); (2) {@code /squadron-overview} shapes its response payload based on the caller's
- * role at the HTTP boundary, so the service stays free of {@code SecurityContextHolder} reads
- * (the ArchUnit rule). The role-driven branch is exercised for ADMIN, OFFICER, plain authenticated
- * user, and anonymous — only the first two pass {@code includeOwnerDetails=true} downstream.
+ * Pure-Mockito unit tests for {@link HangarController}. Two non-pass-through behaviours are pinned
+ * in detail: (1) the {@code /my-ships} family derives the owner from the JWT via {@code
+ * UserService.getUserIdFromJwt} — the test confirms that derived id, never a URL-supplied one,
+ * reaches the service (the controller's core data-isolation guarantee for personal-hangar
+ * endpoints); (2) {@code /squadron-overview} shapes its response payload based on the caller's role
+ * at the HTTP boundary, so the service stays free of {@code SecurityContextHolder} reads (the
+ * ArchUnit rule). The role-driven branch is exercised for ADMIN, OFFICER, plain authenticated user,
+ * and anonymous — only the first two pass {@code includeOwnerDetails=true} downstream.
  */
 @ExtendWith(MockitoExtension.class)
 class HangarControllerTest {
@@ -63,7 +63,11 @@ class HangarControllerTest {
   }
 
   private static Jwt jwt(String sub) {
-    return Jwt.withTokenValue("token").header("alg", "RS256").subject(sub).claim("sub", sub).build();
+    return Jwt.withTokenValue("token")
+        .header("alg", "RS256")
+        .subject(sub)
+        .claim("sub", sub)
+        .build();
   }
 
   // ── GET /my-ships ─────────────────────────────────────────────────────
@@ -102,9 +106,7 @@ class HangarControllerTest {
     ShipDto d = shipDto("Carrack");
     Page<Ship> page =
         new PageImpl<>(
-            List.of(s),
-            PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("name")),
-            1);
+            List.of(s), PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("name")), 1);
     when(hangarService.getAllShips(any(Pageable.class))).thenReturn(page);
     when(shipMapper.toDto(s)).thenReturn(d);
 
@@ -190,7 +192,8 @@ class HangarControllerTest {
   void addShip_forwardsJwtDerivedOwnerToService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
-    ShipRequestDto request = new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L);
+    ShipRequestDto request =
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -210,8 +213,8 @@ class HangarControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
-    ShipRequestDto request = new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false,
-            5L);
+    ShipRequestDto request =
+        new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false, 5L);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass II");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -278,8 +281,8 @@ class HangarControllerTest {
   @Test
   void addUserShip_admin_passesPathUserIdAndRequestToService() {
     UUID targetUser = UUID.randomUUID();
-    ShipRequestDto request = new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true,
-            0L);
+    ShipRequestDto request =
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.addShip(targetUser, request)).thenReturn(created);
@@ -297,8 +300,8 @@ class HangarControllerTest {
   void updateUserShip_admin_passesPathUserIdShipIdAndRequest() {
     UUID targetUser = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
-    ShipRequestDto request = new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true,
-            1L);
+    ShipRequestDto request =
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.updateShip(targetUser, shipId, request)).thenReturn(updated);
@@ -328,8 +331,8 @@ class HangarControllerTest {
   void importShips_forwardsJwtDerivedOwnerAndFileToService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
-    MultipartFile file = new MockMultipartFile("file", "ships.json", "application/json",
-            "[]".getBytes());
+    MultipartFile file =
+        new MockMultipartFile("file", "ships.json", "application/json", "[]".getBytes());
     FleetviewImportResponseDto response =
         new FleetviewImportResponseDto(3, 0, 0, List.of(), List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -351,8 +354,8 @@ class HangarControllerTest {
     // path would silently change behaviour for existing automation.
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
-    MultipartFile file = new MockMultipartFile("file", "fleetview.json", "application/json",
-            "[]".getBytes());
+    MultipartFile file =
+        new MockMultipartFile("file", "fleetview.json", "application/json", "[]".getBytes());
     FleetviewImportResponseDto response =
         new FleetviewImportResponseDto(2, 1, 0, List.of("oldship"), List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
