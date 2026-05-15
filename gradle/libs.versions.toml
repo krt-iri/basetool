@@ -10,6 +10,11 @@ asciidoctor-convert = { id = "org.asciidoctor.jvm.convert", version.ref = "ascii
 [versions]
 
 springBoot = "4.0.6"
+##      ⬆ = "4.1.0-M1"
+##      ⬆ = "4.1.0-M2"
+##      ⬆ = "4.1.0-M3"
+##      ⬆ = "4.1.0-M4"
+##      ⬆ = "4.1.0-RC1"
 # Stay on 4.0.x stable; only 4.1.0-M1..M4 / RC1 milestones available upstream as of 2026-05.
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
@@ -17,6 +22,7 @@ asciidoctor = "4.0.5"
 testcontainers = "1.21.4"
 flyway = "12.6.1"
 mapstruct = "1.6.3"
+##     ⬆ = "1.7.0.Beta1"
 # Stay on 1.6.x stable; only 1.7.0.Beta1 is available upstream as of 2026-05.
 resilience4j = "2.4.0"
 bucket4j = "8.18.0"
