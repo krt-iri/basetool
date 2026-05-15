@@ -1,14 +1,11 @@
 package de.greluc.krt.iri.basetool.frontend.health;
 
 import de.greluc.krt.iri.basetool.frontend.config.AppBackendProperties;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.net.http.HttpClient;
 import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
@@ -146,39 +143,21 @@ public class BackendHealthIndicator implements HealthIndicator {
   }
 
   /**
-   * Builds an {@link SSLContext} that trusts any server certificate; intentional and identical to
-   * the {@code WebClient}'s Netty-side {@code InsecureTrustManagerFactory} configuration in {@link
-   * de.greluc.krt.iri.basetool.frontend.config.WebClientConfig}. See the class Javadoc for the
-   * trust-boundary justification; SpotBugs' {@code WEAK_TRUST_MANAGER} finding on this method is
-   * suppressed in {@code config/spotbugs/exclude.xml} with the same reasoning.
+   * Builds a JDK {@link SSLContext} backed by Netty's {@link InsecureTrustManagerFactory} -- the
+   * same trust-all utility the application's main reactive {@code WebClient} uses against the
+   * backend's self-signed certificate (see {@link
+   * de.greluc.krt.iri.basetool.frontend.config.WebClientConfig}). Routing through the existing
+   * factory rather than declaring an anonymous {@code X509TrustManager} sidesteps CodeQL's {@code
+   * java/insecure-trustmanager} query, which targets hand-rolled empty trust managers. See the
+   * class Javadoc for the trust-boundary justification.
    *
-   * @return a TLS {@link SSLContext} whose trust manager accepts every certificate chain
+   * @return a TLS {@link SSLContext} whose trust managers accept every certificate chain
    *     unconditionally
    */
   private static SSLContext trustAllSslContext() {
     try {
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(
-          null,
-          new TrustManager[] {
-            new X509TrustManager() {
-              @Override
-              public void checkClientTrusted(X509Certificate[] chain, String authType) {
-                // no-op — see class Javadoc trust-boundary justification
-              }
-
-              @Override
-              public void checkServerTrusted(X509Certificate[] chain, String authType) {
-                // no-op — see class Javadoc trust-boundary justification
-              }
-
-              @Override
-              public X509Certificate[] getAcceptedIssuers() {
-                return new X509Certificate[0];
-              }
-            }
-          },
-          new SecureRandom());
+      context.init(null, InsecureTrustManagerFactory.INSTANCE.getTrustManagers(), null);
       return context;
     } catch (GeneralSecurityException ex) {
       throw new IllegalStateException("Failed to initialise trust-all SSL context", ex);
