@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.mapper.RankRequirementMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.iri.basetool.backend.model.RankRequirement;
@@ -141,6 +142,45 @@ class RankRequirementServiceTest {
 
     // When / Then
     assertThrows(ObjectOptimisticLockingFailureException.class, () -> service.update(id, request));
+  }
+
+  @Test
+  void create_shouldRejectMultiStepPromotion() {
+    // Given
+    RankRequirementCreateRequest request =
+        new RankRequirementCreateRequest(20, 18, null, null, PromotionLevel.LEVEL_A, 1, null);
+
+    // When / Then
+    BadRequestException ex = assertThrows(BadRequestException.class, () -> service.create(request));
+    assertEquals("error.rank_requirement.invalid_step", ex.getMessage());
+    verifyNoInteractions(repository, mapper, topicRepository, categoryRepository);
+  }
+
+  @Test
+  void create_shouldRejectReversePromotion() {
+    // Given: lower-numbered fromRank than toRank (would be a demotion)
+    RankRequirementCreateRequest request =
+        new RankRequirementCreateRequest(19, 20, null, null, PromotionLevel.LEVEL_A, 1, null);
+
+    // When / Then
+    assertThrows(BadRequestException.class, () -> service.create(request));
+    verifyNoInteractions(repository, mapper, topicRepository, categoryRepository);
+  }
+
+  @Test
+  void update_shouldRejectMultiStepPromotion() {
+    // Given
+    UUID id = UUID.randomUUID();
+    var request =
+        new de.greluc.krt.iri.basetool.backend.model.dto.RankRequirementUpdateRequest(
+            0L, 20, 18, null, null, PromotionLevel.LEVEL_A, 1, null);
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service.update(id, request));
+    assertEquals("error.rank_requirement.invalid_step", ex.getMessage());
+    // The repository must not even be hit when input validation fails.
+    verifyNoInteractions(repository, mapper, topicRepository, categoryRepository);
   }
 
   @Test

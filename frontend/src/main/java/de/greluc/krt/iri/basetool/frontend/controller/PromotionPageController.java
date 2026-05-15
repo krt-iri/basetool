@@ -163,16 +163,35 @@ public class PromotionPageController {
     return "promotion-admin-topics";
   }
 
-  /** Schritt 8: Admin-Bereich – Rangvoraussetzungen verwalten. */
+  /**
+   * Schritt 8: Admin-Bereich – Rangvoraussetzungen verwalten. The admin view groups the flat list
+   * of requirements by their {@code (fromRank, toRank)} pair so each promotion step is rendered as
+   * one section with its own table, mirroring the read-only layout used on {@code
+   * /promotion/overview}.
+   *
+   * @param model Spring MVC model populated with the grouped requirements, topics and categories
+   * @return the Thymeleaf view name for the rank-requirements admin page
+   */
   @GetMapping("/admin/rank-requirements")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String adminRankRequirements(Model model) {
     List<RankRequirementDto> requirements = fetchAllRankRequirements();
-    List<PromotionTopicDto> topics = fetchTopics();
-    List<PromotionCategoryDto> categories = fetchAllCategories();
+
+    Map<String, List<RankRequirementDto>> groupedRequirements = new LinkedHashMap<>();
+    requirements.stream()
+        .sorted(
+            java.util.Comparator.comparingInt(RankRequirementDto::fromRank)
+                .thenComparingInt(RankRequirementDto::toRank))
+        .forEach(
+            req -> {
+              String key = req.fromRank() + "_" + req.toRank();
+              groupedRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
+            });
+
     model.addAttribute("requirements", requirements);
-    model.addAttribute("topics", topics);
-    model.addAttribute("categories", categories);
+    model.addAttribute("groupedRequirements", groupedRequirements);
+    model.addAttribute("topics", fetchTopics());
+    model.addAttribute("categories", fetchAllCategories());
     return "promotion-admin-rank-requirements";
   }
 
