@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{promotion.admin.ranks.title} + ' - ' + #{app.title}">Rangvoraussetzungen verwalten - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+    <style>
+        .badge-level {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            font-size: 0.7rem;
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+        }
+        .modal-overlay {
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+        }
+        .modal-overlay.active { display: flex; align-items: center; justify-content: center; }
+        .modal-box {
+            background: #141414;
+            border: 1px solid var(--color-primary);
+            padding: 2rem;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 0 20px rgba(231,126,35,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-title {
+            font-family: 'Ethnocentric', sans-serif;
+            text-transform: uppercase;
+            color: var(--color-primary);
+            font-size: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .form-group { margin-bottom: 1rem; }
+        .form-label { display: block; font-size: 0.85rem; color: var(--color-gray-2); margin-bottom: 0.3rem; }
+        .form-input {
+            width: 100%; background: var(--color-gray-5); border: 1px solid #444;
+            color: var(--color-gray-1); padding: 0.5rem 0.75rem; font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+        .form-input:focus { border-color: var(--color-primary); outline: none; }
+        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; flex-wrap: wrap; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
+            .btn { min-height: 44px; }
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{promotion.admin.ranks.title}">Rangvoraussetzungen verwalten</h1>
+        <p th:text="#{promotion.admin.ranks.subtitle}">Anforderungen konfigurieren</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div style="margin-bottom:1rem;">
+            <button class="btn" onclick="openCreateModal()" th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
+        </div>
+
+        <div th:if="${#lists.isEmpty(requirements)}">
+            <p th:text="#{promotion.admin.ranks.no.requirements}">Keine Rangvoraussetzungen vorhanden.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(requirements)}" class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th th:text="#{promotion.admin.ranks.from}">Von</th>
+                        <th th:text="#{promotion.admin.ranks.to}">Nach</th>
+                        <th th:text="#{promotion.admin.ranks.topic}">Themenbereich</th>
+                        <th th:text="#{promotion.admin.ranks.category}">Kategorie</th>
+                        <th th:text="#{promotion.admin.ranks.min.level}">Mindeststufe</th>
+                        <th th:text="#{promotion.admin.ranks.count}">Anzahl</th>
+                        <th th:text="#{promotion.admin.ranks.description}">Beschreibung</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="req : ${requirements}">
+                        <td th:text="${req.fromRank}">20</td>
+                        <td th:text="${req.toRank}">19</td>
+                        <td th:text="${req.topicName} ?: '-'">-</td>
+                        <td th:text="${req.categoryName} ?: '-'">-</td>
+                        <td><span class="badge-level" th:text="${req.minimumLevel}">A</span></td>
+                        <td th:text="${req.requiredCount}">1</td>
+                        <td th:text="${req.description} ?: '-'">-</td>
+                        <td style="white-space:nowrap;">
+                            <div class="flex-gap-xs">
+                                <button class="btn btn-edit-req"
+                                        th:data-id="${req.id}"
+                                        th:data-from="${req.fromRank}"
+                                        th:data-to="${req.toRank}"
+                                        th:data-topic-id="${req.topicId} ?: ''"
+                                        th:data-category-id="${req.categoryId} ?: ''"
+                                        th:data-level="${req.minimumLevel}"
+                                        th:data-count="${req.requiredCount}"
+                                        th:data-description="${req.description} ?: ''"
+                                        th:data-version="${req.version}"
+                                        th:text="#{promotion.admin.ranks.edit}">Bearbeiten</button>
+                                <button class="btn btn-danger btn-delete-req"
+                                        th:data-id="${req.id}"
+                                        th:text="#{promotion.admin.ranks.delete}">Löschen</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- Create Modal -->
+<div id="modal-create" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.create.title}">Neue Rangvoraussetzung</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.from}">Von Rang</label>
+                <input id="cr-from" class="form-input" type="number" value="20">
+            </div>
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.to}">Nach Rang</label>
+                <input id="cr-to" class="form-input" type="number" value="19">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.topic}">Themenbereich</label>
+            <select id="cr-topic" class="form-input">
+                <option value="">-</option>
+                <option th:each="t : ${topics}" th:value="${t.id}" th:text="${t.name}">Topic</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.category}">Kategorie</label>
+            <select id="cr-category" class="form-input">
+                <option value="">-</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">Category</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.min.level}">Mindeststufe</label>
+                <select id="cr-level" class="form-input">
+                    <option value="LEVEL_A" th:text="#{promotion.overview.level.a}">Stufe A</option>
+                    <option value="LEVEL_B" th:text="#{promotion.overview.level.b}">Stufe B</option>
+                    <option value="LEVEL_C" th:text="#{promotion.overview.level.c}">Stufe C</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.count}">Anzahl</label>
+                <input id="cr-count" class="form-input" type="number" value="1" min="1">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.description}">Beschreibung</label>
+            <textarea id="cr-desc" class="form-input" rows="3" maxlength="2000"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('modal-create')" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" onclick="createRequirement()" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="modal-edit" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.edit.title}">Rangvoraussetzung bearbeiten</div>
+        <input id="er-id" type="hidden">
+        <input id="er-version" type="hidden">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.from}">Von Rang</label>
+                <input id="er-from" class="form-input" type="number">
+            </div>
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.to}">Nach Rang</label>
+                <input id="er-to" class="form-input" type="number">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.topic}">Themenbereich</label>
+            <select id="er-topic" class="form-input">
+                <option value="">-</option>
+                <option th:each="t : ${topics}" th:value="${t.id}" th:text="${t.name}">Topic</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.category}">Kategorie</label>
+            <select id="er-category" class="form-input">
+                <option value="">-</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">Category</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.min.level}">Mindeststufe</label>
+                <select id="er-level" class="form-input">
+                    <option value="LEVEL_A" th:text="#{promotion.overview.level.a}">Stufe A</option>
+                    <option value="LEVEL_B" th:text="#{promotion.overview.level.b}">Stufe B</option>
+                    <option value="LEVEL_C" th:text="#{promotion.overview.level.c}">Stufe C</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" th:text="#{promotion.admin.ranks.count}">Anzahl</label>
+                <input id="er-count" class="form-input" type="number" min="1">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" th:text="#{promotion.admin.ranks.description}">Beschreibung</label>
+            <textarea id="er-desc" class="form-input" rows="3" maxlength="2000"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('modal-edit')" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" onclick="updateRequirement()" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="modal-delete" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.delete.title}">LÃ¶schen</div>
+        <p th:text="#{promotion.admin.ranks.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
+        <input id="dr-id" type="hidden">
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('modal-delete')" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn-danger" onclick="deleteRequirement()" th:text="#{promotion.admin.ranks.delete}">LÃ¶schen</button>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+var MSG_SAVED = /*[[#{promotion.admin.ranks.saved}]]*/ 'Saved';
+var MSG_DELETED = /*[[#{promotion.admin.ranks.deleted}]]*/ 'Deleted';
+var MSG_ERROR = /*[[#{promotion.admin.ranks.error}]]*/ 'Error';
+var MSG_CONFLICT = /*[[#{promotion.admin.ranks.conflict}]]*/ 'Conflict';
+
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function openCreateModal() { openModal('modal-create'); }
+function openDeleteModal(id) { document.getElementById('dr-id').value = id; openModal('modal-delete'); }
+
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('btn-edit-req')) {
+        openEditModal(btn.dataset.id, btn.dataset.from, btn.dataset.to, btn.dataset.topicId, btn.dataset.categoryId, btn.dataset.level, btn.dataset.count, btn.dataset.description, btn.dataset.version);
+    } else if (btn.classList.contains('btn-delete-req')) {
+        openDeleteModal(btn.dataset.id);
+    }
+});
+
+function openEditModal(id, fromRank, toRank, topicId, categoryId, level, count, desc, version) {
+    document.getElementById('er-id').value = id;
+    document.getElementById('er-version').value = version;
+    document.getElementById('er-from').value = fromRank;
+    document.getElementById('er-to').value = toRank;
+    document.getElementById('er-topic').value = topicId || '';
+    document.getElementById('er-category').value = categoryId || '';
+    document.getElementById('er-level').value = level;
+    document.getElementById('er-count').value = count;
+    document.getElementById('er-desc').value = desc || '';
+    openModal('modal-edit');
+}
+
+function getCsrfToken() { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+function apiCall(url, method, body, onSuccess) {
+    var headers = { 'Content-Type': 'application/json' };
+    headers[getCsrfHeader()] = getCsrfToken();
+    fetch(url, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined })
+    .then(function(r) {
+        if (r.status === 409) { if (typeof showToast === 'function') showToast(MSG_CONFLICT, 'warning'); setTimeout(function() { window.location.reload(); }, 1500); return null; }
+        if (!r.ok) { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); return null; }
+        return r.status === 204 ? {} : r.json();
+    })
+    .then(function(data) { if (data !== null && data !== undefined) { onSuccess(data); } })
+    .catch(function() { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); });
+}
+
+function createRequirement() {
+    var topicId = document.getElementById('cr-topic').value || null;
+    var categoryId = document.getElementById('cr-category').value || null;
+    var body = { fromRank: parseInt(document.getElementById('cr-from').value), toRank: parseInt(document.getElementById('cr-to').value), topicId: topicId, categoryId: categoryId, minimumLevel: document.getElementById('cr-level').value, requiredCount: parseInt(document.getElementById('cr-count').value), description: document.getElementById('cr-desc').value || null };
+    apiCall('/api/proxy/promotion/rank-requirements', 'POST', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-create'); setTimeout(function() { window.location.reload(); }, 800); });
+}
+function updateRequirement() {
+    var id = document.getElementById('er-id').value;
+    var topicId = document.getElementById('er-topic').value || null;
+    var categoryId = document.getElementById('er-category').value || null;
+    var body = { version: parseInt(document.getElementById('er-version').value), fromRank: parseInt(document.getElementById('er-from').value), toRank: parseInt(document.getElementById('er-to').value), topicId: topicId, categoryId: categoryId, minimumLevel: document.getElementById('er-level').value, requiredCount: parseInt(document.getElementById('er-count').value), description: document.getElementById('er-desc').value || null };
+    apiCall('/api/proxy/promotion/rank-requirements/' + id, 'PUT', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-edit'); setTimeout(function() { window.location.reload(); }, 800); });
+}
+function deleteRequirement() {
+    var id = document.getElementById('dr-id').value;
+    apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete'); setTimeout(function() { window.location.reload(); }, 800); });
+}
+/*]]>*/
+</script>
+</body>
+</html>

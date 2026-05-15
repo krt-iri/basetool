@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{promotion.manage.title} + ' - ' + #{app.title}">Bewertungsverwaltung - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+    <style>
+        .level-select {
+            background: var(--color-gray-4);
+            color: var(--color-gray-1);
+            border: 1px solid var(--color-gray-3);
+            padding: 0.375rem 0.5rem;
+            font-size: 0.85rem;
+            min-height: 44px;
+            width: 100%;
+            cursor: pointer;
+            font-family: var(--font-body);
+        }
+        .level-select:focus { border-color: var(--color-primary); outline: none; }
+        .level-select.saving { opacity: 0.5; }
+        .member-col { min-width: 140px; font-weight: 700; }
+        .eligibility-col { min-width: 160px; font-size: 0.8rem; }
+        .eligibility-chip {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            margin: 0 0.15rem 0.15rem 0;
+            border: 1px solid;
+            font-family: 'Ethnocentric', sans-serif;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .eligibility-chip.is-eligible { color: #4caf50; border-color: #4caf50; }
+        .eligibility-chip.not-eligible { color: #d35400; border-color: #d35400; opacity: 0.6; }
+        @media (max-width: 768px) {
+            th, td { min-width: 110px; }
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{promotion.manage.title}">Bewertungsverwaltung</h1>
+        <p th:text="#{promotion.manage.subtitle}">Stufen verwalten</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div th:if="${#lists.isEmpty(members)}">
+            <p th:text="#{promotion.manage.no.members}">Keine Mitglieder gefunden.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(members)}" class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th th:text="#{promotion.manage.member}">Mitglied</th>
+                        <th th:text="#{promotion.manage.eligibility}">Beförderbar</th>
+                        <th th:each="cat : ${categories}" th:text="${cat.name}">Kategorie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="member : ${members}">
+                        <td class="member-col" th:text="${member.username}">Mitglied</td>
+                        <td class="eligibility-col">
+                            <th:block th:with="eligList=${eligibilityByUser[member.id.toString()]}">
+                                <span th:if="${eligList == null or #lists.isEmpty(eligList)}" style="color:var(--color-gray-3);font-size:0.75rem;" th:text="#{promotion.manage.eligibility.none}">-</span>
+                                <span th:each="elig : ${eligList}"
+                                      th:if="${elig.hasConfiguredRules}"
+                                      th:classappend="${elig.eligible} ? ' is-eligible' : ' not-eligible'"
+                                      class="eligibility-chip"
+                                      th:title="${elig.eligible} ? #{promotion.manage.eligibility.eligible} + ' (' + ${elig.fromRank} + ' → ' + ${elig.toRank} + ')' : #{promotion.manage.eligibility.not.eligible} + ' (' + ${elig.fromRank} + ' → ' + ${elig.toRank} + ')'">
+                                    <span th:text="${elig.fromRank}">20</span>&rarr;<span th:text="${elig.toRank}">19</span>
+                                </span>
+                            </th:block>
+                        </td>
+                        <td th:each="cat : ${categories}">
+                            <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
+                                <select class="level-select"
+                                        th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''}"
+                                        onchange="saveEvaluation(this)">
+                                    <option value="" th:text="#{promotion.manage.level.none}"
+                                            th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
+                                    <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"
+                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_A'}">Stufe A</option>
+                                    <option value="LEVEL_B" th:text="#{promotion.manage.level.b}"
+                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_B'}">Stufe B</option>
+                                    <option value="LEVEL_C" th:text="#{promotion.manage.level.c}"
+                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_C'}">Stufe C</option>
+                                </select>
+                            </th:block>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    var MSG_SAVED = /*[[#{promotion.manage.saved}]]*/ 'Saved';
+    var MSG_ERROR = /*[[#{promotion.manage.error}]]*/ 'Error';
+    var MSG_CONFLICT = /*[[#{promotion.manage.conflict}]]*/ 'Conflict';
+
+    function getCsrfToken() { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+    var _savingInProgress = false;
+
+    function setAllSelectsDisabled(disabled) {
+        document.querySelectorAll('.level-select').forEach(function(s) {
+            s.disabled = disabled;
+        });
+    }
+
+    function saveEvaluation(select) {
+        if (_savingInProgress) return;
+        var userId = select.getAttribute('data-user-id');
+        var categoryId = select.getAttribute('data-category-id');
+        var versionStr = select.getAttribute('data-version');
+        var version = versionStr ? parseInt(versionStr) : null;
+        var assignedLevel = select.value || null;
+
+        _savingInProgress = true;
+        setAllSelectsDisabled(true);
+        select.classList.add('saving');
+
+        var headers = { 'Content-Type': 'application/json' };
+        headers[getCsrfHeader()] = getCsrfToken();
+
+        fetch('/api/proxy/promotion/evaluations/user/' + encodeURIComponent(userId) + '/category/' + encodeURIComponent(categoryId), {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify({ version: version, assignedLevel: assignedLevel })
+        })
+        .then(function(response) {
+            if (response.status === 409) {
+                if (typeof showToast === 'function') showToast(MSG_CONFLICT, 'warning');
+                setTimeout(function() { window.location.reload(); }, 1500);
+                return null;
+            }
+            if (!response.ok) {
+                if (typeof showToast === 'function') showToast(MSG_ERROR, 'error');
+                return null;
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data) {
+                select.setAttribute('data-version', data.version);
+                if (typeof showToast === 'function') showToast(MSG_SAVED, 'success');
+            }
+        })
+        .catch(function() {
+            if (typeof showToast === 'function') showToast(MSG_ERROR, 'error');
+        })
+        .finally(function() {
+            select.classList.remove('saving');
+            _savingInProgress = false;
+            setAllSelectsDisabled(false);
+        });
+    }
+    /*]]>*/
+</script>
+</body>
+</html>
