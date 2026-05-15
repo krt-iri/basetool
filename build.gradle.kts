@@ -218,13 +218,41 @@ subprojects {
 // triages findings before the gate turns strict. The plugin's first invocation
 // downloads the NVD feed (~500 MB cached under
 // `~/.gradle/dependency-check-data`) and takes 5-15 minutes; subsequent runs
-// are seconds. Set `-PnvdApiKey=<key>` to avoid public NVD rate limits.
+// are seconds. Set `-PnvdApiKey=<key>` (CI: `NVD_API_KEY` repo secret) to
+// bypass the public NVD rate limit — register a free key at
+// https://nvd.nist.gov/developers/request-an-api-key.
 dependencyCheck {
   failBuildOnCVSS = 11.0f
   formats = listOf("HTML", "SARIF")
   outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
-  if (project.findProperty("nvdApiKey") != null) {
-    nvd.apiKey = project.property("nvdApiKey") as String
+  // Treat the on-disk NVD copy as valid for a full ISO-week. The
+  // `.github/workflows/dependency-check.yml` actions/cache entry is keyed on
+  // the ISO week as well and the weekly cron re-warms it, so within a week we
+  // reuse the local DB and skip every NVD API call. Only the first run of
+  // each week actually contacts the NVD endpoint, which is what keeps the
+  // workflow inside the 5-req/30-s public rate limit when `NVD_API_KEY` is
+  // unset. The plugin default of 4 hours forced an update on essentially
+  // every invocation, which on github-hosted runners (shared IP pool with
+  // every other CI job on github.com refreshing on Monday morning) led to
+  // 429s mid-transaction and a corrupt H2 DB — see run 25933803540.
+  nvd.validForHours = 168
+  // Bump retries above the default of 10 so a transient 429 burst does not
+  // abort the in-progress H2 update; the corruption-on-abort failure mode
+  // referenced above only triggers once retries are exhausted while writes
+  // are pending.
+  nvd.maxRetryCount = 20
+  val resolvedNvdApiKey = (project.findProperty("nvdApiKey") as String?)?.takeIf { it.isNotBlank() }
+  if (resolvedNvdApiKey != null) {
+    nvd.apiKey = resolvedNvdApiKey
+    // ~30 req/min, comfortably inside NVD's authenticated 50/30-s budget.
+    nvd.delay = 2000
+  } else {
+    // Public NVD limit is 5 req/30 s; 16 s between calls keeps us at
+    // ~3.75 req/30 s with headroom for runner-pool contention on the same
+    // source IP. Register and configure an API key (see header comment) to
+    // drop this delay and make the first-of-week run finish in minutes
+    // instead of tens of minutes.
+    nvd.delay = 16000
   }
 }
 
