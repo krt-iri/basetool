@@ -27,15 +27,31 @@
     var on = window.krtEvents.on;
 
     /**
-     * Navigate to the URL in {@code data-href}. Passed through {@link
-     * window.safeSameOriginUrl} so an attacker-controlled absolute URL on a third-party origin
-     * cannot redirect the user out of the application — the same defense the legacy inline
-     * handlers used.
+     * Local same-origin path sanitiser. Mirrors {@link window.safeSameOriginUrl} but is defined
+     * in the same scope as the {@code window.location.href} sinks below so CodeQL's
+     * {@code js/xss-through-dom} interprocedural analysis can see the explicit
+     * {@code charAt(0) === '/'} sanitizer and prove the data flow safe. Without an in-scope
+     * sanitizer the helper-via-{@code window} indirection is treated as an unsanitised flow.
+     *
+     * Accepts: a non-empty string whose first char is {@code '/'} and whose second char is
+     * neither {@code '/'} nor {@code '\\'} (rejects {@code //attacker} and {@code \\\\share}).
+     * Returns the input unchanged on success, {@code null} on rejection.
+     */
+    function sanitizePath(raw) {
+        if (typeof raw !== 'string' || raw.length < 2) return null;
+        if (raw.charAt(0) !== '/') return null;
+        var second = raw.charAt(1);
+        if (second === '/' || second === '\\') return null;
+        return raw;
+    }
+
+    /**
+     * Navigate to the URL in {@code data-href}. Sanitised by {@link sanitizePath} so an
+     * attacker-controlled absolute URL on a third-party origin cannot redirect the user out
+     * of the application — the same defense the legacy inline handlers used.
      */
     on('click', 'navigate-href', function (el, event) {
-        var raw = el.getAttribute('data-href');
-        if (!raw) return;
-        var url = window.safeSameOriginUrl ? window.safeSameOriginUrl(raw) : raw;
+        var url = sanitizePath(el.getAttribute('data-href'));
         if (!url) return;
         event.preventDefault();
         window.location.href = url;
@@ -44,16 +60,16 @@
     /**
      * Navigate to a URL templated against the selected value. Element declares
      * {@code data-url-template} containing a {@code {value}} placeholder; the placeholder is
-     * substituted with the input's current value. Same-origin sanitised through
-     * {@link window.safeSameOriginUrl}.
+     * substituted with the input's URL-encoded current value, and the resulting path is
+     * sanitised through {@link sanitizePath}.
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
         var template = el.getAttribute('data-url-template');
         if (!template) return;
-        var built = template.replace('{value}', encodeURIComponent(el.value));
-        var url = window.safeSameOriginUrl ? window.safeSameOriginUrl(built) : built;
-        if (url) window.location.href = url;
+        var url = sanitizePath(template.replace('{value}', encodeURIComponent(el.value)));
+        if (!url) return;
+        window.location.href = url;
     });
 
     /**
