@@ -67,3 +67,27 @@ app:
       realm: test
       client-id: test-client
       client-secret: test-secret
+
+# Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
+# (http://keycloak.example.com) is a non-resolvable placeholder; leaving the
+# indicator enabled would slow every context-loading test by the
+# connect-timeout while the JDK HttpClient waits for the DNS lookup to fail.
+# Unit tests for the indicator itself instantiate it directly with a
+# MockWebServer URL and do not consult this property.
+#
+# The readiness group is also redefined here: Spring Boot 4 ships a
+# HealthEndpointGroupMembershipValidator that rejects a group `include` list
+# referencing a non-registered contributor (`NoSuchHealthContributorException`
+# at context startup). Under this profile `keycloak` is disabled (see above)
+# and `ssl` is absent because `server.ssl.enabled=false`, so we narrow the
+# group to the contributors that DO exist in tests. Production retains the
+# full `readinessState, db, keycloak, diskSpace, ssl` set from application.yml.
+management:
+  health:
+    keycloak:
+      enabled: false
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState, db, diskSpace

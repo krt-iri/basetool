@@ -84,6 +84,22 @@ app:
 # Actuator: expose only `health` for the Docker HEALTHCHECK / docker-compose
 # `service_healthy` gating. The response is restricted to the bare status so that
 # unauthenticated callers cannot enumerate internal components.
+#
+# The `readiness` group is widened from Spring's default (just `readinessState`) to
+# also include the indicators whose `DOWN` actually means "stop sending traffic":
+#   - db          — Hikari can run SELECT 1 against Postgres (auto-configured by
+#                   spring-boot-starter-data-jpa).
+#   - keycloak    — custom KeycloakHealthIndicator probes the OIDC discovery
+#                   endpoint so Keycloak outages surface in readiness even though
+#                   the Spring resource-server does not ship a built-in indicator.
+#   - diskSpace   — auto-configured; <10 MB free trips DOWN, which would otherwise
+#                   silently lose logs in prod (LogstashEncoder writes to disk).
+#   - ssl         — auto-configured when server.ssl.enabled=true; warns when the
+#                   keystore certificate is within the expiry threshold.
+# `livenessState` is deliberately NOT in this group — a failing readiness probe
+# should pull the container out of the load-balancer rotation, not restart it.
+# The Docker HEALTHCHECK in backend/Dockerfile points at /actuator/health/readiness
+# so this group is what gates docker-compose `service_healthy`.
 management:
   endpoints:
     web:
@@ -95,5 +111,8 @@ management:
       show-components: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState, db, keycloak, diskSpace, ssl
 
 
