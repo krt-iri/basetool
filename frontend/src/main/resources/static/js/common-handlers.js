@@ -27,35 +27,51 @@
     var on = window.krtEvents.on;
 
     /**
-     * Navigate to the URL in {@code data-href}. The inline {@code startsWith('/')} guard plus
-     * the protocol-relative {@code //} / Windows {@code /\} rejection is the CodeQL-recognised
-     * sanitizer for {@code js/xss-through-dom}; it must live directly at the {@code location.href}
-     * sink because CodeQL's interprocedural analysis does not track a sanitizer through a helper
-     * whose successful branch returns its tainted input verbatim.
+     * Parse {@code raw} against the current origin and return a same-origin path-only string
+     * ({@code pathname + search + hash}) or {@code null} on rejection. CodeQL recognises the
+     * {@code new URL()} + {@code origin} equality check as a {@code js/xss-through-dom}
+     * sanitizer, and because the returned value is reconstructed from parsed URL components
+     * (not the original tainted input), the taint flow into {@code location.href} is broken.
+     */
+    function toSafeSameOriginPath(raw) {
+        if (typeof raw !== 'string' || raw.length === 0) return null;
+        var resolved;
+        try {
+            resolved = new URL(raw, window.location.origin);
+        } catch (e) {
+            return null;
+        }
+        if (resolved.origin !== window.location.origin) return null;
+        return resolved.pathname + resolved.search + resolved.hash;
+    }
+
+    /**
+     * Navigate to the URL in {@code data-href}. {@link toSafeSameOriginPath} resolves the raw
+     * attribute against the current origin and returns a freshly-constructed path string only
+     * if the resulting URL is same-origin — defeating {@code javascript:} schemes,
+     * protocol-relative {@code //attacker}, and Windows UNC {@code /\\share} bypasses.
      */
     on('click', 'navigate-href', function (el, event) {
-        var url = el.getAttribute('data-href');
-        if (typeof url !== 'string' || url.length < 2) return;
-        if (!url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return;
+        var safePath = toSafeSameOriginPath(el.getAttribute('data-href'));
+        if (safePath === null) return;
         event.preventDefault();
-        window.location.href = url;
+        window.location.assign(safePath);
     });
 
     /**
      * Navigate to a URL templated against the selected value. Element declares
      * {@code data-url-template} containing a {@code {value}} placeholder; the placeholder is
-     * substituted with the input's URL-encoded current value. Same inline same-origin guard as
-     * {@code navigate-href} — kept inline rather than extracted so CodeQL recognises the
-     * sanitizer at the {@code location.href} sink.
+     * substituted with the input's URL-encoded current value, then the result is parsed and
+     * same-origin-checked via {@link toSafeSameOriginPath}.
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
         var template = el.getAttribute('data-url-template');
         if (!template) return;
-        var url = template.replace('{value}', encodeURIComponent(el.value));
-        if (typeof url !== 'string' || url.length < 2) return;
-        if (!url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return;
-        window.location.href = url;
+        var safePath =
+            toSafeSameOriginPath(template.replace('{value}', encodeURIComponent(el.value)));
+        if (safePath === null) return;
+        window.location.assign(safePath);
     });
 
     /**
