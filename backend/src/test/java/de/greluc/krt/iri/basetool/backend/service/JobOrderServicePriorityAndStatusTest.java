@@ -360,7 +360,7 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrderMaterial existingMat =
           JobOrderMaterial.builder()
               .material(materialWithId(xId))
-              .minQuality(750)
+              .minQuality(700)
               .amount(10.0)
               .build();
       o.getMaterials().add(existingMat);
@@ -371,7 +371,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(yId, 750, 5.0)), 1L);
+              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)), 1L);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -387,7 +387,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(missingMat, 750, 5.0)), 1L);
+              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)), 1L);
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));
     }
@@ -479,7 +479,7 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrderMaterial mat =
           JobOrderMaterial.builder()
               .material(materialWithId(matId))
-              .minQuality(750)
+              .minQuality(700)
               .amount(10.0)
               .build();
       o.getMaterials().add(mat);
