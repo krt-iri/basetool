@@ -66,12 +66,24 @@ USER 10001:10001
 
 EXPOSE 18081
 
-# Hit the Spring Boot Actuator health endpoint. The frontend serves HTTPS with a
+# Hit the Spring Boot Actuator readiness probe. The frontend serves HTTPS with a
 # self-signed certificate (see application.yml `server.ssl`) so curl runs with -k
 # to skip cert verification. `start-period=60s` covers the JVM warm-up window so
 # Compose does not flap the container into `unhealthy` while Tomcat is still
 # binding the port.
+#
+# Why /actuator/health/readiness instead of /actuator/health:
+#   1. Spring's `readinessState` indicator only goes UP after ApplicationReadyEvent,
+#      so a 200 here guarantees the context is fully initialised (OAuth2 client
+#      registrations resolved, Spring Session ready, scheduled tasks armed) —
+#      not just "Tomcat is bound".
+#   2. The `readiness` health group in application.yml widens the set of indicators
+#      contributing to this endpoint (backend, keycloak, redis, diskSpace, ssl),
+#      so a backend or Keycloak outage drops readiness DOWN and any orchestrator
+#      gating on `service_healthy` will not route traffic to this instance.
+# Liveness (/actuator/health/liveness) stays unused here on purpose — a transient
+# backend/Keycloak blip should yank this instance out of the rotation, not restart it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsSk https://localhost:18081/actuator/health || exit 1
+    CMD curl -fsSk https://localhost:18081/actuator/health/readiness || exit 1
 
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

@@ -85,6 +85,30 @@ app:
 # Actuator: expose only `health` so the Docker HEALTHCHECK / docker-compose
 # `service_healthy` gating can reach it. The response is restricted to the bare
 # status so unauthenticated callers cannot enumerate internal components.
+#
+# The `readiness` group is widened from Spring's default (just `readinessState`)
+# to include the indicators whose `DOWN` actually means "stop sending traffic to
+# this frontend instance":
+#   - backend     — custom BackendHealthIndicator probes the backend's own
+#                   /actuator/health/readiness, so a backend outage drops the
+#                   frontend out of `service_healthy` immediately on startup —
+#                   the auto-configured Resilience4j CircuitBreakerHealthIndicator
+#                   only flips DOWN once enough real traffic has tripped a breaker,
+#                   which is too late for startup-gating.
+#   - keycloak    — custom KeycloakHealthIndicator; a Keycloak outage breaks
+#                   the SSO login redirect and token refresh.
+#   - redis       — auto-configured; Spring Session persists OIDC tokens and
+#                   flash attributes in Redis, so a Redis outage logs users out
+#                   on every request.
+#   - diskSpace   — auto-configured; <10 MB free trips DOWN, otherwise the
+#                   LogstashEncoder JSON appender would silently lose logs in
+#                   prod.
+#   - ssl         — auto-configured when server.ssl.enabled=true; warns when
+#                   the keystore certificate is within the expiry threshold.
+# `livenessState` is deliberately NOT in this group — a failing readiness probe
+# should yank the container out of the load-balancer rotation, not restart it.
+# The Docker HEALTHCHECK in frontend/Dockerfile points at /actuator/health/readiness
+# so this group is what gates docker-compose `service_healthy`.
 management:
   endpoints:
     web:
@@ -96,6 +120,9 @@ management:
       show-components: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState, backend, keycloak, redis, diskSpace, ssl
 
 logging:
   level:
