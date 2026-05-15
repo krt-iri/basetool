@@ -17,13 +17,25 @@ RUN chmod +x gradlew
 RUN ./gradlew :frontend:dependencies --no-daemon || true
 
 # Quellcode kopieren und Anwendung bauen.
-# `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain` skips the
-# static-analysis steps that the `check` task pulls in via `build`. Those tools
-# are meant for developer / CI workflows — running them inside the production
-# image build only adds minutes and needs auxiliary files (`config/checkstyle/`)
-# that are not part of the Docker context. CI runs `./gradlew check` separately.
+# `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain
+# -x spotlessCheck -x spotlessJavaCheck` skip the static-analysis and formatting
+# verification steps that the `check` task pulls in via `build`. Those tools are
+# meant for developer / CI workflows — running them inside the production image
+# build only adds minutes and needs auxiliary files (`config/checkstyle/`) that
+# are not part of the Docker context. Spotless in particular fails the build
+# when source files were checked out with CRLF line endings (typical on a
+# Windows-developer's workstation that pushes to a Linux build host), even
+# though the byte content is otherwise identical to the LF copy in git. CI
+# runs `./gradlew check` separately on a controlled environment where format
+# enforcement is the right call.
 COPY frontend/src/ frontend/src/
-RUN ./gradlew :frontend:build -x test -x checkstyleMain -x spotbugsMain --no-daemon
+RUN ./gradlew :frontend:build \
+    -x test \
+    -x checkstyleMain \
+    -x spotbugsMain \
+    -x spotlessCheck \
+    -x spotlessJavaCheck \
+    --no-daemon
 
 # Layered JAR extrahieren
 WORKDIR /app/frontend/build/libs

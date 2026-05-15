@@ -1,3 +1,24 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+
+# Source files must stay LF in the working tree on every platform so the Linux
+# Docker build (and Spotless inside it) does not see CRLF drift from Windows
+# checkouts. Without these rules, a Windows clone with core.autocrlf=true
+# converts the working-tree copy to CRLF and the resulting `docker compose
+# build` either fails (Spotless) or burns a re-format diff round-trip.
+*.java text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.properties text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.sql text eol=lf
+*.md text eol=lf
+Dockerfile text eol=lf
+*.sh text eol=lf
