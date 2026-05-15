@@ -22,9 +22,15 @@
             margin-bottom: 0.5rem;
             font-size: 1rem;
         }
+        /*
+         * Auto-fit grid for the level cards. The original fixed 3-column grid
+         * left dead space whenever a category only had 1 or 2 stufen-inhalte
+         * configured. minmax(220px, 1fr) lets the browser pack what is actually
+         * present without leaving empty slots.
+         */
         .level-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 0.75rem;
         }
         .level-card {
@@ -57,27 +63,95 @@
             border: 1px solid var(--color-primary);
             color: var(--color-primary);
         }
-        .rank-group { margin-bottom: 1.5rem; }
-        .rank-group-header {
+
+        /*
+         * Collapsible rank-group: native <details>/<summary> for accessibility.
+         * Replaces the original always-open flat sections.
+         */
+        details.rank-group {
+            margin-bottom: 1rem;
+            border: 1px solid var(--color-gray-3);
+            background: var(--color-bg-dark-gray);
+        }
+        details.rank-group > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 0.6rem 0.75rem;
             font-family: 'Lato', sans-serif;
             font-weight: 700;
             font-size: 1rem;
             color: var(--color-primary);
-            border-bottom: 1px solid #333;
-            padding-bottom: 0.35rem;
-            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            background-color: var(--color-gray-4);
+            border-bottom: 1px solid transparent;
         }
+        details.rank-group[open] > summary {
+            border-bottom-color: var(--color-gray-3);
+        }
+        details.rank-group > summary::-webkit-details-marker { display: none; }
+        details.rank-group > summary::before {
+            content: '+';
+            color: var(--color-primary);
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 0.5rem;
+        }
+        details.rank-group[open] > summary::before { content: '\2212'; }
+        details.rank-group > .rank-group-body {
+            padding: 0.75rem;
+        }
+
+        /*
+         * "Du bist hier"-Marker: highlights the rank-group whose fromRank matches
+         * the current user's rank. The group is also auto-opened on load (see JS
+         * at the bottom of the template).
+         */
+        details.rank-group.is-current {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 8px rgba(231, 126, 35, 0.25);
+        }
+        details.rank-group.is-current > summary {
+            background: linear-gradient(90deg, rgba(231,126,35,0.15) 0%, rgba(231,126,35,0) 60%);
+        }
+        .rank-here-badge {
+            display: inline-block;
+            font-family: 'Ethnocentric', sans-serif;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.5rem;
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+            background: rgba(231, 126, 35, 0.08);
+            white-space: nowrap;
+        }
+
         .rank-subtable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         .rank-subtable th { color: var(--color-gray-2); font-weight: 400; text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #2a2a2a; font-size: 0.8rem; }
         .rank-subtable td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e1e; color: var(--color-gray-1); vertical-align: top; }
         .rank-subtable tr:last-child td { border-bottom: none; }
+
+        .ov-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .ov-toolbar .btn-tiny {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.75rem;
+            min-height: 38px;
+        }
+        .ov-toolbar .ov-spacer { flex: 1; }
+
         @media (max-width: 768px) {
-            .level-grid { grid-template-columns: 1fr; }
             .rank-table-wrapper { overflow-x: auto; }
             .rank-subtable { font-size: 0.8rem; }
-        }
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .level-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
     </th:block>
@@ -146,47 +220,95 @@
         </div>
 
         <div th:unless="${#lists.isEmpty(rankRequirements)}">
-            <div th:each="entry : ${groupedRankRequirements}" class="rank-group">
-                <div class="rank-group-header">
-                    <span th:text="#{promotion.overview.rank.from}">Von Rang</span>
-                    <span th:text="${entry.value[0].fromRank}">20</span>
-                    &rarr;
-                    <span th:text="#{promotion.overview.rank.to}">Nach Rang</span>
-                    <span th:text="${entry.value[0].toRank}">19</span>
-                </div>
-                <div class="rank-table-wrapper" style="overflow-x:auto;">
-                    <table class="rank-subtable">
-                        <thead>
-                            <tr>
-                                <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
-                                <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
-                                <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
-                                <th th:text="#{promotion.overview.rank.count}">Anzahl</th>
-                                <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="req : ${entry.value}">
-                                <td th:text="${req.topicName} ?: '-'">-</td>
-                                <td th:text="${req.categoryName} ?: '-'">-</td>
-                                <td>
-                                    <span class="badge-level" th:switch="${req.minimumLevel}">
-                                        <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
-                                        <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
-                                        <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
-                                        <span th:case="*">-</span>
-                                    </span>
-                                </td>
-                                <td th:text="${req.requiredCount}">1</td>
-                                <td th:text="${req.description} ?: '-'">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="ov-toolbar">
+                <span th:if="${currentUserRank != null}"
+                      style="color:var(--color-gray-2);font-size:0.85rem;">
+                    <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
+                    <strong th:text="${currentUserRank}" style="color:var(--color-primary);">20</strong>
+                </span>
+                <div class="ov-spacer"></div>
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="po-expand-all"
+                        th:text="#{promotion.overview.expand.all}">Alle ausklappen</button>
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="po-collapse-all"
+                        th:text="#{promotion.overview.collapse.all}">Alle einklappen</button>
             </div>
+
+            <details th:each="entry : ${groupedRankRequirements}"
+                     class="rank-group"
+                     th:classappend="${currentUserRank != null and entry.value[0].fromRank == currentUserRank ? ' is-current' : ''}"
+                     th:attr="data-po-from-rank=${entry.value[0].fromRank},data-po-to-rank=${entry.value[0].toRank},open=${currentUserRank != null and entry.value[0].fromRank == currentUserRank ? 'open' : null}">
+                <summary>
+                    <span>
+                        <span th:text="#{promotion.overview.rank.from}">Von Rang</span>
+                        <span th:text="${entry.value[0].fromRank}">20</span>
+                        &rarr;
+                        <span th:text="#{promotion.overview.rank.to}">Nach Rang</span>
+                        <span th:text="${entry.value[0].toRank}">19</span>
+                    </span>
+                    <span th:if="${currentUserRank != null and entry.value[0].fromRank == currentUserRank}"
+                          class="rank-here-badge"
+                          th:text="#{promotion.overview.you.are.here}">Du bist hier</span>
+                </summary>
+                <div class="rank-group-body">
+                    <div class="rank-table-wrapper" style="overflow-x:auto;">
+                        <table class="rank-subtable">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
+                                    <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
+                                    <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
+                                    <th th:text="#{promotion.overview.rank.count}">Anzahl</th>
+                                    <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="req : ${entry.value}">
+                                    <td th:text="${req.topicName} ?: '-'">-</td>
+                                    <td th:text="${req.categoryName} ?: '-'">-</td>
+                                    <td>
+                                        <span class="badge-level" th:switch="${req.minimumLevel}">
+                                            <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
+                                            <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
+                                            <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
+                                            <span th:case="*">-</span>
+                                        </span>
+                                    </td>
+                                    <td th:text="${req.requiredCount}">1</td>
+                                    <td th:text="${req.description} ?: '-'">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
         </div>
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    /*
+     * Expand-all / collapse-all helpers for the rank-group <details> blocks.
+     * Native <details> already handles the per-group toggle; we only need to
+     * automate the bulk action. No persistence — the "you are here" group is
+     * always re-opened on load, which is the only state we want to remember.
+     */
+    function poToggleAll(openState) {
+        var nodes = document.querySelectorAll('details.rank-group');
+        nodes.forEach(function (d) { d.open = openState; });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('click', 'po-expand-all', function () { poToggleAll(true); });
+            window.krtEvents.on('click', 'po-collapse-all', function () { poToggleAll(false); });
+        }
+    });
+    /*]]>*/
+</script>
 </body>
 </html>
