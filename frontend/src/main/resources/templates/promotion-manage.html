@@ -4,21 +4,358 @@
     <title th:text="#{promotion.manage.title} + ' - ' + #{app.title}">Bewertungsverwaltung - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
     <style>
+        /* ================================================================
+           TOOLBAR (search, filters, bulk, expand/collapse, CSV, queue)
+           ================================================================ */
+        .pm-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .pm-toolbar .pm-search {
+            flex: 1 1 240px;
+            min-width: 180px;
+            max-width: 320px;
+        }
+        .pm-toolbar .pm-spacer { flex: 1; }
+        .pm-toolbar .btn-tiny {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.75rem;
+            min-height: 38px;
+        }
+        .pm-filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.6rem;
+            border: 1px solid var(--color-gray-3);
+            background-color: var(--color-bg-dark-gray);
+            color: var(--color-gray-1);
+            font-size: 0.8rem;
+            cursor: pointer;
+            user-select: none;
+            min-height: 38px;
+            box-sizing: border-box;
+        }
+        .pm-filter-chip:has(input:checked) {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+        }
+        .pm-filter-chip input[type="checkbox"] {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        /*
+         * Queue indicator: small spinner + counter shown while saves are
+         * in flight. We piggy-back on the global .krt-spinner styling so
+         * the rotation animation, sizing and colour palette stay in sync.
+         */
+        .pm-queue-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.6rem;
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            min-height: 38px;
+        }
+        .pm-queue-indicator[hidden] { display: none; }
+        .pm-queue-indicator .krt-spinner {
+            width: 14px;
+            height: 14px;
+            border-width: 2px;
+        }
+
+        /* ================================================================
+           BULK-EDIT PANEL (visible while ≥1 row checkbox is checked)
+           ================================================================ */
+        .pm-bulk-panel {
+            display: none;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 0.6rem 0.75rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--color-primary);
+            background-color: rgba(231, 126, 35, 0.06);
+        }
+        .pm-bulk-panel.visible { display: flex; }
+        .pm-bulk-count {
+            font-family: var(--font-headline);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--color-primary);
+            letter-spacing: 0.05em;
+            margin-right: 0.5rem;
+        }
+        .pm-bulk-panel select {
+            min-width: 11rem;
+            min-height: 38px;
+            font-size: 0.85rem;
+            padding: 0.3rem 1.75rem 0.3rem 0.5rem;
+        }
+
+        /* ================================================================
+           SCROLL VIEWPORT & MATRIX TABLE
+           ================================================================ */
+        /*
+         * Vertical AND horizontal scroll happen inside this wrapper, NOT on
+         * the page itself — that is what makes `position: sticky` actually
+         * stick. Without a bounded max-height the browser cannot scroll the
+         * table independently from the rest of the page, so sticky degrades
+         * into "static" and the user loses the gepinnte Mitglied-Spalte.
+         */
+        .pm-matrix-wrapper {
+            overflow: auto;
+            max-height: 75vh;
+            border: 1px solid var(--color-gray-3);
+            background-color: var(--color-bg-dark-gray);
+        }
+        .pm-matrix {
+            width: max-content;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 0;
+            background-color: var(--color-bg-dark-gray);
+        }
+        .pm-matrix th, .pm-matrix td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--color-gray-3);
+            border-right: 1px solid var(--color-gray-3);
+            vertical-align: middle;
+            background-color: var(--color-bg-dark-gray);
+            background-clip: padding-box;
+        }
+        .pm-matrix tbody tr:hover td { background-color: var(--color-gray-4); }
+        .pm-matrix tbody tr:hover .pm-checkbox-cell,
+        .pm-matrix tbody tr:hover .pm-member-cell,
+        .pm-matrix tbody tr:hover .pm-eligibility-cell { background-color: var(--color-gray-4); }
+        .pm-matrix tbody tr.pm-row-selected td { background-color: rgba(231, 126, 35, 0.06); }
+        .pm-matrix tbody tr.pm-row-selected .pm-checkbox-cell,
+        .pm-matrix tbody tr.pm-row-selected .pm-member-cell,
+        .pm-matrix tbody tr.pm-row-selected .pm-eligibility-cell {
+            background-color: rgba(231, 126, 35, 0.06);
+        }
+
+        /* Sticky header rows. Two-row header: topic group on top, categories beneath. */
+        .pm-matrix thead tr.pm-row-topic th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background-color: var(--color-gray-4);
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--color-primary);
+            text-align: center;
+        }
+        .pm-matrix thead tr.pm-row-category th {
+            position: sticky;
+            top: 2.55rem; /* height of the topic row */
+            z-index: 20;
+            background-color: var(--color-gray-4);
+            color: var(--color-primary);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 2px solid var(--color-primary);
+            white-space: normal;
+            line-height: 1.2;
+        }
+
+        /*
+         * Sticky column widths and offsets.
+         * Order from left to right: checkbox (2.5rem) | Mitglied (14rem) | Beförderbar (11rem)
+         * Sticky `left` offsets MUST be the cumulative sum so cells stack flush.
+         */
+        .pm-matrix .pm-checkbox-col {
+            width: 2.5rem;
+            min-width: 2.5rem;
+            max-width: 2.5rem;
+            text-align: center;
+        }
+        .pm-matrix .pm-member-col {
+            width: 14rem;
+            min-width: 14rem;
+            max-width: 14rem;
+        }
+        .pm-matrix .pm-eligibility-col {
+            width: 11rem;
+            min-width: 11rem;
+            max-width: 11rem;
+        }
+        .pm-matrix .pm-cat-col {
+            width: 10rem;
+            min-width: 10rem;
+            max-width: 10rem;
+        }
+        .pm-matrix .pm-checkbox-cell,
+        .pm-matrix thead .pm-checkbox-cell {
+            position: sticky;
+            left: 0;
+            z-index: 16;
+            border-right: 1px solid var(--color-gray-3);
+            text-align: center;
+        }
+        .pm-matrix .pm-member-cell,
+        .pm-matrix thead .pm-member-cell {
+            position: sticky;
+            left: 2.5rem; /* width of checkbox column */
+            z-index: 15;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+        .pm-matrix .pm-eligibility-cell,
+        .pm-matrix thead .pm-eligibility-cell {
+            position: sticky;
+            left: 16.5rem; /* 2.5 (checkbox) + 14 (member) */
+            z-index: 14;
+            border-right: 2px solid var(--color-primary);
+        }
+        .pm-matrix thead .pm-checkbox-cell { z-index: 41; background-color: var(--color-gray-4); }
+        .pm-matrix thead .pm-member-cell { z-index: 40; background-color: var(--color-gray-4); }
+        .pm-matrix thead .pm-eligibility-cell { z-index: 39; background-color: var(--color-gray-4); }
+        .pm-matrix thead tr.pm-row-topic .pm-member-cell,
+        .pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        /* ================================================================
+           SORT TOGGLE on the Mitglied header
+           ================================================================ */
+        .pm-sort-toggle {
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            text-transform: inherit;
+            letter-spacing: inherit;
+            cursor: pointer;
+            padding: 0.25rem 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pm-sort-toggle:hover { color: var(--color-accent-light); }
+        .pm-sort-toggle .pm-sort-indicator {
+            font-family: var(--font-body);
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--color-gray-2);
+            text-transform: none;
+            letter-spacing: 0;
+            border: 1px solid var(--color-gray-3);
+            padding: 0.1rem 0.4rem;
+            white-space: nowrap;
+        }
+        .pm-sort-toggle[data-pm-sort-mode="0"] .pm-sort-indicator { color: var(--color-gray-2); }
+        .pm-sort-toggle:not([data-pm-sort-mode="0"]) .pm-sort-indicator {
+            color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+
+        /* ================================================================
+           TOPIC TOGGLE (collapse / expand)
+           ================================================================ */
+        .pm-topic-toggle {
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            text-transform: inherit;
+            letter-spacing: inherit;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            justify-content: center;
+        }
+        .pm-topic-toggle:hover { color: var(--color-accent-light); }
+        .pm-topic-toggle .pm-topic-icon {
+            display: inline-block;
+            width: 1rem;
+            font-family: var(--font-body);
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+        .pm-topic-toggle[aria-expanded="false"] .pm-topic-icon::before { content: '+'; }
+        .pm-topic-toggle[aria-expanded="true"] .pm-topic-icon::before { content: '\2212'; }
+
+        /* Collapsed topic state */
+        .pm-matrix [data-pm-topic-collapsed="true"] { display: none; }
+        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] {
+            width: 3rem;
+            min-width: 3rem;
+            max-width: 3rem;
+        }
+        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-label { display: none; }
+        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-toggle { padding: 0.25rem 0; }
+
+        /* ================================================================
+           LEVEL SELECT
+           ================================================================ */
         .level-select {
             background: var(--color-gray-4);
             color: var(--color-gray-1);
             border: 1px solid var(--color-gray-3);
-            padding: 0.375rem 0.5rem;
+            padding: 0.375rem 1.75rem 0.375rem 0.5rem;
             font-size: 0.85rem;
-            min-height: 44px;
+            min-height: 38px;
             width: 100%;
             cursor: pointer;
             font-family: var(--font-body);
         }
         .level-select:focus { border-color: var(--color-primary); outline: none; }
-        .level-select.saving { opacity: 0.5; }
-        .member-col { min-width: 140px; font-weight: 700; }
-        .eligibility-col { min-width: 160px; font-size: 0.8rem; }
+        .level-select.pm-pending { opacity: 0.55; cursor: progress; }
+        .level-select[data-level="LEVEL_A"] { border-color: var(--color-success); }
+        .level-select[data-level="LEVEL_B"] { border-color: var(--color-warning); }
+        .level-select[data-level="LEVEL_C"] { border-color: var(--color-danger); }
+
+        /*
+         * Diff flash on the cell after a save returns 200. Uses inset
+         * box-shadow so the highlight stays *inside* the cell border and
+         * does not mess with the sticky layout. 800ms is long enough to
+         * register peripheral, short enough to not clutter when multiple
+         * cells finish in quick succession.
+         */
+        @keyframes pm-flash-saved {
+            0%   { box-shadow: inset 0 0 0 2px var(--color-success); }
+            100% { box-shadow: inset 0 0 0 2px transparent; }
+        }
+        .pm-cell-saved { animation: pm-flash-saved 800ms ease-out; }
+
+        /* ================================================================
+           MEMBER CELL META
+           ================================================================ */
+        .pm-member-name { display: block; }
+        .pm-member-rank,
+        .pm-member-last-eval {
+            display: block;
+            color: var(--color-gray-2);
+            font-weight: 400;
+            font-size: 0.72rem;
+            margin-top: 0.1rem;
+        }
+        .pm-member-last-eval { font-style: italic; }
+        .pm-member-last-eval[data-pm-empty="true"] { display: none; }
+
+        /* ================================================================
+           ELIGIBILITY CHIP
+           ================================================================ */
         .eligibility-chip {
             display: inline-block;
             padding: 0.1rem 0.4rem;
@@ -31,8 +368,53 @@
         }
         .eligibility-chip.is-eligible { color: #4caf50; border-color: #4caf50; }
         .eligibility-chip.not-eligible { color: #d35400; border-color: #d35400; opacity: 0.6; }
-        @media (max-width: 768px) {
-            th, td { min-width: 110px; }
+        .pm-eligibility-none {
+            color: var(--color-gray-3);
+            font-size: 0.75rem;
+        }
+
+        /* ================================================================
+           EMPTY / HIDDEN ROWS
+           ================================================================ */
+        .pm-empty {
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--color-gray-2);
+            font-style: italic;
+        }
+        .pm-row-hidden { display: none; }
+
+        /* ================================================================
+           RESPONSIVE: tablet/smartphone
+           ================================================================ */
+        @media (max-width: 1024px) {
+            .pm-matrix .pm-member-col {
+                width: 11rem;
+                min-width: 11rem;
+                max-width: 11rem;
+            }
+            .pm-matrix .pm-eligibility-col {
+                width: 10rem;
+                min-width: 10rem;
+                max-width: 10rem;
+            }
+            .pm-matrix .pm-cat-col {
+                width: 9rem;
+                min-width: 9rem;
+                max-width: 9rem;
+            }
+            /* Member column shifts left to accommodate the checkbox-col change. */
+            .pm-matrix .pm-member-cell,
+            .pm-matrix thead .pm-member-cell {
+                left: 2.5rem;
+            }
+            /* Below 1024px the eligibility column drops out of the sticky stack
+               so the smaller viewport keeps a sensible amount of "real" data
+               visible without overflowing the sticky area. */
+            .pm-matrix .pm-eligibility-cell,
+            .pm-matrix thead .pm-eligibility-cell {
+                position: static;
+            }
         }
     </style>
     </th:block>
@@ -65,50 +447,198 @@
             <p th:text="#{promotion.manage.no.members}">Keine Mitglieder gefunden.</p>
         </div>
 
-        <div th:unless="${#lists.isEmpty(members)}" class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th th:text="#{promotion.manage.member}">Mitglied</th>
-                        <th th:text="#{promotion.manage.eligibility}">Beförderbar</th>
-                        <th th:each="cat : ${categories}" th:text="${cat.name}">Kategorie</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="member : ${members}">
-                        <td class="member-col" th:text="${member.username}">Mitglied</td>
-                        <td class="eligibility-col">
-                            <th:block th:with="eligList=${eligibilityByUser[member.id.toString()]}">
-                                <span th:if="${eligList == null or #lists.isEmpty(eligList)}" style="color:var(--color-gray-3);font-size:0.75rem;" th:text="#{promotion.manage.eligibility.none}">-</span>
+        <th:block th:unless="${#lists.isEmpty(members)}">
+            <!-- Toolbar -->
+            <div class="pm-toolbar">
+                <input type="search"
+                       id="pm-member-search"
+                       class="pm-search"
+                       th:attr="placeholder=#{promotion.manage.filter.placeholder},aria-label=#{promotion.manage.filter.placeholder}"
+                       autocomplete="off" />
+
+                <label class="pm-filter-chip">
+                    <input type="checkbox" id="pm-filter-eligible" data-trigger="pm-filter-change" />
+                    <span th:text="#{promotion.manage.filter.eligible.only}">Nur Beförderbare</span>
+                </label>
+                <label class="pm-filter-chip">
+                    <input type="checkbox" id="pm-filter-no-eval" data-trigger="pm-filter-change" />
+                    <span th:text="#{promotion.manage.filter.no.evaluations}">Nur ohne Bewertung</span>
+                </label>
+
+                <div class="pm-spacer"></div>
+
+                <span id="pm-queue-indicator" class="pm-queue-indicator" hidden
+                      th:attr="aria-label=#{promotion.manage.queue.aria}">
+                    <span class="krt-spinner" aria-hidden="true"></span>
+                    <span>
+                        <span id="pm-queue-count">0</span>
+                        <span th:text="#{promotion.manage.queue.suffix}">Speichervorgänge offen</span>
+                    </span>
+                </span>
+
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="pm-expand-all"
+                        th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="pm-collapse-all"
+                        th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="pm-export-csv"
+                        th:text="#{promotion.manage.export.csv}">CSV-Export</button>
+            </div>
+
+            <!-- Bulk-edit panel: visible while ≥1 row checkbox is checked -->
+            <div class="pm-bulk-panel" id="pm-bulk-panel" hidden role="region"
+                 th:attr="aria-label=#{promotion.manage.bulk.title}">
+                <span class="pm-bulk-count">
+                    <span id="pm-bulk-count-value">0</span>
+                    <span th:text="#{promotion.manage.bulk.selected}">Mitglieder ausgewählt</span>
+                </span>
+
+                <select id="pm-bulk-category" th:attr="aria-label=#{promotion.manage.bulk.category}">
+                    <option value="" th:text="#{promotion.manage.bulk.category.placeholder}">Kategorie wählen…</option>
+                    <optgroup th:each="topic : ${topics}"
+                              th:label="${topic.name}"
+                              th:with="topicId=${topic.id.toString()}">
+                        <option th:each="cat : ${categoriesByTopic[topicId]}"
+                                th:value="${cat.id}"
+                                th:text="${cat.name}">Kategorie</option>
+                    </optgroup>
+                </select>
+
+                <select id="pm-bulk-level" th:attr="aria-label=#{promotion.manage.bulk.level}">
+                    <option value="" th:text="#{promotion.manage.bulk.level.placeholder}">Stufe wählen…</option>
+                    <option value="__NONE__" th:text="#{promotion.manage.level.none}">Keine</option>
+                    <option value="LEVEL_A" th:text="#{promotion.manage.level.a}">Stufe A</option>
+                    <option value="LEVEL_B" th:text="#{promotion.manage.level.b}">Stufe B</option>
+                    <option value="LEVEL_C" th:text="#{promotion.manage.level.c}">Stufe C</option>
+                </select>
+
+                <button type="button"
+                        class="btn btn-tiny"
+                        data-trigger="pm-bulk-apply"
+                        th:text="#{promotion.manage.bulk.apply}">Anwenden</button>
+                <button type="button"
+                        class="btn btn-secondary btn-tiny"
+                        data-trigger="pm-bulk-clear"
+                        th:text="#{promotion.manage.bulk.clear}">Auswahl aufheben</button>
+            </div>
+
+            <div class="pm-matrix-wrapper">
+                <table class="pm-matrix">
+                    <thead>
+                        <tr class="pm-row-topic">
+                            <th class="pm-checkbox-cell pm-checkbox-col" rowspan="2">
+                                <input type="checkbox" id="pm-select-all"
+                                       data-trigger="pm-select-all"
+                                       th:attr="aria-label=#{promotion.manage.select.all}" />
+                            </th>
+                            <th class="pm-member-cell pm-member-col" rowspan="2">
+                                <button type="button"
+                                        class="pm-sort-toggle"
+                                        data-trigger="pm-cycle-sort"
+                                        data-pm-sort-mode="0"
+                                        th:attr="title=#{promotion.manage.sort.tooltip}">
+                                    <span th:text="#{promotion.manage.member}">Mitglied</span>
+                                    <span class="pm-sort-indicator"
+                                          th:text="#{promotion.manage.sort.indicator.none}">↕ Original</span>
+                                </button>
+                            </th>
+                            <th class="pm-eligibility-cell pm-eligibility-col" rowspan="2"
+                                th:text="#{promotion.manage.eligibility}">Beförderbar</th>
+                            <th th:each="topic : ${topics}"
+                                class="pm-topic-cell"
+                                th:attr="data-pm-topic-id=${topic.id},data-pm-collapsed='false',colspan=${categoryCountByTopic[topic.id.toString()]}">
+                                <button type="button"
+                                        class="pm-topic-toggle"
+                                        data-trigger="pm-toggle-topic"
+                                        th:attr="data-pm-topic-id=${topic.id},aria-expanded='true',title=${topic.name}">
+                                    <span class="pm-topic-icon" aria-hidden="true"></span>
+                                    <span class="pm-topic-label" th:text="${topic.name}">Themenbereich</span>
+                                </button>
+                            </th>
+                        </tr>
+                        <tr class="pm-row-category">
+                            <th:block th:each="topic : ${topics}"
+                                      th:with="topicId=${topic.id.toString()}">
+                                <th th:each="cat : ${categoriesByTopic[topicId]}"
+                                    class="pm-cat-col"
+                                    th:attr="data-pm-topic-id=${topic.id},data-pm-category-id=${cat.id},data-pm-topic-name=${topic.name},data-pm-category-name=${cat.name}"
+                                    th:text="${cat.name}"
+                                    th:title="${cat.description}">Kategorie</th>
+                            </th:block>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="member,memberIter : ${members}"
+                            th:with="lastEval=${lastEvaluatedByUser[member.id.toString()]},
+                                     hasEval=${hasEvaluationsByUser[member.id.toString()] != null and hasEvaluationsByUser[member.id.toString()]},
+                                     eligList=${eligibilityByUser[member.id.toString()]}"
+                            th:attr="data-pm-member-name=${#strings.toLowerCase(member.username)},
+                                     data-pm-username=${member.username},
+                                     data-pm-user-id=${member.id},
+                                     data-pm-rank=${member.rank != null ? member.rank : ''},
+                                     data-pm-original-order=${memberIter.index},
+                                     data-pm-has-evaluations=${hasEval},
+                                     data-pm-eligible=${eligList != null and #lists.size(eligList.?[hasConfiguredRules and eligible]) > 0 ? 'true' : 'false'},
+                                     data-pm-last-evaluated=${lastEval != null ? lastEval.toString() : ''}">
+                            <td class="pm-checkbox-cell pm-checkbox-col">
+                                <input type="checkbox"
+                                       class="pm-row-checkbox"
+                                       data-trigger="pm-row-check"
+                                       th:attr="data-pm-user-id=${member.id},aria-label=${member.username}" />
+                            </td>
+                            <td class="pm-member-cell pm-member-col">
+                                <span class="pm-member-name" th:text="${member.username}">Mitglied</span>
+                                <span th:if="${member.rank != null}"
+                                      class="pm-member-rank"
+                                      th:text="|#{promotion.manage.member.rank}: ${member.rank}|">Rang: 20</span>
+                                <span class="pm-member-last-eval"
+                                      th:attr="data-pm-empty=${lastEval == null ? 'true' : 'false'},
+                                               data-pm-last-evaluated=${lastEval != null ? lastEval.toString() : ''}"
+                                      th:text="#{promotion.manage.last.evaluated.placeholder}">Zuletzt bewertet …</span>
+                            </td>
+                            <td class="pm-eligibility-cell pm-eligibility-col">
+                                <span th:if="${eligList == null or #lists.isEmpty(eligList)}"
+                                      class="pm-eligibility-none"
+                                      th:text="#{promotion.manage.eligibility.none}">-</span>
                                 <span th:each="elig : ${eligList}"
                                       th:if="${elig.hasConfiguredRules}"
                                       th:classappend="${elig.eligible} ? ' is-eligible' : ' not-eligible'"
                                       class="eligibility-chip"
-                                      th:title="${elig.eligible} ? #{promotion.manage.eligibility.eligible} + ' (' + ${elig.fromRank} + ' → ' + ${elig.toRank} + ')' : #{promotion.manage.eligibility.not.eligible} + ' (' + ${elig.fromRank} + ' → ' + ${elig.toRank} + ')'">
+                                      th:attr="data-pm-from-rank=${elig.fromRank},data-pm-to-rank=${elig.toRank},data-pm-eligible=${elig.eligible}"
+                                      th:title="${elig.eligible} ? #{promotion.manage.eligibility.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')' : #{promotion.manage.eligibility.not.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')'">
                                     <span th:text="${elig.fromRank}">20</span>&rarr;<span th:text="${elig.toRank}">19</span>
                                 </span>
-                            </th:block>
-                        </td>
-                        <td th:each="cat : ${categories}">
-                            <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
-                                <select class="level-select"
-                                        th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''}"
-                                        onchange="saveEvaluation(this)">
-                                    <option value="" th:text="#{promotion.manage.level.none}"
-                                            th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
-                                    <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"
-                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_A'}">Stufe A</option>
-                                    <option value="LEVEL_B" th:text="#{promotion.manage.level.b}"
-                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_B'}">Stufe B</option>
-                                    <option value="LEVEL_C" th:text="#{promotion.manage.level.c}"
-                                            th:selected="${eval != null and eval.assignedLevel == 'LEVEL_C'}">Stufe C</option>
-                                </select>
-                            </th:block>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                            </td>
+                            <td th:each="cat : ${categories}"
+                                class="pm-cat-col"
+                                th:attr="data-pm-topic-id=${cat.topicId},data-pm-category-id=${cat.id}">
+                                <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
+                                    <select class="level-select"
+                                            data-trigger="pm-save-evaluation"
+                                            th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''},data-level=${eval != null ? eval.assignedLevel : ''},aria-label=${member.username + ' - ' + cat.name}">
+                                        <option value="" th:text="#{promotion.manage.level.none}"
+                                                th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
+                                        <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_A'}">Stufe A</option>
+                                        <option value="LEVEL_B" th:text="#{promotion.manage.level.b}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_B'}">Stufe B</option>
+                                        <option value="LEVEL_C" th:text="#{promotion.manage.level.c}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_C'}">Stufe C</option>
+                                    </select>
+                                </th:block>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="pm-empty-state" class="pm-empty" hidden
+                     th:text="#{promotion.manage.filter.empty}">Keine Treffer.</div>
+            </div>
+        </th:block>
     </div>
 </main>
 
@@ -116,68 +646,591 @@
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
-    var MSG_SAVED = /*[[#{promotion.manage.saved}]]*/ 'Saved';
-    var MSG_ERROR = /*[[#{promotion.manage.error}]]*/ 'Error';
-    var MSG_CONFLICT = /*[[#{promotion.manage.conflict}]]*/ 'Conflict';
+    // ----------------------------------------------------------------------
+    // Translated strings: kept in one block at the top so a future locale-only
+    // change does not touch the imperative code below.
+    // ----------------------------------------------------------------------
+    var MSG_SAVED       = /*[[#{promotion.manage.saved}]]*/ 'Saved';
+    var MSG_ERROR       = /*[[#{promotion.manage.error}]]*/ 'Error';
+    var MSG_CONFLICT    = /*[[#{promotion.manage.conflict}]]*/ 'Conflict';
+    var MSG_LAST_EVAL   = /*[[#{promotion.manage.last.evaluated}]]*/ 'Last evaluated';
+    var MSG_BULK_CONFIRM_TITLE = /*[[#{promotion.manage.bulk.confirm.title}]]*/ 'Apply bulk?';
+    var MSG_BULK_CONFIRM_MSG   = /*[[#{promotion.manage.bulk.confirm.message}]]*/ 'Apply level {level} to {count} members in {category}?';
+    var MSG_BULK_NEED_CAT      = /*[[#{promotion.manage.bulk.need.category}]]*/ 'Please pick a category.';
+    var MSG_BULK_NEED_LEVEL    = /*[[#{promotion.manage.bulk.need.level}]]*/ 'Please pick a level.';
+    var MSG_BULK_RESULT        = /*[[#{promotion.manage.bulk.result}]]*/ 'Bulk: {ok} OK, {fail} failed';
+    var MSG_CSV_NAME           = /*[[#{promotion.manage.export.csv.filename}]]*/ 'evaluations';
+    var MSG_CSV_HEADER_MEMBER  = /*[[#{promotion.manage.member}]]*/ 'Member';
+    var MSG_CSV_HEADER_RANK    = /*[[#{promotion.manage.member.rank}]]*/ 'Rank';
+    var MSG_CSV_HEADER_ELIG    = /*[[#{promotion.manage.eligibility}]]*/ 'Eligible';
+    var MSG_CSV_HEADER_LAST    = /*[[#{promotion.manage.last.evaluated}]]*/ 'Last evaluated';
 
-    function getCsrfToken() { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    var SORT_LABELS = [
+        /*[[#{promotion.manage.sort.indicator.none}]]*/ 'Original',
+        /*[[#{promotion.manage.sort.indicator.name.asc}]]*/ 'Name A-Z',
+        /*[[#{promotion.manage.sort.indicator.name.desc}]]*/ 'Name Z-A',
+        /*[[#{promotion.manage.sort.indicator.rank.asc}]]*/ 'Rank low',
+        /*[[#{promotion.manage.sort.indicator.rank.desc}]]*/ 'Rank high'
+    ];
+
+    var STORAGE_KEY_COLLAPSED = 'promotion-manage-collapsed-topics';
+    var STORAGE_KEY_SORT      = 'promotion-manage-sort-mode';
+    var STORAGE_KEY_FILTERS   = 'promotion-manage-filters';
+
+    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
     function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
 
-    var _savingInProgress = false;
+    // ----------------------------------------------------------------------
+    // Save queue
+    // ----------------------------------------------------------------------
+    // Each item in the queue is `{ key, select }`. `key` is `userId_categoryId`,
+    // which is also the optimistic-lock identity in the backend. We dedupe by
+    // key so rapid changes to the same cell collapse into a single PUT (the
+    // last one wins) — important for two reasons:
+    //   - prevents needless network roundtrips when the user clicks through a
+    //     dropdown to settle on a value;
+    //   - prevents a queued earlier value from overwriting a later one with a
+    //     stale @Version, which would silently 409 and drop user input.
+    // Saves run sequentially: a row's `data-version` must be refreshed from
+    // the response before the next save for that row fires. Conflicts (409)
+    // pause the queue and reload the page so the user sees authoritative state.
+    var pmSaveQueue = [];
+    var pmInFlightKey = null;
 
-    function setAllSelectsDisabled(disabled) {
-        document.querySelectorAll('.level-select').forEach(function(s) {
-            s.disabled = disabled;
-        });
+    function pmUpdateQueueIndicator() {
+        var indicator = document.getElementById('pm-queue-indicator');
+        var counter   = document.getElementById('pm-queue-count');
+        if (!indicator || !counter) return;
+        var total = pmSaveQueue.length + (pmInFlightKey ? 1 : 0);
+        counter.textContent = String(total);
+        indicator.hidden = total === 0;
     }
 
-    function saveEvaluation(select) {
-        if (_savingInProgress) return;
-        var userId = select.getAttribute('data-user-id');
-        var categoryId = select.getAttribute('data-category-id');
-        var versionStr = select.getAttribute('data-version');
-        var version = versionStr ? parseInt(versionStr) : null;
-        var assignedLevel = select.value || null;
+    function pmEnqueueSave(select) {
+        var userId    = select.getAttribute('data-user-id');
+        var catId     = select.getAttribute('data-category-id');
+        var key       = userId + '_' + catId;
+        // Replace any queued entry for the same cell — only the latest value
+        // is interesting. The currently in-flight save is *not* cancelled;
+        // its response will simply be followed by the next one for this cell.
+        pmSaveQueue = pmSaveQueue.filter(function (job) { return job.key !== key; });
+        pmSaveQueue.push({ key: key, select: select });
+        select.classList.add('pm-pending');
+        pmUpdateQueueIndicator();
+        if (!pmInFlightKey) pmProcessNextSave();
+    }
 
-        _savingInProgress = true;
-        setAllSelectsDisabled(true);
-        select.classList.add('saving');
+    function pmProcessNextSave() {
+        if (pmSaveQueue.length === 0) {
+            pmInFlightKey = null;
+            pmUpdateQueueIndicator();
+            return;
+        }
+        var job = pmSaveQueue.shift();
+        pmInFlightKey = job.key;
+        pmUpdateQueueIndicator();
+
+        var select       = job.select;
+        var userId       = select.getAttribute('data-user-id');
+        var categoryId   = select.getAttribute('data-category-id');
+        var versionStr   = select.getAttribute('data-version');
+        var version      = versionStr ? parseInt(versionStr, 10) : null;
+        var assignedLevel = select.value || null;
+        var cell         = select.closest('td');
 
         var headers = { 'Content-Type': 'application/json' };
         headers[getCsrfHeader()] = getCsrfToken();
 
-        fetch('/api/proxy/promotion/evaluations/user/' + encodeURIComponent(userId) + '/category/' + encodeURIComponent(categoryId), {
+        return fetch('/api/proxy/promotion/evaluations/user/' + encodeURIComponent(userId) +
+                     '/category/' + encodeURIComponent(categoryId), {
             method: 'PUT',
             headers: headers,
             body: JSON.stringify({ version: version, assignedLevel: assignedLevel })
         })
-        .then(function(response) {
+        .then(function (response) {
             if (response.status === 409) {
-                if (typeof showToast === 'function') showToast(MSG_CONFLICT, 'warning');
-                setTimeout(function() { window.location.reload(); }, 1500);
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(MSG_CONFLICT);
+                }
+                // Drop pending jobs — the page reload will rebuild the queue
+                // from the server's authoritative state.
+                pmSaveQueue = [];
+                setTimeout(function () { window.location.reload(); }, 1500);
                 return null;
             }
             if (!response.ok) {
-                if (typeof showToast === 'function') showToast(MSG_ERROR, 'error');
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(MSG_ERROR);
+                }
                 return null;
             }
             return response.json();
         })
-        .then(function(data) {
+        .then(function (data) {
             if (data) {
                 select.setAttribute('data-version', data.version);
-                if (typeof showToast === 'function') showToast(MSG_SAVED, 'success');
+                select.setAttribute('data-level', assignedLevel || '');
+                if (cell) {
+                    // Restart the animation by removing+re-adding the class on
+                    // the next animation frame. Without the rAF the browser
+                    // batches both mutations and the animation never replays.
+                    cell.classList.remove('pm-cell-saved');
+                    void cell.offsetWidth; /* trigger reflow */
+                    cell.classList.add('pm-cell-saved');
+                    setTimeout(function () { cell.classList.remove('pm-cell-saved'); }, 850);
+                }
+                if (typeof window.showFrontendSuccessToast === 'function') {
+                    window.showFrontendSuccessToast(MSG_SAVED);
+                }
             }
         })
-        .catch(function() {
-            if (typeof showToast === 'function') showToast(MSG_ERROR, 'error');
+        .catch(function () {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(MSG_ERROR);
+            }
         })
-        .finally(function() {
-            select.classList.remove('saving');
-            _savingInProgress = false;
-            setAllSelectsDisabled(false);
+        .finally(function () {
+            select.classList.remove('pm-pending');
+            pmInFlightKey = null;
+            pmProcessNextSave();
         });
     }
+
+    // ----------------------------------------------------------------------
+    // Topic collapse / expand
+    // ----------------------------------------------------------------------
+    function pmLoadCollapsedTopics() {
+        try {
+            var raw = sessionStorage.getItem(STORAGE_KEY_COLLAPSED);
+            if (!raw) return [];
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) { return []; }
+    }
+    function pmSaveCollapsedTopics(ids) {
+        try { sessionStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids)); } catch (e) { /* ignore */ }
+    }
+
+    function pmSetTopicCollapsed(topicId, collapsed) {
+        var topicHeader = document.querySelector('th.pm-topic-cell[data-pm-topic-id="' + topicId + '"]');
+        if (!topicHeader) return;
+        topicHeader.setAttribute('data-pm-collapsed', collapsed ? 'true' : 'false');
+        var toggle = topicHeader.querySelector('.pm-topic-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+        var cells = document.querySelectorAll(
+            '.pm-matrix [data-pm-topic-id="' + topicId + '"]:not(.pm-topic-cell)');
+        cells.forEach(function (cell) {
+            cell.setAttribute('data-pm-topic-collapsed', collapsed ? 'true' : 'false');
+        });
+
+        var originalColspan = topicHeader.getAttribute('data-pm-colspan');
+        if (!originalColspan) {
+            originalColspan = topicHeader.getAttribute('colspan') || '1';
+            topicHeader.setAttribute('data-pm-colspan', originalColspan);
+        }
+        topicHeader.setAttribute('colspan', collapsed ? '1' : originalColspan);
+    }
+
+    function pmApplyCollapsedState(collapsedIds) {
+        var topicHeaders = document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]');
+        topicHeaders.forEach(function (th) {
+            var id = th.getAttribute('data-pm-topic-id');
+            pmSetTopicCollapsed(id, collapsedIds.indexOf(id) !== -1);
+        });
+    }
+
+    function pmToggleTopic(button) {
+        var topicId = button.getAttribute('data-pm-topic-id');
+        if (!topicId) return;
+        var collapsedIds = pmLoadCollapsedTopics();
+        var idx = collapsedIds.indexOf(topicId);
+        if (idx === -1) {
+            collapsedIds.push(topicId);
+            pmSetTopicCollapsed(topicId, true);
+        } else {
+            collapsedIds.splice(idx, 1);
+            pmSetTopicCollapsed(topicId, false);
+        }
+        pmSaveCollapsedTopics(collapsedIds);
+    }
+
+    function pmExpandAllTopics() {
+        pmSaveCollapsedTopics([]);
+        document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach(function (th) {
+            pmSetTopicCollapsed(th.getAttribute('data-pm-topic-id'), false);
+        });
+    }
+    function pmCollapseAllTopics() {
+        var ids = [];
+        document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach(function (th) {
+            var id = th.getAttribute('data-pm-topic-id');
+            ids.push(id);
+            pmSetTopicCollapsed(id, true);
+        });
+        pmSaveCollapsedTopics(ids);
+    }
+
+    // ----------------------------------------------------------------------
+    // Filter (search + checkboxes)
+    // ----------------------------------------------------------------------
+    function pmGetFilterState() {
+        var search   = document.getElementById('pm-member-search');
+        var elig     = document.getElementById('pm-filter-eligible');
+        var noEval   = document.getElementById('pm-filter-no-eval');
+        return {
+            search: (search && search.value || '').trim().toLowerCase(),
+            eligibleOnly: !!(elig && elig.checked),
+            noEvalOnly: !!(noEval && noEval.checked)
+        };
+    }
+    function pmSaveFilters() {
+        try {
+            var f = pmGetFilterState();
+            sessionStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify({
+                eligibleOnly: f.eligibleOnly,
+                noEvalOnly: f.noEvalOnly
+            }));
+        } catch (e) { /* ignore */ }
+    }
+    function pmRestoreFilters() {
+        try {
+            var raw = sessionStorage.getItem(STORAGE_KEY_FILTERS);
+            if (!raw) return;
+            var f = JSON.parse(raw);
+            var elig = document.getElementById('pm-filter-eligible');
+            var noEval = document.getElementById('pm-filter-no-eval');
+            if (elig && typeof f.eligibleOnly === 'boolean') elig.checked = f.eligibleOnly;
+            if (noEval && typeof f.noEvalOnly === 'boolean') noEval.checked = f.noEvalOnly;
+        } catch (e) { /* ignore */ }
+    }
+
+    function pmApplyFilters() {
+        var state = pmGetFilterState();
+        var rows = document.querySelectorAll('.pm-matrix tbody tr[data-pm-username]');
+        var visible = 0;
+        rows.forEach(function (row) {
+            var name      = row.getAttribute('data-pm-member-name') || '';
+            var eligible  = row.getAttribute('data-pm-eligible') === 'true';
+            var hasEvals  = row.getAttribute('data-pm-has-evaluations') === 'true';
+            var match = (state.search === '' || name.indexOf(state.search) !== -1)
+                && (!state.eligibleOnly || eligible)
+                && (!state.noEvalOnly || !hasEvals);
+            row.classList.toggle('pm-row-hidden', !match);
+            if (match) visible++;
+        });
+        var empty = document.getElementById('pm-empty-state');
+        if (empty) empty.hidden = visible !== 0;
+    }
+
+    // ----------------------------------------------------------------------
+    // Sort cycle on the Mitglied header
+    // ----------------------------------------------------------------------
+    // Five-state cycle: 0=original | 1=name asc | 2=name desc | 3=rank asc | 4=rank desc
+    // Sort runs on a snapshot of the current tbody children — that keeps the
+    // semantics of "filtered rows stay filtered" intact, because we never
+    // toggle .pm-row-hidden during sort.
+    function pmGetSortMode() {
+        var btn = document.querySelector('.pm-sort-toggle');
+        return btn ? parseInt(btn.getAttribute('data-pm-sort-mode') || '0', 10) : 0;
+    }
+    function pmSetSortMode(mode) {
+        var btn = document.querySelector('.pm-sort-toggle');
+        if (btn) btn.setAttribute('data-pm-sort-mode', String(mode));
+        var indicator = btn ? btn.querySelector('.pm-sort-indicator') : null;
+        if (indicator) indicator.textContent = SORT_LABELS[mode] || SORT_LABELS[0];
+        try { sessionStorage.setItem(STORAGE_KEY_SORT, String(mode)); } catch (e) { /* ignore */ }
+    }
+    function pmRestoreSortMode() {
+        try {
+            var raw = sessionStorage.getItem(STORAGE_KEY_SORT);
+            if (!raw) return 0;
+            var m = parseInt(raw, 10);
+            return (m >= 0 && m <= 4) ? m : 0;
+        } catch (e) { return 0; }
+    }
+    function pmApplySort(mode) {
+        var tbody = document.querySelector('.pm-matrix tbody');
+        if (!tbody) return;
+        var rows = Array.from(tbody.querySelectorAll('tr[data-pm-username]'));
+        rows.sort(function (a, b) {
+            var origA = parseInt(a.getAttribute('data-pm-original-order') || '0', 10);
+            var origB = parseInt(b.getAttribute('data-pm-original-order') || '0', 10);
+            if (mode === 0) return origA - origB;
+            if (mode === 1 || mode === 2) {
+                var na = (a.getAttribute('data-pm-username') || '').toLowerCase();
+                var nb = (b.getAttribute('data-pm-username') || '').toLowerCase();
+                var cmp = na.localeCompare(nb);
+                if (cmp === 0) cmp = origA - origB;
+                return mode === 1 ? cmp : -cmp;
+            }
+            // rank sort: missing ranks go to the bottom regardless of direction
+            var ra = a.getAttribute('data-pm-rank');
+            var rb = b.getAttribute('data-pm-rank');
+            var rai = ra ? parseInt(ra, 10) : NaN;
+            var rbi = rb ? parseInt(rb, 10) : NaN;
+            var amissing = isNaN(rai);
+            var bmissing = isNaN(rbi);
+            if (amissing && bmissing) return origA - origB;
+            if (amissing) return 1;
+            if (bmissing) return -1;
+            var rcmp = rai - rbi;
+            if (rcmp === 0) rcmp = origA - origB;
+            return mode === 3 ? rcmp : -rcmp;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+    }
+    function pmCycleSort() {
+        var next = (pmGetSortMode() + 1) % SORT_LABELS.length;
+        pmSetSortMode(next);
+        pmApplySort(next);
+    }
+
+    // ----------------------------------------------------------------------
+    // Selection & bulk edit
+    // ----------------------------------------------------------------------
+    function pmGetSelectedRows() {
+        return document.querySelectorAll(
+            '.pm-matrix tbody tr.pm-row-selected:not(.pm-row-hidden)');
+    }
+    function pmRefreshBulkPanel() {
+        var selected = pmGetSelectedRows();
+        var count = selected.length;
+        var panel = document.getElementById('pm-bulk-panel');
+        var countEl = document.getElementById('pm-bulk-count-value');
+        if (countEl) countEl.textContent = String(count);
+        if (panel) {
+            panel.hidden = count === 0;
+            panel.classList.toggle('visible', count > 0);
+        }
+        // Sync select-all checkbox to current state of visible rows.
+        var selectAll = document.getElementById('pm-select-all');
+        if (selectAll) {
+            var visible = document.querySelectorAll(
+                '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)');
+            var allChecked = visible.length > 0 && Array.from(visible)
+                .every(function (r) { return r.classList.contains('pm-row-selected'); });
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = !allChecked && count > 0;
+        }
+    }
+    function pmOnRowCheck(checkbox) {
+        var row = checkbox.closest('tr');
+        if (!row) return;
+        row.classList.toggle('pm-row-selected', checkbox.checked);
+        pmRefreshBulkPanel();
+    }
+    function pmOnSelectAll(checkbox) {
+        var visible = document.querySelectorAll(
+            '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)');
+        visible.forEach(function (row) {
+            row.classList.toggle('pm-row-selected', checkbox.checked);
+            var cb = row.querySelector('.pm-row-checkbox');
+            if (cb) cb.checked = checkbox.checked;
+        });
+        pmRefreshBulkPanel();
+    }
+    function pmClearSelection() {
+        document.querySelectorAll('.pm-matrix tbody tr.pm-row-selected').forEach(function (r) {
+            r.classList.remove('pm-row-selected');
+            var cb = r.querySelector('.pm-row-checkbox');
+            if (cb) cb.checked = false;
+        });
+        var selectAll = document.getElementById('pm-select-all');
+        if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+        pmRefreshBulkPanel();
+    }
+
+    function pmBulkApply() {
+        var catSel = document.getElementById('pm-bulk-category');
+        var lvlSel = document.getElementById('pm-bulk-level');
+        var categoryId = catSel ? catSel.value : '';
+        var level      = lvlSel ? lvlSel.value : '';
+        if (!categoryId) {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(MSG_BULK_NEED_CAT);
+            }
+            return;
+        }
+        if (!level) {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(MSG_BULK_NEED_LEVEL);
+            }
+            return;
+        }
+        var rows = pmGetSelectedRows();
+        if (rows.length === 0) return;
+
+        // Render a confirmation modal that uses the level's *displayed* text
+        // (not LEVEL_A / __NONE__) so the officer reviews the change in the
+        // same language the dropdown uses.
+        var levelLabel = lvlSel.options[lvlSel.selectedIndex].textContent.trim();
+        var catLabel   = catSel.options[catSel.selectedIndex].textContent.trim();
+        var msg = MSG_BULK_CONFIRM_MSG
+            .replace('{level}', levelLabel)
+            .replace('{count}', String(rows.length))
+            .replace('{category}', catLabel);
+
+        var confirmFn = window.showKrtConfirm || function () { return Promise.resolve(true); };
+        confirmFn(MSG_BULK_CONFIRM_TITLE, msg).then(function (ok) {
+            if (!ok) return;
+            // Enqueue one save per selected row. The queue serialises saves,
+            // so all of these will eventually be PUT in order without
+            // overwhelming the backend or stepping on each other's @Version.
+            var apiLevel = (level === '__NONE__') ? '' : level;
+            rows.forEach(function (row) {
+                var userId = row.getAttribute('data-pm-user-id');
+                var select = document.querySelector(
+                    '.level-select[data-user-id="' + userId + '"][data-category-id="' + categoryId + '"]');
+                if (!select) return;
+                select.value = apiLevel;
+                pmEnqueueSave(select);
+            });
+            pmClearSelection();
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Last-evaluated formatting (server sends ISO Instant; we format locally)
+    // ----------------------------------------------------------------------
+    function pmFormatLastEvaluated() {
+        var nodes = document.querySelectorAll('.pm-member-last-eval[data-pm-last-evaluated]');
+        nodes.forEach(function (node) {
+            var iso = node.getAttribute('data-pm-last-evaluated');
+            if (!iso) return;
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return;
+            var formatted = d.toLocaleDateString();
+            node.textContent = MSG_LAST_EVAL + ': ' + formatted;
+            node.setAttribute('title', MSG_LAST_EVAL + ': ' + d.toLocaleString());
+        });
+    }
+    function pmRefreshLastEvaluatedFor(userId) {
+        // After a save we just bump the row's last-evaluated to "now". The
+        // server's authoritative timestamp lands on the next full page load.
+        var row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
+        if (!row) return;
+        var node = row.querySelector('.pm-member-last-eval');
+        if (!node) return;
+        var now = new Date();
+        node.setAttribute('data-pm-empty', 'false');
+        node.setAttribute('data-pm-last-evaluated', now.toISOString());
+        node.textContent = MSG_LAST_EVAL + ': ' + now.toLocaleDateString();
+        node.setAttribute('title', MSG_LAST_EVAL + ': ' + now.toLocaleString());
+        row.setAttribute('data-pm-has-evaluations', 'true');
+    }
+
+    // ----------------------------------------------------------------------
+    // CSV export (respects current filter + sort, never reads from server)
+    // ----------------------------------------------------------------------
+    function pmCsvEscape(value) {
+        if (value === null || value === undefined) return '';
+        var s = String(value);
+        if (s.indexOf('"') !== -1 || s.indexOf(',') !== -1 || s.indexOf('\n') !== -1 || s.indexOf('\r') !== -1) {
+            s = '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+    function pmLevelLabel(value) {
+        if (!value) return '';
+        if (value === 'LEVEL_A') return 'A';
+        if (value === 'LEVEL_B') return 'B';
+        if (value === 'LEVEL_C') return 'C';
+        return value;
+    }
+    function pmExportCsv() {
+        // Column order from the second header row so the CSV matches the
+        // matrix exactly (including any future column re-ordering done by
+        // the backend). Each header carries the topic and category name.
+        var catHeaders = document.querySelectorAll(
+            '.pm-matrix thead tr.pm-row-category th[data-pm-category-id]');
+        var headers = [MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST];
+        var catIds = [];
+        catHeaders.forEach(function (th) {
+            var topicName = th.getAttribute('data-pm-topic-name') || '';
+            var catName   = th.getAttribute('data-pm-category-name') || th.textContent.trim();
+            headers.push(topicName + ' / ' + catName);
+            catIds.push(th.getAttribute('data-pm-category-id'));
+        });
+
+        var rows = document.querySelectorAll(
+            '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)');
+        var lines = [headers.map(pmCsvEscape).join(',')];
+
+        rows.forEach(function (row) {
+            var username = row.getAttribute('data-pm-username') || '';
+            var rank     = row.getAttribute('data-pm-rank') || '';
+            var iso      = row.getAttribute('data-pm-last-evaluated') || '';
+            var lastEval = '';
+            if (iso) {
+                var d = new Date(iso);
+                if (!isNaN(d.getTime())) lastEval = d.toLocaleDateString();
+            }
+            var chips = row.querySelectorAll('.eligibility-chip[data-pm-eligible="true"]');
+            var eligText = Array.from(chips).map(function (c) {
+                return c.getAttribute('data-pm-from-rank') + '->' + c.getAttribute('data-pm-to-rank');
+            }).join(', ');
+
+            var cells = [username, rank, eligText, lastEval];
+            catIds.forEach(function (catId) {
+                var select = row.querySelector(
+                    '.level-select[data-category-id="' + catId + '"]');
+                cells.push(select ? pmLevelLabel(select.value) : '');
+            });
+            lines.push(cells.map(pmCsvEscape).join(','));
+        });
+
+        var csv = lines.join('\r\n');
+        // BOM so Excel auto-detects UTF-8 for umlauts in member names.
+        var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var iso = new Date().toISOString().slice(0, 10);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = MSG_CSV_NAME + '-' + iso + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    }
+
+    // ----------------------------------------------------------------------
+    // Wiring
+    // ----------------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', function () {
+        pmApplyCollapsedState(pmLoadCollapsedTopics());
+        pmFormatLastEvaluated();
+        pmRestoreFilters();
+        var initialSort = pmRestoreSortMode();
+        pmSetSortMode(initialSort);
+        pmApplySort(initialSort);
+        pmApplyFilters();
+        pmRefreshBulkPanel();
+
+        var search = document.getElementById('pm-member-search');
+        if (search) search.addEventListener('input', pmApplyFilters);
+
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('change', 'pm-save-evaluation', function (el) {
+                pmEnqueueSave(el);
+                pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
+            });
+            window.krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);
+            window.krtEvents.on('click', 'pm-expand-all', pmExpandAllTopics);
+            window.krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
+            window.krtEvents.on('click', 'pm-export-csv', pmExportCsv);
+            window.krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
+            window.krtEvents.on('change', 'pm-filter-change', function () {
+                pmSaveFilters();
+                pmApplyFilters();
+                pmRefreshBulkPanel();
+            });
+            window.krtEvents.on('change', 'pm-row-check', pmOnRowCheck);
+            window.krtEvents.on('change', 'pm-select-all', pmOnSelectAll);
+            window.krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
+            window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
+        }
+    });
     /*]]>*/
 </script>
 </body>
