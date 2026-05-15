@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.mapper.RankRequirementMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
@@ -90,6 +91,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
+    validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = mapper.toEntity(request);
     entity.setTopic(resolveTopic(request.topicId()));
     entity.setCategory(resolveCategory(request.categoryId()));
@@ -121,6 +123,7 @@ public class RankRequirementService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
+    validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
     if (!entity.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(RankRequirement.class, id);
@@ -146,6 +149,25 @@ public class RankRequirementService {
     RankRequirement entity = load(id);
     repository.delete(entity);
     log.info("Deleted RankRequirement id={}", id);
+  }
+
+  /**
+   * Enforces that a rank requirement always describes a single-step promotion ({@code fromRank -
+   * toRank == 1}), e.g. {@code 20 -> 19}. Multi-step transitions like {@code 20 -> 18} would be
+   * structurally ambiguous for the eligibility evaluator (which rules apply, the source or the
+   * target rank's?) and are therefore rejected at the service boundary.
+   *
+   * <p>Lower {@code rank} ordinals denote higher ranks in this codebase, so a valid promotion
+   * always decreases the ordinal by exactly one.
+   *
+   * @param fromRank ordinal of the current rank
+   * @param toRank ordinal of the rank being promoted to
+   * @throws BadRequestException if the difference is anything other than {@code 1}
+   */
+  private static void validateSingleRankStep(int fromRank, int toRank) {
+    if (fromRank - toRank != 1) {
+      throw new BadRequestException("error.rank_requirement.invalid_step");
+    }
   }
 
   @NotNull
