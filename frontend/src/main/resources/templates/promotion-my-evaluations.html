@@ -35,6 +35,27 @@
             border: 1px solid #444;
             color: #666;
         }
+        /*
+         * "Weak"-Highlight: applied to a category badge when the user's assigned
+         * level is strictly below the highest minimum demanded by any rank
+         * requirement for that category. Same colour palette as the "missing"
+         * state on the eligibility chips so the visual language is consistent
+         * across both halves of the page.
+         */
+        .badge-weak {
+            color: #d35400;
+            border-color: #d35400;
+        }
+        .eval-row.is-weak td:first-child {
+            border-left: 3px solid #d35400;
+        }
+        .eval-required {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--color-gray-2);
+            margin-top: 0.15rem;
+        }
+
         .eligibility-card {
             background: #141414;
             border: 1px solid #333;
@@ -68,12 +89,98 @@
         .eligibility-status.is-eligible { color: #4caf50; border-color: #4caf50; }
         .eligibility-status.not-eligible { color: #d35400; border-color: #d35400; }
         .eligibility-status.no-rules { color: #888; border-color: #555; }
+
+        /*
+         * "You-are-here"-Marker: highlights the eligibility card whose fromRank
+         * matches the current user's rank (= next promotion step). Auto-opened
+         * via the order in the DOM stays as-is, but the visual emphasis tells
+         * the user "this is the one to focus on".
+         */
+        .eligibility-card.is-next-step {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 8px rgba(231, 126, 35, 0.4);
+        }
+        .next-step-badge {
+            display: inline-block;
+            font-family: 'Ethnocentric', sans-serif;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.5rem;
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+            background: rgba(231, 126, 35, 0.08);
+            white-space: nowrap;
+        }
+
+        /*
+         * Progress bar per eligibility card. achievedTotal/requiredTotal is
+         * computed client-side (sum across all checks in the card) so the bar
+         * keeps working even if a future server change adds more checks per
+         * rule. Width is set inline by the script after DOMContentLoaded.
+         */
+        .eligibility-progress {
+            margin: 0.5rem 0 0.75rem 0;
+            background: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            height: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .eligibility-progress-fill {
+            height: 100%;
+            background: var(--color-success);
+            transition: width 0.3s ease-out;
+        }
+        .eligibility-card:not(.is-eligible) .eligibility-progress-fill {
+            background: linear-gradient(90deg, var(--color-warning), var(--color-danger));
+        }
+        .eligibility-progress-label {
+            font-size: 0.75rem;
+            color: var(--color-gray-2);
+            margin-bottom: 0.2rem;
+        }
+
         .checks-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .checks-table th { color: var(--color-gray-2); font-weight: 400; text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #2a2a2a; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
         .checks-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e1e; color: var(--color-gray-1); vertical-align: top; }
         .checks-table tr:last-child td { border-bottom: none; }
         .check-status-ok { color: #4caf50; font-weight: 700; }
         .check-status-missing { color: #d35400; font-weight: 700; }
+        .checks-table tr.is-row-satisfied { background: rgba(76, 175, 80, 0.04); }
+        .checks-table tr.is-row-missing { background: rgba(211, 84, 0, 0.04); }
+        .checks-row-hidden { display: none; }
+
+        .me-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .me-filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.6rem;
+            border: 1px solid var(--color-gray-3);
+            background-color: var(--color-bg-dark-gray);
+            color: var(--color-gray-1);
+            font-size: 0.8rem;
+            cursor: pointer;
+            user-select: none;
+            min-height: 38px;
+            box-sizing: border-box;
+        }
+        .me-filter-chip:has(input:checked) {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+        }
+        .me-filter-chip input[type="checkbox"] {
+            width: 1rem;
+            height: 1rem;
+        }
+
         @media (max-width: 768px) {
             .eval-table-wrapper, .checks-wrapper { overflow-x: auto; }
             .eligibility-card-header { flex-direction: column; align-items: flex-start; }
@@ -108,59 +215,121 @@
         <h2 th:text="#{promotion.my.eligibility.title}">Beförderbarkeit</h2>
         <p th:text="#{promotion.my.eligibility.subtitle}" style="color:var(--color-gray-2);margin-bottom:1rem;font-size:0.9rem;">Zeigt, welche Beförderungen anhand deiner aktuellen Bewertungen möglich sind.</p>
 
+        <div th:if="${currentUserRank != null}" style="color:var(--color-gray-2);font-size:0.85rem;margin-bottom:0.75rem;">
+            <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
+            <strong th:text="${currentUserRank}" style="color:var(--color-primary);">20</strong>
+        </div>
+
         <div th:if="${#lists.isEmpty(eligibilities)}">
             <p th:text="#{promotion.my.eligibility.none}" style="color:var(--color-gray-2);">Es sind aktuell keine Rangvoraussetzungen konfiguriert.</p>
         </div>
 
-        <div th:each="elig : ${eligibilities}" th:classappend="${elig.eligible} ? ' is-eligible' : ''" class="eligibility-card">
-            <div class="eligibility-card-header">
-                <span class="eligibility-title">
-                    <span th:text="#{promotion.overview.rank.from}">Rang</span>
-                    <span th:text="${elig.fromRank}">20</span>
-                    &rarr;
-                    <span th:text="#{promotion.overview.rank.to}">Rang</span>
-                    <span th:text="${elig.toRank}">19</span>
-                </span>
-                <span th:if="${elig.eligible}" class="eligibility-status is-eligible" th:text="#{promotion.my.eligibility.eligible}">Beförderbar</span>
-                <span th:if="${!elig.eligible and elig.hasConfiguredRules}" class="eligibility-status not-eligible" th:text="#{promotion.my.eligibility.not.eligible}">Voraussetzungen offen</span>
-                <span th:if="${!elig.hasConfiguredRules}" class="eligibility-status no-rules" th:text="#{promotion.my.eligibility.no.rules}">Keine Regeln definiert</span>
+        <th:block th:unless="${#lists.isEmpty(eligibilities)}">
+            <!-- Toolbar: filter "nur offene Voraussetzungen" -->
+            <div class="me-toolbar">
+                <label class="me-filter-chip">
+                    <input type="checkbox" id="me-filter-open" data-trigger="me-filter-open" />
+                    <span th:text="#{promotion.my.filter.only.open}">Nur offene Voraussetzungen</span>
+                </label>
             </div>
-            <div th:if="${!#lists.isEmpty(elig.checks)}" class="checks-wrapper" style="overflow-x:auto;">
-                <table class="checks-table">
-                    <thead>
-                        <tr>
-                            <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
-                            <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
-                            <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
-                            <th th:text="#{promotion.my.eligibility.progress}">Erfüllt</th>
-                            <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="chk : ${elig.checks}">
-                            <td th:text="${chk.topicName} ?: '-'">-</td>
-                            <td th:text="${chk.categoryName} ?: '-'">-</td>
-                            <td>
-                                <span class="badge-level" th:switch="${chk.minimumLevel}">
-                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
-                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
-                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
-                                    <span th:case="*">-</span>
-                                </span>
-                            </td>
-                            <td>
-                                <span th:classappend="${chk.satisfied} ? ' check-status-ok' : ' check-status-missing'"
-                                      th:text="${chk.achievedCount} + ' / ' + ${chk.requiredCount}">1 / 3</span>
-                            </td>
-                            <td th:text="${chk.description} ?: '-'">-</td>
-                        </tr>
-                    </tbody>
-                </table>
+
+            <div th:each="elig : ${eligibilities}"
+                 th:classappend="${elig.eligible} ? ' is-eligible' : ''"
+                 class="eligibility-card"
+                 th:attr="data-me-eligible=${elig.eligible},
+                          data-me-from-rank=${elig.fromRank},
+                          data-me-to-rank=${elig.toRank},
+                          data-me-is-next-step=${currentUserRank != null and elig.fromRank == currentUserRank}">
+                <div class="eligibility-card-header">
+                    <span class="eligibility-title">
+                        <span th:text="#{promotion.overview.rank.from}">Rang</span>
+                        <span th:text="${elig.fromRank}">20</span>
+                        &rarr;
+                        <span th:text="#{promotion.overview.rank.to}">Rang</span>
+                        <span th:text="${elig.toRank}">19</span>
+                    </span>
+                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <span th:if="${currentUserRank != null and elig.fromRank == currentUserRank}"
+                              class="next-step-badge"
+                              th:text="#{promotion.my.next.step}">Dein nächster Sprung</span>
+                        <span th:if="${elig.eligible}" class="eligibility-status is-eligible" th:text="#{promotion.my.eligibility.eligible}">Beförderbar</span>
+                        <span th:if="${!elig.eligible and elig.hasConfiguredRules}" class="eligibility-status not-eligible" th:text="#{promotion.my.eligibility.not.eligible}">Voraussetzungen offen</span>
+                        <span th:if="${!elig.hasConfiguredRules}" class="eligibility-status no-rules" th:text="#{promotion.my.eligibility.no.rules}">Keine Regeln definiert</span>
+                    </div>
+                </div>
+
+                <!-- Progress bar (M2): aggregate achievedCount / requiredCount across all checks -->
+                <th:block th:if="${!#lists.isEmpty(elig.checks)}">
+                    <div class="eligibility-progress-label">
+                        <span th:text="#{promotion.my.eligibility.progress.label}">Fortschritt</span>:
+                        <span class="me-progress-text">0 / 0</span>
+                    </div>
+                    <div class="eligibility-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="eligibility-progress-fill" style="width:0%;"></div>
+                    </div>
+                </th:block>
+
+                <div th:if="${!#lists.isEmpty(elig.checks)}" class="checks-wrapper" style="overflow-x:auto;">
+                    <table class="checks-table">
+                        <thead>
+                            <tr>
+                                <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
+                                <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
+                                <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
+                                <th th:text="#{promotion.my.eligibility.your.level}">Deine Stufe</th>
+                                <th th:text="#{promotion.my.eligibility.progress}">Erfüllt</th>
+                                <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="chk : ${elig.checks}"
+                                th:classappend="${chk.satisfied ? ' is-row-satisfied' : ' is-row-missing'}"
+                                th:attr="data-me-satisfied=${chk.satisfied}">
+                                <td th:text="${chk.topicName} ?: '-'">-</td>
+                                <td th:text="${chk.categoryName} ?: '-'">-</td>
+                                <td>
+                                    <span class="badge-level" th:switch="${chk.minimumLevel}">
+                                        <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
+                                        <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
+                                        <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
+                                        <span th:case="*">-</span>
+                                    </span>
+                                </td>
+                                <!--
+                                    M1: "Deine Stufe" — server-rendered from evaluationByCategoryId so
+                                    requirement and actual value sit side-by-side. Falls back to a "—"
+                                    badge when the user has no evaluation in that category.
+                                -->
+                                <td>
+                                    <th:block th:with="myEval=${chk.categoryId != null ? evaluationByCategoryId[chk.categoryId.toString()] : null}">
+                                        <span th:if="${myEval != null and myEval.assignedLevel != null}"
+                                              class="badge-level"
+                                              th:switch="${myEval.assignedLevel}">
+                                            <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
+                                            <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
+                                            <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
+                                        </span>
+                                        <span th:unless="${myEval != null and myEval.assignedLevel != null}"
+                                              class="badge-none"
+                                              th:text="#{promotion.my.no.level}">Keine</span>
+                                    </th:block>
+                                </td>
+                                <td>
+                                    <span th:classappend="${chk.satisfied} ? ' check-status-ok' : ' check-status-missing'"
+                                          th:text="${chk.achievedCount} + ' / ' + ${chk.requiredCount}">1 / 3</span>
+                                </td>
+                                <td th:text="${chk.description} ?: '-'">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </th:block>
     </div>
 
     <div class="hud-box mt-2">
+        <h2 th:text="#{promotion.my.categories.title}">Meine Stufen je Kategorie</h2>
+
         <div th:if="${#maps.isEmpty(topicCategoryMap)}">
             <p th:text="#{promotion.my.no.topics}">Keine Kategorien verfügbar.</p>
         </div>
@@ -174,24 +343,50 @@
                         <tr>
                             <th th:text="#{promotion.my.category}">Kategorie</th>
                             <th th:text="#{promotion.my.level}">Stufe</th>
+                            <th th:text="#{promotion.my.required.level}">Maximal benötigt</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="category : ${topicCategoryMap[topic.id.toString()]}">
+                        <!--
+                            Each row carries a weak-flag computed server-side: if the user's assigned
+                            level (by ordinal) is below the highest required level for that category
+                            across any rank requirement, the row is marked as weak and the badge gets
+                            an orange tint. requiredLevelByCategory may be null/empty for categories
+                            with no rules.
+                        -->
+                        <tr th:each="category : ${topicCategoryMap[topic.id.toString()]}"
+                            th:with="myEval=${evaluationByCategoryId[category.id.toString()]},
+                                     reqLevel=${requiredLevelByCategory[category.id.toString()]},
+                                     myOrdinal=${myEval != null and myEval.assignedLevel == 'LEVEL_A' ? 0 : (myEval != null and myEval.assignedLevel == 'LEVEL_B' ? 1 : (myEval != null and myEval.assignedLevel == 'LEVEL_C' ? 2 : -1))},
+                                     reqOrdinal=${reqLevel == 'LEVEL_A' ? 0 : (reqLevel == 'LEVEL_B' ? 1 : (reqLevel == 'LEVEL_C' ? 2 : -1))},
+                                     isWeak=${reqLevel != null and myOrdinal lt reqOrdinal}"
+                            class="eval-row"
+                            th:classappend="${isWeak ? ' is-weak' : ''}">
                             <td th:text="${category.name}">Kategorie</td>
                             <td>
-                                <th:block th:with="eval=${evaluationByCategoryId[category.id.toString()]}">
-                                    <span th:if="${eval != null and eval.assignedLevel != null}"
-                                          class="badge-level"
-                                          th:switch="${eval.assignedLevel}">
-                                        <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
-                                        <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
-                                        <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
-                                    </span>
-                                    <span th:unless="${eval != null and eval.assignedLevel != null}"
-                                          class="badge-none"
-                                          th:text="#{promotion.my.no.level}">Keine Stufe</span>
-                                </th:block>
+                                <span th:if="${myEval != null and myEval.assignedLevel != null}"
+                                      class="badge-level"
+                                      th:classappend="${isWeak ? ' badge-weak' : ''}"
+                                      th:switch="${myEval.assignedLevel}">
+                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                                </span>
+                                <span th:unless="${myEval != null and myEval.assignedLevel != null}"
+                                      class="badge-none"
+                                      th:classappend="${isWeak ? ' badge-weak' : ''}"
+                                      th:text="#{promotion.my.no.level}">Keine Stufe</span>
+                            </td>
+                            <td>
+                                <span th:if="${reqLevel != null}"
+                                      class="badge-level"
+                                      th:switch="${reqLevel}">
+                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
+                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
+                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
+                                </span>
+                                <span th:unless="${reqLevel != null}" class="badge-none"
+                                      th:text="#{promotion.my.no.requirement}">—</span>
                             </td>
                         </tr>
                     </tbody>
@@ -201,5 +396,64 @@
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    /*
+     * Progress-bar fill: client-side because the aggregate "achievedTotal /
+     * requiredTotal" pair across all checks is not on the DTO and recomputing
+     * it server-side just to render a CSS width would be wasted work. We
+     * scrape the per-check fraction texts (already rendered in the table)
+     * with the same logic the user reads visually.
+     */
+    function meFillProgressBars() {
+        var cards = document.querySelectorAll('.eligibility-card');
+        cards.forEach(function (card) {
+            var fractions = card.querySelectorAll('.checks-table tbody tr [class^="check-status-"]');
+            var achieved = 0, required = 0;
+            fractions.forEach(function (span) {
+                var parts = (span.textContent || '').split('/');
+                if (parts.length === 2) {
+                    var a = parseInt(parts[0].trim(), 10);
+                    var r = parseInt(parts[1].trim(), 10);
+                    if (Number.isFinite(a) && Number.isFinite(r)) {
+                        achieved += a;
+                        required += r;
+                    }
+                }
+            });
+            var pct = required > 0 ? Math.min(100, Math.round((achieved / required) * 100)) : 0;
+            var fill = card.querySelector('.eligibility-progress-fill');
+            var text = card.querySelector('.me-progress-text');
+            var bar  = card.querySelector('.eligibility-progress');
+            if (fill) fill.style.width = pct + '%';
+            if (text) text.textContent = achieved + ' / ' + required + ' (' + pct + '%)';
+            if (bar)  bar.setAttribute('aria-valuenow', String(pct));
+        });
+    }
+
+    /*
+     * Filter "nur offene Voraussetzungen": hides satisfied check rows when
+     * checked. Acts on .checks-table rows, not whole cards — even an "almost
+     * eligible" card may still have one missing check the user wants to see.
+     */
+    function meApplyOpenFilter() {
+        var input = document.getElementById('me-filter-open');
+        var onlyOpen = !!(input && input.checked);
+        var rows = document.querySelectorAll('.checks-table tbody tr[data-me-satisfied]');
+        rows.forEach(function (row) {
+            var satisfied = row.getAttribute('data-me-satisfied') === 'true';
+            row.classList.toggle('checks-row-hidden', onlyOpen && satisfied);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        meFillProgressBars();
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('change', 'me-filter-open', meApplyOpenFilter);
+        }
+    });
+    /*]]>*/
+</script>
 </body>
 </html>

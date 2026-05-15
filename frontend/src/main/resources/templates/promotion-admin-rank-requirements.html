@@ -3,6 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{promotion.admin.ranks.title} + ' - ' + #{app.title}">Rangvoraussetzungen verwalten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
+    <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
     <style>
         .badge-level {
             display: inline-block;
@@ -13,41 +14,6 @@
             border: 1px solid var(--color-primary);
             color: var(--color-primary);
         }
-        .modal-overlay {
-            display: none; position: fixed; z-index: 1000;
-            left: 0; top: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-        }
-        .modal-overlay.active { display: flex; align-items: center; justify-content: center; }
-        .modal-box {
-            background: #141414;
-            border: 1px solid var(--color-primary);
-            padding: 2rem;
-            width: 90%;
-            max-width: 520px;
-            box-shadow: 0 0 20px rgba(231,126,35,0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal-title {
-            font-family: 'Ethnocentric', sans-serif;
-            text-transform: uppercase;
-            color: var(--color-primary);
-            font-size: 1rem;
-            margin-bottom: 1.25rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        .form-label { display: block; font-size: 0.85rem; color: var(--color-gray-2); margin-bottom: 0.3rem; }
-        .form-input {
-            width: 100%; background: var(--color-gray-5); border: 1px solid #444;
-            color: var(--color-gray-1); padding: 0.5rem 0.75rem; font-size: 0.9rem;
-            box-sizing: border-box;
-        }
-        .form-input:focus { border-color: var(--color-primary); outline: none; }
-        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; flex-wrap: wrap; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-        .form-input[readonly] { background: #1f1f1f; color: var(--color-gray-2); cursor: not-allowed; }
-        .form-hint { display: block; font-size: 0.75rem; color: var(--color-gray-2); margin-top: 0.3rem; }
         .rank-group { margin-bottom: 1.75rem; }
         .rank-group-header {
             font-family: 'Lato', sans-serif;
@@ -57,13 +23,46 @@
             border-bottom: 1px solid #333;
             padding-bottom: 0.35rem;
             margin-bottom: 0.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .rank-group-header .pa-group-actions {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
         }
         .rank-subtable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         .rank-subtable th { color: var(--color-gray-2); font-weight: 400; text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #2a2a2a; font-size: 0.8rem; }
         .rank-subtable td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e1e; color: var(--color-gray-1); vertical-align: top; }
         .rank-subtable tr:last-child td { border-bottom: none; }
+
+        .rank-group.is-hidden { display: none; }
+        .pa-empty {
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--color-gray-2);
+            font-style: italic;
+        }
+
+        /*
+         * Scope-info block in the create/edit modal: explains the three valid
+         * combinations of (topic, category) selection so the admin understands
+         * the semantic difference rather than guessing from the dropdown state.
+         */
+        .pa-scope-info {
+            font-size: 0.75rem;
+            color: var(--color-gray-2);
+            background: rgba(231, 126, 35, 0.04);
+            border-left: 2px solid var(--color-primary);
+            padding: 0.4rem 0.6rem;
+            margin-bottom: 0.75rem;
+        }
+        .pa-scope-info strong { color: var(--color-primary); font-weight: 700; }
+
         @media (max-width: 768px) {
-            .form-row { grid-template-columns: 1fr; }
             .btn { min-height: 44px; }
             .rank-table-wrapper { overflow-x: auto; }
             .rank-subtable { font-size: 0.8rem; }
@@ -95,8 +94,17 @@
     </div>
 
     <div class="hud-box mt-2">
-        <div style="margin-bottom:1rem;">
-            <button class="btn" onclick="openCreateModal()" th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
+        <div class="pa-toolbar">
+            <input type="search"
+                   id="ar-filter"
+                   class="pa-search"
+                   th:attr="placeholder=#{promotion.admin.ranks.filter.placeholder},aria-label=#{promotion.admin.ranks.filter.placeholder}"
+                   autocomplete="off" />
+            <div class="pa-spacer"></div>
+            <button type="button"
+                    class="btn"
+                    data-trigger="ar-open-create"
+                    th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
         </div>
 
         <div th:if="${#lists.isEmpty(requirements)}">
@@ -104,16 +112,27 @@
         </div>
 
         <div th:unless="${#lists.isEmpty(requirements)}">
-            <div th:each="entry : ${groupedRequirements}" class="rank-group">
+            <div th:each="entry : ${groupedRequirements}"
+                 class="rank-group"
+                 th:attr="data-ar-from-rank=${entry.value[0].fromRank},data-ar-to-rank=${entry.value[0].toRank}">
                 <div class="rank-group-header">
-                    <span th:text="#{promotion.admin.ranks.from}">Von Rang</span>
-                    <span th:text="${entry.value[0].fromRank}">20</span>
-                    &rarr;
-                    <span th:text="#{promotion.admin.ranks.to}">Nach Rang</span>
-                    <span th:text="${entry.value[0].toRank}">19</span>
+                    <span>
+                        <span th:text="#{promotion.admin.ranks.from}">Von Rang</span>
+                        <span th:text="${entry.value[0].fromRank}">20</span>
+                        &rarr;
+                        <span th:text="#{promotion.admin.ranks.to}">Nach Rang</span>
+                        <span th:text="${entry.value[0].toRank}">19</span>
+                    </span>
+                    <div class="pa-group-actions">
+                        <button type="button"
+                                class="btn btn-outline-danger pa-btn-tiny"
+                                data-trigger="ar-delete-group"
+                                th:attr="data-ar-from-rank=${entry.value[0].fromRank},data-ar-to-rank=${entry.value[0].toRank}"
+                                th:text="#{promotion.admin.ranks.delete.group}">Alle löschen</button>
+                    </div>
                 </div>
                 <div class="rank-table-wrapper" style="overflow-x:auto;">
-                    <table class="rank-subtable">
+                    <table class="rank-subtable pa-rank-subtable">
                         <thead>
                             <tr>
                                 <th th:text="#{promotion.admin.ranks.topic}">Themenbereich</th>
@@ -125,7 +144,8 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="req : ${entry.value}">
+                            <tr th:each="req : ${entry.value}"
+                                th:attr="data-ar-req-id=${req.id},data-ar-search=${(req.topicName != null ? #strings.toLowerCase(req.topicName) : '') + ' ' + (req.categoryName != null ? #strings.toLowerCase(req.categoryName) : '') + ' ' + (req.description != null ? #strings.toLowerCase(req.description) : '')}">
                                 <td th:text="${req.topicName} ?: '-'">-</td>
                                 <td th:text="${req.categoryName} ?: '-'">-</td>
                                 <td>
@@ -138,21 +158,23 @@
                                 </td>
                                 <td th:text="${req.requiredCount}">1</td>
                                 <td th:text="${req.description} ?: '-'">-</td>
-                                <td style="white-space:nowrap;">
+                                <td class="pa-actions-cell" style="white-space:nowrap;">
                                     <div class="flex-gap-xs">
-                                        <button class="btn btn-edit-req"
-                                                th:data-id="${req.id}"
-                                                th:data-from="${req.fromRank}"
-                                                th:data-to="${req.toRank}"
-                                                th:data-topic-id="${req.topicId} ?: ''"
-                                                th:data-category-id="${req.categoryId} ?: ''"
-                                                th:data-level="${req.minimumLevel}"
-                                                th:data-count="${req.requiredCount}"
-                                                th:data-description="${req.description} ?: ''"
-                                                th:data-version="${req.version}"
+                                        <button class="btn pa-btn-tiny"
+                                                data-trigger="ar-open-edit"
+                                                th:attr="data-ar-id=${req.id},
+                                                         data-ar-from=${req.fromRank},
+                                                         data-ar-to=${req.toRank},
+                                                         data-ar-topic-id=${req.topicId} ?: '',
+                                                         data-ar-category-id=${req.categoryId} ?: '',
+                                                         data-ar-level=${req.minimumLevel},
+                                                         data-ar-count=${req.requiredCount},
+                                                         data-ar-description=${req.description} ?: '',
+                                                         data-ar-version=${req.version}"
                                                 th:text="#{promotion.admin.ranks.edit}">Bearbeiten</button>
-                                        <button class="btn btn-danger btn-delete-req"
-                                                th:data-id="${req.id}"
+                                        <button class="btn btn-danger pa-btn-tiny"
+                                                data-trigger="ar-open-delete"
+                                                th:attr="data-ar-id=${req.id}"
                                                 th:text="#{promotion.admin.ranks.delete}">Löschen</button>
                                     </div>
                                 </td>
@@ -161,18 +183,20 @@
                     </table>
                 </div>
             </div>
+            <div id="ar-empty" class="pa-empty" hidden
+                 th:text="#{promotion.admin.ranks.filter.empty}">Keine Treffer.</div>
         </div>
     </div>
 </main>
 
 <!-- Create Modal -->
-<div id="modal-create" class="modal-overlay">
+<div id="modal-create" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.ranks.modal.create.title}">Neue Rangvoraussetzung</div>
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label" th:text="#{promotion.admin.ranks.from}">Von Rang</label>
-                <input id="cr-from" class="form-input rank-from-input" type="number" value="20" min="1">
+                <input id="cr-from" class="form-input rank-from-input ar-rank-from" type="number" value="20" min="1">
                 <span class="form-hint" th:text="#{promotion.admin.ranks.step.hint}">Beförderung geht immer eine Rangstufe nach oben.</span>
             </div>
             <div class="form-group">
@@ -180,18 +204,24 @@
                 <input id="cr-to" class="form-input rank-to-input" type="number" value="19" readonly>
             </div>
         </div>
+
+        <!-- Scope explanation: helps the admin avoid the global/topic-wide/category combo trap. -->
+        <div class="pa-scope-info">
+            <strong th:text="#{promotion.admin.ranks.scope.label}">Anwendungsbereich</strong>:
+            <span th:utext="#{promotion.admin.ranks.scope.hint}">Beide Felder leer = globale Regel. Nur Themenbereich = gilt themenbereich-weit. Themenbereich + Kategorie = nur diese Kategorie.</span>
+        </div>
+
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.ranks.topic}">Themenbereich</label>
-            <select id="cr-topic" class="form-input">
+            <select id="cr-topic" class="form-input ar-topic-select" data-trigger="ar-topic-change">
                 <option value="">-</option>
                 <option th:each="t : ${topics}" th:value="${t.id}" th:text="${t.name}">Topic</option>
             </select>
         </div>
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.ranks.category}">Kategorie</label>
-            <select id="cr-category" class="form-input">
+            <select id="cr-category" class="form-input ar-category-select">
                 <option value="">-</option>
-                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">Category</option>
             </select>
         </div>
         <div class="form-row">
@@ -213,14 +243,14 @@
             <textarea id="cr-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-create')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="createRequirement()" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
+            <button class="btn btn-secondary" data-trigger="ar-close-create" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="ar-submit-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
         </div>
     </div>
 </div>
 
 <!-- Edit Modal -->
-<div id="modal-edit" class="modal-overlay">
+<div id="modal-edit" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-box">
         <div class="modal-title" th:text="#{promotion.admin.ranks.modal.edit.title}">Rangvoraussetzung bearbeiten</div>
         <input id="er-id" type="hidden">
@@ -228,7 +258,7 @@
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label" th:text="#{promotion.admin.ranks.from}">Von Rang</label>
-                <input id="er-from" class="form-input rank-from-input" type="number" min="1">
+                <input id="er-from" class="form-input rank-from-input ar-rank-from" type="number" min="1">
                 <span class="form-hint" th:text="#{promotion.admin.ranks.step.hint}">Beförderung geht immer eine Rangstufe nach oben.</span>
             </div>
             <div class="form-group">
@@ -236,18 +266,23 @@
                 <input id="er-to" class="form-input rank-to-input" type="number" readonly>
             </div>
         </div>
+
+        <div class="pa-scope-info">
+            <strong th:text="#{promotion.admin.ranks.scope.label}">Anwendungsbereich</strong>:
+            <span th:utext="#{promotion.admin.ranks.scope.hint}">Beide Felder leer = globale Regel. Nur Themenbereich = themenbereich-weit. Themenbereich + Kategorie = nur diese Kategorie.</span>
+        </div>
+
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.ranks.topic}">Themenbereich</label>
-            <select id="er-topic" class="form-input">
+            <select id="er-topic" class="form-input ar-topic-select" data-trigger="ar-topic-change">
                 <option value="">-</option>
                 <option th:each="t : ${topics}" th:value="${t.id}" th:text="${t.name}">Topic</option>
             </select>
         </div>
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.ranks.category}">Kategorie</label>
-            <select id="er-category" class="form-input">
+            <select id="er-category" class="form-input ar-category-select">
                 <option value="">-</option>
-                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">Category</option>
             </select>
         </div>
         <div class="form-row">
@@ -269,138 +304,301 @@
             <textarea id="er-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-edit')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" onclick="updateRequirement()" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
+            <button class="btn btn-secondary" data-trigger="ar-close-edit" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn" data-trigger="ar-submit-edit" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
         </div>
     </div>
 </div>
-
-<!-- Delete Modal -->
-<div id="modal-delete" class="modal-overlay">
-    <div class="modal-box">
-        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.delete.title}">LÃ¶schen</div>
-        <p th:text="#{promotion.admin.ranks.modal.delete.confirm}" style="color:var(--color-gray-2);margin-bottom:1rem;"></p>
-        <input id="dr-id" type="hidden">
-        <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal('modal-delete')" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn-danger" onclick="deleteRequirement()" th:text="#{promotion.admin.ranks.delete}">LÃ¶schen</button>
-        </div>
-    </div>
-</div>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-/*<![CDATA[*/
-var MSG_SAVED = /*[[#{promotion.admin.ranks.saved}]]*/ 'Saved';
-var MSG_DELETED = /*[[#{promotion.admin.ranks.deleted}]]*/ 'Deleted';
-var MSG_ERROR = /*[[#{promotion.admin.ranks.error}]]*/ 'Error';
-var MSG_CONFLICT = /*[[#{promotion.admin.ranks.conflict}]]*/ 'Conflict';
-var MSG_INVALID_STEP = /*[[#{promotion.admin.ranks.error.step}]]*/ 'Invalid step';
+    /*<![CDATA[*/
+    /*
+     * Categories-by-topic map for the cascade. We build it client-side from
+     * the per-topic <option> set already in the DOM rather than serialising
+     * a separate JSON island (which would duplicate the data the model
+     * already carries). The model attribute categoriesByTopic is the
+     * authoritative source — to expose it we render a hidden <select>
+     * cluster below and read from there. Simpler approach: synthesise via
+     * Thymeleaf-inlined literals.
+     */
+    var AR_CATEGORIES_BY_TOPIC = /*[[${categoriesByTopic}]]*/ {};
 
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function openCreateModal() {
-    syncToRank(document.getElementById('cr-from'));
-    openModal('modal-create');
-}
-function openDeleteModal(id) { document.getElementById('dr-id').value = id; openModal('modal-delete'); }
+    var MSG_SAVED         = /*[[#{promotion.admin.ranks.saved}]]*/ 'Saved';
+    var MSG_DELETED       = /*[[#{promotion.admin.ranks.deleted}]]*/ 'Deleted';
+    var MSG_ERROR         = /*[[#{promotion.admin.ranks.error}]]*/ 'Error';
+    var MSG_CONFLICT      = /*[[#{promotion.admin.ranks.conflict}]]*/ 'Conflict';
+    var MSG_INVALID_STEP  = /*[[#{promotion.admin.ranks.error.step}]]*/ 'Invalid step';
+    var MSG_DELETE_TITLE  = /*[[#{promotion.admin.ranks.modal.delete.title}]]*/ 'Delete?';
+    var MSG_DELETE_MSG    = /*[[#{promotion.admin.ranks.modal.delete.confirm}]]*/ 'Are you sure?';
+    var MSG_DELETE_GROUP_TITLE = /*[[#{promotion.admin.ranks.modal.delete.group.title}]]*/ 'Delete all in group?';
+    var MSG_DELETE_GROUP_MSG   = /*[[#{promotion.admin.ranks.modal.delete.group.confirm}]]*/ 'Delete all rules for this rank step?';
+    var MSG_GROUP_DELETED      = /*[[#{promotion.admin.ranks.deleted.group}]]*/ 'Group deleted';
+    var MSG_OK            = /*[[#{general.confirm}]]*/ 'OK';
+    var MSG_CANCEL        = /*[[#{general.cancel}]]*/ 'Cancel';
 
-function syncToRank(fromInput) {
-    if (!fromInput) return;
-    var form = fromInput.closest('.modal-box');
-    if (!form) return;
-    var toInput = form.querySelector('.rank-to-input');
-    if (!toInput) return;
-    var fromVal = parseInt(fromInput.value, 10);
-    if (Number.isFinite(fromVal)) {
-        toInput.value = fromVal - 1;
-    } else {
-        toInput.value = '';
+    function toastSuccess(msg) { if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg); }
+    function toastError(msg)   { if (window.showFrontendErrorToast)   window.showFrontendErrorToast(msg); }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function openModal(id)  { document.getElementById(id).classList.add('active'); }
+
+    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+    function syncToRank(fromInput) {
+        if (!fromInput) return;
+        var form = fromInput.closest('.modal-box');
+        if (!form) return;
+        var toInput = form.querySelector('.rank-to-input');
+        if (!toInput) return;
+        var fromVal = parseInt(fromInput.value, 10);
+        toInput.value = Number.isFinite(fromVal) ? String(fromVal - 1) : '';
     }
-}
 
-document.addEventListener('input', function(e) {
-    var target = e.target;
-    if (target && target.classList && target.classList.contains('rank-from-input')) {
-        syncToRank(target);
+    /*
+     * Cascading dropdown: when the Topic <select> changes, rebuild the
+     * Category <select> in the same modal so it only contains categories
+     * that belong to the chosen topic. An empty topic resets the category
+     * dropdown to "-" only.
+     */
+    function rebuildCategoryDropdown(topicSelect) {
+        var form = topicSelect.closest('.modal-box');
+        if (!form) return;
+        var catSelect = form.querySelector('.ar-category-select');
+        if (!catSelect) return;
+        var previousValue = catSelect.value;
+        // Clear existing options except the leading "-" placeholder
+        while (catSelect.options.length > 1) catSelect.remove(1);
+        var topicId = topicSelect.value;
+        if (topicId && AR_CATEGORIES_BY_TOPIC && AR_CATEGORIES_BY_TOPIC[topicId]) {
+            AR_CATEGORIES_BY_TOPIC[topicId].forEach(function (cat) {
+                var opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name;
+                catSelect.appendChild(opt);
+            });
+            // Try to restore the previously selected category if it still belongs to this topic.
+            if (previousValue && catSelect.querySelector('option[value="' + previousValue + '"]')) {
+                catSelect.value = previousValue;
+            }
+        }
     }
-});
 
-document.addEventListener('click', function(e) {
-    var btn = e.target.closest('button');
-    if (!btn) return;
-    if (btn.classList.contains('btn-edit-req')) {
-        openEditModal(btn.dataset.id, btn.dataset.from, btn.dataset.to, btn.dataset.topicId, btn.dataset.categoryId, btn.dataset.level, btn.dataset.count, btn.dataset.description, btn.dataset.version);
-    } else if (btn.classList.contains('btn-delete-req')) {
-        openDeleteModal(btn.dataset.id);
+    function isValidSingleStep(fromVal, toVal) {
+        return Number.isFinite(fromVal) && Number.isFinite(toVal) && (fromVal - toVal === 1);
     }
-});
 
-function openEditModal(id, fromRank, toRank, topicId, categoryId, level, count, desc, version) {
-    document.getElementById('er-id').value = id;
-    document.getElementById('er-version').value = version;
-    document.getElementById('er-from').value = fromRank;
-    document.getElementById('er-to').value = toRank;
-    document.getElementById('er-topic').value = topicId || '';
-    document.getElementById('er-category').value = categoryId || '';
-    document.getElementById('er-level').value = level;
-    document.getElementById('er-count').value = count;
-    document.getElementById('er-desc').value = desc || '';
-    syncToRank(document.getElementById('er-from'));
-    openModal('modal-edit');
-}
-
-function isValidSingleStep(fromVal, toVal) {
-    return Number.isFinite(fromVal) && Number.isFinite(toVal) && (fromVal - toVal === 1);
-}
-
-function getCsrfToken() { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
-
-function apiCall(url, method, body, onSuccess) {
-    var headers = { 'Content-Type': 'application/json' };
-    headers[getCsrfHeader()] = getCsrfToken();
-    fetch(url, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined })
-    .then(function(r) {
-        if (r.status === 409) { if (typeof showToast === 'function') showToast(MSG_CONFLICT, 'warning'); setTimeout(function() { window.location.reload(); }, 1500); return null; }
-        if (!r.ok) { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); return null; }
-        return r.status === 204 ? {} : r.json();
-    })
-    .then(function(data) { if (data !== null && data !== undefined) { onSuccess(data); } })
-    .catch(function() { if (typeof showToast === 'function') showToast(MSG_ERROR, 'error'); });
-}
-
-function createRequirement() {
-    var fromRank = parseInt(document.getElementById('cr-from').value, 10);
-    var toRank = parseInt(document.getElementById('cr-to').value, 10);
-    if (!isValidSingleStep(fromRank, toRank)) {
-        if (typeof showToast === 'function') showToast(MSG_INVALID_STEP, 'warning');
-        return;
+    function apiCall(url, method, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        headers[getCsrfHeader()] = getCsrfToken();
+        return fetch(url, {
+            method: method,
+            headers: headers,
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (r) {
+            if (r.status === 409) {
+                toastError(MSG_CONFLICT);
+                setTimeout(function () { window.location.reload(); }, 1500);
+                return null;
+            }
+            if (!r.ok) {
+                toastError(MSG_ERROR);
+                return null;
+            }
+            return r.status === 204 ? {} : r.json();
+        }).catch(function () {
+            toastError(MSG_ERROR);
+            return null;
+        });
     }
-    var topicId = document.getElementById('cr-topic').value || null;
-    var categoryId = document.getElementById('cr-category').value || null;
-    var body = { fromRank: fromRank, toRank: toRank, topicId: topicId, categoryId: categoryId, minimumLevel: document.getElementById('cr-level').value, requiredCount: parseInt(document.getElementById('cr-count').value, 10), description: document.getElementById('cr-desc').value || null };
-    apiCall('/api/proxy/promotion/rank-requirements', 'POST', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-create'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function updateRequirement() {
-    var id = document.getElementById('er-id').value;
-    var fromRank = parseInt(document.getElementById('er-from').value, 10);
-    var toRank = parseInt(document.getElementById('er-to').value, 10);
-    if (!isValidSingleStep(fromRank, toRank)) {
-        if (typeof showToast === 'function') showToast(MSG_INVALID_STEP, 'warning');
-        return;
+
+    function openCreateModal() {
+        document.getElementById('cr-from').value = 20;
+        document.getElementById('cr-to').value = 19;
+        document.getElementById('cr-topic').value = '';
+        rebuildCategoryDropdown(document.getElementById('cr-topic'));
+        document.getElementById('cr-level').value = 'LEVEL_A';
+        document.getElementById('cr-count').value = 1;
+        document.getElementById('cr-desc').value = '';
+        openModal('modal-create');
     }
-    var topicId = document.getElementById('er-topic').value || null;
-    var categoryId = document.getElementById('er-category').value || null;
-    var body = { version: parseInt(document.getElementById('er-version').value, 10), fromRank: fromRank, toRank: toRank, topicId: topicId, categoryId: categoryId, minimumLevel: document.getElementById('er-level').value, requiredCount: parseInt(document.getElementById('er-count').value, 10), description: document.getElementById('er-desc').value || null };
-    apiCall('/api/proxy/promotion/rank-requirements/' + id, 'PUT', body, function() { if (typeof showToast === 'function') showToast(MSG_SAVED, 'success'); closeModal('modal-edit'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-function deleteRequirement() {
-    var id = document.getElementById('dr-id').value;
-    apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null, function() { if (typeof showToast === 'function') showToast(MSG_DELETED, 'success'); closeModal('modal-delete'); setTimeout(function() { window.location.reload(); }, 800); });
-}
-/*]]>*/
+
+    function openEditModal(btn) {
+        document.getElementById('er-id').value      = btn.getAttribute('data-ar-id');
+        document.getElementById('er-version').value = btn.getAttribute('data-ar-version');
+        document.getElementById('er-from').value    = btn.getAttribute('data-ar-from');
+        document.getElementById('er-to').value      = btn.getAttribute('data-ar-to');
+        var topicId = btn.getAttribute('data-ar-topic-id') || '';
+        document.getElementById('er-topic').value = topicId;
+        rebuildCategoryDropdown(document.getElementById('er-topic'));
+        document.getElementById('er-category').value = btn.getAttribute('data-ar-category-id') || '';
+        document.getElementById('er-level').value    = btn.getAttribute('data-ar-level');
+        document.getElementById('er-count').value    = btn.getAttribute('data-ar-count');
+        document.getElementById('er-desc').value     = btn.getAttribute('data-ar-description') || '';
+        syncToRank(document.getElementById('er-from'));
+        openModal('modal-edit');
+    }
+
+    function submitCreate() {
+        var from = parseInt(document.getElementById('cr-from').value, 10);
+        var to   = parseInt(document.getElementById('cr-to').value, 10);
+        if (!isValidSingleStep(from, to)) { toastError(MSG_INVALID_STEP); return; }
+        var body = {
+            fromRank: from, toRank: to,
+            topicId: document.getElementById('cr-topic').value || null,
+            categoryId: document.getElementById('cr-category').value || null,
+            minimumLevel: document.getElementById('cr-level').value,
+            requiredCount: parseInt(document.getElementById('cr-count').value, 10),
+            description: document.getElementById('cr-desc').value || null
+        };
+        apiCall('/api/proxy/promotion/rank-requirements', 'POST', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-create');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+
+    function submitEdit() {
+        var id = document.getElementById('er-id').value;
+        var from = parseInt(document.getElementById('er-from').value, 10);
+        var to   = parseInt(document.getElementById('er-to').value, 10);
+        if (!isValidSingleStep(from, to)) { toastError(MSG_INVALID_STEP); return; }
+        var body = {
+            version: parseInt(document.getElementById('er-version').value, 10),
+            fromRank: from, toRank: to,
+            topicId: document.getElementById('er-topic').value || null,
+            categoryId: document.getElementById('er-category').value || null,
+            minimumLevel: document.getElementById('er-level').value,
+            requiredCount: parseInt(document.getElementById('er-count').value, 10),
+            description: document.getElementById('er-desc').value || null
+        };
+        apiCall('/api/proxy/promotion/rank-requirements/' + id, 'PUT', body).then(function (data) {
+            if (!data) return;
+            toastSuccess(MSG_SAVED);
+            closeModal('modal-edit');
+            setTimeout(function () { window.location.reload(); }, 600);
+        });
+    }
+
+    /*
+     * Single-delete and group-delete share the underlying DELETE per id. The
+     * group variant collects all <tr data-ar-req-id> inside the targeted
+     * .rank-group, then fires DELETE in series so a 409 on any single row
+     * still triggers a clean page reload.
+     */
+    function deleteRequirement(id) {
+        if (!id) return Promise.resolve(false);
+        return apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null);
+    }
+
+    function confirmAndDelete(id) {
+        var fn = window.showKrtConfirm;
+        if (typeof fn !== 'function') return; /* defensive: toast fragment not loaded */
+        fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then(function (ok) {
+            if (!ok) return;
+            deleteRequirement(id).then(function (data) {
+                if (!data) return;
+                toastSuccess(MSG_DELETED);
+                setTimeout(function () { window.location.reload(); }, 600);
+            });
+        });
+    }
+
+    function confirmAndDeleteGroup(fromRank, toRank) {
+        var fn = window.showKrtConfirm;
+        if (typeof fn !== 'function') return;
+        var rows = document.querySelectorAll(
+            '.rank-group[data-ar-from-rank="' + fromRank + '"][data-ar-to-rank="' + toRank + '"] tr[data-ar-req-id]');
+        if (rows.length === 0) return;
+        var msg = MSG_DELETE_GROUP_MSG
+            .replace('{from}', String(fromRank))
+            .replace('{to}', String(toRank))
+            .replace('{count}', String(rows.length));
+        fn(MSG_DELETE_GROUP_TITLE, msg, MSG_OK, MSG_CANCEL).then(function (ok) {
+            if (!ok) return;
+            // Sequential delete so a 409 reload happens once, not N times.
+            var ids = Array.from(rows).map(function (r) { return r.getAttribute('data-ar-req-id'); });
+            var chain = Promise.resolve(true);
+            ids.forEach(function (id) {
+                chain = chain.then(function (alive) {
+                    if (!alive) return false;
+                    return deleteRequirement(id).then(function (data) { return data !== null; });
+                });
+            });
+            chain.then(function () {
+                toastSuccess(MSG_GROUP_DELETED);
+                setTimeout(function () { window.location.reload(); }, 600);
+            });
+        });
+    }
+
+    /*
+     * Filter input: matches the typed text against the joined topic name,
+     * category name and description for each row (lowercased server-side
+     * into data-ar-search). Groups with zero visible rows are hidden too.
+     */
+    function applyFilter() {
+        var input = document.getElementById('ar-filter');
+        var query = (input ? input.value : '').trim().toLowerCase();
+        var groups = document.querySelectorAll('.rank-group');
+        var anyVisible = false;
+        groups.forEach(function (group) {
+            var fromRank = group.getAttribute('data-ar-from-rank') || '';
+            var toRank   = group.getAttribute('data-ar-to-rank') || '';
+            var rankKey  = fromRank + '->' + toRank;
+            var rows = group.querySelectorAll('tr[data-ar-search]');
+            var groupVisible = 0;
+            rows.forEach(function (row) {
+                var text = row.getAttribute('data-ar-search') || '';
+                var match = query === '' || text.indexOf(query) !== -1 || rankKey.indexOf(query) !== -1
+                    || fromRank === query || toRank === query;
+                row.style.display = match ? '' : 'none';
+                if (match) groupVisible++;
+            });
+            group.classList.toggle('is-hidden', groupVisible === 0 && query !== '');
+            if (groupVisible > 0 || query === '') anyVisible = true;
+        });
+        var empty = document.getElementById('ar-empty');
+        if (empty) empty.hidden = anyVisible;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initial population of the create-modal cascade so the first open
+        // shows a sensible category list (empty topic = empty category list).
+        rebuildCategoryDropdown(document.getElementById('cr-topic'));
+
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('click', 'ar-open-create', openCreateModal);
+            window.krtEvents.on('click', 'ar-open-edit', openEditModal);
+            window.krtEvents.on('click', 'ar-open-delete', function (btn) {
+                confirmAndDelete(btn.getAttribute('data-ar-id'));
+            });
+            window.krtEvents.on('click', 'ar-delete-group', function (btn) {
+                confirmAndDeleteGroup(
+                    parseInt(btn.getAttribute('data-ar-from-rank'), 10),
+                    parseInt(btn.getAttribute('data-ar-to-rank'), 10));
+            });
+            window.krtEvents.on('click', 'ar-close-create', function () { closeModal('modal-create'); });
+            window.krtEvents.on('click', 'ar-close-edit',   function () { closeModal('modal-edit'); });
+            window.krtEvents.on('click', 'ar-submit-create', submitCreate);
+            window.krtEvents.on('click', 'ar-submit-edit',   submitEdit);
+            window.krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
+            window.krtEvents.on('input', 'ar-rank-from', syncToRank);
+        }
+
+        // Native input listener for the rank-from inputs so the readonly
+        // toRank reflects every keystroke (krtEvents covers most events but
+        // we keep this redundant listener for the brand-new fields that
+        // haven't carried data-trigger before).
+        document.querySelectorAll('.ar-rank-from').forEach(function (el) {
+            el.addEventListener('input', function () { syncToRank(el); });
+        });
+
+        var filter = document.getElementById('ar-filter');
+        if (filter) filter.addEventListener('input', applyFilter);
+    });
+    /*]]>*/
 </script>
 </body>
 </html>
