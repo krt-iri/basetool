@@ -164,12 +164,15 @@ public class OperationController {
           "For each participant across all missions of the operation, returns the time-share "
               + "(percent), the personal out-of-pocket reimbursement (mission EXPENSE entries "
               + "they own + refinery `expenses + otherExpenses` they own), the per-share amount "
-              + "(totalSum × percentage / 100, 0 for DONATE) and the resulting total payout "
-              + "amount. Also includes the paid-out flag set by mission managers (`paidOut`, "
-              + "`paidOutAt`, `paidOutByName`) — absent flag rows are treated as `paidOut=false`. "
-              + "A participant who chose DONATE in any mission is treated as DONATE for the "
-              + "whole operation; their reimbursement is still paid (it is their own money "
-              + "returned) but their share is contributed to the org.")
+              + "(totalSum × percentage / 100, 0 for DONATE), the in-game banking transfer fee "
+              + "deducted from the gross payout (`transferFee`, rate from the runtime-editable "
+              + "`operation.transfer_fee_rate` system setting, default 0.005 = 0.5%) and the "
+              + "resulting net payout amount (`payoutAmount = personalExpenses + shareAmount − "
+              + "transferFee`). Also includes the paid-out flag set by mission managers "
+              + "(`paidOut`, `paidOutAt`, `paidOutByName`) — absent flag rows are treated as "
+              + "`paidOut=false`. A participant who chose DONATE in any mission is treated as "
+              + "DONATE for the whole operation; their reimbursement is still paid (it is their "
+              + "own money returned) but their share is contributed to the org.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Payout breakdown returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),

@@ -60,12 +60,13 @@
                 <input type="hidden" name="ageYellowVersion" th:value="${ageYellowVersion}">
                 <input type="hidden" name="ageRedVersion" th:value="${ageRedVersion}">
                 <input type="hidden" name="refineryRoundingVersion" th:value="${refineryRoundingVersion}">
-                
+                <input type="hidden" name="transferFeeVersion" th:value="${transferFeeVersion}">
+
                 <div class="form-group" style="max-width: 300px;">
                     <label for="ageYellowDays" th:text="#{admin.settings.orders.yellowDays}">Tage bis gelbe Markierung</label>
                     <input type="number" id="ageYellowDays" name="ageYellowDays" th:value="${ageYellowDays}" min="0" required>
                 </div>
-                
+
                 <div class="form-group" style="max-width: 300px;">
                     <label for="ageRedDays" th:text="#{admin.settings.orders.redDays}">Tage bis rote Markierung</label>
                     <input type="number" id="ageRedDays" name="ageRedDays" th:value="${ageRedDays}" min="0" required>
@@ -74,7 +75,7 @@
                 <div class="data-section mt-2">
                     <h2 th:text="#{admin.settings.refinery}">Raffinerie</h2>
                     <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
-                    
+
                     <div class="form-group" style="max-width: 300px;">
                         <label for="refineryRoundingMode" th:text="#{admin.settings.refinery.roundingMode}">Rundungsmodus (Units -> SCU)</label>
                         <select id="refineryRoundingMode" name="refineryRoundingMode" required>
@@ -83,7 +84,17 @@
                         </select>
                     </div>
                 </div>
-                
+
+                <div class="data-section mt-2">
+                    <h2 th:text="#{admin.settings.operations}">Operationen</h2>
+                    <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.operations.description}">Konfiguration der ingame-Überweisungsgebühr, die vom Auszahlungsbetrag jedes Teilnehmers abgezogen wird.</p>
+
+                    <div class="form-group" style="max-width: 300px;">
+                        <label for="transferFeePercent" th:text="#{admin.settings.operations.transferFeeRate}">Überweisungsgebühr (%)</label>
+                        <input type="number" id="transferFeePercent" name="transferFeePercent" th:value="${transferFeePercent}" min="0" max="99.99" step="0.01" required>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn mt-1" th:text="#{admin.settings.save}">Speichern</button>
             </form>
         </div>

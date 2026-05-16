@@ -58,8 +58,13 @@ import org.springframework.transaction.annotation.Transactional;
  * refinery orders' costs where they are the owner) as a "reimbursement off the top" before the
  * remaining {@code totalSum} is split per participation percentage among PAYOUT participants.
  * DONATE participants still get their personal reimbursement (their own money) but their share is
- * not distributed. {@link #setPayoutStatus(UUID, String, boolean)} provides the mission-manager
- * toggle that records whether a participant has been paid out.
+ * not distributed. Finally, an in-game banking fee is deducted from every participant's gross
+ * payout so the displayed amount matches what their mobiGlas will actually receive. The fee rate is
+ * runtime-editable: it lives under the {@code operation.transfer_fee_rate} key in {@code
+ * system_setting} (seeded to 0.005 = 0.5% by Flyway), can be tuned from {@code /admin/settings} by
+ * officers and admins, and degrades to {@link #DEFAULT_TRANSFER_FEE_RATE} when the row is missing,
+ * blank or unparseable. {@link #setPayoutStatus(UUID, String, boolean)} provides the
+ * mission-manager toggle that records whether a participant has been paid out.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,11 +74,36 @@ public class OperationService {
 
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
+  /**
+   * Key under which the in-game banking fee rate is stored in {@code system_setting}. Seeded by
+   * {@code V79__add_operation_transfer_fee_rate_setting.sql} with the documented default and
+   * editable from {@code /admin/settings} by officers and admins.
+   */
+  static final String TRANSFER_FEE_RATE_SETTING_KEY = "operation.transfer_fee_rate";
+
+  /**
+   * Fallback in-game banking fee rate used when the {@code operation.transfer_fee_rate} system
+   * setting is absent, blank or unparseable. Mirrors Star Citizen's documented Spectrum / mobiGlas
+   * banking charge of 0.5% on every aUEC transfer to the recipient. Kept as a hard fallback so a
+   * truncated or accidentally-deleted setting row degrades gracefully to the historical default
+   * instead of crashing the payout view (which is gated behind authentication and used by mission
+   * managers settling operations — silent zero would be far worse than a possibly-stale rate).
+   */
+  static final BigDecimal DEFAULT_TRANSFER_FEE_RATE = new BigDecimal("0.005");
+
+  /**
+   * Upper bound for the in-game banking fee rate. A value &gt;= 1 would deduct the entire payout
+   * (or more), which is never a legitimate Star Citizen banking fee — reject defensively and fall
+   * back to the documented default instead of zeroing out every payout silently.
+   */
+  private static final BigDecimal MAX_TRANSFER_FEE_RATE = BigDecimal.ONE;
+
   private final OperationRepository operationRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
+  private final SystemSettingService systemSettingService;
 
   /**
    * Returns paged operation list.
@@ -187,7 +217,7 @@ public class OperationService {
    * and refinery orders by mission id so the percentage AND the money number can be derived in one
    * pass. The percentage is the participant's clamped attendance time over the operation's clamped
    * attendance time (mirrors the previous behavior); the money number is {@code personalExpenses +
-   * sharePayout} where:
+   * sharePayout − transferFee} where:
    *
    * <ul>
    *   <li><b>personalExpenses</b> reimburses each participant for the expenses attributed to them —
@@ -196,6 +226,14 @@ public class OperationService {
    *   <li><b>sharePayout</b> is {@code totalSum × percentage / 100} for PAYOUT participants and
    *       {@link BigDecimal#ZERO} for DONATE participants. Their share is contributed to the org
    *       but the reimbursement is still paid out (it is the participant's own money returned).
+   *   <li><b>transferFee</b> is {@code (personalExpenses + sharePayout) × transferFeeRate} — Star
+   *       Citizen's in-game banking deducts a small fraction from any aUEC transfer to the
+   *       recipient, so this fee is subtracted from the gross payout to show what actually lands in
+   *       the participant's mobiGlas. The rate is runtime-editable via the {@code
+   *       operation.transfer_fee_rate} system setting (default 0.005 = 0.5%, fallback applied when
+   *       the row is absent or unparseable). Applies to PAYOUT and DONATE participants alike
+   *       (DONATE participants only receive their reimbursement, but that transfer also incurs the
+   *       fee).
    * </ul>
    *
    * <p>The {@code paidOut*} fields are merged in from {@link OperationPayoutStatus} rows by
@@ -227,6 +265,7 @@ public class OperationService {
     BigDecimal totalSum = computeTotalSum(allEntries, allOrders);
     Map<String, BigDecimal> personalExpensesByKey =
         computePersonalExpensesByParticipant(allEntries, allOrders);
+    BigDecimal transferFeeRate = resolveTransferFeeRate();
 
     ParticipationBreakdown breakdown = computeParticipationBreakdown(operation);
 
@@ -254,7 +293,17 @@ public class OperationService {
               : totalSum
                   .multiply(BigDecimal.valueOf(percentage))
                   .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
-      BigDecimal payoutAmount = personalExpenses.add(shareAmount);
+      BigDecimal grossPayout = personalExpenses.add(shareAmount);
+      // Star Citizen banking deducts a small percentage from any aUEC transfer to the recipient —
+      // model that here so the displayed Auszahlungsbetrag is what actually lands in the
+      // participant's mobiGlas. The rate is loaded once per call from system_setting (see
+      // resolveTransferFeeRate) so officers/admins can adjust it without a redeploy. Rounded
+      // HALF_UP to match the other monetary fields. Negative gross would produce a negative fee
+      // mathematically; in practice grossPayout is always >= 0 (expenses are positive, share is
+      // >= 0), so HALF_UP rounding here mirrors the rest of the pipeline.
+      BigDecimal transferFee =
+          grossPayout.multiply(transferFeeRate).setScale(2, RoundingMode.HALF_UP);
+      BigDecimal payoutAmount = grossPayout.subtract(transferFee);
 
       OperationPayoutStatus status = statusByKey.get(key);
       boolean paidOut = status != null && status.isPaidOut();
@@ -272,6 +321,7 @@ public class OperationService {
               pref,
               personalExpenses,
               shareAmount,
+              transferFee,
               payoutAmount,
               paidOut,
               paidOutAt,
@@ -343,6 +393,49 @@ public class OperationService {
                         + participantKey
                         + "' is not part of operation "
                         + operationId));
+  }
+
+  /**
+   * Loads and validates the runtime-editable in-game transfer-fee rate from {@code system_setting}.
+   * Falls back to {@link #DEFAULT_TRANSFER_FEE_RATE} when the row is absent, blank, not a number,
+   * negative or {@code >= 1} (which would zero-out or invert every payout). The fallback is logged
+   * at WARN so an operator sees the misconfiguration in the access log instead of silently working
+   * off a stale default. Called once per {@link #getOperationPayouts(UUID)} invocation — the
+   * underlying repository hit is a single PK lookup on a tiny table, so caching is unnecessary and
+   * would only introduce stale-value risk after admin edits.
+   *
+   * @return a non-null, validated rate in the range {@code [0, 1)}; either the persisted setting
+   *     value or {@link #DEFAULT_TRANSFER_FEE_RATE} when the persisted value is unusable
+   */
+  @NotNull
+  private BigDecimal resolveTransferFeeRate() {
+    Optional<String> raw = systemSettingService.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
+    if (raw.isEmpty() || raw.get().isBlank()) {
+      log.warn(
+          "System setting '{}' is missing or blank, falling back to default {}",
+          TRANSFER_FEE_RATE_SETTING_KEY,
+          DEFAULT_TRANSFER_FEE_RATE);
+      return DEFAULT_TRANSFER_FEE_RATE;
+    }
+    try {
+      BigDecimal parsed = new BigDecimal(raw.get().trim());
+      if (parsed.signum() < 0 || parsed.compareTo(MAX_TRANSFER_FEE_RATE) >= 0) {
+        log.warn(
+            "System setting '{}'={} is out of range [0, 1), falling back to default {}",
+            TRANSFER_FEE_RATE_SETTING_KEY,
+            parsed,
+            DEFAULT_TRANSFER_FEE_RATE);
+        return DEFAULT_TRANSFER_FEE_RATE;
+      }
+      return parsed;
+    } catch (NumberFormatException e) {
+      log.warn(
+          "System setting '{}'='{}' is not a valid decimal, falling back to default {}",
+          TRANSFER_FEE_RATE_SETTING_KEY,
+          raw.get(),
+          DEFAULT_TRANSFER_FEE_RATE);
+      return DEFAULT_TRANSFER_FEE_RATE;
+    }
   }
 
   /**

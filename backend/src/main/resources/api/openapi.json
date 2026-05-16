@@ -4326,6 +4326,105 @@
         }
       }
     },
+    "/api/v1/operations/{id}/payouts/paid-out" : {
+      "put" : {
+        "tags" : [ "Operations" ],
+        "summary" : "Toggle the per-participant paid-out flag for an operation",
+        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`).",
+        "operationId" : "setPayoutStatus",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OperationPayoutStatusUpdateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Paid-out flag updated.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OperationPayoutDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{id}" : {
       "get" : {
         "tags" : [ "Missions" ],
@@ -22076,8 +22175,8 @@
     "/api/v1/operations/{id}/payouts" : {
       "get" : {
         "tags" : [ "Operations" ],
-        "summary" : "Get participation-time payout breakdown",
-        "description" : "For each participant across all missions of the operation, returns the share (in percent) of valid participation time. A participant who chose DONATE in any mission is treated as DONATE for the whole operation.",
+        "summary" : "Get participation payout breakdown with amounts and paid-out status",
+        "description" : "For each participant across all missions of the operation, returns the time-share (percent), the personal out-of-pocket reimbursement (mission EXPENSE entries they own + refinery `expenses + otherExpenses` they own), the per-share amount (totalSum × percentage / 100, 0 for DONATE), the in-game banking transfer fee deducted from the gross payout (`transferFee`, rate from the runtime-editable `operation.transfer_fee_rate` system setting, default 0.005 = 0.5%) and the resulting net payout amount (`payoutAmount = personalExpenses + shareAmount − transferFee`). Also includes the paid-out flag set by mission managers (`paidOut`, `paidOutAt`, `paidOutByName`) — absent flag rows are treated as `paidOut=false`. A participant who chose DONATE in any mission is treated as DONATE for the whole operation; their reimbursement is still paid (it is their own money returned) but their share is contributed to the org.",
         "operationId" : "getOperationPayouts",
         "parameters" : [ {
           "name" : "id",
@@ -27936,6 +28035,61 @@
           }
         }
       },
+      "OperationPayoutStatusUpdateDto" : {
+        "type" : "object",
+        "properties" : {
+          "participantKey" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "paidOut" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "participantKey" ]
+      },
+      "OperationPayoutDto" : {
+        "type" : "object",
+        "properties" : {
+          "participantId" : {
+            "type" : "string"
+          },
+          "participantName" : {
+            "type" : "string"
+          },
+          "participationPercentage" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "payoutPreference" : {
+            "type" : "string",
+            "enum" : [ "PAYOUT", "DONATE" ]
+          },
+          "personalExpenses" : {
+            "type" : "number"
+          },
+          "shareAmount" : {
+            "type" : "number"
+          },
+          "transferFee" : {
+            "type" : "number"
+          },
+          "payoutAmount" : {
+            "type" : "number"
+          },
+          "paidOut" : {
+            "type" : "boolean"
+          },
+          "paidOutAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "paidOutByName" : {
+            "type" : "string"
+          }
+        }
+      },
       "FrequencyTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -30176,25 +30330,6 @@
             "items" : {
               "type" : "string"
             }
-          }
-        }
-      },
-      "OperationPayoutDto" : {
-        "type" : "object",
-        "properties" : {
-          "participantId" : {
-            "type" : "string"
-          },
-          "participantName" : {
-            "type" : "string"
-          },
-          "participationPercentage" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "payoutPreference" : {
-            "type" : "string",
-            "enum" : [ "PAYOUT", "DONATE" ]
           }
         }
       },
