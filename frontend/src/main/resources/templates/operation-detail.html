@@ -189,50 +189,144 @@
                 }
             }
 
-            /* Payout panel: pre-computed amount + paid-out checkbox.
-               The amount column shows the total payout on top and the
-               reimbursement portion as a smaller dim subtitle so users
-               can see how much of the number is "their own money back". */
-            .payout-table .payout-amount-cell {
+            /* =========================================================
+               Auszahlungen panel — Payout table layout
+               -----------------------------------------------------------
+               The parent .mission-column applies a global
+                 ".col-content table td:last-child { text-align: right }"
+               rule that's meant for action-button columns. The payout
+               table's last column is the "Bezahlt" checkbox, which under
+               that rule clings to the right edge and looks unbalanced —
+               we reset it per-column to the semantically correct
+               alignment instead: text left, percentages and amounts
+               right, status badge + checkbox centered. Numbers use
+               tabular figures so the digits line up vertically across
+               rows (best practice for monetary tables). Paid rows get a
+               subtle profit-green left border on the checkbox cell as a
+               scan-at-a-glance marker.
+               ========================================================= */
+            .payout-table {
+                margin-top: 1rem;
+            }
+            /* Override the inherited last-child right-align — the
+               payout-paid column is centered, not right-pushed. */
+            .payout-table th:last-child,
+            .payout-table td:last-child {
+                text-align: center;
                 white-space: nowrap;
+            }
+            .payout-table th.payout-user-col,
+            .payout-table td.payout-user-cell {
+                text-align: left;
+                font-weight: 600;
+            }
+            .payout-table th.payout-percentage-col,
+            .payout-table td.payout-percentage-cell {
+                text-align: right;
+                white-space: nowrap;
+                font-variant-numeric: tabular-nums;
+                color: var(--color-gray-2);
+            }
+            .payout-table th.payout-preference-col,
+            .payout-table td.payout-preference-cell {
+                text-align: left;
+                white-space: nowrap;
+            }
+            .payout-preference-badge {
+                display: inline-block;
+                padding: 0.18rem 0.65rem;
+                border: 1px solid currentColor;
+                border-radius: 999px;
+                font-size: 0.78em;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                line-height: 1.4;
+            }
+            .payout-preference-badge--payout {
+                color: var(--color-primary);
+                background-color: rgba(231, 126, 35, 0.12);
+            }
+            .payout-preference-badge--donate {
+                /* Marine-Corps purple from the Styleguide for the
+                   "donating" preference — distinct from the brand orange
+                   so PAYOUT/DONATE are recognisable at a glance. */
+                color: var(--color-dept-marine, #7A5E96);
+                background-color: rgba(122, 94, 150, 0.14);
+            }
+            .payout-table th.payout-amount-col,
+            .payout-table td.payout-amount-cell {
+                text-align: right;
+                white-space: nowrap;
+                font-variant-numeric: tabular-nums;
+                min-width: 11em; /* fits "1.500.000,00 aUEC" without wrap */
             }
             .payout-table .payout-amount-value {
                 display: block;
+                font-weight: 600;
+                color: var(--color-gray-1);
             }
             .payout-table .payout-amount-reimbursement {
                 display: block;
-                font-size: 0.8em;
+                font-size: 0.78em;
                 color: var(--color-gray-2);
-                margin-top: 0.15rem;
+                font-style: italic;
+                margin-top: 0.2rem;
+            }
+            .payout-table th.payout-paid-col,
+            .payout-table td.payout-paid-cell {
+                text-align: center;
+                white-space: nowrap;
+                min-width: 9em; /* breathing room for checkbox + audit name */
             }
             .payout-table .payout-paid-label {
                 display: inline-flex;
                 align-items: center;
-                gap: 0.5rem;
+                justify-content: center;
+                gap: 0.55rem;
                 cursor: pointer;
                 margin: 0;
                 font-weight: normal;
                 color: inherit;
             }
             .payout-table .payout-paid-checkbox {
-                /* Fat-finger target: minimum 18×18 so a 44px parent label
-                   still hits the 44px responsive-design minimum. */
-                width: 18px;
-                height: 18px;
+                /* 20×20 keeps the touch target generous while the
+                   wrapping <label> still satisfies the 44px-min rule. */
+                width: 20px;
+                height: 20px;
                 cursor: pointer;
                 accent-color: var(--color-primary);
                 flex: 0 0 auto;
+                margin: 0;
             }
             .payout-table .payout-paid-status {
-                font-size: 0.8em;
+                font-size: 0.78em;
                 color: var(--color-gray-2);
+                line-height: 1.2;
             }
             .payout-table .payout-paid-yes {
-                color: var(--color-success, var(--color-primary));
-                font-weight: bold;
+                color: var(--color-dept-profit, #239E33);
+                font-weight: 600;
             }
             .payout-table .payout-paid-no {
                 color: var(--color-gray-2);
+            }
+            /* Faint scan-at-a-glance marker for paid rows: a 3px
+               profit-green inset on the Bezahlt cell + a very subtle
+               row tint. ":has()" is widely supported in modern browsers;
+               older browsers simply skip the marker, the checkbox state
+               itself remains the source of truth. */
+            .payout-table tbody tr:has(.payout-paid-checkbox:checked) {
+                background-color: rgba(35, 158, 51, 0.06);
+            }
+            .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell {
+                box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33);
+            }
+            @media (max-width: 768px) {
+                .payout-table th,
+                .payout-table td {
+                    padding: 0.75rem 0.6rem;
+                }
             }
 
             /* Nested mission-finance cards inside the finance panel. */
@@ -390,9 +484,9 @@
                         <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}" class="payout-table">
                             <thead>
                                 <tr>
-                                    <th th:text="#{general.user}">Nutzer</th>
-                                    <th th:text="#{mission.payout.percentage}" sec:authorize="isAuthenticated()">Anteil</th>
-                                    <th th:text="#{mission.payout.preference}">Auszahlungsart</th>
+                                    <th th:text="#{general.user}" class="payout-user-col">Nutzer</th>
+                                    <th th:text="#{mission.payout.percentage}" sec:authorize="isAuthenticated()" class="payout-percentage-col">Anteil</th>
+                                    <th th:text="#{mission.payout.preference}" class="payout-preference-col">Auszahlungsart</th>
                                     <th th:text="#{operation.payout.amount}" sec:authorize="isAuthenticated()" class="payout-amount-col">Auszahlungsbetrag</th>
                                     <th th:text="#{operation.payout.paid}" sec:authorize="isAuthenticated()" class="payout-paid-col">Bezahlt</th>
                                 </tr>
@@ -400,18 +494,18 @@
                             <tbody>
                                 <tr th:each="payout : ${operationPayouts}"
                                     th:attr="data-participant-id=${payout.participantId}">
-                                    <td th:text="${payout.participantName}">User</td>
-                                    <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'NONE', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()">0,00%</td>
-                                    <td>
-                                        <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
-                                        <span th:if="${payout.payoutPreference.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</span>
+                                    <td th:text="${payout.participantName}" class="payout-user-cell">User</td>
+                                    <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()" class="payout-percentage-cell">0,00%</td>
+                                    <td class="payout-preference-cell">
+                                        <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}" class="payout-preference-badge payout-preference-badge--payout">Auszahlen</span>
+                                        <span th:if="${payout.payoutPreference.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}" class="payout-preference-badge payout-preference-badge--donate">Spenden</span>
                                     </td>
                                     <td class="payout-amount-cell" sec:authorize="isAuthenticated()">
                                         <span class="payout-amount-value"
-                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
                                         <span class="payout-amount-reimbursement"
-                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
-                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'NONE', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
+                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
+                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
@@ -452,7 +546,7 @@
                     <div style="margin-bottom: 1.5rem; text-align: center;">
                         <h3 style="margin: 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-primary);">
                             <span th:text="#{operation.finances.total}">Gesamtergebnis</span>:
-                            <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'NONE', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
+                            <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'POINT', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
                         </h3>
                     </div>
 
@@ -464,7 +558,7 @@
                                  data-trigger="operation-toggle-mission-finances">
                                 <strong style="color: var(--color-primary);" th:text="${msnFin.missionName}">Mission Name</strong>
                                 <span>
-                                    <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                    <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
                                     <span class="toggle-icon-msn">&#9660;</span>
                                 </span>
                             </div>
@@ -487,7 +581,7 @@
                                                 </td>
                                                 <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
                                                 <td th:text="${entry.note}">Notiz</td>
-                                                <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'"
+                                                <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'"
                                                     th:class="${entry.type.name() == 'INCOME'} ? 'text-success' : 'text-danger'">0,00 aUEC</td>
                                             </tr>
                                             <tr th:each="order : ${msnFin.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
@@ -496,7 +590,7 @@
                                                 </td>
                                                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                                 <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color:var(--color-primary);text-decoration:none;">Raffinerieauftrag</a></td>
-                                                <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'NONE', 2, 'COMMA')} + ' aUEC'" class="text-danger">0,00 aUEC</td>
+                                                <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC'" class="text-danger">0,00 aUEC</td>
                                             </tr>
                                         </tbody>
                                     </table>
