@@ -555,10 +555,18 @@
 
                 <select id="pm-bulk-category" th:attr="aria-label=#{promotion.manage.bulk.category}">
                     <option value="" th:text="#{promotion.manage.bulk.category.placeholder}">Kategorie wählen…</option>
+                    <!--/*
+                      Same Thymeleaf gotcha as the matrix's category header row: a th:with-derived
+                      topicId combined with categoriesByTopic[topicId] on a nested th:each renders
+                      zero <option> elements (the <optgroup> stays, but its body is empty), so the
+                      officer would see only an empty topic label and could never pick a category
+                      for bulk edit. Calling .get(...) explicitly on the map sidesteps the issue
+                      and restores the options. The <optgroup> grouping is preserved so the
+                      dropdown keeps its topic-then-category hierarchy.
+                    */-->
                     <optgroup th:each="topic : ${topics}"
-                              th:label="${topic.name}"
-                              th:with="topicId=${topic.id.toString()}">
-                        <option th:each="cat : ${categoriesByTopic[topicId]}"
+                              th:label="${topic.name}">
+                        <option th:each="cat : ${categoriesByTopic.get(topic.id.toString())}"
                                 th:value="${cat.id}"
                                 th:text="${cat.name}">Kategorie</option>
                     </optgroup>
@@ -620,14 +628,23 @@
                             <th class="pm-checkbox-cell pm-checkbox-col" aria-hidden="true"></th>
                             <th class="pm-member-cell pm-member-col" aria-hidden="true"></th>
                             <th class="pm-eligibility-cell pm-eligibility-col" aria-hidden="true"></th>
-                            <th:block th:each="topic : ${topics}"
-                                      th:with="topicId=${topic.id.toString()}">
-                                <th th:each="cat : ${categoriesByTopic[topicId]}"
-                                    class="pm-cat-col"
-                                    th:attr="data-pm-topic-id=${topic.id},data-pm-category-id=${cat.id},data-pm-topic-name=${topic.name},data-pm-category-name=${cat.name}"
-                                    th:text="${cat.name}"
-                                    th:title="${cat.description}">Kategorie</th>
-                            </th:block>
+                            <!--/*
+                              Iterates the flat ${categories} list in the same topic-then-sortOrder
+                              order the body rows use, so every category cell here lines up with the
+                              <td> below. The grouped categoriesByTopic map cannot be used here:
+                              wrapping the topic loop in <th:block th:with="topicId=...">…<th th:each="cat
+                              : ${categoriesByTopic[topicId]}"> renders zero <th> cells in this template
+                              (verified by MockMvc dump) even though the same map access works on the
+                              topic row's colspan attribute when inlined as ${categoryCountByTopic[topic.id.toString()]}.
+                              Iterating the pre-flattened list sidesteps that and produces one <th> per
+                              category, with cat.topicId / cat.topicName / cat.name / cat.description
+                              supplying the data attributes and label.
+                            */-->
+                            <th th:each="cat : ${categories}"
+                                class="pm-cat-col"
+                                th:attr="data-pm-topic-id=${cat.topicId},data-pm-category-id=${cat.id},data-pm-topic-name=${cat.topicName},data-pm-category-name=${cat.name}"
+                                th:text="${cat.name}"
+                                th:title="${cat.description}">Kategorie</th>
                         </tr>
                     </thead>
                     <tbody>
