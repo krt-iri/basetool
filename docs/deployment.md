@@ -373,9 +373,9 @@ sudo -u deploy /usr/bin/docker compose \
     -f /var/iri/code/docker-compose.yml --profile prod \
     stop frontend
 
-curl -i https://basetool.iri-base.org/                  # expect HTTP/1.1 503 + HTML
+curl -i https://iri-base.org/                  # expect HTTP/1.1 503 + HTML
 curl -i -H 'Accept: application/json' \
-        https://basetool.iri-base.org/api/v1/missions   # expect HTTP/1.1 503 + JSON
+        https://iri-base.org/api/v1/missions   # expect HTTP/1.1 503 + JSON
 
 sudo -u deploy /usr/bin/docker compose \
     -f /var/iri/code/docker-compose.yml --profile prod \
