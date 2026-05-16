@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:1af9e299-0d19-4f7a-b8b2-2d148044c2cb" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:aa51689f-575a-404a-ac98-1cdc9d0bcda7" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-05-16T13:39:26Z</timestamp>
+    <timestamp>2026-05-16T19:01:50Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -7097,6 +7097,82 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar">
+      <publisher>VMware, Inc.</publisher>
+      <group>org.springframework.boot</group>
+      <name>spring-boot-starter-webmvc</name>
+      <version>4.0.6</version>
+      <description>Starter for using Spring MVC and Tomcat</description>
+      <hashes>
+        <hash alg="MD5">a88db0435d9d02d306f7ea88066a88cc</hash>
+        <hash alg="SHA-1">a7ac55e4eb7cf4d2931557135f90870003641290</hash>
+        <hash alg="SHA-256">a323bb1d72d680a9e492bdcf13731ae9ff443b96cce68072ac2b13fe1fe8ff82</hash>
+        <hash alg="SHA-512">382f70618b88f6240911aae60e7a1dc0f8a420ebd1119802d137d8eb742f79e4d74f14d704ab63814eaf3a486ed2edc803bb9a2800065a854216e2fbcb0d3b6b</hash>
+        <hash alg="SHA-384">6ea7d06ce646de8e8d44a42a8544561bb4d563b1b88956bf099d70bc9d2fc587f4624bed063da922eb1ab752351bfdc2</hash>
+        <hash alg="SHA3-384">28cfe9908d720472bb15815bdb95e8eed643165d05e0ffecc6a52a29b46f7de9954133ddf2d2b24894421f2535493f74</hash>
+        <hash alg="SHA3-256">ca4f3deb1eb2c4bbbccea43fe19b6ce9fb6c8c71eb121b02f45a85019225f231</hash>
+        <hash alg="SHA3-512">4ea9ba069923a68f34af9e9e1eff2f329f08a0f3275a6b013ded003a3f9348da5ad0341c45534b22c083e03225de95375d984b6dcb874a8bf965b4dce3637985</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-boot/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-boot</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar">
+      <publisher>VMware, Inc.</publisher>
+      <group>org.springframework.boot</group>
+      <name>spring-boot-starter-websocket</name>
+      <version>4.0.6</version>
+      <description>Starter for using Spring MVC WebSocket support</description>
+      <hashes>
+        <hash alg="MD5">a0d9168706a9a088bf7cada7224dac22</hash>
+        <hash alg="SHA-1">112faa3d8e866277472263d739c267214d316a4c</hash>
+        <hash alg="SHA-256">3d1c47ad95c263976588f974187fce7dce07f7295b4453c54cfef747209d29df</hash>
+        <hash alg="SHA-512">380a04271b0ba9baad1fcfa3bac8f176ca9f8f53b91acec442e3c5c0ef854dde5513e62932debb6d30ba5f57d51ba6711bc57d7f93a18be2bc22c2c30a84418b</hash>
+        <hash alg="SHA-384">2a4d4367c72a892cff4a636ec2c30564fd13dbc4757f7d7a1c78786d9e2d6a1a1e99572dca6acbfd65301ac56922dc7d</hash>
+        <hash alg="SHA3-384">a3a07301d32e20e477d2bae9a92c0952150a873f81de7a11fe704498c9ff62b12e9190f92d35425e89f5faf0f1cb62f8</hash>
+        <hash alg="SHA3-256">88abd4204217b9be6d6994c37c5a494e66cc007f9235ca2e88161212c789b876</hash>
+        <hash alg="SHA3-512">84e8c2416bf37b8a57b6cea86e5a8484736870a84b369b45d517002daa4cff51ce1191f137759a019844b6a970202e2725813e3e1cae731026764b12bbdbc4c3</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-boot/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-boot</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar">
       <publisher>VMware, Inc.</publisher>
       <group>org.springframework.boot</group>
@@ -7461,6 +7537,44 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         </license>
       </licenses>
       <purl>pkg:maven/org.springframework.boot/spring-boot-webmvc@4.0.6?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-boot/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-boot</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar">
+      <publisher>VMware, Inc.</publisher>
+      <group>org.springframework.boot</group>
+      <name>spring-boot-websocket</name>
+      <version>4.0.6</version>
+      <description>Spring Boot WebSocket</description>
+      <hashes>
+        <hash alg="MD5">acaf42dcb8d7646d4ccfa376d1fd0f9e</hash>
+        <hash alg="SHA-1">61b53c63d89880e8f5f5579bc47980a5cfba027b</hash>
+        <hash alg="SHA-256">3e1fdfce8cdddd1ba3b782653bf9697562619c07c3a374d3eb5723db76523e5d</hash>
+        <hash alg="SHA-512">13492f91d56a6b1d12ca90c78063cfc5b5c5d0b040d852eeca974a83b13191aa1cc57a642e6e569a7b1a57adb00678ba6dee6efd28c6e686cf9f81bad2028caf</hash>
+        <hash alg="SHA-384">6ece36c6e8e1416522af8b27d02bb4da5761dc2430a083f4dbeba4972189b4ead4dbd022552d3c93c51a070f278f5583</hash>
+        <hash alg="SHA3-384">4ffe7cebc2afa3b96f85bf1cab9b2d434c32c2da7a8f1e7985b6183f6c645c0fd288f9f653c10cd9c4b4b22f77685412</hash>
+        <hash alg="SHA3-256">1fc5ef398e823c3c23460dd2ee54e8571f3bc854dfd42e6c4ca498324e1db37a</hash>
+        <hash alg="SHA3-512">d7e61c2669bb8e8f4662856baa2cddfde55ee41567511b1f357659cfd92a116a8b54d05c156ff1a041a6791117c89655c500b09ff1d57951d0a35b97901d2aa8</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -8216,6 +8330,44 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar">
+      <publisher>Spring IO</publisher>
+      <group>org.springframework</group>
+      <name>spring-messaging</name>
+      <version>7.0.7</version>
+      <description>Spring Messaging</description>
+      <hashes>
+        <hash alg="MD5">643830ddf060cba2c7abafd66bb31e9b</hash>
+        <hash alg="SHA-1">5c053835a5c1e561fc3af7a680dbb0ad006be225</hash>
+        <hash alg="SHA-256">e8e717b1959dcf2fa90bb80e967605143b97c9606800c13c030b99fc5fcf5e47</hash>
+        <hash alg="SHA-512">9517e78c6406d74c1881f1641517d3d3fc07fd5423e2f283aeecb8891007b688f52f26486610703ae6fc83b9c4f08ba4711df138b8b7394eaff52b81226b50c6</hash>
+        <hash alg="SHA-384">b83c47ac8ab7a8505b3ddf1b03c795fb4de870dcd5156c4ec0c134a1f35d5858e1605d8a8a60cab92b79e33d2d2ca3ac</hash>
+        <hash alg="SHA3-384">5e5eae4264f53921db615d9023f1fe99c5ef0d97ab4a79a1f93b2adc3bcd931aa74e38ce708a2cacde3e5978b9fc2215</hash>
+        <hash alg="SHA3-256">18525fc41a06ac712354447d8c5504b38935565395b4c0858fbcce7545aa58e6</hash>
+        <hash alg="SHA3-512">a51f464575a7740cdf771ab389342f6244f3e76224aac3f809504b0652b3bc30abd04459033727af28f59e2730d1292e44efe1870923f293d3967f76d8699730</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io/projects/spring-framework</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-framework/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-framework</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.springframework/spring-oxm@7.0.7?type=jar">
       <publisher>Spring IO</publisher>
       <group>org.springframework</group>
@@ -8428,6 +8580,44 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         </license>
       </licenses>
       <purl>pkg:maven/org.springframework/spring-webmvc@7.0.7?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io/projects/spring-framework</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-framework/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-framework</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar">
+      <publisher>Spring IO</publisher>
+      <group>org.springframework</group>
+      <name>spring-websocket</name>
+      <version>7.0.7</version>
+      <description>Spring WebSocket</description>
+      <hashes>
+        <hash alg="MD5">1665c3e59c0e25b2afd02aeefe3578ee</hash>
+        <hash alg="SHA-1">b22df7ec1d134cf00ba42fca957e92df8a390c93</hash>
+        <hash alg="SHA-256">ff8bdcde4ab8717bd06c6be3a17fdc0695bfd6ba92bf44065c3275ef9aaba8a2</hash>
+        <hash alg="SHA-512">15b1d375c5a59f88e955ce1bb0bff04ec7cf7fb5f74f444bfd6cf9a178492bd23c29c60a350971954108e53ccba5b3394d2bc59bf0314b4c22ed2bd07b14ad5b</hash>
+        <hash alg="SHA-384">1bad1753dbec77855eeaa5ee33d942be052ceb8c5dbbb0ed33498ba0237f5093abbe8dd5bd0c40d770069b4cd0cbb3dc</hash>
+        <hash alg="SHA3-384">046253e8b5bfde481fd4392c685f317f7f27f103263ea23d48e5019fdd4a7786ae9020df840f464dd93a0851de82d638</hash>
+        <hash alg="SHA3-256">c35ef83b46c29980560a366bc0729b8200219599b37c8e12f49171df8b8b1f7a</hash>
+        <hash alg="SHA3-512">7f8c072641a660b30bc4bcc488d9209e29006ed9069d6e159cd93033dad1f25b70058c833e6b85a5f344574a033d3b43e5d4bf957427284f4a17dd80f8b82699</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -8941,6 +9131,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-test-autoconfigure@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.security/spring-security-test@7.0.5?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.session/spring-session-data-redis@4.0.3?type=jar"/>
@@ -9649,6 +9840,18 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-webflux@4.0.6?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar">
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-http-converter@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-jackson@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-webmvc@4.0.6?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar">
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar">
       <dependency ref="pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-autoconfigure@4.0.6?type=jar"/>
@@ -9697,6 +9900,11 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-servlet@4.0.6?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-web@7.0.7?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-webmvc@7.0.7?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar">
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.0.6?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.0.6?type=jar">
       <dependency ref="pkg:maven/org.springframework/spring-context@7.0.7?type=jar"/>
@@ -9804,6 +10012,10 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.springframework/spring-expression@7.0.7?type=jar">
       <dependency ref="pkg:maven/org.springframework/spring-core@7.0.7?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar">
+      <dependency ref="pkg:maven/org.springframework/spring-beans@7.0.7?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-core@7.0.7?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.springframework/spring-oxm@7.0.7?type=jar">
       <dependency ref="pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.4?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-beans@7.0.7?type=jar"/>
@@ -9833,6 +10045,11 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework/spring-context@7.0.7?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-core@7.0.7?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-expression@7.0.7?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-web@7.0.7?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar">
+      <dependency ref="pkg:maven/org.springframework/spring-context@7.0.7?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-core@7.0.7?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-web@7.0.7?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar">
