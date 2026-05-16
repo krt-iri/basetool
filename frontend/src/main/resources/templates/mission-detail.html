@@ -497,7 +497,7 @@
                             </div>
                             <div class="flex-gap-sm"
                                  th:with="f=${frequencyByTypeId[freqType.id]}"
-                                 th:attr="data-freq-type-id=${freqType.id}">
+                                 th:attr="data-freq-type-id=${freqType.id}, data-version=${f != null ? f.version : ''}">
                                 <span class="freq-value-display"
                                       th:attr="data-freq-type-id=${freqType.id}"
                                       th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
@@ -548,7 +548,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr th:each="p : ${participants}">
+                <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
                     <td th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Username</td>
                     <td th:text="${p?.squadron != null ? p.squadron.shorthand : '-'}">Staffel</td>
                     <td th:text="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.name : '-'}">Job</td>
@@ -1543,6 +1543,7 @@
                             const match = result.body.find(f => f && f.frequencyType && f.frequencyType.id === typeId);
                             const display = document.querySelector('.freq-value-display[data-freq-type-id="' + typeId + '"]');
                             const editBtn = document.querySelector('.set-freq-btn[data-type-id="' + typeId + '"]');
+                            const rowContainer = document.querySelector('[data-freq-type-id="' + typeId + '"]:not(.freq-value-display):not(.set-freq-btn)');
                             if (display && match) {
                                 const formatted = Number(match.value).toFixed(2);
                                 display.textContent = formatted;
@@ -1550,6 +1551,13 @@
                             }
                             if (editBtn && match) {
                                 editBtn.setAttribute('data-current-value', String(match.value));
+                            }
+                            // Per-frequency data-version sync: keeps the row's optimistic-lock
+                            // counter fresh so a follow-up edit on the same frequency does not
+                            // ship a stale version. Touches the row container only — display
+                            // and edit-button data-version (if present) are derived from it.
+                            if (rowContainer && match && match.version != null) {
+                                rowContainer.setAttribute('data-version', String(match.version));
                             }
                         }
                         frequencyModal.style.display = 'none';
@@ -2375,12 +2383,22 @@
             if (participantId && missionDto.participants) {
                 const updatedParticipant = missionDto.participants.find(p => p.id === participantId);
                 if (updatedParticipant) {
+                    // Update the payout preference on the edit-button(s) so the next modal
+                    // pre-fills with the new value.
                     document.querySelectorAll('.edit-participant-btn[data-participant-id="' + participantId + '"]').forEach(btn => {
                         btn.setAttribute('data-payout-preference', value);
-                        if (updatedParticipant.version !== undefined) {
-                            btn.setAttribute('data-version', updatedParticipant.version);
-                        }
                     });
+                    // Row-wide data-version sync: keeps every data-version attribute on the
+                    // <tr> (and its descendant edit/delete buttons, modals) in lockstep with
+                    // the freshly-saved participant version. Without this, a follow-up click
+                    // on a different action in the same row would ship a stale version and
+                    // produce a spurious 409 — even though no other user has edited anything.
+                    if (window.MissionSubresource && updatedParticipant.version !== undefined) {
+                        window.MissionSubresource.syncVersion(
+                            'tr[data-participant-id="' + participantId + '"]',
+                            updatedParticipant.version
+                        );
+                    }
                 }
             }
         })
