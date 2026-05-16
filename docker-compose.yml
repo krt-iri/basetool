@@ -89,9 +89,13 @@ x-keycloak: &keycloak-template
     - /var/iri/keycloak/log:/var/log/keycloak
 
 x-backend: &backend-template
-  build:
-    context: .
-    dockerfile: backend/Dockerfile
+  # Image lives in GHCR and is produced by .github/workflows/release-images.yml.
+  # `IRI_BASETOOL_VERSION` is the version pointer (default `stable`, which the
+  # promote.yml workflow updates atomically); the server's deploy.sh script
+  # writes a concrete version (e.g. `1.4.2`) into the host .env for explicit
+  # rollbacks. For local-iteration on the Dockerfile itself, use
+  # docker-compose.build.yml as an override to add `build:` back in.
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   stop_grace_period: 30s
   # Biggest workload on the host: every API call goes through this JVM, Flyway
@@ -113,10 +117,24 @@ x-backend: &backend-template
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
+    # The keystore lives on the host filesystem (bind-mounted below) and is
+    # explicitly NOT packaged into the GHCR image. Both backend and frontend
+    # share the same PKCS12 file because the cert's SAN covers the Docker
+    # network aliases `backend` and `frontend`. If a future operator wants
+    # per-service keystores, set IRI_KEYSTORE_HOST_PATH_BACKEND and
+    # IRI_KEYSTORE_HOST_PATH_FRONTEND separately in .env and override the
+    # volume entry per service.
+    SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - /var/iri/backend/log:/app/logs
+    # Production cert is on the host, never in the image. Default points at the
+    # repo-root `./keystore.p12` so a local developer can generate one there
+    # and `docker compose --profile dev up -d` works out of the box; the prod
+    # `.env` overrides this to `/var/iri/secrets/keystore.p12`. The path is
+    # resolved relative to the directory containing docker-compose.yml.
+    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
 
 x-redis: &redis-template
   image: redis:8-alpine
@@ -140,9 +158,9 @@ x-redis: &redis-template
     - /var/iri/redis:/data
 
 x-frontend: &frontend-template
-  build:
-    context: .
-    dockerfile: frontend/Dockerfile
+  # See x-backend above for the GHCR / IRI_BASETOOL_VERSION rationale. Local
+  # rebuilds happen via docker-compose.build.yml.
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   stop_grace_period: 30s
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
@@ -160,10 +178,12 @@ x-frontend: &frontend-template
     KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
     BACKEND_URL: https://backend:11261
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - /var/iri/frontend/log:/app/logs
+    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
 
 services:
   redis:

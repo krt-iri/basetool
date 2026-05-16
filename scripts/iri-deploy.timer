@@ -1,0 +1,43 @@
+; systemd timer that fires the IRIDIUM Basetool deploy check every 5 minutes.
+;
+; The deploy script itself is idempotent — if the resolved digests of
+; `:stable` match the last successfully deployed pair, it exits 0 without
+; restarting anything. So in steady state the timer costs one HEAD request
+; against GHCR per tick. Only when promote.yml has flipped `:stable` to a new
+; digest does an actual `docker compose up -d --wait` happen.
+;
+; If you prefer a maintenance-window-only roll-out instead of continuous
+; polling, replace the `OnUnitActiveSec` line with one or more `OnCalendar`
+; entries, e.g.:
+;     OnCalendar=*-*-* 02:00,06:00,14:00,22:00:00
+; Four ticks per day is still well within the ratio that keeps :stable
+; promotions visible the same workday they happen.
+
+[Unit]
+Description=IRIDIUM Basetool — periodic deploy check (every 5 minutes)
+Documentation=https://github.com/krt-iri/basetool/blob/main/docs/deployment.md
+Requires=iri-deploy.service
+
+[Timer]
+; First run 5 minutes after boot — gives Docker + the network stack time to
+; settle before we hit GHCR.
+OnBootSec=5min
+
+; Repeat every 5 minutes thereafter. Idempotent: no-op when nothing changed
+; in GHCR.
+OnUnitActiveSec=5min
+
+; Spread the tick by up to 30 s so several hosts in the same fleet do not
+; hammer GHCR simultaneously. No effect for the single-server setup today,
+; but cheap insurance for when the topology grows.
+RandomizedDelaySec=30s
+
+; Make missed ticks (e.g. host was rebooting) catch up on the next boot,
+; instead of waiting until the next regular interval. Critical for a fleet
+; that may be powered off during off-hours.
+Persistent=true
+
+Unit=iri-deploy.service
+
+[Install]
+WantedBy=timers.target

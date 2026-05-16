@@ -8,7 +8,14 @@ server:
   port: 11261
   ssl:
     enabled: true
-    key-store: classpath:keystore.p12
+    # Default keeps backwards compatibility for local development and the test
+    # stack, where the keystore is bind-mounted into the JAR as a classpath
+    # resource at `backend/src/main/resources/keystore.p12`. In production the
+    # keystore MUST NOT be baked into the image (see CLAUDE.md and
+    # `.dockerignore`) — docker-compose overrides this with a `file:` URL
+    # pointing at a runtime bind mount so the production cert lives outside
+    # the GHCR image and never enters the registry.
+    key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
     key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
     key-store-type: PKCS12
     key-alias: basetool

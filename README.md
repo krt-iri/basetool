@@ -168,38 +168,90 @@ KEYCLOAK_ADMIN_CLIENT_SECRET=CHANGE_ME
 # PKCS12 keystore password for backend + frontend Spring SSL.
 SERVER_SSL_KEY_STORE_PASSWORD=CHANGE_ME
 
+# Absolute host path of the production keystore.p12. Bind-mounted read-only
+# into backend + frontend at /run/secrets/keystore.p12. The keystore is
+# NEVER baked into the GHCR image (see CLAUDE.md and .dockerignore).
+IRI_KEYSTORE_HOST_PATH=/var/iri/secrets/keystore.p12
+
 REDIS_PASSWORD=CHANGE_ME
 ```
 
-### Running with Docker Compose (Production)
+### Production Deployment (GHCR pull + systemd timer)
 
-This is the easiest way to run the entire isolated stack (Databases, Backend, Frontend, Keycloak, NGINX Proxy Manager) using dedicated docker networks. Data is persisted in `/var/iri`.
+Production hosts no longer build images locally. The
+[release-images](.github/workflows/release-images.yml) GitHub Actions workflow
+builds, scans (Trivy), signs (cosign keyless / Sigstore) and pushes the
+backend + frontend images to GHCR on every push to `main` and every
+`v*.*.*` tag. A separate
+[promote](.github/workflows/promote.yml) workflow re-tags an existing digest
+as `:stable` when an operator decides it should go live. The production host
+polls `:stable` every five minutes via `iri-deploy.timer` and applies any
+new digest with health-check-gated rollback.
 
-1.  **Start Services**:
+The end-to-end runbook — host bootstrap, normal releases, manual rollback,
+PAT rotation, troubleshooting — lives in
+[**docs/deployment.md**](docs/deployment.md). The quick summary:
+
+1.  **Build + push**: `git tag -a v1.4.3 -m "..." && git push origin v1.4.3`
+    → fires `release-images.yml` → images appear in GHCR as `:1.4.3`,
+    `:1.4`, `:1`, `:latest`. Nothing is deployed yet.
+2.  **Promote**: `gh workflow run promote.yml -f version=1.4.3` → flips
+    `:stable` to point at the same digest. Still nothing is deployed; the
+    server polls the change within five minutes.
+3.  **Pull + apply**: `iri-deploy.timer` fires → `scripts/deploy.sh`
+    resolves the new `:stable` digest, pins it in a compose override,
+    runs `docker compose pull && docker compose up -d --wait` with a
+    180 s health-check, and auto-rolls-back to the previous digest if the
+    new images fail to become healthy.
+
+### Running with Docker Compose (locally, pulling from GHCR)
+
+Same images, same orchestration as production, but on your own machine:
+
+1.  **Authenticate to GHCR** (one-time): create a fine-grained PAT with
+    `Packages: Read` on `krt-iri/basetool`, then
     ```bash
-    docker compose --profile prod up -d
+    echo "$GHCR_TOKEN" | docker login ghcr.io --username your-gh-handle --password-stdin
     ```
 
-2.  **Access**:
-    *   **NGINX Proxy Manager UI**: `http://localhost:10081` (Port 10080 for HTTP, 10443 for HTTPS)
-    *   **Frontend (via NPM)**: Configure proxy in NPM to forward to `frontend:18081`
-    *   **Backend API (Internal)**: `backend:11261`
-    *   **Keycloak (Internal)**: `keycloak:18080`
+2.  **Provide a `keystore.p12`** at the path your `.env`'s
+    `IRI_KEYSTORE_HOST_PATH` points to (default: repo root `./keystore.p12`).
+    See *Running the Local Test Stack* below for the `keytool` recipe.
+
+3.  **Start**:
+    ```bash
+    docker compose --profile prod up -d   # pulls :stable
+    # or pin a version:
+    IRI_BASETOOL_VERSION=1.4.3 docker compose --profile prod up -d
+    ```
 
 ### Running with Docker Compose (Full Dev Stack)
 
-To run the whole stack with exposed host ports for development:
+Two flavours, depending on whether you need a local rebuild of the
+application image:
 
-1.  **Start Services**:
-    ```bash
-    docker compose --profile dev up -d
-    ```
+#### Pulling from GHCR (default — fast, matches prod)
 
-2.  **Access**:
-    *   **Frontend**: `http://localhost:18081`
-    *   **Backend API**: `http://localhost:11261`
-    *   **Swagger UI**: `http://localhost:11261/swagger-ui.html`
-    *   **Keycloak**: `http://localhost:18080`
+```bash
+docker compose --profile dev up -d        # pulls :stable, exposes host ports
+```
+
+#### Building locally from this checkout (when iterating on the Dockerfile)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+    --profile dev up -d --build
+```
+
+The `docker-compose.build.yml` override re-introduces `build:` directives
+and tags the result as `:local` so it does not collide with GHCR-pulled
+images.
+
+**Access** in either flavour:
+*   **Frontend**: `http://localhost:18081`
+*   **Backend API**: `http://localhost:11261`
+*   **Swagger UI**: `http://localhost:11261/swagger-ui.html`
+*   **Keycloak**: `http://localhost:18080`
 
 ### Running the Local Test Stack
 
@@ -231,17 +283,22 @@ The procedure assumes you are working in the repository root (or in a worktree; 
 
     # PKCS12 keystore password (must match the test keystore — see below)
     SERVER_SSL_KEY_STORE_PASSWORD=keystore-test-pw-do-not-use-in-prod
+
+    # Host path of the test keystore (bind-mounted into the containers).
+    # Default in docker-compose.yml is `./keystore.p12` at the repo root,
+    # which lines up with step 2 below.
+    IRI_KEYSTORE_HOST_PATH=./keystore.p12
     ```
 
-2.  **Generate a test keystore** with the password from step 1. Do _not_ copy a `keystore.p12` from any other checkout — the password would not match and `keytool` errors are hard to debug.
+2.  **Generate a test keystore** with the password from step 1. Place it at the repo root so the default `IRI_KEYSTORE_HOST_PATH=./keystore.p12` from step 1 resolves. Do _not_ copy a `keystore.p12` from any other checkout — the password would not match and `keytool` errors are hard to debug.
     ```bash
-    keytool -genkeypair -alias backend -storetype PKCS12 \
-      -keystore backend/src/main/resources/keystore.p12 \
+    keytool -genkeypair -alias basetool -storetype PKCS12 \
+      -keystore ./keystore.p12 \
       -storepass "keystore-test-pw-do-not-use-in-prod" \
       -keypass  "keystore-test-pw-do-not-use-in-prod" \
       -keyalg RSA -keysize 2048 -validity 365 \
       -dname "CN=localhost, OU=Test, O=KRT Basetool Test, L=Test, ST=Test, C=DE" \
-      -ext "san=dns:localhost,ip:127.0.0.1,dns:backend"
+      -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend"
     ```
 
 3.  **Provide a test `realm-export.json`** at the repo root containing a Keycloak realm named `iri` with a `basetool-frontend` public client, a `backend-service` confidential client whose `secret` matches `KEYCLOAK_ADMIN_CLIENT_SECRET` from `.env.test`, and at least one test user. The minimal recipe: copy the production export, replace the `backend-service` secret, clear the SMTP block, drop the password policy, and replace the `users` array with a single test admin:

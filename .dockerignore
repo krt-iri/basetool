@@ -1,0 +1,60 @@
+# Belt-and-suspenders against secrets ever entering a Docker build context.
+#
+# These files are also in .gitignore (so a clean GitHub checkout will never
+# contain them), but a developer running `docker compose build` locally could
+# still have them lying around in their working tree from an earlier local
+# stack spin-up. This .dockerignore guarantees they never make it past the
+# build context boundary even in that case.
+#
+# Rule of thumb: anything that is `.gitignore`d for security reasons belongs
+# here too.
+
+# --- Secrets / credentials --------------------------------------------------
+**/keystore.p12
+**/*.p12
+**/*.jks
+**/*.pem
+**/*.key
+.env
+.env.*
+!.env.example
+**/realm-export.json
+
+# --- VCS / build artefacts (size + cache invalidation) ----------------------
+.git
+.gitattributes
+.gitignore
+.gitmodules
+**/.gradle
+**/build
+**/out
+**/bin
+**/target
+**/node_modules
+**/dist
+
+# --- IDE / editor scratch ---------------------------------------------------
+.idea
+.vscode
+**/*.iml
+**/*.iws
+**/*.ipr
+**/.springBeans
+**/.classpath
+**/.project
+**/.settings
+**/.factorypath
+
+# --- Local-only documentation / runbooks ------------------------------------
+HELP.md
+ToDo.md
+.aiignore
+.claude
+
+# --- Test / harness leftovers ----------------------------------------------
+**/build/reports
+**/build/test-results
+**/logs
+**/*.log
+**/*.log.zip
+log.txt
