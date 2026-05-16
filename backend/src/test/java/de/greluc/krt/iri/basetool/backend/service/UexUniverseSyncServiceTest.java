@@ -645,7 +645,13 @@ class UexUniverseSyncServiceTest {
 
     ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
     verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    // The effective column keeps the admin pin …
     assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+    // … but the raw UEX mirror column tracks what UEX actually said this sweep, so the
+    // admin UI can render "UEX: Nein" next to an admin-pinned "Yes" button.
+    assertFalse(
+        cap.getValue().getUexHasLoadingDock(),
+        "Raw UEX mirror column must be written even when the override is active");
   }
 
   @Test
@@ -673,5 +679,54 @@ class UexUniverseSyncServiceTest {
     ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
     verify(terminalRepository, atLeastOnce()).save(cap.capture());
     assertTrue(cap.getValue().getIsAutoLoad(), "Admin-pinned isAutoLoad must survive sync");
+    assertFalse(
+        cap.getValue().getUexIsAutoLoad(),
+        "Raw UEX mirror column must be written even when the override is active");
+  }
+
+  @Test
+  void syncTerminals_stampsUexSyncedAt_andMirrorsRawValues() {
+    // Sweep must write the raw mirror columns + the per-row timestamp on every visit,
+    // independently of any override flag. The admin terminals page reads these three
+    // fields verbatim, so a regression that gates them behind an override would silently
+    // blank the "UEX: …" chip and the "Letzter UEX-Sync" header for the next sweep.
+    java.time.Instant before = java.time.Instant.now();
+
+    UexTerminalDto dto =
+        UexTerminalDto.builder().id(81).name("Area 18 TDD").hasLoadingDock(1).isAutoLoad(0).build();
+    when(uexClient.getTerminals()).thenReturn(List.of(dto));
+    when(terminalRepository.findByIdTerminal(81)).thenReturn(Optional.empty());
+    when(terminalRepository.findByName("Area 18 TDD")).thenReturn(Optional.empty());
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncTerminals();
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    Terminal saved = cap.getValue();
+    assertTrue(saved.getUexHasLoadingDock());
+    assertFalse(saved.getUexIsAutoLoad());
+    assertNotNull(saved.getUexSyncedAt(), "uexSyncedAt must be stamped on every sweep");
+    assertFalse(saved.getUexSyncedAt().isBefore(before));
+  }
+
+  @Test
+  void syncTerminals_recordsNullUexMirror_whenUpstreamFieldsAreNull() {
+    // Defensive: UEX has historically dropped fields rather than emit a default. The
+    // raw mirror column is allowed to go to NULL so the admin UI can show "—" instead
+    // of inferring a false value that was never reported.
+    UexTerminalDto dto = UexTerminalDto.builder().id(82).name("Empty Terminal").build();
+    when(uexClient.getTerminals()).thenReturn(List.of(dto));
+    when(terminalRepository.findByIdTerminal(82)).thenReturn(Optional.empty());
+    when(terminalRepository.findByName("Empty Terminal")).thenReturn(Optional.empty());
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncTerminals();
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    assertNull(cap.getValue().getUexHasLoadingDock());
+    assertNull(cap.getValue().getUexIsAutoLoad());
+    assertNotNull(cap.getValue().getUexSyncedAt());
   }
 }

@@ -1,14 +1,18 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
  * Outbound projection of a {@code Terminal} aggregate.
  *
  * <p>Mirrors the persisted entity plus the two admin-override flags {@code
- * hasLoadingDockOverridden} / {@code isAutoLoadOverridden}. The override booleans tell the admin UI
- * whether the corresponding value column is currently pinned by an officer (so the next UEX sweep
- * leaves it untouched) or is being managed by the upstream feed.
+ * hasLoadingDockOverridden} / {@code isAutoLoadOverridden} and the raw UEX-side mirror columns. The
+ * override booleans tell the admin UI whether the corresponding value column is currently pinned by
+ * an officer (so the next UEX sweep leaves it untouched) or is being managed by the upstream feed;
+ * the {@code uex*} fields carry the last value UEX actually reported for the terminal, which the
+ * admin UI displays alongside the override so officers can decide whether a pin still needs to be
+ * in place.
  *
  * @param id terminal primary key
  * @param name canonical terminal name as supplied by UEX
@@ -24,6 +28,13 @@ import java.util.UUID;
  *     UEX sync will skip writing the value column until this flag is cleared
  * @param isAutoLoadOverridden {@code true} iff an admin has pinned {@code isAutoLoad}; the UEX sync
  *     will skip writing the value column until this flag is cleared
+ * @param uexHasLoadingDock raw {@code has_loading_dock} value from the most recent UEX sweep,
+ *     written unconditionally by the sync — may differ from {@code hasLoadingDock} when an admin
+ *     pin is active; {@code null} when the terminal has not been synced yet
+ * @param uexIsAutoLoad raw {@code is_auto_load} value from the most recent UEX sweep; same caveats
+ *     as {@code uexHasLoadingDock}
+ * @param uexSyncedAt UTC instant of the most recent UEX sweep that touched the terminal, or {@code
+ *     null} if it has never been synced
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */
 public record TerminalDto(
@@ -38,4 +49,7 @@ public record TerminalDto(
     Boolean isAutoLoad,
     boolean hasLoadingDockOverridden,
     boolean isAutoLoadOverridden,
+    Boolean uexHasLoadingDock,
+    Boolean uexIsAutoLoad,
+    Instant uexSyncedAt,
     boolean hidden) {}

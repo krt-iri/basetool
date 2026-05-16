@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -9,7 +10,8 @@ import java.util.UUID;
  * frontend's WebClient can deserialise the JSON without a translation step. The two boolean flags
  * {@code hasLoadingDockOverridden} / {@code isAutoLoadOverridden} drive the admin override UI: when
  * {@code true}, the corresponding value column is admin-pinned and the next UEX sweep leaves it
- * alone.
+ * alone. The {@code uex*} fields carry the most recent raw UEX-reported state for the terminal so
+ * the admin page can display what UEX currently claims even while a pin is active.
  *
  * @param id terminal primary key
  * @param name canonical terminal name as supplied by UEX
@@ -22,6 +24,11 @@ import java.util.UUID;
  * @param isAutoLoad current effective "is auto-load" value
  * @param hasLoadingDockOverridden whether {@code hasLoadingDock} is admin-pinned
  * @param isAutoLoadOverridden whether {@code isAutoLoad} is admin-pinned
+ * @param uexHasLoadingDock raw {@code hasLoadingDock} value from the most recent UEX sweep, or
+ *     {@code null} when the terminal has not been synced yet
+ * @param uexIsAutoLoad raw {@code isAutoLoad} value from the most recent UEX sweep, or {@code null}
+ *     when the terminal has not been synced yet
+ * @param uexSyncedAt UTC instant of the last UEX sweep that touched the terminal, or {@code null}
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */
 public record TerminalDto(
@@ -36,4 +43,7 @@ public record TerminalDto(
     Boolean isAutoLoad,
     boolean hasLoadingDockOverridden,
     boolean isAutoLoadOverridden,
+    Boolean uexHasLoadingDock,
+    Boolean uexIsAutoLoad,
+    Instant uexSyncedAt,
     boolean hidden) {}
