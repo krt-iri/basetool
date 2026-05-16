@@ -130,7 +130,9 @@ public class UexUniverseSyncService {
       entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
       entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
       entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
-      entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
@@ -407,7 +409,9 @@ public class UexUniverseSyncService {
       entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
       entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
       entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
-      entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
@@ -527,7 +531,9 @@ public class UexUniverseSyncService {
       entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
       entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
       entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
-      entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
@@ -604,7 +610,9 @@ public class UexUniverseSyncService {
       entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
       entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
       entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
-      entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
@@ -688,11 +696,15 @@ public class UexUniverseSyncService {
       entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
       entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
       entity.setIsJumpPoint(dto.isJumpPoint() != null && dto.isJumpPoint() == 1);
-      entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+      }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
-      entity.setIsAutoLoad(dto.isAutoLoad() != null && dto.isAutoLoad() == 1);
+      if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
+        entity.setIsAutoLoad(dto.isAutoLoad() != null && dto.isAutoLoad() == 1);
+      }
       entity.setNickname(dto.nickname());
       entity.setStarSystemName(dto.starSystemName());
       entity.setPlanetName(dto.planetName());

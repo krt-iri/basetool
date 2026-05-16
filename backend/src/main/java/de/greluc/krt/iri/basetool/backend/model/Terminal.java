@@ -72,4 +72,20 @@ public class Terminal extends AbstractEntity<UUID> {
   private Boolean hasFreightElevator;
   private Boolean isAutoLoad;
   private Boolean hidden = false;
+
+  /**
+   * If {@code true}, the UEX sync skips writing {@link #hasLoadingDock} from the upstream feed. Set
+   * by admins/officers when UEX reports the wrong value; cleared by the same UI to hand control
+   * back to UEX on the next sweep.
+   */
+  @Column(nullable = false)
+  private Boolean hasLoadingDockOverridden = false;
+
+  /**
+   * If {@code true}, the UEX sync skips writing {@link #isAutoLoad} from the upstream feed. Set by
+   * admins/officers when UEX reports the wrong value; cleared by the same UI to hand control back
+   * to UEX on the next sweep.
+   */
+  @Column(nullable = false)
+  private Boolean isAutoLoadOverridden = false;
 }

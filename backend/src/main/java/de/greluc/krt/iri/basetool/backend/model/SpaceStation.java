@@ -82,4 +82,12 @@ public class SpaceStation extends AbstractEntity<UUID> {
   private Boolean hasDockingPort;
   private Boolean hasFreightElevator;
   private String padTypes;
+
+  /**
+   * If {@code true}, the UEX sync skips writing {@link #hasLoadingDock} from the upstream feed. Set
+   * by admins/officers when UEX reports the wrong value; cleared by the same UI to hand control
+   * back to UEX on the next sweep.
+   */
+  @Column(nullable = false)
+  private Boolean hasLoadingDockOverridden = false;
 }
