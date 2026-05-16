@@ -266,7 +266,8 @@
                 font-weight: 600;
                 color: var(--color-gray-1);
             }
-            .payout-table .payout-amount-reimbursement {
+            .payout-table .payout-amount-reimbursement,
+            .payout-table .payout-amount-transferfee {
                 display: block;
                 font-size: 0.78em;
                 color: var(--color-gray-2);
@@ -506,6 +507,9 @@
                                         <span class="payout-amount-reimbursement"
                                               th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
                                               th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
+                                        <span class="payout-amount-transferfee"
+                                              th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}"
+                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatDecimal(payout.transferFee, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Überweisungsgebühr)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">

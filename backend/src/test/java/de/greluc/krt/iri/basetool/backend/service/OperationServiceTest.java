@@ -783,8 +783,10 @@ class OperationServiceTest {
    * participant's out-of-pocket expenses (mission EXPENSE entries owned by them + refinery orders'
    * costs they own) are paid back from gross income, and the remaining {@code totalSum} is split
    * per participation percentage among PAYOUT participants. DONATE participants keep their
-   * reimbursement (it is their own money returned) but contribute their share. The combined
-   * paid-out fields are covered together because they share the same setup.
+   * reimbursement (it is their own money returned) but contribute their share. Finally a flat 0.5%
+   * in-game banking fee is deducted from every participant's gross payout, so {@code payoutAmount =
+   * personalExpenses + shareAmount - transferFee}. The combined paid-out fields are covered
+   * together because they share the same setup.
    */
   @Nested
   class GetOperationPayoutsAmountTests {
@@ -817,17 +819,20 @@ class OperationServiceTest {
       OperationPayoutDto bobRow = byName(result, "bob");
       assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("500.00"), aliceRow.shareAmount());
-      assertEquals(new BigDecimal("500.00"), aliceRow.payoutAmount());
+      // 0.5% of 500.00 in-game banking fee deducted from the gross payout.
+      assertEquals(new BigDecimal("2.50"), aliceRow.transferFee());
+      assertEquals(new BigDecimal("497.50"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("500.00"), bobRow.shareAmount());
-      assertEquals(new BigDecimal("500.00"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("2.50"), bobRow.transferFee());
+      assertEquals(new BigDecimal("497.50"), bobRow.payoutAmount());
     }
 
     @Test
     void missionExpenseAttributedToParticipant_reimbursedOffTheTop_thenRemainderSplit() {
       // Gross income 1000, alice paid 300 in mission expenses, totalSum = 700.
       // Reimburse alice 300 first; split 700 evenly: alice 350, bob 350.
-      // Net positions: alice paid 300 out of pocket, got 650 back -> +350; bob 0 out, +350.
+      // Gross payouts: alice 650, bob 350. After 0.5% banking fee: alice 646.75, bob 348.25.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -848,20 +853,23 @@ class OperationServiceTest {
       OperationPayoutDto bobRow = byName(result, "bob");
       assertEquals(new BigDecimal("300.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("350.00"), aliceRow.shareAmount());
+      assertEquals(new BigDecimal("3.25"), aliceRow.transferFee(), "0.5% of 650.00 gross");
       assertEquals(
-          new BigDecimal("650.00"),
+          new BigDecimal("646.75"),
           aliceRow.payoutAmount(),
-          "alice's payout = reimbursement (300) + share (350)");
+          "alice's payout = reimbursement (300) + share (350) - fee (3.25)");
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("350.00"), bobRow.shareAmount());
-      assertEquals(new BigDecimal("350.00"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("1.75"), bobRow.transferFee(), "0.5% of 350.00 gross");
+      assertEquals(new BigDecimal("348.25"), bobRow.payoutAmount());
     }
 
     @Test
     void refineryOrderCosts_attributedToOwner_asReimbursement() {
       // alice runs a refinery order: sales=2000, expenses=500, other=200, profit=1300.
       // totalSum = 1300. alice gets reimbursed 700, then 50% of 1300 = 650.
-      // bob gets 50% of 1300 = 650. Net: alice paid 700, got 1350 -> +650 = bob's +650.
+      // bob gets 50% of 1300 = 650. Gross payouts: alice 1350, bob 650.
+      // After 0.5% banking fee: alice 1343.25 (fee 6.75), bob 646.75 (fee 3.25).
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -884,17 +892,21 @@ class OperationServiceTest {
       OperationPayoutDto bobRow = byName(result, "bob");
       assertEquals(new BigDecimal("700.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("650.00"), aliceRow.shareAmount());
-      assertEquals(new BigDecimal("1350.00"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("6.75"), aliceRow.transferFee());
+      assertEquals(new BigDecimal("1343.25"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("650.00"), bobRow.shareAmount());
-      assertEquals(new BigDecimal("650.00"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("3.25"), bobRow.transferFee());
+      assertEquals(new BigDecimal("646.75"), bobRow.payoutAmount());
     }
 
     @Test
     void donateParticipantKeepsReimbursementButGetsZeroShare() {
       // alice DONATE 50%, bob PAYOUT 50%. INCOME 1000, alice paid 300 expense.
       // totalSum = 700. alice: reimbursement 300, share 0 (donating). bob: share 350.
-      // alice's share of 350 is donated to the org and not paid out.
+      // alice's share of 350 is donated to the org and not paid out. The 0.5% banking fee
+      // still applies to alice's reimbursement transfer (it is an in-game aUEC payout too).
+      // Gross payouts: alice 300 -> fee 1.50 -> net 298.50; bob 350 -> fee 1.75 -> net 348.25.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -919,8 +931,10 @@ class OperationServiceTest {
           new BigDecimal("0.00"),
           aliceRow.shareAmount(),
           "DONATE participants contribute their share; only reimbursement is paid out");
-      assertEquals(new BigDecimal("300.00"), aliceRow.payoutAmount());
-      assertEquals(new BigDecimal("350.00"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("1.50"), aliceRow.transferFee());
+      assertEquals(new BigDecimal("298.50"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("1.75"), bobRow.transferFee());
+      assertEquals(new BigDecimal("348.25"), bobRow.payoutAmount());
     }
 
     @Test
@@ -948,9 +962,10 @@ class OperationServiceTest {
       OperationPayoutDto row = result.get(0);
       assertTrue(row.participantId().startsWith("guest_"));
       assertEquals(new BigDecimal("250.00"), row.personalExpenses());
-      // sole participant, 100% share. totalSum = 500 - 250 = 250.
+      // sole participant, 100% share. totalSum = 500 - 250 = 250. Gross payout 500, fee 2.50.
       assertEquals(new BigDecimal("250.00"), row.shareAmount());
-      assertEquals(new BigDecimal("500.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("2.50"), row.transferFee());
+      assertEquals(new BigDecimal("497.50"), row.payoutAmount());
     }
 
     @Test
@@ -976,7 +991,58 @@ class OperationServiceTest {
       OperationPayoutDto aliceRow = byName(result, "alice");
       assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("1000.00"), aliceRow.shareAmount());
-      assertEquals(new BigDecimal("1000.00"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("5.00"), aliceRow.transferFee());
+      assertEquals(new BigDecimal("995.00"), aliceRow.payoutAmount());
+    }
+
+    @Test
+    void transferFee_isZero_whenGrossPayoutIsZero() {
+      // DONATE participant with no personal expenses receives nothing in-game (their share
+      // goes to the org), so the 0.5% banking fee on a zero transfer is also zero. Verifies
+      // that the fee row stays a tidy 0.00 instead of producing a phantom rounding artifact.
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      User bob = newUser("bob");
+      addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.DONATE);
+      MissionParticipant bobP =
+          addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income = newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      List<OperationPayoutDto> result = operationService.getOperationPayouts(OPERATION_ID);
+
+      OperationPayoutDto aliceRow = byName(result, "alice");
+      assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
+      assertEquals(new BigDecimal("0.00"), aliceRow.shareAmount());
+      assertEquals(
+          new BigDecimal("0.00"),
+          aliceRow.transferFee(),
+          "no gross payout means no in-game transfer happens; fee must be zero");
+      assertEquals(new BigDecimal("0.00"), aliceRow.payoutAmount());
+    }
+
+    @Test
+    void transferFee_roundsHalfUp_onUnevenGross() {
+      // Verify HALF_UP rounding semantics. Single participant, gross = 333.33 (totalSum 333.33),
+      // 0.5% = 1.66665 -> 1.67 (HALF_UP). Net payout = 331.66.
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("333.33"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("333.33"), row.shareAmount());
+      assertEquals(
+          new BigDecimal("1.67"), row.transferFee(), "333.33 * 0.005 = 1.66665 rounds to 1.67");
+      assertEquals(new BigDecimal("331.66"), row.payoutAmount());
     }
 
     @Test

@@ -58,8 +58,10 @@ import org.springframework.transaction.annotation.Transactional;
  * refinery orders' costs where they are the owner) as a "reimbursement off the top" before the
  * remaining {@code totalSum} is split per participation percentage among PAYOUT participants.
  * DONATE participants still get their personal reimbursement (their own money) but their share is
- * not distributed. {@link #setPayoutStatus(UUID, String, boolean)} provides the mission-manager
- * toggle that records whether a participant has been paid out.
+ * not distributed. Finally, a flat 0.5% in-game banking fee is deducted from every participant's
+ * gross payout so the displayed amount matches what their mobiGlas will actually receive. {@link
+ * #setPayoutStatus(UUID, String, boolean)} provides the mission-manager toggle that records whether
+ * a participant has been paid out.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,6 +70,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class OperationService {
 
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+  /**
+   * Flat in-game banking fee deducted from every participant's gross payout. Star Citizen's
+   * Spectrum / mobiGlas banking charges 0.5% on aUEC transfers to the recipient, so the org has to
+   * pay {@code grossPayout / 0.995} to make a participant whole — equivalently we deduct {@code
+   * grossPayout * 0.005} from the displayed payout amount. Applies to PAYOUT and DONATE
+   * participants alike (DONATE participants only receive their reimbursement, but that is still an
+   * in-game transfer that incurs the fee).
+   */
+  private static final BigDecimal TRANSFER_FEE_RATE = new BigDecimal("0.005");
 
   private final OperationRepository operationRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
@@ -187,7 +199,7 @@ public class OperationService {
    * and refinery orders by mission id so the percentage AND the money number can be derived in one
    * pass. The percentage is the participant's clamped attendance time over the operation's clamped
    * attendance time (mirrors the previous behavior); the money number is {@code personalExpenses +
-   * sharePayout} where:
+   * sharePayout − transferFee} where:
    *
    * <ul>
    *   <li><b>personalExpenses</b> reimburses each participant for the expenses attributed to them —
@@ -196,6 +208,11 @@ public class OperationService {
    *   <li><b>sharePayout</b> is {@code totalSum × percentage / 100} for PAYOUT participants and
    *       {@link BigDecimal#ZERO} for DONATE participants. Their share is contributed to the org
    *       but the reimbursement is still paid out (it is the participant's own money returned).
+   *   <li><b>transferFee</b> is {@code (personalExpenses + sharePayout) × 0.5%} — Star Citizen's
+   *       in-game banking deducts 0.5% from any aUEC transfer to the recipient, so this fee is
+   *       subtracted from the gross payout to show what actually lands in the participant's
+   *       mobiGlas. Applies to PAYOUT and DONATE participants alike (DONATE participants only
+   *       receive their reimbursement, but that transfer also incurs the fee).
    * </ul>
    *
    * <p>The {@code paidOut*} fields are merged in from {@link OperationPayoutStatus} rows by
@@ -254,7 +271,15 @@ public class OperationService {
               : totalSum
                   .multiply(BigDecimal.valueOf(percentage))
                   .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
-      BigDecimal payoutAmount = personalExpenses.add(shareAmount);
+      BigDecimal grossPayout = personalExpenses.add(shareAmount);
+      // Star Citizen banking deducts 0.5% from any aUEC transfer to the recipient — model that
+      // here so the displayed Auszahlungsbetrag is what actually lands in the participant's
+      // mobiGlas. Rounded HALF_UP to match the other monetary fields. Negative gross would
+      // produce a negative fee mathematically; in practice grossPayout is always >= 0 (expenses
+      // are positive, share is >= 0), so HALF_UP rounding here mirrors the rest of the pipeline.
+      BigDecimal transferFee =
+          grossPayout.multiply(TRANSFER_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
+      BigDecimal payoutAmount = grossPayout.subtract(transferFee);
 
       OperationPayoutStatus status = statusByKey.get(key);
       boolean paidOut = status != null && status.isPaidOut();
@@ -272,6 +297,7 @@ public class OperationService {
               pref,
               personalExpenses,
               shareAmount,
+              transferFee,
               payoutAmount,
               paidOut,
               paidOutAt,
