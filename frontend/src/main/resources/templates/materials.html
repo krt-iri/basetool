@@ -95,6 +95,17 @@
 
         <div class="form-group" style="position: relative;">
             <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" data-trigger="materials-filter" autocomplete="off">
+            <!--/*
+              Material names for the custom krtAutocomplete dropdown. The names live in a datalist
+              rather than being inlined into the surrounding script via the Thymeleaf JS inline
+              comment-fallback pattern, because Thymeleaf 3.1's inline mechanism truncates the
+              rest of the script block as soon as it serialises a Java List/Collection into a JS
+              context — the substituted JSON array swallows every event after it, including the
+              data-trigger registrations for the category-expand handler further down.
+            */-->
+            <datalist id="materialNames-data">
+                <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
+            </datalist>
         </div>
 
         <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
@@ -130,11 +141,18 @@
 </main>
 
 <script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
-        const materialNames = /*[[${materials.![name]}]]*/ [];
+        // Names come from the <datalist id="materialNames-data"> rendered above. The historical
+        // Thymeleaf JS inline comment-fallback pattern would truncate the entire <script> block
+        // once a Java List was serialised into it (see the parser-level comment next to the
+        // datalist for the full diagnosis).
+        const dataEl = document.getElementById("materialNames-data");
+        const materialNames = dataEl
+            ? Array.from(dataEl.options).map(function (opt) { return opt.value; })
+            : [];
         const inp = document.getElementById("materialFilter");
-        if(inp) krtAutocomplete(inp, materialNames);
+        if (inp) krtAutocomplete(inp, materialNames);
     });
 
     function toggleKindGroup(element) {
