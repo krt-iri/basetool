@@ -231,6 +231,27 @@
             text-align: left;
             text-transform: uppercase;
         }
+        /*
+         * The pinned columns (checkbox / Mitglied / Beförderbar) are rendered
+         * as two separate sticky cells — one in the topic row, one in the
+         * category row — instead of a single rowspan="2" cell. The browser
+         * cannot reliably reconcile `position: sticky` with `rowspan`, which
+         * left the pinned header visibly shorter than the topic+category
+         * stack on the scrollable side. Removing the bottom border on the
+         * topic-row half and zeroing the padding of the category-row half
+         * makes the pair read as one continuous cell while letting each row
+         * use its natural height — so both sides of the header now line up.
+         */
+        .pm-matrix thead tr.pm-row-topic .pm-checkbox-cell,
+        .pm-matrix thead tr.pm-row-topic .pm-member-cell,
+        .pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
+            border-bottom: none;
+        }
+        .pm-matrix thead tr.pm-row-category .pm-checkbox-cell,
+        .pm-matrix thead tr.pm-row-category .pm-member-cell,
+        .pm-matrix thead tr.pm-row-category .pm-eligibility-cell {
+            padding: 0;
+        }
 
         /* ================================================================
            SORT TOGGLE on the Mitglied header
@@ -295,15 +316,49 @@
         .pm-topic-toggle[aria-expanded="false"] .pm-topic-icon::before { content: '+'; }
         .pm-topic-toggle[aria-expanded="true"] .pm-topic-icon::before { content: '\2212'; }
 
-        /* Collapsed topic state */
-        .pm-matrix [data-pm-topic-collapsed="true"] { display: none; }
+        /*
+         * Collapsed topic state.
+         *
+         * The category-row and body-row cells of a collapsed topic shrink
+         * to zero rendered size but stay in the column grid. We avoid
+         * `display: none` deliberately: removing the cells from table
+         * layout drops their column slots, the topic header (which keeps
+         * its original colspan) then has more slots than the rows below,
+         * and the browser compensates by sliding the *next* topic's
+         * cells leftward — so "Cat B1" ends up rendered underneath
+         * "Topic A"'s "+" trigger and the user can no longer reach the
+         * trigger they want to expand. Keeping the cells at zero size
+         * with `visibility: hidden` preserves the alignment.
+         *
+         * The topic header itself shrinks to a tap-friendly 3rem with
+         * zero TH padding so the entire visible column is the click
+         * target — previously the button was only ~24px wide (100% of
+         * the 48px content area minus 2x 12px TH padding) and the
+         * surrounding ring of TH padding looked clickable but wasn't.
+         */
+        .pm-matrix [data-pm-topic-collapsed="true"] {
+            width: 0;
+            min-width: 0;
+            max-width: 0;
+            padding: 0;
+            border-right: 0;
+            visibility: hidden;
+        }
         .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] {
             width: 3rem;
             min-width: 3rem;
             max-width: 3rem;
+            padding: 0;
         }
         .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-label { display: none; }
-        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-toggle { padding: 0.25rem 0; }
+        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-toggle {
+            padding: 0.5rem 0;
+            width: 100%;
+            min-height: 44px;
+        }
+        .pm-matrix th.pm-topic-cell[data-pm-collapsed="true"] .pm-topic-icon {
+            font-size: 1.1rem;
+        }
 
         /* ================================================================
            LEVEL SELECT
@@ -531,12 +586,12 @@
                 <table class="pm-matrix">
                     <thead>
                         <tr class="pm-row-topic">
-                            <th class="pm-checkbox-cell pm-checkbox-col" rowspan="2">
+                            <th class="pm-checkbox-cell pm-checkbox-col">
                                 <input type="checkbox" id="pm-select-all"
                                        data-trigger="pm-select-all"
                                        th:attr="aria-label=#{promotion.manage.select.all}" />
                             </th>
-                            <th class="pm-member-cell pm-member-col" rowspan="2">
+                            <th class="pm-member-cell pm-member-col">
                                 <button type="button"
                                         class="pm-sort-toggle"
                                         data-trigger="pm-cycle-sort"
@@ -547,7 +602,7 @@
                                           th:text="#{promotion.manage.sort.indicator.none}">↕ Original</span>
                                 </button>
                             </th>
-                            <th class="pm-eligibility-cell pm-eligibility-col" rowspan="2"
+                            <th class="pm-eligibility-cell pm-eligibility-col"
                                 th:text="#{promotion.manage.eligibility}">Beförderbar</th>
                             <th th:each="topic : ${topics}"
                                 class="pm-topic-cell"
@@ -562,6 +617,9 @@
                             </th>
                         </tr>
                         <tr class="pm-row-category">
+                            <th class="pm-checkbox-cell pm-checkbox-col" aria-hidden="true"></th>
+                            <th class="pm-member-cell pm-member-col" aria-hidden="true"></th>
+                            <th class="pm-eligibility-cell pm-eligibility-col" aria-hidden="true"></th>
                             <th:block th:each="topic : ${topics}"
                                       th:with="topicId=${topic.id.toString()}">
                                 <th th:each="cat : ${categoriesByTopic[topicId]}"
@@ -823,13 +881,15 @@
         cells.forEach(function (cell) {
             cell.setAttribute('data-pm-topic-collapsed', collapsed ? 'true' : 'false');
         });
-
-        var originalColspan = topicHeader.getAttribute('data-pm-colspan');
-        if (!originalColspan) {
-            originalColspan = topicHeader.getAttribute('colspan') || '1';
-            topicHeader.setAttribute('data-pm-colspan', originalColspan);
-        }
-        topicHeader.setAttribute('colspan', collapsed ? '1' : originalColspan);
+        // The topic header keeps its original colspan. Reducing it to 1
+        // while the cat/body rows below lose all N category slots leaves
+        // the topic row one slot shorter than the cat row, and the
+        // browser slides the next topic's cells leftward to fill the
+        // gap — which is the "I can't find the + trigger anymore" bug.
+        // The visual collapse is purely CSS-driven now: the topic header
+        // narrows to 3rem (data-pm-collapsed) and the cat/body cells
+        // shrink to zero width (data-pm-topic-collapsed). See the CSS
+        // block of the same name for details.
     }
 
     function pmApplyCollapsedState(collapsedIds) {
