@@ -22,9 +22,9 @@ allprojects {
 
 // Shared Java conventions for the backend and frontend modules. Both subprojects
 // apply the Spring Boot plugin and need an identical Test/BootRun/JavaCompile
-// setup — centralising it here removes the previous duplication (see
-// ANALYSIS.md 3.3) while still letting each module add its own specifics
-// (frontend wires `finalizedBy(tasks.jacocoTestReport)` separately, for example).
+// setup — centralising it here removes the previous duplication while still
+// letting each module add its own specifics (frontend wires
+// `finalizedBy(tasks.jacocoTestReport)` separately, for example).
 subprojects {
   plugins.withId("java") {
     tasks.withType<Test>().configureEach {

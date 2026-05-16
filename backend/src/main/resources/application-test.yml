@@ -11,7 +11,7 @@
 # Postgres-specific syntax (JSONB, GIN, pg_trgm, ON CONFLICT, gen_random_uuid),
 # and `ddl-auto: validate` only catches schema drift if the schema being validated
 # was produced by Flyway. Running tests on H2 reintroduced the exact "mock/prod
-# divergence" risk CLAUDE.md warns about (see PROJECT_REVIEW.md §1.3).
+# divergence" risk CLAUDE.md warns about.
 #
 # Tests that are pure Mockito unit tests (`@ExtendWith(MockitoExtension.class)`
 # without `@SpringBootTest`) do NOT load this YAML and start no container, so the
