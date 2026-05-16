@@ -14,10 +14,13 @@
 # test-admin / test-admin-pw (defined in realm-export.json).
 #
 # Prerequisites in the worktree (all gitignored):
-#   .env.test                            — credentials
+#   .env.test                            — credentials (incl. IRI_KEYSTORE_HOST_PATH)
 #   realm-export.json                    — Keycloak realm dump with test-admin user
-#   backend/src/main/resources/keystore.p12  — generated with the password
-#                                              from .env.test (matching SAN: localhost, backend)
+#   ./keystore.p12                       — generated with the password from
+#                                          .env.test (matching SAN: localhost,
+#                                          backend, frontend). Bind-mounted via
+#                                          IRI_KEYSTORE_HOST_PATH into the
+#                                          containers at /run/secrets/keystore.p12.
 #
 # This file is intentionally not auto-loaded (no `.override.yml` name) — it
 # has to be passed explicitly so the production-targeted `docker compose up`

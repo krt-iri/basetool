@@ -1,0 +1,78 @@
+; systemd service for the periodic IRIDIUM Basetool deploy check.
+;
+; Installation (on the production host, one-time):
+;   sudo cp /var/iri/code/scripts/iri-deploy.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-deploy.timer   /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now iri-deploy.timer
+;
+; Force an immediate run (bypassing the next scheduled tick):
+;   sudo systemctl start iri-deploy.service
+;
+; Inspect:
+;   systemctl status iri-deploy.timer
+;   journalctl -u iri-deploy.service -f
+;
+; The unit deliberately runs as a dedicated `deploy` user (member of the
+; `docker` group, no shell, no sudo) — not as root. Reason: anything the
+; deploy script can do is bounded by what that user can already do via
+; `docker compose`. A compromised GHCR pull token cannot escalate further
+; than rerunning images that already live in the registry.
+
+[Unit]
+Description=IRIDIUM Basetool — pull and apply latest GHCR images
+Documentation=https://github.com/krt-iri/basetool/blob/main/docs/deployment.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+
+# The `deploy` user is created during host bootstrap (see docs/deployment.md).
+# Group `docker` is required to invoke `docker compose` without sudo. The
+# user has NO sudo grants and a `/sbin/nologin` shell — interactive use is
+# impossible.
+User=deploy
+Group=docker
+
+ExecStart=/var/iri/code/scripts/deploy.sh
+
+# Send stdout/stderr to journald (visible with `journalctl -u iri-deploy.service`)
+# AND to /var/log/iri-deploy.log so logrotate can keep human-readable history
+; for post-mortems beyond the journald retention window.
+StandardOutput=append:/var/log/iri-deploy.log
+StandardError=append:/var/log/iri-deploy.log
+
+# --- Hardening -------------------------------------------------------------
+# Defence-in-depth: the deploy user is already unprivileged, but if a bug
+; in deploy.sh or a malicious tag in GHCR triggered code execution inside
+; the unit's process, these directives bound the damage radius.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+# The script needs to write to:
+#   /var/lib/iri/    — state files (digest pins, last-deployed marker)
+#   /var/log/        — append to iri-deploy.log
+#   /var/lock/       — flock file
+;   /var/iri/        — Docker volume hierarchy (logs etc. are written through
+;                      docker, not directly by the script, but compose touches
+;                      this path during volume init on first run)
+ReadWritePaths=/var/lib/iri /var/log /var/lock /var/iri
+
+# Hard memory and CPU caps so a runaway script cannot starve the production
+; stack of resources during a deploy. Generous on purpose — the actual work
+; is delegated to docker, the script itself is a thin wrapper.
+MemoryMax=512M
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,11 +1,18 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+/** Unit tests for {@link MaterialMatrixItemDto}. */
 public class MaterialMatrixItemDtoTest {
+
+  /** Verifies the DTO round-trips through Jackson and exposes the effective {@code planetName}. */
   @Test
   public void testSerialization() throws Exception {
     MaterialMatrixItemDto dto =
@@ -25,10 +32,14 @@ public class MaterialMatrixItemDtoTest {
             "City",
             "Station",
             "Outpost",
+            "Hurston",
             true,
             true,
             true);
     ObjectMapper mapper = new ObjectMapper();
-    mapper.writeValueAsString(dto);
+    String json = mapper.writeValueAsString(dto);
+    assertNotNull(json);
+    assertTrue(json.contains("\"planetName\":\"Hurston\""));
+    assertEquals("Hurston", dto.planetName());
   }
 }

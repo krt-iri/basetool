@@ -1,6 +1,21 @@
 #!/bin/bash
 # =============================================================================
 # IRIDIUM Basetool - Nightly Update Script
+#
+# *** DEPRECATED — superseded by scripts/deploy.sh + iri-deploy.timer ***
+#
+# This script remains in the tree as a transitional fallback for hosts that
+# have not yet been migrated to the GHCR-pull-based workflow documented in
+# docs/deployment.md. The replacement gives you:
+#   - explicit GHCR digest pinning (no silent tag drift mid-deploy)
+#   - cosign signature verification on the promote.yml workflow gate
+#   - automatic rollback to the previous digest on health-check failure
+#   - 5-minute polling cadence instead of 24-hour cron lag
+#
+# Migration steps live in docs/deployment.md (sections "Initial server
+# bootstrap" → "Install the systemd timer"). After the timer is running
+# successfully for one cycle, remove the cron entry for this script.
+#
 # Fährt alle Prod-Container herunter, pullt neue Images und startet sie neu.
 # Cron-Beispiel (täglich um 03:30 Uhr):
 #   30 3 * * * /var/iri/code/scripts/nightly-update.sh >> /var/log/iri-nightly-update.log 2>&1
