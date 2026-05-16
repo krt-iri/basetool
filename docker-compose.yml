@@ -366,12 +366,19 @@ services:
       # snippets in ./docker/maintenance/nginx are picked up by NPM via its
       # /data/nginx/custom hook (http.conf into the `http` block, server_proxy.conf
       # into every proxy host's `server` block) and the static assets are read
-      # from /usr/share/nginx/html/maintenance/. All three mounts are read-only;
-      # the page is decoupled from the Spring containers on purpose so it stays
-      # available exactly while they are unavailable.
+      # from /usr/share/nginx/html/maintenance/.
+      #
+      # The static-assets mount is :ro; the two .conf mounts are intentionally
+      # NOT read-only. NPM's startup script `/etc/s6-overlay/s6-rc.d/prepare/
+      # 50-ipv6.sh` walks every *.conf under /data/nginx/ and runs `sed -i`
+      # against it to add IPv6 listeners — with :ro that fails with EROFS,
+      # the `prepare` s6 service exits non-zero, and the entire NPM container
+      # refuses to start. Our snippets contain no `listen` directives so sed
+      # produces byte-identical content, but the write attempt itself has to
+      # succeed for the container boot to proceed.
       - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
-      - ./docker/maintenance/nginx/http.conf:/data/nginx/custom/http.conf:ro
-      - ./docker/maintenance/nginx/server_proxy.conf:/data/nginx/custom/server_proxy.conf:ro
+      - ./docker/maintenance/nginx/http.conf:/data/nginx/custom/http.conf
+      - ./docker/maintenance/nginx/server_proxy.conf:/data/nginx/custom/server_proxy.conf
     networks:
       - net-proxy-frontend
       - net-proxy-keycloak
