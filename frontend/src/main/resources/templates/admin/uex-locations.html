@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.uex_locations.title} + ' - ' + #{app.title}">UEX Locations - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style>
+        .data-section {
+            margin-bottom: 3rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.8rem;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--color-gray-4);
+            border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1);
+            font-family: var(--font-body);
+            box-sizing: border-box;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.uex_locations.title}">UEX-Orte verwalten</h1>
+    </div>
+
+    <div class="hud-box mt-2">
+        <!-- Cities -->
+        <div class="data-section">
+            <div class="flex-between-mb">
+                <h2 th:text="#{admin.uex_locations.cities}">Cities</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterCities" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="citiesTable" autocomplete="off">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="citiesTable">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.terminal.name}">Name</th>
+                            <th th:text="#{admin.terminal.system}">System</th>
+                            <th th:text="#{admin.uex_locations.planet}">Planet</th>
+                            <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="city : ${cities}">
+                            <td th:text="${city.name}">Name</td>
+                            <td th:text="${city.starSystemName}">System</td>
+                            <td th:text="${city.planetName}">Planet</td>
+                            <td>
+                                <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+                                    <form method="post" th:action="@{/admin/uex-locations/cities/{id}/loading-dock(id=${city.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="uex">
+                                        <button type="submit" class="btn" th:classappend="${!city.hasLoadingDockOverridden} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/cities/{id}/loading-dock(id=${city.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="yes">
+                                        <button type="submit" class="btn" th:classappend="${city.hasLoadingDockOverridden && city.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/cities/{id}/loading-dock(id=${city.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="no">
+                                        <button type="submit" class="btn" th:classappend="${city.hasLoadingDockOverridden && !city.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.no}">No</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Space Stations -->
+        <div class="data-section">
+            <div class="flex-between-mb">
+                <h2 th:text="#{admin.uex_locations.spaceStations}">Space Stations</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterStations" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="stationsTable" autocomplete="off">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="stationsTable">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.terminal.name}">Name</th>
+                            <th th:text="#{admin.terminal.system}">System</th>
+                            <th th:text="#{admin.uex_locations.planet}">Planet</th>
+                            <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="station : ${stations}">
+                            <td th:text="${station.name}">Name</td>
+                            <td th:text="${station.starSystemName}">System</td>
+                            <td th:text="${station.planetName}">Planet</td>
+                            <td>
+                                <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+                                    <form method="post" th:action="@{/admin/uex-locations/space-stations/{id}/loading-dock(id=${station.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="uex">
+                                        <button type="submit" class="btn" th:classappend="${!station.hasLoadingDockOverridden} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/space-stations/{id}/loading-dock(id=${station.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="yes">
+                                        <button type="submit" class="btn" th:classappend="${station.hasLoadingDockOverridden && station.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/space-stations/{id}/loading-dock(id=${station.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="no">
+                                        <button type="submit" class="btn" th:classappend="${station.hasLoadingDockOverridden && !station.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.no}">No</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Outposts -->
+        <div class="data-section">
+            <div class="flex-between-mb">
+                <h2 th:text="#{admin.uex_locations.outposts}">Outposts</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterOutposts" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="outpostsTable" autocomplete="off">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="outpostsTable">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.terminal.name}">Name</th>
+                            <th th:text="#{admin.terminal.system}">System</th>
+                            <th th:text="#{admin.uex_locations.planet}">Planet</th>
+                            <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="outpost : ${outposts}">
+                            <td th:text="${outpost.name}">Name</td>
+                            <td th:text="${outpost.starSystemName}">System</td>
+                            <td th:text="${outpost.planetName}">Planet</td>
+                            <td>
+                                <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+                                    <form method="post" th:action="@{/admin/uex-locations/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="uex">
+                                        <button type="submit" class="btn" th:classappend="${!outpost.hasLoadingDockOverridden} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="yes">
+                                        <button type="submit" class="btn" th:classappend="${outpost.hasLoadingDockOverridden && outpost.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="no">
+                                        <button type="submit" class="btn" th:classappend="${outpost.hasLoadingDockOverridden && !outpost.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.no}">No</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- POIs -->
+        <div class="data-section">
+            <div class="flex-between-mb">
+                <h2 th:text="#{admin.uex_locations.pois}">POIs</h2>
+                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                    <input type="text" id="filterPois" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="poisTable" autocomplete="off">
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="poisTable">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.terminal.name}">Name</th>
+                            <th th:text="#{admin.terminal.system}">System</th>
+                            <th th:text="#{admin.uex_locations.planet}">Planet</th>
+                            <th th:text="#{admin.uex.flag.column.loadingDock}">Loading Dock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="poi : ${pois}">
+                            <td th:text="${poi.name}">Name</td>
+                            <td th:text="${poi.starSystemName}">System</td>
+                            <td th:text="${poi.planetName}">Planet</td>
+                            <td>
+                                <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+                                    <form method="post" th:action="@{/admin/uex-locations/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="uex">
+                                        <button type="submit" class="btn" th:classappend="${!poi.hasLoadingDockOverridden} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="yes">
+                                        <button type="submit" class="btn" th:classappend="${poi.hasLoadingDockOverridden && poi.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
+                                    </form>
+                                    <form method="post" th:action="@{/admin/uex-locations/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <input type="hidden" name="action" value="no">
+                                        <button type="submit" class="btn" th:classappend="${poi.hasLoadingDockOverridden && !poi.hasLoadingDock} ? 'btn-secondary' : ''" th:text="#{admin.uex.flag.btn.no}">No</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    document.addEventListener("DOMContentLoaded", function() {
+        const cityNames = /*[[${cities.![name]}]]*/ [];
+        const stationNames = /*[[${stations.![name]}]]*/ [];
+        const outpostNames = /*[[${outposts.![name]}]]*/ [];
+        const poiNames = /*[[${pois.![name]}]]*/ [];
+
+        const inpCities = document.getElementById("filterCities");
+        if (inpCities) krtAutocomplete(inpCities, cityNames);
+        const inpStations = document.getElementById("filterStations");
+        if (inpStations) krtAutocomplete(inpStations, stationNames);
+        const inpOutposts = document.getElementById("filterOutposts");
+        if (inpOutposts) krtAutocomplete(inpOutposts, outpostNames);
+        const inpPois = document.getElementById("filterPois");
+        if (inpPois) krtAutocomplete(inpPois, poiNames);
+    });
+
+    function filterTable(tableId, query) {
+        var filter = query.toUpperCase();
+        var table = document.getElementById(tableId);
+        var tr = table.getElementsByTagName("tr");
+        for (var i = 1; i < tr.length; i++) {
+            var td = tr[i].getElementsByTagName("td")[0];
+            if (td) {
+                var txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+</script>
+</body>
+</html>

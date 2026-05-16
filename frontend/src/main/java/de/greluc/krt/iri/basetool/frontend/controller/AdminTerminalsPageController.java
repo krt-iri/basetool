@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -71,6 +72,10 @@ public class AdminTerminalsPageController {
                             parseString(m.get("planetName")),
                             parseString(m.get("cityName")),
                             parseString(m.get("spaceStationName")),
+                            parseNullableBoolean(m.get("hasLoadingDock")),
+                            parseNullableBoolean(m.get("isAutoLoad")),
+                            Boolean.TRUE.equals(m.get("hasLoadingDockOverridden")),
+                            Boolean.TRUE.equals(m.get("isAutoLoadOverridden")),
                             Boolean.TRUE.equals(m.get("hidden"))))
                 .collect(Collectors.toCollection(ArrayList::new));
         terminals.sort(
@@ -116,12 +121,92 @@ public class AdminTerminalsPageController {
               currentTerminal.planetName(),
               currentTerminal.cityName(),
               currentTerminal.spaceStationName(),
+              currentTerminal.hasLoadingDock(),
+              currentTerminal.isAutoLoad(),
+              currentTerminal.hasLoadingDockOverridden(),
+              currentTerminal.isAutoLoadOverridden(),
               hidden);
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Toggle terminal visibility failed", e);
       return "redirect:/admin/terminals?error=ToggleVisibilityFailed";
+    }
+    return "redirect:/admin/terminals";
+  }
+
+  /**
+   * Sets or clears the loading-dock override on a terminal.
+   *
+   * <p>The {@code action} query param maps to the three button states in the admin UI:
+   *
+   * <ul>
+   *   <li>{@code uex} → clear the admin pin so the next UEX sweep restores the value
+   *   <li>{@code yes} → pin {@code hasLoadingDock} to {@code true}
+   *   <li>{@code no} → pin {@code hasLoadingDock} to {@code false}
+   * </ul>
+   *
+   * @param id terminal id
+   * @param action requested state (see above)
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/terminals}
+   */
+  @PostMapping("/{id}/loading-dock")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  public String updateLoadingDockOverride(
+      @PathVariable @NotNull UUID id,
+      @RequestParam String action,
+      RedirectAttributes redirectAttributes) {
+    return dispatchOverride(
+        id, action, "loading-dock", "loading-dock-override", redirectAttributes);
+  }
+
+  /**
+   * Sets or clears the auto-load override on a terminal. See {@link
+   * #updateLoadingDockOverride(UUID, String, RedirectAttributes)} for the {@code action} semantics.
+   *
+   * @param id terminal id
+   * @param action requested state ({@code uex}, {@code yes}, or {@code no})
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/terminals}
+   */
+  @PostMapping("/{id}/auto-load")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  public String updateAutoLoadOverride(
+      @PathVariable @NotNull UUID id,
+      @RequestParam String action,
+      RedirectAttributes redirectAttributes) {
+    return dispatchOverride(id, action, "auto-load", "auto-load-override", redirectAttributes);
+  }
+
+  private String dispatchOverride(
+      UUID id,
+      String action,
+      String setPath,
+      String clearPath,
+      RedirectAttributes redirectAttributes) {
+    try {
+      switch (action) {
+        case "uex" ->
+            backendApiClient.delete("/api/v1/terminals/" + id + "/" + clearPath, Void.class);
+        case "yes" ->
+            backendApiClient.patch(
+                "/api/v1/terminals/" + id + "/" + setPath + "?value=true", null, Void.class);
+        case "no" ->
+            backendApiClient.patch(
+                "/api/v1/terminals/" + id + "/" + setPath + "?value=false", null, Void.class);
+        default -> {
+          redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
+          return "redirect:/admin/terminals";
+        }
+      }
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.error("Override update failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
+    } catch (Exception e) {
+      log.error("Override update failed", e);
+      return "redirect:/admin/terminals?error=OverrideUpdateFailed";
     }
     return "redirect:/admin/terminals";
   }
@@ -139,5 +224,15 @@ public class AdminTerminalsPageController {
     } catch (Exception e) {
       return null;
     }
+  }
+
+  private Boolean parseNullableBoolean(Object o) {
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof Boolean b) {
+      return b;
+    }
+    return Boolean.parseBoolean(o.toString());
   }
 }

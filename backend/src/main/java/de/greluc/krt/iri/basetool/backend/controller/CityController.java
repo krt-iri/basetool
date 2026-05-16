@@ -1,0 +1,106 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.mapper.CityMapper;
+import de.greluc.krt.iri.basetool.backend.model.City;
+import de.greluc.krt.iri.basetool.backend.model.dto.CityDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.service.CityService;
+import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Read-mostly REST surface over the city catalogue. UEX owns the table content; the override
+ * endpoints let admins/officers pin {@code hasLoadingDock} so the next UEX sweep cannot reset a
+ * manual correction.
+ */
+@RestController
+@RequestMapping("/api/v1/cities")
+@RequiredArgsConstructor
+@Transactional
+@PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+public class CityController {
+
+  private final CityService cityService;
+  private final CityMapper cityMapper;
+
+  /**
+   * Paged city list with whitelist-enforced sort.
+   *
+   * @param page zero-based page index (optional)
+   * @param size page size (optional)
+   * @param sort sort spec, restricted to the whitelist
+   * @return paged city DTOs
+   */
+  @GetMapping
+  public PageResponse<CityDto> getAllCities(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page, size, sort, Set.of("name", "id", "starSystemName"), "name");
+    Page<City> p = cityService.getAllCities(pageable);
+    List<CityDto> content = p.getContent().stream().map(cityMapper::toDto).toList();
+    return new PageResponse<>(
+        content,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  /**
+   * Returns a single city DTO.
+   *
+   * @param id city id
+   * @return the city DTO
+   */
+  @GetMapping("/{id}")
+  public CityDto getCity(@PathVariable @NotNull UUID id) {
+    return cityMapper.toDto(cityService.getCity(id));
+  }
+
+  /**
+   * Pins {@code hasLoadingDock} to {@code value} and marks it as admin-overridden so the next UEX
+   * sweep skips writing the column.
+   *
+   * @param id city id
+   * @param value desired {@code hasLoadingDock} value
+   * @return the persisted city DTO
+   */
+  @PatchMapping("/{id}/loading-dock")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public CityDto setLoadingDockOverride(
+      @PathVariable @NotNull UUID id, @RequestParam boolean value) {
+    return cityMapper.toDto(cityService.setLoadingDockOverride(id, value));
+  }
+
+  /**
+   * Clears the admin pin on the city's {@code hasLoadingDock} flag. The value column keeps its
+   * current state until the next UEX sweep restores the upstream value.
+   *
+   * @param id city id
+   * @return the persisted city DTO
+   */
+  @DeleteMapping("/{id}/loading-dock-override")
+  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  public CityDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
+    return cityMapper.toDto(cityService.clearLoadingDockOverride(id));
+  }
+}

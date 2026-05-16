@@ -60,4 +60,64 @@ public class TerminalService {
     terminal.setHidden(hidden);
     return terminalRepository.save(terminal);
   }
+
+  /**
+   * Pins {@code hasLoadingDock} to the supplied value and marks it as admin-overridden so the next
+   * UEX sweep leaves the value column untouched.
+   *
+   * @param id terminal primary key
+   * @param value desired {@code hasLoadingDock} value
+   * @return the persisted terminal
+   */
+  @Transactional
+  public Terminal setLoadingDockOverride(UUID id, boolean value) {
+    Terminal terminal = getTerminal(id);
+    terminal.setHasLoadingDock(value);
+    terminal.setHasLoadingDockOverridden(true);
+    return terminalRepository.save(terminal);
+  }
+
+  /**
+   * Releases the admin pin on {@code hasLoadingDock}. The value column stays at its last value
+   * until the next UEX sweep overwrites it from the upstream feed.
+   *
+   * @param id terminal primary key
+   * @return the persisted terminal
+   */
+  @Transactional
+  public Terminal clearLoadingDockOverride(UUID id) {
+    Terminal terminal = getTerminal(id);
+    terminal.setHasLoadingDockOverridden(false);
+    return terminalRepository.save(terminal);
+  }
+
+  /**
+   * Pins {@code isAutoLoad} to the supplied value and marks it as admin-overridden so the next UEX
+   * sweep leaves the value column untouched.
+   *
+   * @param id terminal primary key
+   * @param value desired {@code isAutoLoad} value
+   * @return the persisted terminal
+   */
+  @Transactional
+  public Terminal setAutoLoadOverride(UUID id, boolean value) {
+    Terminal terminal = getTerminal(id);
+    terminal.setIsAutoLoad(value);
+    terminal.setIsAutoLoadOverridden(true);
+    return terminalRepository.save(terminal);
+  }
+
+  /**
+   * Releases the admin pin on {@code isAutoLoad}. The value column stays at its last value until
+   * the next UEX sweep overwrites it from the upstream feed.
+   *
+   * @param id terminal primary key
+   * @return the persisted terminal
+   */
+  @Transactional
+  public Terminal clearAutoLoadOverride(UUID id) {
+    Terminal terminal = getTerminal(id);
+    terminal.setIsAutoLoadOverridden(false);
+    return terminalRepository.save(terminal);
+  }
 }

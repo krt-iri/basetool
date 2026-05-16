@@ -24,6 +24,10 @@ class TerminalMapperTest {
     entity.setPlanetName("ArcCorp");
     entity.setCityName("Area18");
     entity.setSpaceStationName(null);
+    entity.setHasLoadingDock(true);
+    entity.setIsAutoLoad(false);
+    entity.setHasLoadingDockOverridden(true);
+    entity.setIsAutoLoadOverridden(false);
     entity.setHidden(true);
 
     // When
@@ -38,6 +42,10 @@ class TerminalMapperTest {
     assertEquals("ArcCorp", dto.planetName());
     assertEquals("Area18", dto.cityName());
     assertNull(dto.spaceStationName());
+    assertTrue(dto.hasLoadingDock());
+    assertFalse(dto.isAutoLoad());
+    assertTrue(dto.hasLoadingDockOverridden());
+    assertFalse(dto.isAutoLoadOverridden());
     assertTrue(dto.hidden());
   }
 
@@ -47,7 +55,18 @@ class TerminalMapperTest {
     UUID id = UUID.randomUUID();
     TerminalDto dto =
         new TerminalDto(
-            id, "Lorville TDD", "TDD LV", "Stanton", "Hurston", "Lorville", null, false);
+            id,
+            "Lorville TDD",
+            "TDD LV",
+            "Stanton",
+            "Hurston",
+            "Lorville",
+            null,
+            true,
+            false,
+            true,
+            false,
+            false);
 
     // When
     Terminal entity = mapper.toEntity(dto);
@@ -61,6 +80,10 @@ class TerminalMapperTest {
     assertEquals("Hurston", entity.getPlanetName());
     assertEquals("Lorville", entity.getCityName());
     assertNull(entity.getSpaceStationName());
+    assertTrue(entity.getHasLoadingDock());
+    assertFalse(entity.getIsAutoLoad());
+    assertTrue(entity.getHasLoadingDockOverridden());
+    assertFalse(entity.getIsAutoLoadOverridden());
     assertFalse(entity.getHidden());
     // Fields not present in DTO must stay at entity defaults
     assertNull(entity.getIdTerminal());
