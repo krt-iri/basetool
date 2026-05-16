@@ -424,7 +424,7 @@ public class MissionService {
 
   private void assertCoreVersion(
       @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    Long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
+    long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
     if (!expectedVersion.equals(current)) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
@@ -433,7 +433,7 @@ public class MissionService {
 
   private void assertScheduleVersion(
       @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    Long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
+    long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
     if (!expectedVersion.equals(current)) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
@@ -442,7 +442,7 @@ public class MissionService {
 
   private void assertFlagsVersion(
       @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    Long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
+    long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
     if (!expectedVersion.equals(current)) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
@@ -450,17 +450,17 @@ public class MissionService {
   }
 
   private void bumpCoreVersion(@NotNull Mission mission) {
-    Long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
+    long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
     mission.setCoreVersion(current + 1L);
   }
 
   private void bumpScheduleVersion(@NotNull Mission mission) {
-    Long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
+    long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
     mission.setScheduleVersion(current + 1L);
   }
 
   private void bumpFlagsVersion(@NotNull Mission mission) {
-    Long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
+    long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
     mission.setFlagsVersion(current + 1L);
   }
 
