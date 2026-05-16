@@ -1,0 +1,84 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import de.greluc.krt.iri.basetool.backend.mapper.PoiMapper;
+import de.greluc.krt.iri.basetool.backend.model.Poi;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PoiDto;
+import de.greluc.krt.iri.basetool.backend.service.PoiService;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
+/** Mockito unit tests for {@link PoiController}. */
+@ExtendWith(MockitoExtension.class)
+class PoiControllerTest {
+
+  @Mock private PoiService service;
+  @Mock private PoiMapper mapper;
+
+  @InjectMocks private PoiController controller;
+
+  @Test
+  void getAllPois_wrapsServicePageIntoPageResponse() {
+    Poi entity = new Poi();
+    PoiDto dto = new PoiDto(UUID.randomUUID(), "Grim HEX", "Stanton", "Crusader", true, false);
+    when(service.getAllPois(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
+    when(mapper.toDto(entity)).thenReturn(dto);
+
+    PageResponse<PoiDto> resp = controller.getAllPois(null, null, null);
+
+    assertEquals(1, resp.totalElements());
+    assertSame(dto, resp.content().getFirst());
+  }
+
+  @Test
+  void getPoi_delegatesAndMaps() {
+    UUID id = UUID.randomUUID();
+    Poi entity = new Poi();
+    PoiDto dto = new PoiDto(id, "Grim HEX", "Stanton", "Crusader", true, false);
+    when(service.getPoi(id)).thenReturn(entity);
+    when(mapper.toDto(entity)).thenReturn(dto);
+
+    PoiDto result = controller.getPoi(id);
+
+    assertSame(dto, result);
+  }
+
+  @Test
+  void setLoadingDockOverride_forwardsValueAndReturnsDto() {
+    UUID id = UUID.randomUUID();
+    Poi updated = new Poi();
+    PoiDto response = new PoiDto(id, "Grim HEX", "Stanton", "Crusader", true, true);
+    when(service.setLoadingDockOverride(id, true)).thenReturn(updated);
+    when(mapper.toDto(updated)).thenReturn(response);
+
+    PoiDto result = controller.setLoadingDockOverride(id, true);
+
+    assertSame(response, result);
+    verify(service).setLoadingDockOverride(id, true);
+  }
+
+  @Test
+  void clearLoadingDockOverride_callsServiceAndReturnsDto() {
+    UUID id = UUID.randomUUID();
+    Poi updated = new Poi();
+    PoiDto response = new PoiDto(id, "Grim HEX", "Stanton", "Crusader", true, false);
+    when(service.clearLoadingDockOverride(id)).thenReturn(updated);
+    when(mapper.toDto(updated)).thenReturn(response);
+
+    PoiDto result = controller.clearLoadingDockOverride(id);
+
+    assertSame(response, result);
+    verify(service).clearLoadingDockOverride(id);
+  }
+}

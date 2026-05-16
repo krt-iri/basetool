@@ -513,4 +513,165 @@ class UexUniverseSyncServiceTest {
     service.syncTerminals();
     verifyNoInteractions(terminalRepository);
   }
+
+  // ─── Override-respect tests ─────────────────────────────────────────────
+  //
+  // Each test below pins the override flag on an existing entity to TRUE, feeds
+  // the sync the *opposite* boolean from UEX, and verifies the persisted entity
+  // still carries the admin-pinned value. The other (non-overridden) flag is
+  // expected to track UEX. This is the regression guard for the bug the
+  // override feature was built to fix: UEX silently clobbering admin
+  // corrections every hour.
+
+  @Test
+  void syncCities_respectsLoadingDockOverride() {
+    City existing = new City();
+    existing.setId(UUID.randomUUID());
+    existing.setIdCity(11);
+    existing.setName("Lorville");
+    existing.setHasLoadingDock(true);
+    existing.setHasLoadingDockOverridden(true);
+
+    UexCityDto dto =
+        UexCityDto.builder().id(11).name("Lorville").hasLoadingDock(0).isAvailableLive(0).build();
+    when(uexClient.getCities()).thenReturn(List.of(dto));
+    when(cityRepository.findByIdCity(11)).thenReturn(Optional.of(existing));
+    when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncCities();
+
+    ArgumentCaptor<City> cap = ArgumentCaptor.forClass(City.class);
+    verify(cityRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+  }
+
+  @Test
+  void syncOutposts_respectsLoadingDockOverride() {
+    Outpost existing = new Outpost();
+    existing.setId(UUID.randomUUID());
+    existing.setIdOutpost(12);
+    existing.setName("HDMS-Anderson");
+    existing.setHasLoadingDock(true);
+    existing.setHasLoadingDockOverridden(true);
+
+    UexOutpostDto dto =
+        UexOutpostDto.builder()
+            .id(12)
+            .name("HDMS-Anderson")
+            .hasLoadingDock(0)
+            .isAvailableLive(0)
+            .build();
+    when(uexClient.getOutposts()).thenReturn(List.of(dto));
+    when(outpostRepository.findByIdOutpost(12)).thenReturn(Optional.of(existing));
+    when(outpostRepository.save(any(Outpost.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncOutposts();
+
+    ArgumentCaptor<Outpost> cap = ArgumentCaptor.forClass(Outpost.class);
+    verify(outpostRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+  }
+
+  @Test
+  void syncPois_respectsLoadingDockOverride() {
+    Poi existing = new Poi();
+    existing.setId(UUID.randomUUID());
+    existing.setIdPoi(13);
+    existing.setName("Grim HEX");
+    existing.setHasLoadingDock(true);
+    existing.setHasLoadingDockOverridden(true);
+
+    UexPoiDto dto =
+        UexPoiDto.builder().id(13).name("Grim HEX").hasLoadingDock(0).isAvailableLive(0).build();
+    when(uexClient.getPoi()).thenReturn(List.of(dto));
+    when(poiRepository.findByIdPoi(13)).thenReturn(Optional.of(existing));
+    when(poiRepository.save(any(Poi.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncPois();
+
+    ArgumentCaptor<Poi> cap = ArgumentCaptor.forClass(Poi.class);
+    verify(poiRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+  }
+
+  @Test
+  void syncSpaceStations_respectsLoadingDockOverride() {
+    SpaceStation existing = new SpaceStation();
+    existing.setId(UUID.randomUUID());
+    existing.setIdSpaceStation(14);
+    existing.setName("Port Olisar");
+    existing.setHasLoadingDock(true);
+    existing.setHasLoadingDockOverridden(true);
+
+    UexSpaceStationDto dto =
+        UexSpaceStationDto.builder()
+            .id(14)
+            .name("Port Olisar")
+            .hasLoadingDock(0)
+            .isAvailableLive(0)
+            .build();
+    when(uexClient.getSpaceStations()).thenReturn(List.of(dto));
+    when(spaceStationRepository.findByIdSpaceStation(14)).thenReturn(Optional.of(existing));
+    when(spaceStationRepository.save(any(SpaceStation.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncSpaceStations();
+
+    ArgumentCaptor<SpaceStation> cap = ArgumentCaptor.forClass(SpaceStation.class);
+    verify(spaceStationRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+  }
+
+  @Test
+  void syncTerminals_respectsLoadingDockOverride() {
+    Terminal existing = new Terminal();
+    existing.setId(UUID.randomUUID());
+    existing.setIdTerminal(15);
+    existing.setName("Lorville TDD");
+    existing.setHasLoadingDock(true);
+    existing.setHasLoadingDockOverridden(true);
+
+    UexTerminalDto dto =
+        UexTerminalDto.builder()
+            .id(15)
+            .name("Lorville TDD")
+            .hasLoadingDock(0)
+            .isAutoLoad(0)
+            .build();
+    when(uexClient.getTerminals()).thenReturn(List.of(dto));
+    when(terminalRepository.findByIdTerminal(15)).thenReturn(Optional.of(existing));
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncTerminals();
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getHasLoadingDock(), "Admin-pinned hasLoadingDock must survive sync");
+  }
+
+  @Test
+  void syncTerminals_respectsAutoLoadOverride() {
+    Terminal existing = new Terminal();
+    existing.setId(UUID.randomUUID());
+    existing.setIdTerminal(16);
+    existing.setName("CRU-L1 Cargo");
+    existing.setIsAutoLoad(true);
+    existing.setIsAutoLoadOverridden(true);
+
+    UexTerminalDto dto =
+        UexTerminalDto.builder()
+            .id(16)
+            .name("CRU-L1 Cargo")
+            .hasLoadingDock(0)
+            .isAutoLoad(0)
+            .build();
+    when(uexClient.getTerminals()).thenReturn(List.of(dto));
+    when(terminalRepository.findByIdTerminal(16)).thenReturn(Optional.of(existing));
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncTerminals();
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository, atLeastOnce()).save(cap.capture());
+    assertTrue(cap.getValue().getIsAutoLoad(), "Admin-pinned isAutoLoad must survive sync");
+  }
 }
