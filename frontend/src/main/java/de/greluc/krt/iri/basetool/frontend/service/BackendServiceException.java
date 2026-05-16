@@ -156,7 +156,11 @@ public class BackendServiceException extends RuntimeException {
       }
     }
 
-    String message = "Backend returned " + status + (code != null ? " [" + code + "]" : "");
+    // deriveCodeFromStatus is @NotNull and Jackson's asText(default) never returns null,
+    // so code is guaranteed non-null here. The previous "code != null" defensive guard
+    // mis-signalled to SpotBugs that the author believed a null code was reachable, which
+    // conflicted with the @NotNull problemCode parameter on the constructor below.
+    String message = "Backend returned " + status + " [" + code + "]";
     return new BackendServiceException(
         message, cause, status, code, correlationId, fieldErrors, detail);
   }
