@@ -28203,6 +28203,18 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "coreVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "scheduleVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "flagsVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "checkedInParticipants" : {
             "type" : "integer",
             "format" : "int32"
@@ -29283,6 +29295,10 @@
             "type" : "string",
             "maxLength" : 64,
             "minLength" : 0
+          },
+          "operationId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "version" : {
             "type" : "integer",

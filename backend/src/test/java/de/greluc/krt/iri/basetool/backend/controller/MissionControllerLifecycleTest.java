@@ -147,6 +147,9 @@ class MissionControllerLifecycleTest {
         true,
         true,
         9L,
+        4L, // coreVersion
+        5L, // scheduleVersion
+        6L, // flagsVersion
         1,
         1);
   }
@@ -544,23 +547,28 @@ class MissionControllerLifecycleTest {
   @Test
   void patchMissionCore_unpacksRequestRecordInDocumentedArgumentOrder() {
     UUID id = UUID.randomUUID();
+    UUID operationId = UUID.randomUUID();
     PatchMissionCoreRequest request =
-        new PatchMissionCoreRequest("New name", "New description", "https://cal", "PLANNED", 5L);
+        new PatchMissionCoreRequest(
+            "New name", "New description", "https://cal", "PLANNED", operationId, 5L);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
     when(missionService.updateCoreSection(
-            id, "New name", "New description", "https://cal", "PLANNED", 5L))
+            id, "New name", "New description", "https://cal", "PLANNED", operationId, 5L))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
     MissionDto result = controller.patchMissionCore(id, request);
 
-    // The five-arg positional service call is the spot where a copy-paste during refactor would
-    // silently swap name and description (both Strings). The verify-call pins the EXACT argument
-    // order so a regression surfaces here instead of in production data.
+    // The positional service call is the spot where a copy-paste during refactor would
+    // silently swap arguments of identical type (name and description are both Strings; the
+    // section version is a Long that could collide with other longs in scope). The verify-call
+    // pins the EXACT argument order — including {@code operationId} as part of the core section —
+    // so a regression surfaces here instead of in production data.
     assertThat(result).isSameAs(dto);
     verify(missionService)
-        .updateCoreSection(id, "New name", "New description", "https://cal", "PLANNED", 5L);
+        .updateCoreSection(
+            id, "New name", "New description", "https://cal", "PLANNED", operationId, 5L);
   }
 
   // ── PATCH /api/v1/missions/{id}/schedule ─────────────────────────────

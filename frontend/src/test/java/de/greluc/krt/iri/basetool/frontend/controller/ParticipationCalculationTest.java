@@ -69,6 +69,9 @@ class ParticipationCalculationTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             1,
             1);
 
@@ -159,6 +162,9 @@ class ParticipationCalculationTest {
             Collections.emptySet(),
             true,
             true,
+            1L,
+            1L,
+            1L,
             1L,
             1,
             2);

@@ -112,6 +112,9 @@ class MissionTimeTest {
             false,
             false,
             0L,
+            0L,
+            0L,
+            0L,
             0,
             0);
 
@@ -158,6 +161,9 @@ class MissionTimeTest {
             Collections.emptySet(),
             false,
             false,
+            0L,
+            0L,
+            0L,
             0L,
             0,
             0);
@@ -275,6 +281,9 @@ class MissionTimeTest {
             Collections.emptySet(),
             false,
             false,
+            0L,
+            0L,
+            0L,
             0L,
             0,
             0);
