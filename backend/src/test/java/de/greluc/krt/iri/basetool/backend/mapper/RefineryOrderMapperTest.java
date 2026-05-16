@@ -169,6 +169,9 @@ class RefineryOrderMapperTest {
             null, // canEdit, canManageManagers
             null, // version
             null,
+            null,
+            null, // coreVersion, scheduleVersion, flagsVersion
+            null,
             null // checkedInParticipants, registeredParticipants
             );
 

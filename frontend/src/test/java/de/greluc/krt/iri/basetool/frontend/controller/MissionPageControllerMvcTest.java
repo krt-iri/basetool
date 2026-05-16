@@ -118,6 +118,9 @@ class MissionPageControllerMvcTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             0);
 
@@ -226,6 +229,9 @@ class MissionPageControllerMvcTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             1,
             1);
     when(backendApiClient.get(
@@ -287,6 +293,9 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             true,
             true,
+            1L,
+            1L,
+            1L,
             1L,
             1,
             1);
@@ -386,6 +395,9 @@ class MissionPageControllerMvcTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             2,
             3);
     when(backendApiClient.get(
@@ -443,6 +455,9 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             true,
             true,
+            1L,
+            1L,
+            1L,
             1L,
             0,
             1);
@@ -521,6 +536,9 @@ class MissionPageControllerMvcTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             0);
     MissionDto refreshed =
@@ -548,13 +566,18 @@ class MissionPageControllerMvcTest {
             true,
             true,
             2L,
+            1L,
+            1L,
+            1L,
             0,
             0);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
         .thenReturn(refreshed);
-    when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId), any(MissionDto.class), eq(Void.class)))
+    // The actual-time endpoint now dispatches a section-scoped PATCH on /schedule, not the
+    // legacy full-PUT — concurrent edits on other sections must not 409 the actual-time flow.
+    when(backendApiClient.patch(
+            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
         .thenReturn(null);
 
     String body =
@@ -597,12 +620,18 @@ class MissionPageControllerMvcTest {
             true,
             true,
             5L,
+            1L,
+            1L,
+            1L,
             0,
             0);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
-    when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId), any(MissionDto.class), eq(Void.class)))
+    // The actual-time endpoint dispatches a section-scoped PATCH on /schedule. A stale
+    // scheduleVersion now surfaces as a 409 here — and only on the schedule patch, so
+    // concurrent edits on core or flags are unaffected.
+    when(backendApiClient.patch(
+            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
         .thenThrow(
             new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1175,6 +1204,9 @@ class MissionPageControllerMvcTest {
             false, // canEdit = false (kein Manager/Admin)
             false,
             1L,
+            1L,
+            1L,
+            1L,
             1,
             1);
 
@@ -1280,6 +1312,9 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             false, // canEdit = false (kein Manager/Admin)
             false,
+            1L,
+            1L,
+            1L,
             1L,
             1,
             1);

@@ -401,7 +401,10 @@ public class MissionPageController {
                 formatInstant(mission.actualEndTime()),
                 mission.isInternal() != null && mission.isInternal(),
                 mission.operation() != null ? String.valueOf(mission.operation().id()) : null,
-                mission.version()));
+                mission.version(),
+                mission.coreVersion(),
+                mission.scheduleVersion(),
+                mission.flagsVersion()));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
@@ -676,14 +679,13 @@ public class MissionPageController {
 
   /**
    * Sets the actual start or end time of a mission to the supplied UTC instant and saves
-   * immediately. The client sends the current {@code version} from the DOM; this engages optimistic
-   * locking in the backend, which returns HTTP 409 on concurrent changes.
+   * immediately. The client sends the current schedule-section counter ({@code scheduleVersion})
+   * from the DOM; this engages optimistic locking on the dedicated schedule section, which means a
+   * concurrent edit of the core or flags section never triggers a 409 here (and vice versa).
    *
-   * <p>Why this dedicated endpoint? The regular mission update goes through a form submit with
-   * full-page reload, which is undesired when clicking "Now". This endpoint therefore fetches the
-   * mission from the backend, overwrites only the requested time field and forwards the client's
-   * version so that lost updates are prevented (see AGENTS.md: CRITICAL JUNIE RULE - CONCURRENCY
-   * AND OPTIMISTIC LOCKING).
+   * <p>The endpoint fetches the current schedule values from the backend, overlays the single field
+   * the client requested ({@code actualStartTime} or {@code actualEndTime}) and dispatches a single
+   * {@code PATCH /api/v1/missions/{id}/schedule}.
    */
   @PostMapping("/{id}/actual-time")
   @ResponseBody
@@ -712,35 +714,15 @@ public class MissionPageController {
       Instant newEnd =
           "actualEndTime".equals(request.field()) ? request.value() : current.actualEndTime();
 
-      MissionDto updated =
-          new MissionDto(
-              current.id(),
-              current.name(),
-              current.description(),
-              current.calendarLink(),
-              current.status(),
-              current.meetingTime(),
-              current.plannedStartTime(),
-              newStart,
-              current.plannedEndTime(),
-              newEnd,
-              current.isInternal(),
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              current.operation(),
-              null,
-              null,
-              null,
-              null,
-              request.version(), // Optimistic-lock version from the DOM
-              current.checkedInParticipants(),
-              current.registeredParticipants());
+      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+      schedulePatch.put("meetingTime", current.meetingTime());
+      schedulePatch.put("plannedStartTime", current.plannedStartTime());
+      schedulePatch.put("plannedEndTime", current.plannedEndTime());
+      schedulePatch.put("actualStartTime", newStart);
+      schedulePatch.put("actualEndTime", newEnd);
+      schedulePatch.put("version", request.version()); // scheduleVersion from the DOM
 
-      backendApiClient.put("/api/v1/missions/" + id, updated, Void.class);
+      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       return org.springframework.http.ResponseEntity.ok(refreshed);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
@@ -1052,14 +1034,15 @@ public class MissionPageController {
     if (!model.containsAttribute("missionForm")) {
       model.addAttribute(
           "missionForm",
-          new MissionForm("", "", "", "PLANNED", "", "", "", "", "", false, null, null));
+          new MissionForm(
+              "", "", "", "PLANNED", "", "", "", "", "", false, null, null, null, null, null));
     }
     model.addAttribute("isNew", true);
     model.addAttribute(
         "mission",
         new MissionDto(
             null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
-            null, null, null, null, null, null, true, true, null, 0, 0));
+            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
     return "mission-detail";
@@ -1128,6 +1111,9 @@ public class MissionPageController {
               null, // canEdit
               null, // canManageManagers
               null, // version
+              null, // coreVersion (server-assigned)
+              null, // scheduleVersion (server-assigned)
+              null, // flagsVersion (server-assigned)
               0, // checkedInParticipants
               0 // registeredParticipants
               );
@@ -1144,8 +1130,17 @@ public class MissionPageController {
   }
 
   /**
-   * Form-post endpoint that persists edits to a mission. Carries the optimistic-lock version
-   * through the form; a 409 surfaces as the dedicated concurrency-conflict toast.
+   * Form-post endpoint that persists edits to a mission. Splits the submitted form into three
+   * section-scoped patches (core, schedule, flags) and dispatches them sequentially against the
+   * backend so that concurrent editors on other sections of the same mission do not invalidate each
+   * other's saves. Each section carries its own optimistic-lock counter ({@code coreVersion},
+   * {@code scheduleVersion}, {@code flagsVersion}); a 409 from any of them surfaces as the
+   * dedicated concurrency-conflict toast.
+   *
+   * <p>Schedule is patched first because the status-driven auto-transition (PLANNED → ACTIVE) in
+   * the core patch will additionally bump the schedule version — running schedule first lets the
+   * caller's plain time edits land before the auto-stamp logic kicks in, which keeps the round-trip
+   * free of an avoidable internal 409.
    *
    * @return redirect to the mission detail page
    */
@@ -1183,41 +1178,33 @@ public class MissionPageController {
               ? parseToInstant(form.actualEndTime())
               : null;
 
-      OperationDto operation =
+      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+      schedulePatch.put("meetingTime", meetingTime);
+      schedulePatch.put("plannedStartTime", plannedStartTime);
+      schedulePatch.put("plannedEndTime", plannedEndTime);
+      schedulePatch.put("actualStartTime", actualStartTime);
+      schedulePatch.put("actualEndTime", actualEndTime);
+      schedulePatch.put("version", form.scheduleVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+
+      UUID operationId =
           (form.operationId() != null && !form.operationId().isBlank())
-              ? new OperationDto(UUID.fromString(form.operationId()), null, null, null, null)
+              ? UUID.fromString(form.operationId())
               : null;
+      Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
+      corePatch.put("name", form.name());
+      corePatch.put("description", form.description());
+      corePatch.put("calendarLink", form.calendarLink());
+      corePatch.put("status", form.status());
+      corePatch.put("operationId", operationId);
+      corePatch.put("version", form.coreVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
 
-      MissionDto missionDto =
-          new MissionDto(
-              id, // id
-              form.name(), // name
-              form.description(), // description
-              form.calendarLink(), // calendarLink
-              form.status(), // status
-              meetingTime, // meetingTime
-              plannedStartTime, // plannedStartTime
-              actualStartTime, // actualStartTime
-              plannedEndTime, // plannedEndTime
-              actualEndTime, // actualEndTime
-              form.isInternal(), // isInternal
-              null, // participants
-              null, // assignedUnits
-              null, // frequencies
-              null, // subMissions
-              null, // inventoryEntries
-              null, // refineryOrders
-              operation, // operation
-              null, // owner
-              null, // managers
-              null, // canEdit
-              null, // canManageManagers
-              form.version(), // version
-              0, // checkedInParticipants
-              0 // registeredParticipants
-              );
+      Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
+      flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
+      flagsPatch.put("version", form.flagsVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
 
-      backendApiClient.put("/api/v1/missions/" + id, missionDto, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update mission failed", e);

@@ -288,6 +288,9 @@
 
                     <form id="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
+                        <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
+                        <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
+                        <input type="hidden" id="mission-flags-version" name="flagsVersion" th:field="*{flagsVersion}">
 
             <div class="form-group">
                 <label th:text="#{mission.name}">Name</label>
@@ -2146,10 +2149,14 @@
             console.error('[mission-detail] Mission ID nicht gefunden');
             return;
         }
-        const versionInput = document.getElementById('mission-version');
+        // actual-time only touches the schedule section, so it carries the dedicated
+        // scheduleVersion counter — concurrent edits on the core or flags section therefore
+        // never trigger a 409 here (and vice versa).
+        const versionInput = document.getElementById('mission-schedule-version')
+            || document.getElementById('mission-version');
         const version = versionInput ? versionInput.value : null;
         if (version === null || version === '') {
-            console.error('[mission-detail] Version nicht gefunden (mission-version input)');
+            console.error('[mission-detail] Schedule-Version nicht gefunden (mission-schedule-version input)');
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
             }

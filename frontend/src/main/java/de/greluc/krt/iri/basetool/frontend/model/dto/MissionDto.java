@@ -5,7 +5,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission payload. */
+/**
+ * Data transfer record carrying mission payload.
+ *
+ * <p>{@code version} is the global mission counter (legacy full-update path). The dedicated section
+ * counters {@code coreVersion}, {@code scheduleVersion} and {@code flagsVersion} drive the
+ * section-scoped patch endpoints; carrying them on the frontend DTO lets the mission detail page
+ * pin the correct counter into each hidden form input independently.
+ */
 public record MissionDto(
     UUID id,
     String name,
@@ -30,5 +37,8 @@ public record MissionDto(
     Boolean canEdit,
     Boolean canManageManagers,
     Long version,
+    Long coreVersion,
+    Long scheduleVersion,
+    Long flagsVersion,
     Integer checkedInParticipants,
     Integer registeredParticipants) {}

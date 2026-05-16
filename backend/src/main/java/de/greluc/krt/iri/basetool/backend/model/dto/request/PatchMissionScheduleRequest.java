@@ -10,9 +10,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>All timestamps are accepted and stored in UTC ({@link Instant}). Display in the frontend uses
  * the user's local timezone.
  *
- * <p>Optimistic locking is performed via the parent version of the {@code Mission}; parallel
- * changes to sub-collections (participants, units, finance) no longer bump the parent version
- * thanks to {@code @OptimisticLock(excluded = true)}.
+ * <p>The {@code version} field is the dedicated {@code mission.schedule_version} section counter —
+ * not the global {@code Mission.@Version}. Concurrent edits on the core or flags section therefore
+ * never invalidate a schedule patch in flight (and vice versa).
  */
 public record PatchMissionScheduleRequest(
     @Nullable Instant meetingTime,

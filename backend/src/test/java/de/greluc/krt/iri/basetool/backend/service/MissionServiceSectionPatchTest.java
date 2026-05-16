@@ -61,15 +61,19 @@ class MissionServiceSectionPatchTest {
     existing = new Mission();
     existing.setId(missionId);
     existing.setVersion(7L);
+    existing.setCoreVersion(4L);
+    existing.setScheduleVersion(5L);
+    existing.setFlagsVersion(6L);
     existing.setName("Old name");
     existing.setDescription("Old desc");
+    existing.setStatus("PLANNED");
     existing.setIsInternal(false);
     existing.setPlannedStartTime(Instant.parse("2030-01-01T10:00:00Z"));
     existing.setPlannedEndTime(Instant.parse("2030-01-01T12:00:00Z"));
   }
 
   @Test
-  void updateCoreSection_shouldUpdateOnlyCoreFields_whenVersionMatches() {
+  void updateCoreSection_shouldUpdateOnlyCoreFields_whenCoreVersionMatches() {
     // Given
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -77,29 +81,62 @@ class MissionServiceSectionPatchTest {
     // When
     Mission result =
         missionService.updateCoreSection(
-            missionId, "New name", "New desc", "https://example.org/cal", "PLANNED", 7L);
+            missionId, "New name", "New desc", "https://example.org/cal", "PLANNED", null, 4L);
 
     // Then
     assertEquals("New name", result.getName());
     assertEquals("New desc", result.getDescription());
     assertEquals("https://example.org/cal", result.getCalendarLink());
     assertEquals("PLANNED", result.getStatus());
+    // Section-Counter: coreVersion ist gebumpt, schedule/flags unveraendert
+    assertEquals(5L, result.getCoreVersion());
+    assertEquals(5L, result.getScheduleVersion());
+    assertEquals(6L, result.getFlagsVersion());
     // Schedule-/Flags-Felder bleiben unveraendert
     assertEquals(Instant.parse("2030-01-01T10:00:00Z"), result.getPlannedStartTime());
     assertFalse(result.getIsInternal());
   }
 
   @Test
-  void updateCoreSection_shouldThrow409_whenVersionMismatch() {
+  void updateCoreSection_shouldThrow409_whenCoreVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
+    // Stale coreVersion (mission has 4, caller sends 3) must fail — even though the global
+    // Mission.version (7) and the other section counters (schedule=5, flags=6) are untouched.
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> missionService.updateCoreSection(missionId, "X", null, null, null, 6L));
+        () -> missionService.updateCoreSection(missionId, "X", null, null, null, null, 3L));
   }
 
   @Test
-  void updateScheduleSection_shouldUpdateOnlyScheduleFields_whenVersionMatches() {
+  void updateCoreSection_shouldAlsoBumpScheduleAndStampActualStart_whenStatusTransitionsToActive() {
+    // Given: existing.status == PLANNED, actualStartTime == null
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Instant before = Instant.now();
+
+    // When: caller switches status to ACTIVE via the core patch
+    Mission result =
+        missionService.updateCoreSection(
+            missionId, "Old name", "Old desc", null, "ACTIVE", null, 4L);
+
+    Instant after = Instant.now();
+
+    // Then: actualStartTime is auto-stamped AND scheduleVersion is bumped, because the
+    // activation crosses the core/schedule boundary and concurrent schedule editors must
+    // see the change as a 409 instead of silently overwriting the stamp.
+    assertNotNull(result.getActualStartTime());
+    assertTrue(!result.getActualStartTime().isBefore(before));
+    assertTrue(!result.getActualStartTime().isAfter(after));
+    assertEquals("ACTIVE", result.getStatus());
+    assertEquals(5L, result.getCoreVersion());
+    assertEquals(6L, result.getScheduleVersion());
+    assertEquals(6L, result.getFlagsVersion()); // flags unaffected
+  }
+
+  @Test
+  void updateScheduleSection_shouldUpdateOnlyScheduleFields_whenScheduleVersionMatches() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -109,13 +146,26 @@ class MissionServiceSectionPatchTest {
 
     Mission result =
         missionService.updateScheduleSection(
-            missionId, meeting, plannedStart, plannedEnd, null, null, 7L);
+            missionId, meeting, plannedStart, plannedEnd, null, null, 5L);
 
     assertEquals(meeting, result.getMeetingTime());
     assertEquals(plannedStart, result.getPlannedStartTime());
     assertEquals(plannedEnd, result.getPlannedEndTime());
     // Core-Felder bleiben unveraendert
     assertEquals("Old name", result.getName());
+    // Section-Counter: scheduleVersion ist gebumpt, core/flags unveraendert
+    assertEquals(4L, result.getCoreVersion());
+    assertEquals(6L, result.getScheduleVersion());
+    assertEquals(6L, result.getFlagsVersion());
+  }
+
+  @Test
+  void updateScheduleSection_shouldThrow409_whenScheduleVersionMismatch() {
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> missionService.updateScheduleSection(missionId, null, null, null, null, null, 4L));
   }
 
   @Test
@@ -129,28 +179,60 @@ class MissionServiceSectionPatchTest {
         IllegalArgumentException.class,
         () ->
             missionService.updateScheduleSection(
-                missionId, null, plannedStart, plannedEnd, null, null, 7L));
+                missionId, null, plannedStart, plannedEnd, null, null, 5L));
   }
 
   @Test
-  void updateFlagsSection_shouldFlipInternalFlag_whenVersionMatches() {
+  void updateFlagsSection_shouldFlipInternalFlag_whenFlagsVersionMatches() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    Mission result = missionService.updateFlagsSection(missionId, true, 7L);
+    Mission result = missionService.updateFlagsSection(missionId, true, 6L);
 
     assertTrue(result.getIsInternal());
     // Core unveraendert
     assertEquals("Old name", result.getName());
+    // Section-Counter: flagsVersion ist gebumpt, core/schedule unveraendert
+    assertEquals(4L, result.getCoreVersion());
+    assertEquals(5L, result.getScheduleVersion());
+    assertEquals(7L, result.getFlagsVersion());
   }
 
   @Test
-  void updateFlagsSection_shouldThrow409_whenVersionMismatch() {
+  void updateFlagsSection_shouldThrow409_whenFlagsVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateFlagsSection(missionId, true, 999L));
+  }
+
+  @Test
+  void sectionPatches_acrossDisjointSections_doNotInvalidateEachOther() {
+    // Given: core and flags patches arrive with their respective section counters; both
+    // hit the mission in sequence — this is the canonical Stufe-1 promise: concurrent users
+    // editing disjoint sections of the same mission do not produce 409 conflicts.
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When (1): a core-section caller saves
+    Mission afterCore =
+        missionService.updateCoreSection(missionId, "New name", null, null, "PLANNED", null, 4L);
+
+    // Then (1): coreVersion advances to 5, flagsVersion is still 6
+    assertEquals(5L, afterCore.getCoreVersion());
+    assertEquals(6L, afterCore.getFlagsVersion());
+
+    // When (2): a flags-section caller — that had loaded the mission BEFORE the core save —
+    // submits with the still-valid flagsVersion=6. The previously-issued core save must NOT
+    // have invalidated this flags submit.
+    Mission afterFlags = missionService.updateFlagsSection(missionId, true, 6L);
+
+    // Then (2): both edits coexist; flagsVersion now 7, coreVersion stays at 5.
+    assertEquals(5L, afterFlags.getCoreVersion());
+    assertEquals(7L, afterFlags.getFlagsVersion());
+    assertEquals("New name", afterFlags.getName());
+    assertTrue(afterFlags.getIsInternal());
   }
 
   // -----------------------------------------------------------------------------------------

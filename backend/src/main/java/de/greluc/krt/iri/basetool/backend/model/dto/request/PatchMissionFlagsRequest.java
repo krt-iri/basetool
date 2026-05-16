@@ -3,10 +3,10 @@ package de.greluc.krt.iri.basetool.backend.model.dto.request;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * Request DTO for a partial update of the flags section of a mission (e.g. isInternal).
+ * Request DTO for a partial update of the flags section of a mission ({@code isInternal}).
  *
- * <p>Section patches allow multiple users to work in parallel on different areas of the mission
- * detail page; thanks to {@code @OptimisticLock(excluded = true)}, sub-changes (participants,
- * units, finance) no longer cause a parent-version collision.
+ * <p>The {@code version} field is the dedicated {@code mission.flags_version} section counter — not
+ * the global {@code Mission.@Version}. Concurrent edits on the core or schedule section therefore
+ * never invalidate a flags patch in flight (and vice versa).
  */
 public record PatchMissionFlagsRequest(@NotNull Boolean isInternal, @NotNull Long version) {}

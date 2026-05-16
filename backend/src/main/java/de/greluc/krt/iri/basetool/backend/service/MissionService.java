@@ -196,6 +196,12 @@ public class MissionService {
    * {@link #addUnitToMission}, etc.) so the per-row optimistic-lock checks on those flows do not
    * collide with a mission-level edit.
    *
+   * <p>Bumps all three section counters ({@code coreVersion}, {@code scheduleVersion}, {@code
+   * flagsVersion}) on success because a full-replace is semantically an overwrite of every section;
+   * concurrent section-scoped patches in flight will get a 409 on their next save. Prefer the
+   * dedicated section endpoints {@link #updateCoreSection}, {@link #updateScheduleSection}, {@link
+   * #updateFlagsSection} for multi-user-friendly edits.
+   *
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the mission or any
    *     referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
@@ -214,12 +220,16 @@ public class MissionService {
           Mission.class, missionId);
     }
 
-    // Status Update Logic for Actual Start Time
-    if ("ACTIVE".equals(missionDetails.getStatus()) && !"ACTIVE".equals(mission.getStatus())) {
-      if (missionDetails.getActualStartTime() == null) {
-        missionDetails.setActualStartTime(Instant.now());
-      }
-    }
+    // Decide the effective actualStartTime UP FRONT, before mutating any setter on the managed
+    // entity — the auto-stamp branch reads the current (pre-mutation) status, so capturing it
+    // here keeps the decision honest and avoids a far-away usage of the snapshot variable that
+    // Checkstyle's VariableDeclarationUsageDistance would otherwise flag.
+    Instant explicitActualStart = missionDetails.getActualStartTime();
+    boolean autoStampActualStart =
+        "ACTIVE".equals(missionDetails.getStatus())
+            && !"ACTIVE".equals(mission.getStatus())
+            && explicitActualStart == null;
+    Instant effectiveActualStart = autoStampActualStart ? Instant.now() : explicitActualStart;
 
     mission.setName(missionDetails.getName());
     mission.setDescription(missionDetails.getDescription());
@@ -228,7 +238,7 @@ public class MissionService {
     mission.setMeetingTime(missionDetails.getMeetingTime());
     mission.setPlannedStartTime(missionDetails.getPlannedStartTime());
     mission.setPlannedEndTime(missionDetails.getPlannedEndTime());
-    mission.setActualStartTime(missionDetails.getActualStartTime());
+    mission.setActualStartTime(effectiveActualStart);
 
     if (missionDetails.getOperation() != null && missionDetails.getOperation().getId() != null) {
       Operation op =
@@ -261,18 +271,30 @@ public class MissionService {
 
     validateMissionTimes(mission);
 
+    bumpCoreVersion(mission);
+    bumpScheduleVersion(mission);
+    bumpFlagsVersion(mission);
+
     return missionRepository.save(mission);
   }
 
   /**
-   * Updates only the core (master-data) section of a mission. Sub-collections (participants, units,
-   * finance) are not touched and, thanks to {@code @OptimisticLock(excluded = true)}, do not bump
-   * the parent version either — this allows multiple users to work on different sections
-   * concurrently without blocking each other or losing input due to a 409 conflict.
+   * Updates only the core (master-data) section of a mission. Validates the dedicated {@code
+   * coreVersion} counter so concurrent edits on {@code schedule} or {@code flags} do not invalidate
+   * this form. Sub-collections (participants, units, finance) are not touched and, thanks to
+   * {@code @OptimisticLock(excluded = true)}, do not bump the parent version either.
+   *
+   * <p>When the status transitions from anything other than {@code ACTIVE} to {@code ACTIVE} and
+   * {@link Mission#getActualStartTime()} is still {@code null}, this method ALSO bumps {@code
+   * scheduleVersion} and stamps {@code actualStartTime = now()} via {@link
+   * #bumpActualStartTimeOnActivationWithinTransaction(Mission)}. This is by design: the activation
+   * crosses the core/schedule boundary, and the schedule counter must move so concurrent schedule
+   * edits surface the change as a 409 instead of silently overwriting the auto-stamped value.
    *
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
    *     is unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     {@code expectedCoreVersion} is stale
    */
   @Transactional
   public Mission updateCoreSection(
@@ -281,24 +303,55 @@ public class MissionService {
       String description,
       String calendarLink,
       String status,
-      @NotNull Long expectedVersion) {
+      UUID operationId,
+      @NotNull Long expectedCoreVersion) {
     Mission mission =
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertVersion(mission, expectedVersion, missionId);
+    assertCoreVersion(mission, expectedCoreVersion, missionId);
+
+    // Cross-section auto-stamp FIRST, before mutating mission.status — the condition reads the
+    // OLD status, so it must run before the setter below. Setting actualStartTime here is safe
+    // because it touches a different field; the later setters do not overwrite it.
+    if ("ACTIVE".equals(status)
+        && !"ACTIVE".equals(mission.getStatus())
+        && mission.getActualStartTime() == null) {
+      bumpActualStartTimeOnActivationWithinTransaction(mission);
+    }
+
     mission.setName(name);
     mission.setDescription(description);
     mission.setCalendarLink(calendarLink);
     if (status != null) {
       mission.setStatus(status);
     }
+
+    if (operationId != null) {
+      Operation op =
+          operationRepository
+              .findById(operationId)
+              .orElseThrow(() -> new NotFoundException("Operation not found"));
+      mission.setOperation(op);
+    } else {
+      mission.setOperation(null);
+    }
+
+    bumpCoreVersion(mission);
     return missionRepository.save(mission);
   }
 
   /**
    * Updates only the schedule section of a mission. All timestamps are processed and stored in UTC.
-   * Validation is identical to the full update.
+   * Validates the dedicated {@code scheduleVersion} counter; concurrent core or flags edits do not
+   * invalidate this form.
+   *
+   * <p>Setting {@code actualEndTime} also closes any open participant end-times (dirty-checked on
+   * the managed entities; the participants' own {@code @Version} fields will be bumped naturally by
+   * Hibernate at flush time, mission section counters are not affected by that).
+   *
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     {@code expectedScheduleVersion} is stale
    */
   @Transactional
   public Mission updateScheduleSection(
@@ -308,12 +361,12 @@ public class MissionService {
       Instant plannedEndTime,
       Instant actualStartTime,
       Instant actualEndTime,
-      @NotNull Long expectedVersion) {
+      @NotNull Long expectedScheduleVersion) {
     Mission mission =
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertVersion(mission, expectedVersion, missionId);
+    assertScheduleVersion(mission, expectedScheduleVersion, missionId);
     mission.setMeetingTime(meetingTime);
     mission.setPlannedStartTime(plannedStartTime);
     mission.setPlannedEndTime(plannedEndTime);
@@ -331,28 +384,84 @@ public class MissionService {
     }
 
     validateMissionTimes(mission);
+    bumpScheduleVersion(mission);
     return missionRepository.save(mission);
   }
 
-  /** Updates only the flags section of a mission (e.g. {@code isInternal}). */
+  /**
+   * Updates only the flags section of a mission ({@code isInternal}). Validates the dedicated
+   * {@code flagsVersion} counter.
+   *
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     {@code expectedFlagsVersion} is stale
+   */
   @Transactional
   public Mission updateFlagsSection(
-      @NotNull UUID missionId, @NotNull Boolean isInternal, @NotNull Long expectedVersion) {
+      @NotNull UUID missionId, @NotNull Boolean isInternal, @NotNull Long expectedFlagsVersion) {
     Mission mission =
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertVersion(mission, expectedVersion, missionId);
+    assertFlagsVersion(mission, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
+    bumpFlagsVersion(mission);
     return missionRepository.save(mission);
   }
 
-  private void assertVersion(
+  /**
+   * Cross-section helper invoked from {@link #updateCoreSection} when a status transition to {@code
+   * ACTIVE} requires auto-stamping {@code actualStartTime}. Operates on the already-managed entity
+   * via dirty-checking (no {@code save()}/{@code flush()} of its own — see CLAUDE.md's {@code
+   * …WithinTransaction} pattern) and bumps the schedule counter so other open schedule editors get
+   * a 409 instead of silently overwriting the stamp.
+   *
+   * @param mission managed mission entity in the current transaction
+   */
+  private void bumpActualStartTimeOnActivationWithinTransaction(@NotNull Mission mission) {
+    mission.setActualStartTime(Instant.now());
+    bumpScheduleVersion(mission);
+  }
+
+  private void assertCoreVersion(
       @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    if (mission.getVersion() != null && !mission.getVersion().equals(expectedVersion)) {
+    Long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
+    if (!expectedVersion.equals(current)) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
     }
+  }
+
+  private void assertScheduleVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    Long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
+  private void assertFlagsVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    Long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
+  private void bumpCoreVersion(@NotNull Mission mission) {
+    Long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
+    mission.setCoreVersion(current + 1L);
+  }
+
+  private void bumpScheduleVersion(@NotNull Mission mission) {
+    Long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
+    mission.setScheduleVersion(current + 1L);
+  }
+
+  private void bumpFlagsVersion(@NotNull Mission mission) {
+    Long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
+    mission.setFlagsVersion(current + 1L);
   }
 
   /**
