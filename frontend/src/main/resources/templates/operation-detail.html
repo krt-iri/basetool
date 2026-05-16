@@ -408,10 +408,10 @@
                                     </td>
                                     <td class="payout-amount-cell" sec:authorize="isAuthenticated()">
                                         <span class="payout-amount-value"
-                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
                                         <span class="payout-amount-reimbursement"
-                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
-                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'NONE', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
+                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
+                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
@@ -452,7 +452,7 @@
                     <div style="margin-bottom: 1.5rem; text-align: center;">
                         <h3 style="margin: 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-primary);">
                             <span th:text="#{operation.finances.total}">Gesamtergebnis</span>:
-                            <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'NONE', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
+                            <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'POINT', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
                         </h3>
                     </div>
 
