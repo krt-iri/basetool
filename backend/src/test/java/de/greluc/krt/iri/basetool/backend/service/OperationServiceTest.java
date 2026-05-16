@@ -800,8 +800,7 @@ class OperationServiceTest {
       User bob = newUser("bob");
       MissionParticipant aliceP =
           addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
-      MissionParticipant bobP =
-          addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
 
       // INCOME 1000 not attributed to any single participant (entry.participant references one
