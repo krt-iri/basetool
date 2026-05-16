@@ -1,0 +1,23 @@
+# logrotate(8) configuration for /var/log/iri-deploy.log.
+#
+# Installation (on the production host, one-time):
+#   sudo cp /var/iri/code/scripts/iri-deploy.logrotate /etc/logrotate.d/iri-deploy
+#   sudo chown root:root /etc/logrotate.d/iri-deploy
+#   sudo chmod 0644       /etc/logrotate.d/iri-deploy
+#
+# `copytruncate` is required because the systemd unit appends to the file via
+# `StandardOutput=append:...` — that holds a file descriptor open across
+# logrotate's run, so a naive `create` strategy would leave systemd writing
+# into the rotated (now-renamed) file. `copytruncate` rotates the inode
+# without breaking the open fd.
+
+/var/log/iri-deploy.log {
+    weekly
+    rotate 12
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 deploy adm
+}

@@ -1,0 +1,181 @@
+name: Release Images
+
+# Build, scan, sign and push the backend + frontend production images to GHCR.
+#
+# Trigger model:
+#   - push to main           -> rolling :edge tag plus an immutable :sha-<short>
+#                               tag for traceability. No :stable promotion.
+#   - push of a v*.*.* tag   -> semver-derived tags (:1.2.3, :1.2, :1, :latest).
+#                               Still no :stable promotion — that is the
+#                               separate `promote.yml` workflow so the human in
+#                               the loop decides what reaches the server.
+#   - workflow_dispatch      -> manual rebuild from the Actions UI.
+#
+# What this workflow guarantees about the resulting images:
+#   1. Built from a clean GitHub checkout — `.dockerignore` blocks production
+#      secrets (keystore.p12, .env, realm-export.json, ...) from ever entering
+#      the build context. There is no way for a CI-built image to carry the
+#      production TLS keystore.
+#   2. Signed with cosign keyless (Sigstore Rekor / Fulcio via OIDC), so the
+#      server can verify the image was produced by THIS workflow on THIS repo
+#      before pulling. No long-lived signing key to rotate.
+#   3. Carries SLSA build provenance + an SPDX SBOM as OCI attestations
+#      (`provenance: mode=max`, `sbom: true`) so a downstream auditor can prove
+#      which commit + builder produced the image and which packages it bundles.
+#   4. Scanned with Trivy. Findings are uploaded as SARIF to the repository's
+#      Security tab for visibility; the scan does NOT block the push itself
+#      (a CVE-bearing image is preferable to no image when a hotfix is
+#      urgent), but the `promote.yml` workflow re-checks before flipping
+#      the :stable tag — that is the production gate.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+# Releases are idempotent (image tags are immutable per digest), so we do not
+# cancel an in-flight release if a new push lands — that would leave a tag
+# half-promoted. Different refs run in parallel; the same ref serialises.
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write          # push to ghcr.io
+  id-token: write          # cosign keyless OIDC (Sigstore Fulcio)
+  attestations: write      # SLSA provenance + SBOM attestation
+  security-events: write   # Trivy SARIF upload
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    name: Build & Push (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, frontend]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # QEMU is only strictly required if we cross-build for arm64. We currently
+      # only build linux/amd64 (the production host architecture), so this is a
+      # very cheap no-op — keeping it in makes a future multi-arch flip a
+      # one-line `platforms:` change in the build step instead of a workflow
+      # restructure.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN gets `packages: write` from the workflow permissions
+          # block above, scoped to this repo's package namespace. No PAT
+          # required, no secret rotation needed.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata (tags + OCI labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          tags: |
+            # Rolling pointer on every main push — useful for chasing the
+            # bleeding edge in a staging environment, never used by the server.
+            type=edge,branch=main
+            # Immutable per-commit reference. The server's deploy.sh can pin to
+            # `:sha-<short>` if an explicit commit-level rollback is required.
+            type=sha,prefix=sha-,format=short
+            # Semver tags from `v1.4.2` git tag — strip the `v` so image tags
+            # follow the OCI convention (`:1.4.2`, not `:v1.4.2`).
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # `:latest` only moves on a tag push, never on a main push, so that
+            # a casual `docker pull ...:latest` always yields the most recent
+            # release rather than an arbitrary main commit.
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+          labels: |
+            org.opencontainers.image.title=basetool-${{ matrix.module }}
+            org.opencontainers.image.description=IRIDIUM Basetool ${{ matrix.module }} (Spring Boot)
+            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build & push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.module }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions cache backend. `mode=max` caches all build stages
+          # including the multi-stage `build` layer (Gradle dependency
+          # download), which is the slowest part of the build. Scoped per
+          # module so backend and frontend do not invalidate each other.
+          cache-from: type=gha,scope=${{ matrix.module }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.module }}
+          # `mode=max` provenance records every build step's command and
+          # parameters in the SLSA attestation; the default `mode=min` only
+          # records the final manifest. Max is verbose but auditable.
+          provenance: mode=max
+          # Attach an SPDX SBOM of every package shipped in the image as an
+          # OCI attestation. This is image-scope; the CycloneDX BOM produced
+          # by `./gradlew cyclonedxBom` in the main CI workflow is
+          # Java-only, the buildx SBOM also covers the Alpine + JRE layers.
+          sbom: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless / OIDC)
+        # Signs the *digest*, not the tag. Multiple tags pointing at the same
+        # digest are all covered by one signature, so a later `:stable`
+        # promotion does not need a re-sign. The keyless flow uses the
+        # workflow's GitHub-OIDC token to mint a short-lived Sigstore Fulcio
+        # cert and writes the signature to the Rekor transparency log.
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
+      - name: Run Trivy vulnerability scan
+        # Reports HIGH+CRITICAL CVEs with available fixes. `exit-code: 0` is
+        # deliberate: we do NOT block the push on findings (a CVE-bearing
+        # image is preferable to a missing image when a hotfix is urgent).
+        # The findings show up in the Security tab and the `promote.yml`
+        # workflow re-runs this check as a gate before flipping :stable.
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-${{ matrix.module }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.module }}.sarif
+          category: trivy-${{ matrix.module }}

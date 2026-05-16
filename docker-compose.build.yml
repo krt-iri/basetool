@@ -1,0 +1,57 @@
+# Local-build override. The base docker-compose.yml is image-only — its
+# backend / frontend services pull from GHCR. That is the right default for
+# the production host (and for any environment that should consume CI-built
+# images), but it makes iterating on a Dockerfile or testing an unreleased
+# change painful.
+#
+# This override re-introduces a `build:` block alongside the existing `image:`
+# tag on every Spring-Boot service. Compose semantics: when both are present,
+# `docker compose up` builds locally and tags the result with the image tag,
+# `docker compose pull` still pulls from GHCR, and `docker compose up --build`
+# forces a rebuild.
+#
+# Usage examples:
+#   # Iterate on the dev stack with local Dockerfile changes:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#       --profile dev up -d --build
+#
+#   # Smoke-test a production image build locally without pushing:
+#   IRI_BASETOOL_VERSION=local \
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#       --profile prod up -d --build
+#
+# Why this is a separate file and not merged into docker-compose.yml:
+#   1. The production host should NEVER have `build:` available — it does not
+#      have the source tree, only the compose file. Keeping the override
+#      separate makes that impossible by construction.
+#   2. CI runs `docker compose config` against docker-compose.yml as a
+#      sanity check before publishing; a `build:` directive that references
+#      a missing context would fail that lint step.
+#   3. The build override is git-tracked, but it never reaches the production
+#      `/var/iri/code/` directory (the bootstrap procedure copies only the
+#      base compose file and the scripts directory).
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+
+  backend-dev:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}

@@ -1,0 +1,144 @@
+name: Promote to stable
+
+# Promote an already-built image to the rolling `:stable` tag that the
+# production host's deploy.sh polls. Does NOT rebuild — it re-tags an existing
+# digest, so the production deploy that follows is by definition identical to
+# what `release-images.yml` validated (built, scanned, signed) earlier.
+#
+# Trigger: workflow_dispatch only. Promotion is an intentional human decision,
+# never automatic from a CI build.
+#
+# Pre-flight gate: cosign-verifies the source image's keyless signature
+# against this repository's release-images workflow identity. A tag that was
+# not produced by our own CI cannot be promoted, even if the registry contains
+# one (e.g. someone pushed manually with a leaked PAT). This is the supply
+# chain seam that makes the host's blind `:stable` pull safe.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Image tag to promote (e.g. "1.4.3", "sha-abc1234"). NOT "stable" itself.'
+        required: true
+        type: string
+
+concurrency:
+  # Serialise promotions globally so two simultaneous flips cannot leave the
+  # backend and frontend images on different versions.
+  group: promote-stable
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write    # push the :stable tag
+  id-token: write    # cosign verify against Sigstore Fulcio
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  validate-inputs:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Reject promoting :stable to :stable
+        if: ${{ inputs.version == 'stable' }}
+        run: |
+          echo "::error::Cannot promote 'stable' to 'stable' — pick a concrete version."
+          exit 1
+
+      - name: Reject empty version
+        if: ${{ inputs.version == '' }}
+        run: |
+          echo "::error::version input is empty."
+          exit 1
+
+  promote:
+    name: Promote ${{ matrix.module }}
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      # If one module promotion fails, do NOT carry on with the other —
+      # otherwise we land in a backend/frontend version skew on the live host
+      # the next time the timer ticks. fail-fast is the correct policy here.
+      fail-fast: true
+      matrix:
+        module: [backend, frontend]
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Resolve source digest
+        id: resolve
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Source: ${IMAGE}:${VERSION} → ${DIGEST}"
+
+      - name: Verify source image signature (cosign keyless)
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.resolve.outputs.digest }}
+          REPO: ${{ github.repository }}
+        # The release-images workflow signs every pushed digest with a Fulcio
+        # cert that carries the workflow's full ref as subject. Restricting the
+        # identity to that exact workflow file rejects images signed by any
+        # other workflow in the org (or by anyone with stolen credentials who
+        # never had access to fire our release pipeline in the first place).
+        run: |
+          set -euo pipefail
+          cosign verify "${IMAGE_REF}" \
+            --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/.+" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            > /dev/null
+          echo "Signature OK"
+
+      - name: Re-tag digest as :stable
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          SOURCE_DIGEST: ${{ steps.resolve.outputs.digest }}
+        # `buildx imagetools create` rewrites the registry manifest reference
+        # without pulling or repushing layers. The new `:stable` tag and the
+        # original `:${{ inputs.version }}` tag now point at the same digest,
+        # so the cosign signature attached to that digest remains valid for
+        # both tags — no re-sign needed.
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${IMAGE}:stable" \
+            "${IMAGE}@${SOURCE_DIGEST}"
+          echo "Promoted ${SOURCE_DIGEST} → ${IMAGE}:stable"
+
+      - name: Summarise
+        env:
+          MODULE: ${{ matrix.module }}
+          VERSION: ${{ inputs.version }}
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: |
+          {
+            echo "### Promoted basetool-${MODULE}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Source tag | \`${VERSION}\` |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo "| New tag | \`stable\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
