@@ -333,8 +333,14 @@ existing "backend unreachable" toast cleanly.
 
 ### Where the files live
 
-All assets are part of the repo and mounted read-only into the NPM container
-via `docker-compose.yml`:
+All assets are part of the repo and mounted into the NPM container via
+`docker-compose.yml`. The static assets directory is mounted read-only;
+the two nginx snippets are mounted read-write because NPM's startup
+script `s6-rc.d/prepare/50-ipv6.sh` runs `sed -i` against every `*.conf`
+under `/data/nginx/` to add IPv6 listeners — with `:ro` the write fails
+with `EROFS` and the container refuses to boot. Our snippets contain no
+`listen` directives, so `sed` produces byte-identical content; the file
+is touched but unchanged.
 
 ```
 docker/maintenance/
