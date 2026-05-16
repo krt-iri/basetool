@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCategoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -28,7 +30,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for the {@code /materials} category-listing page.
+ * MVC-level rendering checks for the {@code /materials} category-listing page and the {@code
+ * /materials/{id}} detail page.
  *
  * <p>Originally added because Thymeleaf 3.1's JavaScript-inline mechanism truncates the rest of the
  * surrounding {@code <script>} block as soon as it serialises a Java {@code List}/{@code
@@ -36,10 +39,12 @@ import org.springframework.web.context.WebApplicationContext;
  * after it. That truncation killed the {@code window.krtEvents.on('click', 'materials-toggle-kind',
  * …)} registration further down in the script, so clicking a category header no longer expanded the
  * materials grid. The autocomplete name list now lives in a {@code <datalist>} sibling element
- * instead, which means the script no longer needs to inline a {@code List}.
+ * instead, which means the script no longer needs to inline a {@code List}. The detail page carried
+ * the same broken pattern (terminal names list); the second test in this class pins the
+ * post-datalist filter binding there.
  *
- * <p>The assertions below pin both halves of the contract: the toggle binding survives into the
- * rendered HTML, and the page ends with the closing {@code </html>} tag (i.e. Thymeleaf did not
+ * <p>The assertions below pin both halves of the contract: the post-datalist binding survives into
+ * the rendered HTML, and the page ends with the closing {@code </html>} tag (i.e. Thymeleaf did not
  * abort mid-render). A regression that re-introduces the broken inline pattern would fail the
  * second assertion long before any human notices the missing click handler.
  */
@@ -99,5 +104,70 @@ class MaterialsPageControllerMvcTest {
         // an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("<datalist id=\"materialNames-data\">")))
         .andExpect(content().string(containsString("<option value=\"Aluminum\">")));
+  }
+
+  /**
+   * Mirror of {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the
+   * per-material detail page ({@code /materials/{id}}). Pre-fix, {@code material-detail.html}
+   * carried the same broken inline pattern (now {@code const terminalNames = …}) at the top of its
+   * script, so the {@code 'material-detail-filter-terminals'} delegated binding registered at the
+   * tail of the script — plus the surrounding sortable-column handler — silently never wired. The
+   * datalist workaround moves the terminal names into {@code <datalist id="terminalNames-data">}
+   * next to the filter input. This test pins both halves of the same contract: the post-datalist
+   * binding key is in the rendered HTML, and the response actually contains {@code </html>}.
+   */
+  @Test
+  @WithMockUser
+  void getMaterialDetail_ShouldRenderFilterBinding_AfterDatalist() throws Exception {
+    UUID id = UUID.randomUUID();
+    MaterialDto material =
+        new MaterialDto(
+            id,
+            1,
+            "Aluminum",
+            "RAW",
+            "SCU",
+            "Aluminum description",
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            0L);
+    MaterialPriceDto priceDto =
+        new MaterialPriceDto(
+            UUID.randomUUID(),
+            "Area18",
+            new BigDecimal("5.0"),
+            new BigDecimal("7.0"),
+            100,
+            200,
+            true,
+            true);
+    PageResponse<MaterialPriceDto> pricesPage =
+        new PageResponse<>(List.of(priceDto), 0, 1000, 1, 1, List.of());
+
+    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
+        .thenReturn(material);
+    when(backendApiClient.get(
+            eq("/api/v1/materials/" + id + "/prices?size=1000&sort=terminal.name,asc"),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(pricesPage);
+
+    mockMvc
+        .perform(get("/materials/" + id))
+        .andExpect(status().isOk())
+        // Post-datalist binding key: the tail of the script registers the live filter on the
+        // terminal table. If the inline-list bug re-appears, this string disappears from output.
+        .andExpect(content().string(containsString("'material-detail-filter-terminals'")))
+        // Rendering completion marker: the truncation aborts before </body></html>.
+        .andExpect(content().string(containsString("</body>")))
+        .andExpect(content().string(containsString("</html>")))
+        // The datalist that carries the terminal names must be rendered with the price's terminal
+        // as an option — that's the data source the surrounding script now reads from.
+        .andExpect(content().string(containsString("id=\"terminalNames-data\"")))
+        .andExpect(content().string(containsString("value=\"Area18\"")));
   }
 }

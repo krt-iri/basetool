@@ -99,6 +99,20 @@
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
                     <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
+                    <!--/*
+                      Material names are exposed to JavaScript via this server-
+                      rendered <datalist> instead of a Thymeleaf JS-inline
+                      expression. Thymeleaf 3.1 truncates the surrounding
+                      <script> block right after the first List/Collection
+                      JS-inline serialisation, so the data-krt-confirm form
+                      delete-confirmation handlers + updateMaterial bindings
+                      defined further down in the script would silently never
+                      be wired. Keep the datalist; do NOT move this back into
+                      the <script> block.
+                    */-->
+                    <datalist id="materialNames-data" style="display: none;">
+                        <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
+                    </datalist>
                 </div>
             </div>
 
@@ -172,7 +186,17 @@
 <script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
-        const materialNames = /*[[${materials.![name]}]]*/ [];
+        // Material names come from the sibling <datalist id="materialNames-data">
+        // rather than a Thymeleaf JS-inline expression; see the HTML comment on
+        // the datalist for the Thymeleaf 3.1 truncation bug. th:inline=
+        // "javascript" stays on this script because the toast translation keys
+        // further down (notification.success.save / notification.error.save)
+        // still rely on it — those are single primitives, which Thymeleaf's
+        // inline parser handles correctly.
+        const dataList = document.getElementById("materialNames-data");
+        const materialNames = dataList
+            ? Array.from(dataList.options).map(function (o) { return o.value; })
+            : [];
         const inpMaterials = document.getElementById("filterMaterials");
         if(inpMaterials) krtAutocomplete(inpMaterials, materialNames);
 
