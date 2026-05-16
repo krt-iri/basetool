@@ -76,6 +76,10 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_REGISTRY=ghcr.io
   IRI_IMAGE_NAMESPACE=krt-iri
   IRI_GHCR_USERNAME=deploy-bot
+  DOCKER_CONFIG=/var/lib/iri/.docker   (where `docker login` writes its
+                                        credentials.json; defaults to a
+                                        per-script location under STATE_DIR
+                                        because the deploy user has no \$HOME)
 USAGE
       exit 0
       ;;
@@ -121,6 +125,19 @@ if ! docker compose version --short >/dev/null 2>&1; then
 fi
 
 mkdir -p "${STATE_DIR}"
+
+# Docker writes credentials from `docker login` into $DOCKER_CONFIG/config.json
+# (default $HOME/.docker). The `deploy` user is created with --no-create-home
+# (see docs/deployment.md → bootstrap), so $HOME points at /home/deploy and
+# does not exist — the default path therefore fails with
+# `mkdir /home/deploy: permission denied`. The systemd unit also runs with
+# ProtectHome=true and a fresh PrivateTmp= sandbox, so an ad-hoc /tmp config
+# would not survive across invocations. Pin DOCKER_CONFIG inside STATE_DIR
+# instead: that path is already in the unit's ReadWritePaths set, persists
+# the credential between timer ticks, and stays under the deploy user's
+# exclusive 0700 ownership.
+export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
+install -d -m 0700 "${DOCKER_CONFIG}"
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
 PIN_FILE_PREVIOUS="${STATE_DIR}/previous-digest-pin.yml"
