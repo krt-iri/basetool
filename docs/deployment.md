@@ -285,6 +285,110 @@ if you do not want to wait for the next tick.
 
 ---
 
+## Maintenance page
+
+While `deploy.sh` cycles `backend` and `frontend` out and the new images are
+booting, the upstream behind `nginx-proxy-manager` (NPM) momentarily returns
+`502 Bad Gateway`. NPM intercepts those failures and serves a branded
+maintenance page in their place, so a user hitting the site mid-deploy sees a
+deliberate "we'll be right back" screen instead of nginx's default error page.
+
+### How it works
+
+NPM's per-server hook (`/data/nginx/custom/server_proxy.conf`, included in
+every proxy host's `server { }` block) wires up:
+
+```nginx
+error_page 502 503 504 =503 @maintenance;
+
+location @maintenance {
+    internal;
+    root /usr/share/nginx/html;
+    rewrite ^.*$ $maintenance_target break;
+
+    types {
+        application/problem+json json;
+        text/html                html;
+    }
+
+    add_header Retry-After   "60"       always;
+    add_header Cache-Control "no-store" always;
+}
+```
+
+`$maintenance_target` is set by a small `map` in `/data/nginx/custom/http.conf`
+that branches on the request's `Accept` header:
+
+| `Accept`                                | Response               | Content-Type                     |
+| --------------------------------------- | ---------------------- | -------------------------------- |
+| `text/html`, `*/*`, missing             | `maintenance.html`     | `text/html; charset=utf-8`       |
+| `application/json`, `application/problem+json` | `maintenance.json` | `application/problem+json; charset=utf-8` |
+
+Both responses are returned with HTTP `503 Service Unavailable` and
+`Retry-After: 60`. The HTML page auto-refreshes every 30 seconds, so a user
+who lands on it during a deploy is back on the real app as soon as the new
+containers pass their healthcheck. AJAX/fetch calls from the live frontend
+receive an RFC 7807 `application/problem+json` document and can render their
+existing "backend unreachable" toast cleanly.
+
+### Where the files live
+
+All assets are part of the repo and mounted read-only into the NPM container
+via `docker-compose.yml`:
+
+```
+docker/maintenance/
+├── nginx/
+│   ├── http.conf            -> /data/nginx/custom/http.conf
+│   └── server_proxy.conf    -> /data/nginx/custom/server_proxy.conf
+└── static/
+    ├── maintenance.html     -> /usr/share/nginx/html/maintenance/maintenance.html
+    └── maintenance.json     -> /usr/share/nginx/html/maintenance/maintenance.json
+```
+
+Nothing in `scripts/deploy.sh` touches these files. They are static, the
+trigger is purely an upstream `5xx`, so the page appears for the exact window
+between "old container gone" and "new container healthy" — the same window
+`docker compose up -d --wait` is already gating on.
+
+### Verifying after a config change
+
+After editing any file under `docker/maintenance/`, restart the NPM container
+so the new bind-mounts take effect and ask nginx to re-parse its config:
+
+```bash
+sudo -u deploy /usr/bin/docker compose \
+    -f /var/iri/code/docker-compose.yml --profile prod \
+    up -d npm
+
+sudo -u deploy /usr/bin/docker compose \
+    -f /var/iri/code/docker-compose.yml --profile prod \
+    exec npm nginx -t          # must report "syntax is ok"
+```
+
+Then simulate an upstream failure to confirm the page is wired up:
+
+```bash
+sudo -u deploy /usr/bin/docker compose \
+    -f /var/iri/code/docker-compose.yml --profile prod \
+    stop frontend
+
+curl -i https://basetool.iri-base.org/                  # expect HTTP/1.1 503 + HTML
+curl -i -H 'Accept: application/json' \
+        https://basetool.iri-base.org/api/v1/missions   # expect HTTP/1.1 503 + JSON
+
+sudo -u deploy /usr/bin/docker compose \
+    -f /var/iri/code/docker-compose.yml --profile prod \
+    start frontend
+```
+
+The page is intentionally not scoped per virtual host — any proxy host behind
+NPM (including `keycloak.iri-base.org`) will fall back to the same screen if
+its upstream ever serves a `5xx`. The wording is kept generic ("System
+maintenance") so it reads correctly for both.
+
+---
+
 ## Manual deploy / rollback
 
 ### Pin to a specific version (forward or backward)
