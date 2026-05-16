@@ -50,6 +50,9 @@ class TerminalControllerTest {
             null,
             false,
             false,
+            null,
+            null,
+            null,
             false);
     when(service.getAllTerminals(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
     when(mapper.toDto(entity)).thenReturn(dto);
@@ -65,7 +68,9 @@ class TerminalControllerTest {
     UUID id = UUID.randomUUID();
     Terminal entity = new Terminal();
     TerminalDto dto =
-        new TerminalDto(id, "x", null, null, null, null, null, null, null, false, false, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, null, null, false, false, null, null, null,
+            false);
     when(service.getTerminal(id)).thenReturn(entity);
     when(mapper.toDto(entity)).thenReturn(dto);
 
@@ -94,6 +99,9 @@ class TerminalControllerTest {
             true,
             true,
             true,
+            null,
+            null,
+            null,
             true);
     Terminal updated = new Terminal();
     TerminalDto response =
@@ -109,6 +117,9 @@ class TerminalControllerTest {
             null,
             false,
             false,
+            null,
+            null,
+            null,
             true);
 
     when(service.updateTerminalVisibility(id, true)).thenReturn(updated);
@@ -126,7 +137,9 @@ class TerminalControllerTest {
   void updateTerminal_passesHiddenFalseVerbatim() {
     UUID id = UUID.randomUUID();
     TerminalDto request =
-        new TerminalDto(id, "x", null, null, null, null, null, null, null, false, false, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, null, null, false, false, null, null, null,
+            false);
     when(service.updateTerminalVisibility(id, false)).thenReturn(new Terminal());
     when(mapper.toDto(any())).thenReturn(request);
 
@@ -142,7 +155,9 @@ class TerminalControllerTest {
     UUID id = UUID.randomUUID();
     Terminal updated = new Terminal();
     TerminalDto response =
-        new TerminalDto(id, "x", null, null, null, null, null, true, null, true, false, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, true, null, true, false, null, null, null,
+            false);
     when(service.setLoadingDockOverride(id, true)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);
 
@@ -157,7 +172,9 @@ class TerminalControllerTest {
     UUID id = UUID.randomUUID();
     Terminal updated = new Terminal();
     TerminalDto response =
-        new TerminalDto(id, "x", null, null, null, null, null, false, null, false, false, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, false, null, false, false, null, null, null,
+            false);
     when(service.clearLoadingDockOverride(id)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);
 
@@ -172,7 +189,9 @@ class TerminalControllerTest {
     UUID id = UUID.randomUUID();
     Terminal updated = new Terminal();
     TerminalDto response =
-        new TerminalDto(id, "x", null, null, null, null, null, null, true, false, true, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, null, true, false, true, null, null, null,
+            false);
     when(service.setAutoLoadOverride(id, true)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);
 
@@ -187,7 +206,9 @@ class TerminalControllerTest {
     UUID id = UUID.randomUUID();
     Terminal updated = new Terminal();
     TerminalDto response =
-        new TerminalDto(id, "x", null, null, null, null, null, null, false, false, false, false);
+        new TerminalDto(
+            id, "x", null, null, null, null, null, null, false, false, false, null, null, null,
+            false);
     when(service.clearAutoLoadOverride(id)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);
 

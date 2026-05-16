@@ -39,6 +39,65 @@
             background-color: var(--color-primary);
             color: var(--color-bg-black);
         }
+        /* Tiny footer below each segmented control: surfaces what UEX actually
+           reported for this flag, regardless of whether an officer has pinned
+           it. The "UEX" label uses the brand orange to anchor the line in the
+           page palette; the value sits in muted gray-1 so it reads as
+           informational, not actionable. When the on-screen value disagrees
+           with what UEX claims (.uex-source-chip.mismatch) we tint the value
+           amber to flag a divergence at a glance — keeps the column compact
+           without adding a separate "UEX says" column. */
+        .uex-source-chip {
+            display: flex;
+            align-items: baseline;
+            gap: 0.35rem;
+            margin-top: 0.35rem;
+            font-family: var(--font-body);
+            font-size: 0.7rem;
+            line-height: 1;
+            color: var(--color-gray-1);
+        }
+        .uex-source-chip .uex-source-chip__label {
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            letter-spacing: 0.04em;
+        }
+        .uex-source-chip .uex-source-chip__value {
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .uex-source-chip.mismatch .uex-source-chip__value {
+            color: var(--color-accent-light);
+        }
+        .uex-source-chip .uex-source-chip__value.unknown {
+            color: var(--color-gray-2);
+            font-style: italic;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        /* Global "last UEX sweep" stamp at the top of the page. Sits inline
+           with the page heading on wide screens and wraps below it on phones;
+           visually quiet (gray-1, small caps label) so it does not compete
+           with the H1 but stays in the same hud-box for context. */
+        .uex-sync-stamp {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.4rem;
+            margin-top: 0.6rem;
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            color: var(--color-gray-1);
+        }
+        .uex-sync-stamp__label {
+            color: var(--color-primary);
+            font-family: var(--font-headline);
+            font-size: 0.7rem;
+            letter-spacing: 0.06em;
+        }
+        .uex-sync-stamp__value.unknown {
+            color: var(--color-gray-2);
+            font-style: italic;
+        }
     </style>
     </th:block>
 </head>
@@ -62,6 +121,16 @@
 <main>
     <div class="greeting hud-box">
         <h1 th:text="#{admin.terminals.title}">Terminals verwalten</h1>
+        <div class="uex-sync-stamp">
+            <span class="uex-sync-stamp__label" th:text="#{admin.terminal.uexLastSync}">Letzter UEX-Sync</span>
+            <span th:if="${latestUexSync != null}"
+                  class="uex-sync-stamp__value local-datetime-display"
+                  th:data-utc="${latestUexSync.toEpochMilli()}"
+                  th:text="${#temporals.format(latestUexSync, 'dd.MM.yy HH:mm', 'UTC')} + ' UTC'">--</span>
+            <span th:if="${latestUexSync == null}"
+                  class="uex-sync-stamp__value unknown"
+                  th:text="#{admin.terminal.uexLastSync.never}">noch nicht gesynct</span>
+        </div>
     </div>
 
     <div class="hud-box mt-2">
@@ -106,6 +175,17 @@
                                     <button type="submit" class="btn" th:classappend="${term.hasLoadingDockOverridden && !term.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                                 </form>
                             </div>
+                            <div class="uex-source-chip"
+                                 th:classappend="${term.uexHasLoadingDock != null and term.hasLoadingDock != null and term.uexHasLoadingDock != term.hasLoadingDock} ? 'mismatch' : ''"
+                                 th:title="#{admin.terminal.uexValue.tooltip}">
+                                <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
+                                <span th:if="${term.uexHasLoadingDock != null}"
+                                      class="uex-source-chip__value"
+                                      th:text="${term.uexHasLoadingDock} ? #{admin.uex.flag.btn.yes} : #{admin.uex.flag.btn.no}">--</span>
+                                <span th:if="${term.uexHasLoadingDock == null}"
+                                      class="uex-source-chip__value unknown"
+                                      th:text="#{admin.terminal.uexValue.unknown}">--</span>
+                            </div>
                         </td>
                         <td>
                             <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
@@ -121,6 +201,17 @@
                                     <input type="hidden" name="action" value="no">
                                     <button type="submit" class="btn" th:classappend="${term.isAutoLoadOverridden && !term.isAutoLoad} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                                 </form>
+                            </div>
+                            <div class="uex-source-chip"
+                                 th:classappend="${term.uexIsAutoLoad != null and term.isAutoLoad != null and term.uexIsAutoLoad != term.isAutoLoad} ? 'mismatch' : ''"
+                                 th:title="#{admin.terminal.uexValue.tooltip}">
+                                <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
+                                <span th:if="${term.uexIsAutoLoad != null}"
+                                      class="uex-source-chip__value"
+                                      th:text="${term.uexIsAutoLoad} ? #{admin.uex.flag.btn.yes} : #{admin.uex.flag.btn.no}">--</span>
+                                <span th:if="${term.uexIsAutoLoad == null}"
+                                      class="uex-source-chip__value unknown"
+                                      th:text="#{admin.terminal.uexValue.unknown}">--</span>
                             </div>
                         </td>
                         <td>
@@ -175,6 +266,24 @@
                 }
             }
         } catch (e) { /* ignore */ }
+
+        // Render the UEX sync stamp in the browser's local timezone. The server
+        // renders the value pre-formatted in UTC (so the page works even with
+        // JS disabled); when JS is available we rewrite it to the user's local
+        // clock to match the convention used elsewhere in the app (see
+        // refinery-orders-index.html).
+        document.querySelectorAll('.local-datetime-display').forEach(function (el) {
+            var utcMsStr = el.getAttribute('data-utc');
+            if (!utcMsStr) return;
+            var date = new Date(parseInt(utcMsStr, 10));
+            if (isNaN(date.getTime())) return;
+            var day = String(date.getDate()).padStart(2, '0');
+            var month = String(date.getMonth() + 1).padStart(2, '0');
+            var year = String(date.getFullYear()).slice(-2);
+            var hours = String(date.getHours()).padStart(2, '0');
+            var minutes = String(date.getMinutes()).padStart(2, '0');
+            el.textContent = day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
+        });
     });
 
     function filterTable(tableId, query) {
