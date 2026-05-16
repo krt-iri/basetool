@@ -167,6 +167,12 @@ public class SecurityConfig {
                     .requestMatchers("/missions/**")
                     .permitAll() // Still permitAll for general access, @PreAuthorize or logic
                     // inside handles details
+                    // Mission-detail presence WebSocket: only authenticated users can join the
+                    // awareness channel (anonymous guests browsing a mission detail page must
+                    // not appear as "editors" and must not see who is editing). The OIDC
+                    // session is reused by the WebSocket handshake.
+                    .requestMatchers("/ws/missions/**")
+                    .authenticated()
                     .requestMatchers("/operations", "/operations/")
                     .permitAll()
                     .requestMatchers("/operations/**")

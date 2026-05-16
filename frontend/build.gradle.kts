@@ -35,6 +35,12 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+  // WebSocket for the mission-detail presence/awareness feature: shows in real time which
+  // section of a mission another user is currently editing. Native Spring WebSocket
+  // (no STOMP) — minimal wire format, no broker required. The in-memory presence store
+  // is single-instance only; running multiple frontend replicas would need a Redis-backed
+  // fan-out (see MissionPresenceService javadoc).
+  implementation("org.springframework.boot:spring-boot-starter-websocket")
   implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
   // Validation for @ConfigurationProperties validation
   implementation("org.springframework.boot:spring-boot-starter-validation")

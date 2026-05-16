@@ -341,6 +341,9 @@ class MissionPageControllerTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             0);
 
@@ -404,6 +407,9 @@ class MissionPageControllerTest {
             Collections.emptySet(),
             true,
             true,
+            1L,
+            1L,
+            1L,
             1L,
             0,
             0);

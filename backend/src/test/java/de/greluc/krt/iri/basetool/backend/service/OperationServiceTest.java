@@ -332,8 +332,7 @@ class OperationServiceTest {
 
   /**
    * The payout calculator is the money-handling core of the operation flow. Its previous coverage
-   * was 0% — these tests exhaustively cover the branches enumerated in PROJECT_REVIEW.md's coverage
-   * analysis:
+   * was 0% — these tests exhaustively cover the branches:
    *
    * <ol>
    *   <li>Operation lookup (not-found path).

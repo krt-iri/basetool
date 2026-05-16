@@ -313,6 +313,9 @@ public class MissionController {
         false, // canEdit
         false, // canManageManagers
         dto.version(),
+        dto.coreVersion(),
+        dto.scheduleVersion(),
+        dto.flagsVersion(),
         dto.checkedInParticipants(),
         dto.registeredParticipants());
   }
@@ -458,6 +461,7 @@ public class MissionController {
             request.description(),
             request.calendarLink(),
             request.status(),
+            request.operationId(),
             request.version()));
   }
 

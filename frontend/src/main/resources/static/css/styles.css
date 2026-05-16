@@ -1480,6 +1480,49 @@ textarea:focus-visible,
     to { transform: rotate(360deg); }
 }
 
+/* ==========================================================================
+   Mission Detail Presence Indicator (Stufe 3 / Awareness)
+   Pulsing orange dot + count chip rendered on each .col-header[data-panel-key]
+   when other users are currently editing that section. KRT brand orange.
+   Awareness only — does not block any input.
+   ========================================================================== */
+@keyframes krt-presence-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(231, 126, 35, 0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(231, 126, 35, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(231, 126, 35, 0); }
+}
+
+.krt-presence-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.6rem;
+    padding: 0.15rem 0.5rem 0.15rem 0.4rem;
+    border: 1px solid var(--color-primary);
+    border-radius: 999px;
+    background: rgba(231, 126, 35, 0.08);
+    color: var(--color-primary);
+    font-family: 'Lato', sans-serif;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: default;
+    vertical-align: middle;
+}
+
+.krt-presence-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+    animation: krt-presence-pulse 2s infinite;
+}
+
+.krt-presence-count {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
 #missions-results[aria-busy="true"] {
     opacity: 0.55;
     transition: opacity 120ms ease-in-out;

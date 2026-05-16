@@ -6,7 +6,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission payload. */
+/**
+ * Data transfer record carrying Mission payload.
+ *
+ * <p>The {@code version} field is the global {@link
+ * de.greluc.krt.iri.basetool.backend.model.AbstractEntity#getVersion()} counter and continues to
+ * guard the legacy full-update endpoint. For the section-scoped patch endpoints ({@code /core},
+ * {@code /schedule}, {@code /flags}) the dedicated counters {@code coreVersion}, {@code
+ * scheduleVersion} and {@code flagsVersion} are the source of truth — they allow concurrent edits
+ * on disjoint sections of the same mission without spurious 409 conflicts.
+ */
 public record MissionDto(
     UUID id,
     @NotBlank String name,
@@ -31,5 +40,8 @@ public record MissionDto(
     Boolean canEdit,
     Boolean canManageManagers,
     Long version,
+    Long coreVersion,
+    Long scheduleVersion,
+    Long flagsVersion,
     Integer checkedInParticipants,
     Integer registeredParticipants) {}

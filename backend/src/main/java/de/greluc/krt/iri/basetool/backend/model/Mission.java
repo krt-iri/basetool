@@ -57,6 +57,34 @@ public class Mission extends AbstractEntity<UUID> {
   @Column(name = "is_internal", nullable = false)
   private Boolean isInternal = false;
 
+  /**
+   * Section-scoped optimistic-lock counter for the {@code core} patch endpoint (name, description,
+   * calendar link, status, operation). Independent of {@link AbstractEntity#getVersion()} so that
+   * concurrent edits on {@code schedule} and {@code flags} do not produce spurious 409 conflicts.
+   * Marked {@code @OptimisticLock(excluded = true)} so bumping it does not in turn bump the global
+   * {@link AbstractEntity#getVersion()}.
+   */
+  @Column(name = "core_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long coreVersion = 0L;
+
+  /**
+   * Section-scoped optimistic-lock counter for the {@code schedule} patch endpoint (meeting,
+   * planned-start, planned-end, actual-start, actual-end). Status-driven auto-transitions that set
+   * {@code actualStartTime} (PLANNED → ACTIVE) bump this counter via {@code …WithinTransaction}.
+   */
+  @Column(name = "schedule_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long scheduleVersion = 0L;
+
+  /**
+   * Section-scoped optimistic-lock counter for the {@code flags} patch endpoint ({@code
+   * isInternal}).
+   */
+  @Column(name = "flags_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long flagsVersion = 0L;
+
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionParticipant> participants = new HashSet<>();
@@ -97,6 +125,7 @@ public class Mission extends AbstractEntity<UUID> {
 
   @ManyToOne
   @JoinColumn(name = "operation_id")
+  @OptimisticLock(excluded = true)
   private Operation operation;
 
   @ManyToOne

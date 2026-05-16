@@ -116,6 +116,9 @@ public abstract class MissionMapper {
   @Mapping(target = "frequencies", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "managers", ignore = true)
+  @Mapping(target = "coreVersion", ignore = true)
+  @Mapping(target = "scheduleVersion", ignore = true)
+  @Mapping(target = "flagsVersion", ignore = true)
   public abstract Mission toEntity(MissionDto dto);
 
   /**

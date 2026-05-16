@@ -109,6 +109,9 @@ class MissionSecurityRenderingTest {
             false,
             false,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             1);
 
@@ -199,6 +202,9 @@ class MissionSecurityRenderingTest {
             true,
             true,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             1);
 
@@ -288,6 +294,9 @@ class MissionSecurityRenderingTest {
             false,
             false,
             1L,
+            1L,
+            1L,
+            1L,
             0,
             1);
 
@@ -375,6 +384,9 @@ class MissionSecurityRenderingTest {
             Collections.emptySet(),
             false,
             false,
+            1L,
+            1L,
+            1L,
             1L,
             0,
             1);
