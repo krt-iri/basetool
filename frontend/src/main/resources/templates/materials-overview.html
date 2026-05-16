@@ -193,6 +193,16 @@
             overflow-y: scroll;
             border: 1px solid var(--color-gray-3);
         }
+
+        /*
+         * Override the global `main { max-width: 1200px }` (and its ultra-wide 1600px bump in
+         * styles.css) for this page only. The matrix is a data grid, not long-form text, so
+         * capping its width wastes screen real estate on large monitors. The 80ch p-cap from
+         * styles.css still applies to any paragraphs inside.
+         */
+        main.materials-overview-main {
+            max-width: none;
+        }
     </style>
     </th:block>
 </head>
@@ -213,7 +223,7 @@
     </nav>
 </header>
 
-<main>
+<main class="materials-overview-main">
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.materials.overview}">Material-Übersicht</h1>
     </div>
