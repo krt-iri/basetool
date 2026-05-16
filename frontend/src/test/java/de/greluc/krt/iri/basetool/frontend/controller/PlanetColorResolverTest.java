@@ -1,6 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,10 +43,12 @@ class PlanetColorResolverTest {
   void unknownPlanetFallsBackToHashedClass() {
     String result = PlanetColorResolver.cssClassFor("Nyx", "MadePlanet");
     assertTrue(result.startsWith("planet-hash-"), "expected hash fallback, got: " + result);
-    int index =
-        assertDoesNotThrow(
-            () -> Integer.parseInt(result.substring("planet-hash-".length())),
-            "hash class suffix must be a valid integer, got: " + result);
+    int index;
+    try {
+      index = Integer.parseInt(result.substring("planet-hash-".length()));
+    } catch (NumberFormatException ex) {
+      throw new AssertionError("hash class suffix must be a valid integer, got: " + result, ex);
+    }
     assertTrue(
         index >= 0 && index < PlanetColorResolver.HASH_PALETTE_SIZE,
         "hash bucket out of range: " + index);
