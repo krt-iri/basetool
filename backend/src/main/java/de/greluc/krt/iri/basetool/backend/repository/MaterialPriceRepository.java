@@ -62,6 +62,21 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    * isIllegal/isVolatileQt/isVolatileTime} are normalised from UEX-style {@code Integer} 0/1 flags
    * into booleans inside the JPQL via {@code CASE}; the category is left-joined because not every
    * material has one. Excludes hidden terminals.
+   *
+   * <p>The projected {@code planetName} is the <i>effective</i> planet-system anchor for a
+   * terminal, resolved in this order via {@code COALESCE}:
+   *
+   * <ol>
+   *   <li>{@code terminal.planet_name} (set directly when the terminal sits on a planet or a
+   *       station in that planet's orbit),
+   *   <li>{@code moon.planet_name} via {@code moon.name = terminal.moon_name} - covers terminals on
+   *       moons whose parent planet is only indirectly known,
+   *   <li>{@code planet.name} where the planet's own name matches {@code terminal.orbit_name} in
+   *       the same star system - covers Lagrange-style orbits named after their host planet.
+   * </ol>
+   *
+   * <p>The result is {@code null} for true system-level terminals (e.g. raw jump-point or
+   * interplanetary Lagrange stations) that have no parent planet at all.
    */
   @Query(
       """
@@ -71,13 +86,17 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           CASE WHEN m.isVolatileTime = 1 THEN true ELSE false END,
           c.id, c.name, c.version, t.id, t.name, t.nickname, t.starSystemName,
           p.priceBuy, p.priceSell,
-          t.cityName, t.spaceStationName, t.outpostName, t.isJumpPoint, t.hasLoadingDock,
+          t.cityName, t.spaceStationName, t.outpostName,
+          COALESCE(t.planetName, mn.planetName, pl.name),
+          t.isJumpPoint, t.hasLoadingDock,
           t.isAutoLoad
       )
       FROM MaterialPrice p
       JOIN p.material m
       LEFT JOIN m.category c
       JOIN p.terminal t
+      LEFT JOIN Moon mn ON mn.name = t.moonName AND mn.starSystemName = t.starSystemName
+      LEFT JOIN Planet pl ON pl.name = t.orbitName AND pl.starSystemName = t.starSystemName
       WHERE (t.hidden = false OR t.hidden IS NULL)
       """)
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);

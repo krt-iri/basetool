@@ -47,14 +47,22 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class MaterialsPageController {
 
   /**
-   * Terminal column for the matrix. Sorts first by star system, then by location-type group (city
-   * &lt; jump-point space station &lt; loading-dock space station &lt; other station &lt; outpost
-   * &lt; everything else), then alphabetically by name. The order is meaningful for the template —
-   * it controls the visual grouping of column headers.
+   * Terminal column for the matrix. Sorts first by star system, then by effective planet system (so
+   * terminals on the same planet/moon/orbit stay visually contiguous), then by location-type group
+   * (city &lt; jump-point space station &lt; loading-dock space station &lt; other station &lt;
+   * outpost &lt; everything else), and finally alphabetically by name. The order is meaningful for
+   * the template — it controls the visual grouping of column headers and ensures planet-tint
+   * stripes form unbroken bands.
    *
    * @param name terminal display name
    * @param nickname terminal short name
    * @param starSystemName parent star system; {@code null} or blank pushes the column to the back
+   * @param planetName effective planet system this terminal belongs to (direct, via parent moon, or
+   *     via like-named orbit); {@code null} or blank pushes the column to the end of its star
+   *     system
+   * @param planetCssClass CSS class derived from {@code planetName} via {@link
+   *     PlanetColorResolver}; controls the planet-color tint applied to the column header and a
+   *     thin top-border stripe on each body cell
    * @param cityName parent city, if any (highest grouping priority)
    * @param spaceStationName parent space station, if any
    * @param outpostName parent outpost, if any
@@ -66,6 +74,8 @@ public class MaterialsPageController {
       String name,
       String nickname,
       String starSystemName,
+      String planetName,
+      String planetCssClass,
       String cityName,
       String spaceStationName,
       String outpostName,
@@ -100,6 +110,21 @@ public class MaterialsPageController {
       int sysCmp = thisSystem.compareToIgnoreCase(otherSystem);
       if (sysCmp != 0) {
         return sysCmp;
+      }
+
+      // Planet-less terminals (jump points / Lagrange) sink to the end of their star system so
+      // the planet-tinted block stays contiguous. Within the planet-less tail the existing
+      // group/name ordering still applies.
+      boolean thisHasPlanet = this.planetName != null && !this.planetName.isBlank();
+      boolean otherHasPlanet = o.planetName != null && !o.planetName.isBlank();
+      if (thisHasPlanet != otherHasPlanet) {
+        return thisHasPlanet ? -1 : 1;
+      }
+      if (thisHasPlanet) {
+        int planetCmp = this.planetName.compareToIgnoreCase(o.planetName);
+        if (planetCmp != 0) {
+          return planetCmp;
+        }
       }
 
       int group1 = this.getGroupPriority();
@@ -275,11 +300,14 @@ public class MaterialsPageController {
           continue;
         }
 
+        String effectiveSystem = item.starSystemName() != null ? item.starSystemName() : "";
         terminals.add(
             new TerminalCol(
                 item.terminalName(),
                 item.terminalNickname(),
-                item.starSystemName() != null ? item.starSystemName() : "",
+                effectiveSystem,
+                item.planetName(),
+                PlanetColorResolver.cssClassFor(effectiveSystem, item.planetName()),
                 item.cityName(),
                 item.spaceStationName(),
                 item.outpostName(),
