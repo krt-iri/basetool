@@ -113,6 +113,14 @@ sudo mkdir -p /etc/iri                 # token
 # backend / frontend Dockerfiles).
 sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log
 sudo chown -R deploy:docker /var/lib/iri /var/iri/code
+
+# Docker config dir for the deploy user. `docker login` writes its
+# credentials.json into $DOCKER_CONFIG (default $HOME/.docker), and the
+# deploy user has no $HOME because it was created with --no-create-home in
+# step 2. deploy.sh sets DOCKER_CONFIG=/var/lib/iri/.docker explicitly; we
+# pre-create the dir here with 0700 so the credentials file is exclusive
+# to the deploy user.
+sudo install -d -m 0700 -o deploy -g docker /var/lib/iri/.docker
 ```
 
 ### 4. Compose file + scripts
