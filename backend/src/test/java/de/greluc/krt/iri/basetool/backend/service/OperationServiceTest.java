@@ -59,6 +59,7 @@ class OperationServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
+  @Mock private SystemSettingService systemSettingService;
 
   @InjectMocks private OperationService operationService;
 
@@ -783,10 +784,13 @@ class OperationServiceTest {
    * participant's out-of-pocket expenses (mission EXPENSE entries owned by them + refinery orders'
    * costs they own) are paid back from gross income, and the remaining {@code totalSum} is split
    * per participation percentage among PAYOUT participants. DONATE participants keep their
-   * reimbursement (it is their own money returned) but contribute their share. Finally a flat 0.5%
-   * in-game banking fee is deducted from every participant's gross payout, so {@code payoutAmount =
-   * personalExpenses + shareAmount - transferFee}. The combined paid-out fields are covered
-   * together because they share the same setup.
+   * reimbursement (it is their own money returned) but contribute their share. Finally an in-game
+   * banking fee is deducted from every participant's gross payout, so {@code payoutAmount =
+   * personalExpenses + shareAmount - transferFee}. The fee rate comes from the runtime-editable
+   * {@code operation.transfer_fee_rate} system setting and falls back to 0.5% when the row is
+   * missing — tests that don't stub {@code systemSettingService.getSettingValue(...)} therefore
+   * exercise the 0.5% fallback path, which is what the existing assertions are calibrated to. The
+   * combined paid-out fields are covered together because they share the same setup.
    */
   @Nested
   class GetOperationPayoutsAmountTests {
@@ -1043,6 +1047,118 @@ class OperationServiceTest {
       assertEquals(
           new BigDecimal("1.67"), row.transferFee(), "333.33 * 0.005 = 1.66665 rounds to 1.67");
       assertEquals(new BigDecimal("331.66"), row.payoutAmount());
+    }
+
+    @Test
+    void transferFee_usesRateFromSystemSetting_whenPresent() {
+      // Admin raises the rate to 1% via /admin/settings. Single participant, gross 1000.
+      // Expected fee 10.00, net 990.00 — proves the resolver actually consults the setting
+      // rather than always returning the hardcoded fallback.
+      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+          .thenReturn(Optional.of("0.01"));
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("10.00"), row.transferFee());
+      assertEquals(new BigDecimal("990.00"), row.payoutAmount());
+    }
+
+    @Test
+    void transferFee_fallsBackToDefault_whenSettingIsBlank() {
+      // Operator accidentally cleared the value via the admin form. Resolver must degrade to
+      // 0.5% (not 0%, which would silently overpay every participant).
+      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+          .thenReturn(Optional.of("   "));
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("5.00"), row.transferFee());
+      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+    }
+
+    @Test
+    void transferFee_fallsBackToDefault_whenSettingIsUnparseable() {
+      // Someone hand-edited the DB to "five percent". Don't crash the payout view; fall back to
+      // 0.5% and emit a warn log (verified visually, not asserted here).
+      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+          .thenReturn(Optional.of("five percent"));
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("5.00"), row.transferFee());
+      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+    }
+
+    @Test
+    void transferFee_fallsBackToDefault_whenSettingIsOutOfRange() {
+      // Rate of 1 or above would zero out (or invert) every payout. Defensive fallback to 0.5%
+      // protects against fat-finger entries like "1" (meant as 1%, but stored as 100%) and
+      // negative values.
+      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+          .thenReturn(Optional.of("1.5"));
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("5.00"), row.transferFee());
+      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+    }
+
+    @Test
+    void transferFee_acceptsZeroRate_disablingTheFee() {
+      // Setting rate to "0" is a legitimate admin choice (e.g. testing without the fee on a
+      // staging stack). Must NOT trigger the >= 1 fallback because zero is on the valid edge.
+      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+          .thenReturn(Optional.of("0"));
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+
+      MissionFinanceEntry income =
+          newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("1000.00"));
+      stubFinances(List.of(income), List.of());
+
+      OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
+
+      assertEquals(new BigDecimal("0.00"), row.transferFee());
+      assertEquals(new BigDecimal("1000.00"), row.payoutAmount());
     }
 
     @Test
