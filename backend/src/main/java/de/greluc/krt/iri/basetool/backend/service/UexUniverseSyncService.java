@@ -33,6 +33,7 @@ import de.greluc.krt.iri.basetool.backend.repository.PlanetRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PoiRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -667,6 +668,7 @@ public class UexUniverseSyncService {
     if (dtos.isEmpty()) {
       return;
     }
+    Instant syncedAt = Instant.now();
     for (UexTerminalDto dto : dtos) {
       if (dto.id() == null) {
         continue;
@@ -696,14 +698,21 @@ public class UexUniverseSyncService {
       entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
       entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
       entity.setIsJumpPoint(dto.isJumpPoint() != null && dto.isJumpPoint() == 1);
+      // The raw UEX state is recorded on every sweep, regardless of the override flags,
+      // so the admin UI can show what UEX currently claims even while a pin is active.
+      Boolean uexLoadingDock = dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
+      Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;
+      entity.setUexHasLoadingDock(uexLoadingDock);
+      entity.setUexIsAutoLoad(uexAutoLoad);
+      entity.setUexSyncedAt(syncedAt);
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+        entity.setHasLoadingDock(Boolean.TRUE.equals(uexLoadingDock));
       }
       entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
       entity.setHasFreightElevator(
           dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
       if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
-        entity.setIsAutoLoad(dto.isAutoLoad() != null && dto.isAutoLoad() == 1);
+        entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
       }
       entity.setNickname(dto.nickname());
       entity.setStarSystemName(dto.starSystemName());

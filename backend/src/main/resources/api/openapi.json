@@ -26868,6 +26868,16 @@
           "isAutoLoadOverridden" : {
             "type" : "boolean"
           },
+          "uexHasLoadingDock" : {
+            "type" : "boolean"
+          },
+          "uexIsAutoLoad" : {
+            "type" : "boolean"
+          },
+          "uexSyncedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
           "hidden" : {
             "type" : "boolean"
           }

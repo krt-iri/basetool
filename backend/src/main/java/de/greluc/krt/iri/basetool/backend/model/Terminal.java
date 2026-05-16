@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -88,4 +89,31 @@ public class Terminal extends AbstractEntity<UUID> {
    */
   @Column(nullable = false)
   private Boolean isAutoLoadOverridden = false;
+
+  /**
+   * Raw {@code has_loading_dock} value that the most recent UEX sweep reported for this terminal.
+   * Always written by {@code UexUniverseSyncService.syncTerminals()} regardless of {@link
+   * #hasLoadingDockOverridden}, so the admin UI can show what UEX currently claims even while an
+   * officer's pin is active. {@code null} until the first sweep touches this row (or for legacy
+   * rows that were admin-pinned before the column existed and never re-synced).
+   */
+  @Column(name = "uex_has_loading_dock")
+  private Boolean uexHasLoadingDock;
+
+  /**
+   * Raw {@code is_auto_load} value that the most recent UEX sweep reported. Same semantics as
+   * {@link #uexHasLoadingDock} — always written by the sync, decoupled from the admin override
+   * flag, {@code null} until the first sweep populates it.
+   */
+  @Column(name = "uex_is_auto_load")
+  private Boolean uexIsAutoLoad;
+
+  /**
+   * UTC instant of the most recent UEX sweep that touched this terminal. Stamped unconditionally by
+   * {@code UexUniverseSyncService.syncTerminals()} on every visit; a value markedly older than the
+   * latest sync timestamp on neighbouring rows means UEX has stopped emitting this terminal. {@code
+   * null} until the first sweep.
+   */
+  @Column(name = "uex_synced_at")
+  private Instant uexSyncedAt;
 }
