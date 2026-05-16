@@ -4,15 +4,19 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -22,8 +26,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -205,6 +211,48 @@ public class OperationPageController {
       redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
     }
     return "redirect:/operations";
+  }
+
+  /**
+   * AJAX endpoint behind the per-row "Bezahlt" checkbox in the Auszahlungen panel. Proxies the call
+   * straight to {@code PUT /api/v1/operations/{id}/payouts/paid-out}, forwarding the operation id
+   * from the URL and the participant key plus new flag from the request body. The backend
+   * re-renders the affected payout row and we hand it back as JSON so the client can patch a single
+   * table row without refetching the whole breakdown.
+   *
+   * @param id operation id (from the URL)
+   * @param request participant key + new {@code paidOut} value
+   * @return refreshed payout row on success, or a 403 / 500 mirroring the backend status
+   */
+  @PostMapping("/{id}/payouts/paid-out")
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @ResponseBody
+  public ResponseEntity<OperationPayoutDto> updatePayoutStatus(
+      @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
+    try {
+      OperationPayoutDto updated =
+          backendApiClient.put(
+              "/api/v1/operations/" + id + "/payouts/paid-out",
+              request,
+              OperationPayoutDto.class,
+              false);
+      return ResponseEntity.ok(updated);
+    } catch (BackendServiceException e) {
+      log.error(
+          "Update payout paid-out flag failed with status {}: {}",
+          e.getStatusCode(),
+          e.getMessage());
+      if (e.getStatusCode() == 401 || e.getStatusCode() == 403) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+      }
+      if (e.getStatusCode() == 404) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+      }
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    } catch (Exception e) {
+      log.error("Update payout paid-out flag failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
   }
 
   /**

@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:1af9e299-0d19-4f7a-b8b2-2d148044c2cb",
+  "serialNumber" : "urn:uuid:aa51689f-575a-404a-ac98-1cdc9d0bcda7",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-16T13:39:26Z",
+    "timestamp" : "2026-05-16T19:01:50Z",
     "tools" : {
       "components" : [
         {
@@ -13968,6 +13968,150 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-starter-webmvc",
+      "version" : "4.0.6",
+      "description" : "Starter for using Spring MVC and Tomcat",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "a88db0435d9d02d306f7ea88066a88cc"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "a7ac55e4eb7cf4d2931557135f90870003641290"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "a323bb1d72d680a9e492bdcf13731ae9ff443b96cce68072ac2b13fe1fe8ff82"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "382f70618b88f6240911aae60e7a1dc0f8a420ebd1119802d137d8eb742f79e4d74f14d704ab63814eaf3a486ed2edc803bb9a2800065a854216e2fbcb0d3b6b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "6ea7d06ce646de8e8d44a42a8544561bb4d563b1b88956bf099d70bc9d2fc587f4624bed063da922eb1ab752351bfdc2"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "28cfe9908d720472bb15815bdb95e8eed643165d05e0ffecc6a52a29b46f7de9954133ddf2d2b24894421f2535493f74"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "ca4f3deb1eb2c4bbbccea43fe19b6ce9fb6c8c71eb121b02f45a85019225f231"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "4ea9ba069923a68f34af9e9e1eff2f329f08a0f3275a6b013ded003a3f9348da5ad0341c45534b22c083e03225de95375d984b6dcb874a8bf965b4dce3637985"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-starter-websocket",
+      "version" : "4.0.6",
+      "description" : "Starter for using Spring MVC WebSocket support",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "a0d9168706a9a088bf7cada7224dac22"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "112faa3d8e866277472263d739c267214d316a4c"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "3d1c47ad95c263976588f974187fce7dce07f7295b4453c54cfef747209d29df"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "380a04271b0ba9baad1fcfa3bac8f176ca9f8f53b91acec442e3c5c0ef854dde5513e62932debb6d30ba5f57d51ba6711bc57d7f93a18be2bc22c2c30a84418b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2a4d4367c72a892cff4a636ec2c30564fd13dbc4757f7d7a1c78786d9e2d6a1a1e99572dca6acbfd65301ac56922dc7d"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "a3a07301d32e20e477d2bae9a92c0952150a873f81de7a11fe704498c9ff62b12e9190f92d35425e89f5faf0f1cb62f8"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "88abd4204217b9be6d6994c37c5a494e66cc007f9235ca2e88161212c789b876"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "84e8c2416bf37b8a57b6cea86e5a8484736870a84b369b45d517002daa4cff51ce1191f137759a019844b6a970202e2725813e3e1cae731026764b12bbdbc4c3"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -14664,6 +14808,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-webmvc@4.0.6?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-websocket",
+      "version" : "4.0.6",
+      "description" : "Spring Boot WebSocket",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "acaf42dcb8d7646d4ccfa376d1fd0f9e"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "61b53c63d89880e8f5f5579bc47980a5cfba027b"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "3e1fdfce8cdddd1ba3b782653bf9697562619c07c3a374d3eb5723db76523e5d"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "13492f91d56a6b1d12ca90c78063cfc5b5c5d0b040d852eeca974a83b13191aa1cc57a642e6e569a7b1a57adb00678ba6dee6efd28c6e686cf9f81bad2028caf"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "6ece36c6e8e1416522af8b27d02bb4da5761dc2430a083f4dbeba4972189b4ead4dbd022552d3c93c51a070f278f5583"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "4ffe7cebc2afa3b96f85bf1cab9b2d434c32c2da7a8f1e7985b6183f6c645c0fd288f9f653c10cd9c4b4b22f77685412"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "1fc5ef398e823c3c23460dd2ee54e8571f3bc854dfd42e6c4ca498324e1db37a"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "d7e61c2669bb8e8f4662856baa2cddfde55ee41567511b1f357659cfd92a116a8b54d05c156ff1a041a6791117c89655c500b09ff1d57951d0a35b97901d2aa8"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -16102,6 +16318,78 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar",
+      "publisher" : "Spring IO",
+      "group" : "org.springframework",
+      "name" : "spring-messaging",
+      "version" : "7.0.7",
+      "description" : "Spring Messaging",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "643830ddf060cba2c7abafd66bb31e9b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "5c053835a5c1e561fc3af7a680dbb0ad006be225"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "e8e717b1959dcf2fa90bb80e967605143b97c9606800c13c030b99fc5fcf5e47"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "9517e78c6406d74c1881f1641517d3d3fc07fd5423e2f283aeecb8891007b688f52f26486610703ae6fc83b9c4f08ba4711df138b8b7394eaff52b81226b50c6"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "b83c47ac8ab7a8505b3ddf1b03c795fb4de870dcd5156c4ec0c134a1f35d5858e1605d8a8a60cab92b79e33d2d2ca3ac"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "5e5eae4264f53921db615d9023f1fe99c5ef0d97ab4a79a1f93b2adc3bcd931aa74e38ce708a2cacde3e5978b9fc2215"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "18525fc41a06ac712354447d8c5504b38935565395b4c0858fbcce7545aa58e6"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "a51f464575a7740cdf771ab389342f6244f3e76224aac3f809504b0652b3bc30abd04459033727af28f59e2730d1292e44efe1870923f293d3967f76d8699730"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io/projects/spring-framework"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-framework/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework/spring-oxm@7.0.7?type=jar",
       "publisher" : "Spring IO",
       "group" : "org.springframework",
@@ -16510,6 +16798,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework/spring-webmvc@7.0.7?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io/projects/spring-framework"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-framework/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar",
+      "publisher" : "Spring IO",
+      "group" : "org.springframework",
+      "name" : "spring-websocket",
+      "version" : "7.0.7",
+      "description" : "Spring WebSocket",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "1665c3e59c0e25b2afd02aeefe3578ee"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "b22df7ec1d134cf00ba42fca957e92df8a390c93"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "ff8bdcde4ab8717bd06c6be3a17fdc0695bfd6ba92bf44065c3275ef9aaba8a2"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "15b1d375c5a59f88e955ce1bb0bff04ec7cf7fb5f74f444bfd6cf9a178492bd23c29c60a350971954108e53ccba5b3394d2bc59bf0314b4c22ed2bd07b14ad5b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "1bad1753dbec77855eeaa5ee33d942be052ceb8c5dbbb0ed33498ba0237f5093abbe8dd5bd0c40d770069b4cd0cbb3dc"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "046253e8b5bfde481fd4392c685f317f7f27f103263ea23d48e5019fdd4a7786ae9020df840f464dd93a0851de82d638"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "c35ef83b46c29980560a366bc0729b8200219599b37c8e12f49171df8b8b1f7a"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "7f8c072641a660b30bc4bcc488d9209e29006ed9069d6e159cd93033dad1f25b70058c833e6b85a5f344574a033d3b43e5d4bf957427284f4a17dd80f8b82699"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -17485,6 +17845,7 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.0.6?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.0.6?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-test-autoconfigure@4.0.6?type=jar",
         "pkg:maven/org.springframework.security/spring-security-test@7.0.5?type=jar",
         "pkg:maven/org.springframework.session/spring-session-data-redis@4.0.3?type=jar",
@@ -18723,6 +19084,24 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework.boot/spring-boot-http-converter@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-jackson@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-webmvc@4.0.6?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.0.6?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework.boot/spring-boot-starter-webmvc@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter@4.0.6?type=jar",
       "dependsOn" : [
         "pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar",
@@ -18799,6 +19178,14 @@
         "pkg:maven/org.springframework.boot/spring-boot-servlet@4.0.6?type=jar",
         "pkg:maven/org.springframework/spring-web@7.0.7?type=jar",
         "pkg:maven/org.springframework/spring-webmvc@7.0.7?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-websocket@4.0.6?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework.boot/spring-boot@4.0.6?type=jar",
+        "pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar",
+        "pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar"
       ]
     },
     {
@@ -18968,6 +19355,13 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework/spring-messaging@7.0.7?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework/spring-beans@7.0.7?type=jar",
+        "pkg:maven/org.springframework/spring-core@7.0.7?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework/spring-oxm@7.0.7?type=jar",
       "dependsOn" : [
         "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.4?type=jar",
@@ -19013,6 +19407,14 @@
         "pkg:maven/org.springframework/spring-context@7.0.7?type=jar",
         "pkg:maven/org.springframework/spring-core@7.0.7?type=jar",
         "pkg:maven/org.springframework/spring-expression@7.0.7?type=jar",
+        "pkg:maven/org.springframework/spring-web@7.0.7?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework/spring-websocket@7.0.7?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework/spring-context@7.0.7?type=jar",
+        "pkg:maven/org.springframework/spring-core@7.0.7?type=jar",
         "pkg:maven/org.springframework/spring-web@7.0.7?type=jar"
       ]
     },

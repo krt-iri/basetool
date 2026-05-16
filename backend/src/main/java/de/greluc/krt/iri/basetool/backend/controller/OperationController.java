@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.OperationFinanceService;
@@ -148,8 +149,9 @@ public class OperationController {
   }
 
   /**
-   * Per-participant time-share for payout splitting (DONATE in any sub-mission is sticky for the
-   * whole operation).
+   * Per-participant payout breakdown: time-share percentage, the actual money number (expense
+   * reimbursement + share-of-pool), and the mission-manager-set paid-out audit flag (DONATE in any
+   * sub-mission is sticky for the whole operation).
    *
    * @param id operation id
    * @return payout rows sorted by participant name
@@ -157,11 +159,17 @@ public class OperationController {
   @GetMapping("/{id}/payouts")
   @PreAuthorize("isAuthenticated()")
   @Operation(
-      summary = "Get participation-time payout breakdown",
+      summary = "Get participation payout breakdown with amounts and paid-out status",
       description =
-          "For each participant across all missions of the operation, returns the "
-              + "share (in percent) of valid participation time. A participant who chose "
-              + "DONATE in any mission is treated as DONATE for the whole operation.")
+          "For each participant across all missions of the operation, returns the time-share "
+              + "(percent), the personal out-of-pocket reimbursement (mission EXPENSE entries "
+              + "they own + refinery `expenses + otherExpenses` they own), the per-share amount "
+              + "(totalSum × percentage / 100, 0 for DONATE) and the resulting total payout "
+              + "amount. Also includes the paid-out flag set by mission managers (`paidOut`, "
+              + "`paidOutAt`, `paidOutByName`) — absent flag rows are treated as `paidOut=false`. "
+              + "A participant who chose DONATE in any mission is treated as DONATE for the "
+              + "whole operation; their reimbursement is still paid (it is their own money "
+              + "returned) but their share is contributed to the org.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Payout breakdown returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
@@ -169,6 +177,40 @@ public class OperationController {
   })
   public List<OperationPayoutDto> getOperationPayouts(@PathVariable UUID id) {
     return operationService.getOperationPayouts(id);
+  }
+
+  /**
+   * Toggles the per-participant paid-out flag on the operation. Reserved for mission managers
+   * (which the role hierarchy widens to admins and officers).
+   *
+   * @param id operation id
+   * @param dto request body with the participant key and new paid-out value
+   * @return the refreshed payout row for the participant, so the caller can patch a single row of
+   *     its table without re-fetching the whole breakdown
+   */
+  @PutMapping("/{id}/payouts/paid-out")
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @Operation(
+      summary = "Toggle the per-participant paid-out flag for an operation",
+      description =
+          "Records that a mission manager has marked the participant as paid out (or unset "
+              + "it). Last-writer-wins: no client-supplied version is required because the "
+              + "field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are "
+              + "always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last "
+              + "audit fields as a historical record. The participantKey matches the opaque "
+              + "key returned by `/payouts` (real user UUID stringified or `guest_<name>`).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Paid-out flag updated."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
+    @ApiResponse(responseCode = "403", description = "Caller lacks the MISSION_MANAGER role."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Operation not found, or participantKey is not part of the operation.")
+  })
+  public OperationPayoutDto setPayoutStatus(
+      @PathVariable UUID id, @Valid @RequestBody OperationPayoutStatusUpdateDto dto) {
+    return operationService.setPayoutStatus(id, dto.participantKey(), dto.paidOut());
   }
 
   /**

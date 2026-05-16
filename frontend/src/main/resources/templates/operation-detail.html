@@ -189,6 +189,52 @@
                 }
             }
 
+            /* Payout panel: pre-computed amount + paid-out checkbox.
+               The amount column shows the total payout on top and the
+               reimbursement portion as a smaller dim subtitle so users
+               can see how much of the number is "their own money back". */
+            .payout-table .payout-amount-cell {
+                white-space: nowrap;
+            }
+            .payout-table .payout-amount-value {
+                display: block;
+            }
+            .payout-table .payout-amount-reimbursement {
+                display: block;
+                font-size: 0.8em;
+                color: var(--color-gray-2);
+                margin-top: 0.15rem;
+            }
+            .payout-table .payout-paid-label {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                cursor: pointer;
+                margin: 0;
+                font-weight: normal;
+                color: inherit;
+            }
+            .payout-table .payout-paid-checkbox {
+                /* Fat-finger target: minimum 18×18 so a 44px parent label
+                   still hits the 44px responsive-design minimum. */
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+                accent-color: var(--color-primary);
+                flex: 0 0 auto;
+            }
+            .payout-table .payout-paid-status {
+                font-size: 0.8em;
+                color: var(--color-gray-2);
+            }
+            .payout-table .payout-paid-yes {
+                color: var(--color-success, var(--color-primary));
+                font-weight: bold;
+            }
+            .payout-table .payout-paid-no {
+                color: var(--color-gray-2);
+            }
+
             /* Nested mission-finance cards inside the finance panel. */
             .operation-mission-fin {
                 margin-bottom: 1rem;
@@ -341,21 +387,48 @@
             <div class="col-content" id="col-payout-content">
                 <div class="hud-box">
                     <div class="table-responsive">
-                        <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}">
+                        <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}" class="payout-table">
                             <thead>
                                 <tr>
                                     <th th:text="#{general.user}">Nutzer</th>
                                     <th th:text="#{mission.payout.percentage}" sec:authorize="isAuthenticated()">Anteil</th>
                                     <th th:text="#{mission.payout.preference}">Auszahlungsart</th>
+                                    <th th:text="#{operation.payout.amount}" sec:authorize="isAuthenticated()" class="payout-amount-col">Auszahlungsbetrag</th>
+                                    <th th:text="#{operation.payout.paid}" sec:authorize="isAuthenticated()" class="payout-paid-col">Bezahlt</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="payout : ${operationPayouts}">
+                                <tr th:each="payout : ${operationPayouts}"
+                                    th:attr="data-participant-id=${payout.participantId}">
                                     <td th:text="${payout.participantName}">User</td>
                                     <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'NONE', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()">0,00%</td>
                                     <td>
                                         <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
                                         <span th:if="${payout.payoutPreference.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</span>
+                                    </td>
+                                    <td class="payout-amount-cell" sec:authorize="isAuthenticated()">
+                                        <span class="payout-amount-value"
+                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'NONE', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                        <span class="payout-amount-reimbursement"
+                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
+                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'NONE', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
+                                    </td>
+                                    <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
+                                        <label class="payout-paid-label" th:if="${canEdit}">
+                                            <input type="checkbox"
+                                                   class="payout-paid-checkbox"
+                                                   th:attr="data-participant-id=${payout.participantId},
+                                                            data-operation-id=${operation.id}"
+                                                   th:checked="${payout.paidOut}">
+                                            <span class="payout-paid-status"
+                                                  th:if="${payout.paidOut and payout.paidOutByName != null}"
+                                                  th:text="${payout.paidOutByName}"
+                                                  th:title="${payout.paidOutAt != null ? #temporals.format(payout.paidOutAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">audit name</span>
+                                        </label>
+                                        <span th:unless="${canEdit}">
+                                            <span th:if="${payout.paidOut}" th:text="#{general.yes}" class="payout-paid-yes">Ja</span>
+                                            <span th:unless="${payout.paidOut}" th:text="#{general.no}" class="payout-paid-no">Nein</span>
+                                        </span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -546,6 +619,107 @@
             toggleMissionFinances(el.getAttribute('data-mission-id'));
         });
     }
+</script>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // ---- Payout paid-out toggle (AJAX) ---------------------------------
+    // The Auszahlungen panel has a "Bezahlt" checkbox per participant that
+    // mission managers can flip. We POST to the page controller, which
+    // proxies to the backend, then patch the row in place — no full
+    // page reload. On failure we revert the checkbox optimistically and
+    // surface a toast (CLAUDE.md forbids native alerts).
+    /*<![CDATA[*/
+    const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';
+    const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung, den Auszahlungsstatus zu aendern.';
+    /*]]>*/
+
+    function payoutPaidUrl() {
+        const col = document.getElementById('col-payout');
+        const operationId = col ? col.getAttribute('data-operation-id') : null;
+        return operationId ? ('/operations/' + operationId + '/payouts/paid-out') : null;
+    }
+
+    function refreshPayoutPaidStatusCell(row, dto) {
+        if (!row) return;
+        // Only mutate the audit subtitle for the canEdit branch (the one with the checkbox).
+        const checkbox = row.querySelector('.payout-paid-checkbox');
+        if (!checkbox) return;
+        checkbox.checked = !!dto.paidOut;
+        let statusSpan = row.querySelector('.payout-paid-status');
+        if (dto.paidOut && dto.paidOutByName) {
+            if (!statusSpan) {
+                statusSpan = document.createElement('span');
+                statusSpan.className = 'payout-paid-status';
+                checkbox.parentElement.appendChild(statusSpan);
+            }
+            statusSpan.textContent = dto.paidOutByName;
+            if (dto.paidOutAt) {
+                const date = new Date(dto.paidOutAt);
+                if (!isNaN(date)) {
+                    statusSpan.title = date.toLocaleString();
+                }
+            }
+        } else if (statusSpan) {
+            statusSpan.remove();
+        }
+    }
+
+    function handlePayoutPaidToggle(checkbox) {
+        const url = payoutPaidUrl();
+        if (!url) return;
+        const participantKey = checkbox.getAttribute('data-participant-id');
+        if (!participantKey) return;
+        const desired = checkbox.checked;
+        const previous = !desired;
+
+        const headers = { 'Content-Type': 'application/json' };
+        const csrfToken = document.querySelector('meta[name="_csrf"]');
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]');
+        if (csrfToken && csrfHeader) {
+            headers[csrfHeader.getAttribute('content')] = csrfToken.getAttribute('content');
+        }
+
+        // Disable while in-flight so a double-click does not race two writes.
+        checkbox.disabled = true;
+        fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ participantKey: participantKey, paidOut: desired })
+        })
+        .then(response => {
+            if (!response.ok) {
+                checkbox.checked = previous;
+                if (response.status === 401 || response.status === 403) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_FORBIDDEN);
+                } else {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                }
+                return null;
+            }
+            return response.json();
+        })
+        .then(dto => {
+            if (!dto) return;
+            const row = checkbox.closest('tr[data-participant-id]');
+            refreshPayoutPaidStatusCell(row, dto);
+        })
+        .catch(err => {
+            console.error('payout paid-out toggle failed', err);
+            checkbox.checked = previous;
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+        })
+        .finally(() => {
+            checkbox.disabled = false;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.payout-paid-checkbox').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                handlePayoutPaidToggle(checkbox);
+            });
+        });
+    });
 </script>
 </body>
 </html>
