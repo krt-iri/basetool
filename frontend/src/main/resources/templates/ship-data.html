@@ -62,6 +62,19 @@
                 <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
                     <input type="text" id="filterShipTypes" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="shipTypesTable" autocomplete="off">
+                    <!--/*
+                      Ship-type names are exposed to JavaScript via this server-
+                      rendered <datalist> instead of a Thymeleaf JS-inline
+                      expression. Thymeleaf 3.1 truncates the surrounding
+                      <script> block right after the first List/Collection
+                      JS-inline serialisation, so the second autocomplete
+                      binding (manufacturers) plus filterTable + the modal
+                      close handler would silently never wire. Keep the
+                      datalist; do NOT move this back into <script>.
+                    */-->
+                    <datalist id="shipTypeNames-data" style="display: none;">
+                        <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
+                    </datalist>
                 </div>
             </div>
 
@@ -98,6 +111,14 @@
                 <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
                 <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
                     <input type="text" id="filterManufacturers" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="manufacturersTable" autocomplete="off">
+                    <!--/*
+                      Manufacturer names datalist — companion to the shipTypes
+                      datalist above. See that comment for the Thymeleaf 3.1
+                      truncation bug.
+                    */-->
+                    <datalist id="mfgNames-data" style="display: none;">
+                        <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
+                    </datalist>
                 </div>
             </div>
             
@@ -146,14 +167,20 @@
 </div>
 
 <script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:attr="nonce=${cspNonce}">
     document.addEventListener("DOMContentLoaded", function() {
-        const shipTypeNames = /*[[${shipTypes.![name]}]]*/ [];
-        const mfgNames = /*[[${manufacturers.![name]}]]*/ [];
-        
+        const shipTypesData = document.getElementById("shipTypeNames-data");
+        const shipTypeNames = shipTypesData
+            ? Array.from(shipTypesData.options).map(function (o) { return o.value; })
+            : [];
+        const mfgData = document.getElementById("mfgNames-data");
+        const mfgNames = mfgData
+            ? Array.from(mfgData.options).map(function (o) { return o.value; })
+            : [];
+
         const inpShipTypes = document.getElementById("filterShipTypes");
         if(inpShipTypes) krtAutocomplete(inpShipTypes, shipTypeNames);
-        
+
         const inpMfgs = document.getElementById("filterManufacturers");
         if(inpMfgs) krtAutocomplete(inpMfgs, mfgNames);
     });
