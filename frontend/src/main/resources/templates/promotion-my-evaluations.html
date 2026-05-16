@@ -409,7 +409,12 @@
     function meFillProgressBars() {
         var cards = document.querySelectorAll('.eligibility-card');
         cards.forEach(function (card) {
-            var fractions = card.querySelectorAll('.checks-table tbody tr [class^="check-status-"]');
+            // Use class selectors instead of [class^="..."]: the spans are rendered by
+            // th:classappend on an element without an initial class attribute, which makes
+            // Thymeleaf emit class=" check-status-ok" with a leading space. The attribute
+            // prefix selector would then fail to match while the tokenised classList still
+            // works — so the aggregate read 0/0 even when individual rows had real values.
+            var fractions = card.querySelectorAll('.checks-table tbody tr .check-status-ok, .checks-table tbody tr .check-status-missing');
             var achieved = 0, required = 0;
             fractions.forEach(function (span) {
                 var parts = (span.textContent || '').split('/');

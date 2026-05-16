@@ -120,10 +120,12 @@ class PromotionEligibilityServiceTest {
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
 
-    // 3 of 3 categories reach at least LEVEL_A (B counts for A); requirement is 2 so satisfied.
+    // Disjoint matching reserves exactly `requiredCount` categories and stops – achievedCount
+    // therefore caps at requiredCount. The third A-category remains unreserved (no other rule
+    // claims it). Aggregate eligibility is still satisfied.
     assertTrue(result.eligible());
     PromotionRequirementCheckResponse check = result.checks().get(0);
-    assertEquals(3, check.achievedCount());
+    assertEquals(2, check.achievedCount());
     assertEquals(2, check.requiredCount());
     assertEquals(grundlagen.getId(), check.topicId());
     assertNull(check.categoryId(), "topic-scoped check carries no category");
@@ -234,6 +236,203 @@ class PromotionEligibilityServiceTest {
   }
 
   @Test
+  void evaluateForRanks_shouldEnforceDisjointMatching_betweenTopicScopedRulesInSameTopic() {
+    // The squadron's promotion concept demands: "3× B in Grundlagen-Kategorien plus 1× A in
+    // einer ANDEREN Grundlagen-Kategorie" — i.e. the A-rule's category must be distinct from
+    // the three B-categories. With only three B-rated categories available, the A-rule must
+    // fail (no fourth distinct category) even though all three categories trivially satisfy
+    // the "at least A" check on their own.
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionCategory katA = category(grundlagen, "KatA");
+    PromotionCategory katB = category(grundlagen, "KatB");
+    PromotionCategory katC = category(grundlagen, "KatC");
+
+    RankRequirement threeBRule =
+        topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
+    RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(threeBRule, oneARule));
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, katA, PromotionLevel.LEVEL_B),
+                evaluation(USER, katB, PromotionLevel.LEVEL_B),
+                evaluation(USER, katC, PromotionLevel.LEVEL_B)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertFalse(result.eligible(), "no fourth distinct category exists for the 1A rule");
+    PromotionRequirementCheckResponse bCheck = checkForRequirement(result, threeBRule);
+    PromotionRequirementCheckResponse aCheck = checkForRequirement(result, oneARule);
+    assertTrue(bCheck.satisfied(), "3B is satisfied by the three B-rated categories");
+    assertEquals(3, bCheck.achievedCount());
+    assertFalse(aCheck.satisfied(), "1A fails – all three B-categories are reserved for 3B");
+    assertEquals(0, aCheck.achievedCount());
+  }
+
+  @Test
+  void evaluateForRanks_shouldSatisfyDisjointTopicRules_whenFourDistinctCategoriesProvided() {
+    // Same setup as the previous test but with a fourth A-rated category. Now the disjoint
+    // matching succeeds: 3B consumes the three B-categories, 1A picks up the fourth.
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionCategory katA = category(grundlagen, "KatA");
+    PromotionCategory katB = category(grundlagen, "KatB");
+    PromotionCategory katC = category(grundlagen, "KatC");
+    PromotionCategory katD = category(grundlagen, "KatD");
+
+    RankRequirement threeBRule =
+        topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
+    RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(threeBRule, oneARule));
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, katA, PromotionLevel.LEVEL_B),
+                evaluation(USER, katB, PromotionLevel.LEVEL_B),
+                evaluation(USER, katC, PromotionLevel.LEVEL_B),
+                evaluation(USER, katD, PromotionLevel.LEVEL_A)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertTrue(result.eligible());
+    assertTrue(checkForRequirement(result, threeBRule).satisfied());
+    assertEquals(3, checkForRequirement(result, threeBRule).achievedCount());
+    assertTrue(checkForRequirement(result, oneARule).satisfied());
+    assertEquals(1, checkForRequirement(result, oneARule).achievedCount());
+  }
+
+  @Test
+  void evaluateForRanks_shouldReserveHigherLevelForStricterRule_inDisjointMatching() {
+    // Strictest-first ordering: with two C-rated and one A-rated category in the topic, the
+    // "2× C" rule must take both C-categories first; the "1× A" rule then picks up the A-cat.
+    // Even if the repository returns the rules in (A-rule, C-rule) order, the algorithm sorts
+    // by strictness so C wins the C-categories.
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionCategory katA = category(grundlagen, "KatA");
+    PromotionCategory katB = category(grundlagen, "KatB");
+    PromotionCategory katC = category(grundlagen, "KatC");
+
+    RankRequirement twoCRule = topicRule(grundlagen, PromotionLevel.LEVEL_C, 2, "2C in Grundlagen");
+    RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(oneARule, twoCRule));
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, katA, PromotionLevel.LEVEL_C),
+                evaluation(USER, katB, PromotionLevel.LEVEL_C),
+                evaluation(USER, katC, PromotionLevel.LEVEL_A)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertTrue(result.eligible(), "strictest-first reserves the C-cats for 2C, A-cat left for 1A");
+    assertEquals(2, checkForRequirement(result, twoCRule).achievedCount());
+    assertEquals(1, checkForRequirement(result, oneARule).achievedCount());
+  }
+
+  @Test
+  void evaluateForRanks_shouldStillSatisfyLooserRule_whenStricterRuleNotFullyMet() {
+    // The stricter rule runs out of high-level categories; the looser rule can still claim
+    // the remaining ones. Independent evaluation – not "either both or neither".
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionCategory katA = category(grundlagen, "KatA");
+    PromotionCategory katB = category(grundlagen, "KatB");
+
+    RankRequirement twoCRule = topicRule(grundlagen, PromotionLevel.LEVEL_C, 2, "2C in Grundlagen");
+    RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(twoCRule, oneARule));
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, katA, PromotionLevel.LEVEL_C),
+                evaluation(USER, katB, PromotionLevel.LEVEL_A)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertFalse(result.eligible(), "2C rule needs two C-cats but only one exists");
+    PromotionRequirementCheckResponse cCheck = checkForRequirement(result, twoCRule);
+    PromotionRequirementCheckResponse aCheck = checkForRequirement(result, oneARule);
+    assertFalse(cCheck.satisfied());
+    assertEquals(1, cCheck.achievedCount(), "the single C-cat is reserved for the stricter rule");
+    assertTrue(aCheck.satisfied(), "the A-cat remains unreserved and satisfies 1A");
+    assertEquals(1, aCheck.achievedCount());
+  }
+
+  @Test
+  void evaluateForRanks_shouldAllowCategoryRuleToOverlapWithTopicAggregate_underDisjointMatching() {
+    // The squadron's full canonical scenario: "3B in Grundlagen + 1A in another Grundlagen
+    // category + Anwesenheit (a Grundlagen category) must be B". The category-scoped
+    // Anwesenheit rule must NOT consume the Anwesenheit-cat from the topic-scoped pool –
+    // otherwise satisfying Anwesenheit-B would reduce the available B-cats for "3B".
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
+    PromotionCategory katA = category(grundlagen, "KatA");
+    PromotionCategory katB = category(grundlagen, "KatB");
+    PromotionCategory katC = category(grundlagen, "KatC");
+
+    RankRequirement threeBRule =
+        topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
+    RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
+    RankRequirement anwesenheitRule =
+        categoryRule(anwesenheit, PromotionLevel.LEVEL_B, "Anwesenheit B");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(threeBRule, oneARule, anwesenheitRule));
+    // Four distinct categories: Anwesenheit (B) + two more B's + one A. The Anwesenheit cat
+    // satisfies BOTH the category rule AND counts as one of the three B-cats for "3B".
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, anwesenheit, PromotionLevel.LEVEL_B),
+                evaluation(USER, katA, PromotionLevel.LEVEL_B),
+                evaluation(USER, katB, PromotionLevel.LEVEL_B),
+                evaluation(USER, katC, PromotionLevel.LEVEL_A)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertTrue(result.eligible(), "Anwesenheit-B counts for both the category and topic rules");
+    assertEquals(3, checkForRequirement(result, threeBRule).achievedCount());
+    assertEquals(1, checkForRequirement(result, oneARule).achievedCount());
+    assertEquals(1, checkForRequirement(result, anwesenheitRule).achievedCount());
+  }
+
+  @Test
+  void evaluateForRanks_shouldKeepDisjointMatchingPerTopic_notAcrossTopics() {
+    // Disjointness is a within-topic property. A B-cat in Grundlagen and a B-cat in
+    // Spezialisierungen each satisfy their own topic's "1× B" rule – they don't compete
+    // because they live in different topics.
+    PromotionTopic grundlagen = topic("Grundlagen");
+    PromotionTopic spez = topic("Spezialisierungen");
+    PromotionCategory grundlagenKat = category(grundlagen, "G-Kat");
+    PromotionCategory spezKat = category(spez, "S-Kat");
+
+    RankRequirement grundlagenRule =
+        topicRule(grundlagen, PromotionLevel.LEVEL_B, 1, "1B in Grundlagen");
+    RankRequirement spezRule =
+        topicRule(spez, PromotionLevel.LEVEL_B, 1, "1B in Spezialisierungen");
+
+    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+        .thenReturn(List.of(grundlagenRule, spezRule));
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+        .thenReturn(
+            List.of(
+                evaluation(USER, grundlagenKat, PromotionLevel.LEVEL_B),
+                evaluation(USER, spezKat, PromotionLevel.LEVEL_B)));
+
+    PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
+
+    assertTrue(result.eligible(), "disjoint matching is per-topic; both rules satisfied");
+    assertEquals(1, checkForRequirement(result, grundlagenRule).achievedCount());
+    assertEquals(1, checkForRequirement(result, spezRule).achievedCount());
+  }
+
+  @Test
   void evaluateAllForUser_shouldReturnOneEntryPerConfiguredTransition() {
     when(rankRequirementRepository.findDistinctRankTransitions())
         .thenReturn(List.of(new Object[] {20, 19}, new Object[] {19, 18}));
@@ -255,6 +454,21 @@ class PromotionEligibilityServiceTest {
   // ---------------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------------
+
+  private PromotionRequirementCheckResponse checkForRequirement(
+      PromotionEligibilityResponse result, RankRequirement req) {
+    return result.checks().stream()
+        .filter(c -> c.requirementId().equals(req.getId()))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new AssertionError(
+                    "no check returned for requirement "
+                        + req.getId()
+                        + " ("
+                        + req.getDescription()
+                        + ")"));
+  }
 
   private PromotionTopic topic(String name) {
     PromotionTopic t = PromotionTopic.builder().name(name).sortOrder(0).build();
