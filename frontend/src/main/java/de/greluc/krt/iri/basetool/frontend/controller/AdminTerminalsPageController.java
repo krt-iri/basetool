@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -76,13 +77,26 @@ public class AdminTerminalsPageController {
                             parseNullableBoolean(m.get("isAutoLoad")),
                             Boolean.TRUE.equals(m.get("hasLoadingDockOverridden")),
                             Boolean.TRUE.equals(m.get("isAutoLoadOverridden")),
+                            parseNullableBoolean(m.get("uexHasLoadingDock")),
+                            parseNullableBoolean(m.get("uexIsAutoLoad")),
+                            parseInstant(m.get("uexSyncedAt")),
                             Boolean.TRUE.equals(m.get("hidden"))))
                 .collect(Collectors.toCollection(ArrayList::new));
         terminals.sort(
             Comparator.comparing(
                 t -> t.name() == null ? "" : t.name(), String.CASE_INSENSITIVE_ORDER));
       }
+      // The terminal sweep stamps every row with the same instant, so the most recent
+      // value across the list is also the most recent global sweep — surfacing it once
+      // at the top keeps the table itself clean.
+      Instant latestSync =
+          terminals.stream()
+              .map(TerminalDto::uexSyncedAt)
+              .filter(java.util.Objects::nonNull)
+              .max(Comparator.naturalOrder())
+              .orElse(null);
       model.addAttribute("terminals", terminals);
+      model.addAttribute("latestUexSync", latestSync);
 
     } catch (Exception e) {
       log.error("Error loading terminals data", e);
@@ -125,6 +139,9 @@ public class AdminTerminalsPageController {
               currentTerminal.isAutoLoad(),
               currentTerminal.hasLoadingDockOverridden(),
               currentTerminal.isAutoLoadOverridden(),
+              currentTerminal.uexHasLoadingDock(),
+              currentTerminal.uexIsAutoLoad(),
+              currentTerminal.uexSyncedAt(),
               hidden);
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -234,5 +251,19 @@ public class AdminTerminalsPageController {
       return b;
     }
     return Boolean.parseBoolean(o.toString());
+  }
+
+  private Instant parseInstant(Object o) {
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof Instant i) {
+      return i;
+    }
+    try {
+      return Instant.parse(o.toString());
+    } catch (Exception e) {
+      return null;
+    }
   }
 }

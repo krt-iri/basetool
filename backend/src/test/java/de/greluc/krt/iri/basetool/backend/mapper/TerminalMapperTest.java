@@ -16,6 +16,7 @@ class TerminalMapperTest {
   void toDto_shouldMapExposedFields() {
     // Given — only the fields that TerminalDto actually exposes.
     UUID id = UUID.randomUUID();
+    java.time.Instant syncedAt = java.time.Instant.parse("2026-05-16T12:34:56Z");
     Terminal entity = new Terminal();
     entity.setId(id);
     entity.setName("Area 18 Trade & Development Division");
@@ -28,6 +29,9 @@ class TerminalMapperTest {
     entity.setIsAutoLoad(false);
     entity.setHasLoadingDockOverridden(true);
     entity.setIsAutoLoadOverridden(false);
+    entity.setUexHasLoadingDock(false);
+    entity.setUexIsAutoLoad(true);
+    entity.setUexSyncedAt(syncedAt);
     entity.setHidden(true);
 
     // When
@@ -46,6 +50,11 @@ class TerminalMapperTest {
     assertFalse(dto.isAutoLoad());
     assertTrue(dto.hasLoadingDockOverridden());
     assertFalse(dto.isAutoLoadOverridden());
+    // The raw UEX mirror columns are exposed independently of the override flags so
+    // the admin UI can show what UEX currently claims even while a pin is active.
+    assertFalse(dto.uexHasLoadingDock());
+    assertTrue(dto.uexIsAutoLoad());
+    assertEquals(syncedAt, dto.uexSyncedAt());
     assertTrue(dto.hidden());
   }
 
@@ -53,6 +62,7 @@ class TerminalMapperTest {
   void toEntity_shouldMapDtoFields_andLeaveUnmappedFieldsAtDefaults() {
     // Given
     UUID id = UUID.randomUUID();
+    java.time.Instant syncedAt = java.time.Instant.parse("2026-05-16T12:34:56Z");
     TerminalDto dto =
         new TerminalDto(
             id,
@@ -66,6 +76,9 @@ class TerminalMapperTest {
             false,
             true,
             false,
+            false,
+            true,
+            syncedAt,
             false);
 
     // When
@@ -84,6 +97,9 @@ class TerminalMapperTest {
     assertFalse(entity.getIsAutoLoad());
     assertTrue(entity.getHasLoadingDockOverridden());
     assertFalse(entity.getIsAutoLoadOverridden());
+    assertFalse(entity.getUexHasLoadingDock());
+    assertTrue(entity.getUexIsAutoLoad());
+    assertEquals(syncedAt, entity.getUexSyncedAt());
     assertFalse(entity.getHidden());
     // Fields not present in DTO must stay at entity defaults
     assertNull(entity.getIdTerminal());
