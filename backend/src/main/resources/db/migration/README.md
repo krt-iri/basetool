@@ -110,9 +110,8 @@ migrations are where things go subtly wrong.
 
 The test profile (`application-test.yml`) currently runs against H2 and sets
 `flyway.enabled: false`, so Flyway scripts are **not** executed by the standard
-test suite (see ANALYSIS.md 1.3 for the open follow-up to move tests onto
-Testcontainers + Postgres so migrations actually run there). Until that
-follow-up lands:
+test suite. Moving tests onto Testcontainers + Postgres so migrations actually
+run there is an open follow-up. Until that lands:
 
 * Don't assume `./gradlew test` validated your migration. Run the dev
   Compose stack at least once before merging:

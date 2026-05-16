@@ -11,12 +11,12 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Regression coverage for the Redis-session {@link JsonMapper} configuration in {@link
- * RedisSessionConfig}. The original bug was reported in PROJECT_REVIEW.md as a 500 surfacing on
- * POST {@code /personal-inventory/add} whenever the submitted form failed validation: the page
- * controller pushed the {@link BeanPropertyBindingResult} into a {@code RedirectAttributes} flash
- * attribute, the redirect commit serialised the FlashMap to Redis and Jackson exploded on the
- * {@code BindingResult -> model -> BindingResult -> ...} self-reference cycle with {@code Document
- * nesting depth (501) exceeds the maximum (500)}.
+ * RedisSessionConfig}. The original bug was a 500 surfacing on POST {@code /personal-inventory/add}
+ * whenever the submitted form failed validation: the page controller pushed the {@link
+ * BeanPropertyBindingResult} into a {@code RedirectAttributes} flash attribute, the redirect commit
+ * serialised the FlashMap to Redis and Jackson exploded on the {@code BindingResult -> model ->
+ * BindingResult -> ...} self-reference cycle with {@code Document nesting depth (501) exceeds the
+ * maximum (500)}.
  *
  * <p>{@link RedisSessionConfig#buildSessionJsonMapper(ClassLoader)} now installs a Jackson mix-in
  * that hides {@code BindingResult.getModel()} from the serialiser, breaking the cycle without
