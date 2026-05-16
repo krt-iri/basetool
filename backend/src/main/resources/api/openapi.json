@@ -30611,6 +30611,9 @@
           "outpostName" : {
             "type" : "string"
           },
+          "planetName" : {
+            "type" : "string"
+          },
           "isJumpPoint" : {
             "type" : "boolean"
           },
