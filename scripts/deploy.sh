@@ -117,27 +117,32 @@ KEYSTORE_HOST_PATH="$(grep -E '^IRI_KEYSTORE_HOST_PATH=' "${COMPOSE_DIR}/.env" 2
 KEYSTORE_HOST_PATH="${KEYSTORE_HOST_PATH:-/var/iri/secrets/keystore.p12}"
 require_file "${KEYSTORE_HOST_PATH}"
 
+mkdir -p "${STATE_DIR}"
+
+# Pin DOCKER_CONFIG BEFORE the first docker invocation. The `deploy` user is
+# created with `useradd --no-create-home`, so $HOME=/home/deploy does not
+# exist on disk; under the systemd unit's `ProtectHome=true` the directory
+# is additionally an inaccessible empty tmpfs mount. Either situation makes
+# Docker CLI's default config-discovery path under $HOME/.docker fail —
+# `docker login` would error out with `mkdir /home/deploy: permission
+# denied`, and even the cheaper `docker compose version --short` pre-flight
+# probe below exits non-zero because the compose plugin tries to read its
+# config from the unreachable $HOME on startup.
+#
+# Pinning DOCKER_CONFIG into STATE_DIR sidesteps both problems: the path is
+# already in the systemd unit's ReadWritePaths set, persists the credential
+# between timer ticks, and stays under the deploy user's exclusive 0700
+# ownership. Must come BEFORE the docker compose version check below — the
+# order is load-bearing.
+export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
+install -d -m 0700 "${DOCKER_CONFIG}"
+
 # Compose v2 ships with Docker Engine ≥ 20.10.13 as `docker compose`; the
 # `--wait` flag landed in 2.1.0. Fail fast on older installs rather than
 # discovering it during `up`.
 if ! docker compose version --short >/dev/null 2>&1; then
   fail "docker compose v2 not available; install Docker Engine ≥ 23.x"
 fi
-
-mkdir -p "${STATE_DIR}"
-
-# Docker writes credentials from `docker login` into $DOCKER_CONFIG/config.json
-# (default $HOME/.docker). The `deploy` user is created with --no-create-home
-# (see docs/deployment.md → bootstrap), so $HOME points at /home/deploy and
-# does not exist — the default path therefore fails with
-# `mkdir /home/deploy: permission denied`. The systemd unit also runs with
-# ProtectHome=true and a fresh PrivateTmp= sandbox, so an ad-hoc /tmp config
-# would not survive across invocations. Pin DOCKER_CONFIG inside STATE_DIR
-# instead: that path is already in the unit's ReadWritePaths set, persists
-# the credential between timer ticks, and stays under the deploy user's
-# exclusive 0700 ownership.
-export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
-install -d -m 0700 "${DOCKER_CONFIG}"
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
 PIN_FILE_PREVIOUS="${STATE_DIR}/previous-digest-pin.yml"
