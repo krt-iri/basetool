@@ -1,0 +1,7 @@
+{
+  "type": "https://iri-base.org/problems/maintenance",
+  "title": "Service Unavailable",
+  "status": 503,
+  "detail": "The IRIDIUM Basetool is currently undergoing maintenance. Please retry in a few moments.",
+  "retryAfterSeconds": 60
+}

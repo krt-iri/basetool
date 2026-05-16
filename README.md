@@ -145,6 +145,14 @@ Summary of the release loop:
    180 s health-check, and auto-rolls-back to the previous digest if
    the new images fail to become healthy.
 
+During the brief window in step 3 between "old container gone" and "new
+container healthy", `nginx-proxy-manager` intercepts the upstream `502` and
+serves a branded `503 Service Unavailable` maintenance page from
+[`docker/maintenance/`](docker/maintenance/) — the HTML variant auto-refreshes
+every 30 s, the `application/problem+json` variant lets AJAX calls render their
+existing "backend unreachable" toast. Mechanics live in
+[docs/deployment.md → Maintenance page](docs/deployment.md#maintenance-page).
+
 ### 3.3 Running locally with Docker Compose (pulling from GHCR)
 
 Same images, same orchestration as production, but on your own machine:

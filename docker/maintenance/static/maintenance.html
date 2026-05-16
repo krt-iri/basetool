@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="30">
+  <meta name="robots" content="noindex, nofollow">
+  <title>System Maintenance &mdash; IRIDIUM Basetool</title>
+  <style>
+    /* The KRT corporate fonts (Ethnocentric, Lato) live inside the Spring
+       frontend's static assets. This page is served by nginx while that
+       container is restarting, so we cannot reach them. Fall back to a
+       wide-set bold sans-serif for the HUD headlines. */
+    :root {
+      --color-primary: #E77E23;
+      --color-accent-dark: #C45C00;
+      --color-bg: #000000;
+      --color-bg-2: #141414;
+      --color-text: #D2D2D2;
+      --color-text-muted: rgba(210, 210, 210, 0.55);
+      --color-border: rgba(231, 126, 35, 0.45);
+      --color-divider: rgba(210, 210, 210, 0.15);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      min-height: 100vh;
+    }
+    main.panel {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      padding: 2.25rem 1.5rem;
+      background: var(--color-bg-2);
+      border: 2px solid var(--color-border);
+      box-shadow: 0 0 24px rgba(231, 126, 35, 0.18);
+    }
+    /* Technical HUD-style corner markers. */
+    main.panel::before,
+    main.panel::after {
+      content: '';
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border: 2px solid var(--color-primary);
+    }
+    main.panel::before {
+      top: -2px;
+      left: -2px;
+      border-right: none;
+      border-bottom: none;
+    }
+    main.panel::after {
+      bottom: -2px;
+      right: -2px;
+      border-left: none;
+      border-top: none;
+    }
+    .status-row {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      background: var(--color-accent-dark);
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+    .pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.7); }
+    }
+    h1 {
+      font-family: 'Arial Black', 'Helvetica Neue', sans-serif;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 1.6rem;
+      line-height: 1.15;
+      margin: 0 0 1.5rem;
+      text-align: center;
+      font-weight: 900;
+    }
+    .lang-block {
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--color-divider);
+    }
+    .lang-block:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .lang-label {
+      display: inline-block;
+      font-size: 0.68rem;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      margin-bottom: 0.6rem;
+      font-weight: 700;
+    }
+    h2 {
+      font-family: 'Arial Black', 'Helvetica Neue', sans-serif;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 1.05rem;
+      line-height: 1.2;
+      margin: 0 0 0.6rem;
+      font-weight: 900;
+    }
+    p {
+      line-height: 1.55;
+      margin: 0.45rem 0;
+      font-size: 0.95rem;
+      max-width: 64ch;
+    }
+    .meta {
+      margin-top: 1.75rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-divider);
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+    .meta .pulse {
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+
+    /* Tablet (>= 768px). */
+    @media (min-width: 768px) {
+      body { padding: 2rem; }
+      main.panel { padding: 3rem 2.5rem; }
+      h1 { font-size: 2.1rem; }
+      h2 { font-size: 1.2rem; }
+      p  { font-size: 1rem; }
+    }
+    /* Desktop (>= 1024px). */
+    @media (min-width: 1024px) {
+      main.panel { max-width: 760px; padding: 3.5rem 3rem; }
+      h1 { font-size: 2.4rem; }
+      h2 { font-size: 1.25rem; }
+      p  { font-size: 1.05rem; }
+    }
+    /* Ultra-wide (>= 1600px). */
+    @media (min-width: 1600px) {
+      main.panel { max-width: 820px; }
+      h1 { font-size: 2.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="panel" role="main" aria-labelledby="page-title">
+    <div class="status-row">
+      <span class="status-badge"><span class="pulse" aria-hidden="true"></span>Maintenance</span>
+    </div>
+
+    <h1 id="page-title">System Maintenance</h1>
+
+    <section class="lang-block" lang="de">
+      <span class="lang-label">Deutsch</span>
+      <h2>Wartungsarbeiten</h2>
+      <p>Das IRIDIUM Basetool wird gerade aktualisiert. Bitte habt etwas Geduld &mdash; diese Seite lädt sich automatisch neu, sobald das System wieder erreichbar ist.</p>
+      <p>Normalerweise dauert das nur wenige Augenblicke.</p>
+    </section>
+
+    <section class="lang-block" lang="en">
+      <span class="lang-label">English</span>
+      <h2>Maintenance in Progress</h2>
+      <p>The IRIDIUM Basetool is currently being updated. Please stand by &mdash; this page reloads automatically as soon as the system is back online.</p>
+      <p>This typically only takes a few moments.</p>
+    </section>
+
+    <div class="meta">
+      <span class="pulse" aria-hidden="true"></span>IRIDIUM // DAS KARTELL &mdash; auto-refresh every 30&nbsp;s
+    </div>
+  </main>
+</body>
+</html>
