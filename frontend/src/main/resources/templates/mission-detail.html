@@ -2538,5 +2538,24 @@
 </script>
 <!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
 <script th:src="@{/js/mission-subresource.js}" defer th:attr="nonce=${cspNonce}"></script>
+<!-- Mission detail presence/awareness client (Stufe 3). -->
+<script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}">
+    window.MISSION_PRESENCE_I18N = {
+        'mission.presence.editing.solo': /*[[#{mission.presence.editing.solo}]]*/ 'currently editing:',
+        'mission.presence.editing.multi': /*[[#{mission.presence.editing.multi}]]*/ 'currently editing:'
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof window.MissionPresence !== 'function' || !window.missionId) {
+            return;
+        }
+        const presence = new window.MissionPresence(
+            window.missionId,
+            /*[[${authUserId}]]*/ null
+        );
+        presence.start();
+        window.missionPresence = presence;
+    });
+</script>
 </body>
 </html>

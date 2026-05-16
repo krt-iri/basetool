@@ -1,0 +1,327 @@
+package de.greluc.krt.iri.basetool.frontend.websocket;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.iri.basetool.frontend.service.MissionPresenceService;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketExtension;
+import org.springframework.web.socket.WebSocketMessage;
+import org.springframework.web.socket.WebSocketSession;
+
+/**
+ * Tests for {@link MissionPresenceWebSocketHandler}.
+ *
+ * <p>Drives the handler through a hand-rolled {@link FakeSession} that records outbound messages in
+ * a buffer so the JSON wire format, mission-id extraction, principal-resolution, and broadcast
+ * behaviour can be verified without starting a real servlet container.
+ */
+class MissionPresenceWebSocketHandlerTest {
+
+  private MissionPresenceService service;
+  private ObjectMapper objectMapper;
+  private MissionPresenceWebSocketHandler handler;
+
+  @BeforeEach
+  void setUp() {
+    service = new MissionPresenceService();
+    objectMapper = new ObjectMapper();
+    handler = new MissionPresenceWebSocketHandler(service, objectMapper);
+  }
+
+  @Test
+  void extractMissionId_acceptsCanonicalPath() {
+    UUID id = UUID.randomUUID();
+    UUID extracted =
+        MissionPresenceWebSocketHandler.extractMissionId(
+            URI.create("ws://localhost/ws/missions/" + id + "/presence"));
+    assertThat(extracted).isEqualTo(id);
+  }
+
+  @Test
+  void extractMissionId_rejectsWrongShape() {
+    assertThat(MissionPresenceWebSocketHandler.extractMissionId(URI.create("ws://x/ws/missions")))
+        .isNull();
+    assertThat(
+            MissionPresenceWebSocketHandler.extractMissionId(
+                URI.create("ws://x/api/missions/" + UUID.randomUUID() + "/presence")))
+        .isNull();
+    assertThat(
+            MissionPresenceWebSocketHandler.extractMissionId(
+                URI.create("ws://x/ws/missions/not-a-uuid/presence")))
+        .isNull();
+  }
+
+  @Test
+  void focusMessage_recordsPresence_andBroadcastsSnapshot() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+
+    session.sent.clear();
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+
+    assertThat(service.get(missionId, "details", "user-1")).isNotNull();
+    assertThat(service.get(missionId, "details", "user-1").displayName()).isEqualTo("Alice");
+
+    JsonNode broadcast = lastBroadcast(session);
+    assertThat(broadcast.get("type").asText()).isEqualTo("presence");
+    JsonNode editors = broadcast.get("sections").get("details");
+    assertThat(editors).isNotNull();
+    assertThat(editors.get(0).get("userId").asText()).isEqualTo("user-1");
+    assertThat(editors.get(0).get("displayName").asText()).isEqualTo("Alice");
+  }
+
+  @Test
+  void blurMessage_clearsPresence_andBroadcastsEmptySection() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+
+    session.sent.clear();
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"blur\",\"sectionKey\":\"details\"}"));
+
+    assertThat(service.get(missionId, "details", "user-1")).isNull();
+    JsonNode broadcast = lastBroadcast(session);
+    // After the blur the snapshot has no sections at all (the entry was the only one).
+    assertThat(broadcast.get("type").asText()).isEqualTo("presence");
+    assertThat(broadcast.get("sections").size()).isZero();
+  }
+
+  @Test
+  void heartbeat_doesNotBroadcast_whenUserAlreadyKnown() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+
+    int countAfterFocus = session.sent.size();
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"heartbeat\",\"sectionKey\":\"details\"}"));
+
+    // Heartbeat from an already-known editor must NOT trigger a broadcast — generating one
+    // frame per heartbeat per connected client per mission would be wasteful and visually
+    // pointless because the state didn't change.
+    assertThat(session.sent).hasSize(countAfterFocus);
+  }
+
+  @Test
+  void malformedPayload_isSilentlyDropped() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    session.sent.clear();
+
+    handler.handleTextMessage(session, new TextMessage("{this is not json"));
+    handler.handleTextMessage(session, new TextMessage("{\"type\":null}"));
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"unknown\",\"sectionKey\":\"x\"}"));
+
+    // No state mutation, no broadcasts.
+    assertThat(service.trackedMissions()).isEmpty();
+    assertThat(session.sent).isEmpty();
+  }
+
+  @Test
+  void connectionClosed_clearsAllPresence_andBroadcastsToRemainingClients() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession aliceSession = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bobSession = openSession(missionId, oidcUser("user-2", "Bob"));
+    handler.handleTextMessage(
+        aliceSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+    handler.handleTextMessage(
+        bobSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"schedule\"}"));
+
+    bobSession.sent.clear();
+    aliceSession.open = false;
+    handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
+
+    // Alice's presence is gone on every section.
+    assertThat(service.get(missionId, "details", "user-1")).isNull();
+    // Bob's presence is untouched.
+    assertThat(service.get(missionId, "schedule", "user-2")).isNotNull();
+    // Bob's session received an updated snapshot (no Alice in `details`).
+    JsonNode broadcast = lastBroadcast(bobSession);
+    assertThat(broadcast.get("sections").has("details")).isFalse();
+    assertThat(broadcast.get("sections").get("schedule").get(0).get("userId").asText())
+        .isEqualTo("user-2");
+  }
+
+  @Test
+  void connectionClosed_keepsPresence_whenSameUserHasAnotherOpenTab() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession tabA = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession tabB = openSession(missionId, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(
+        tabA, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+
+    tabA.open = false;
+    handler.afterConnectionClosed(tabA, CloseStatus.NORMAL);
+
+    // The other tab is still alive — Alice's "details" presence must survive.
+    assertThat(service.get(missionId, "details", "user-1")).isNotNull();
+    assertThat(tabB.isOpen()).isTrue();
+  }
+
+  // ── helpers ────────────────────────────────────────────────────────────────────────────────
+
+  private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/missions/" + missionId + "/presence");
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    handler.afterConnectionEstablished(session);
+    return session;
+  }
+
+  private static OidcUser oidcUser(String sub, String preferredUsername) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("sub", sub);
+    claims.put("preferred_username", preferredUsername);
+    OidcIdToken token =
+        new OidcIdToken(
+            "tok-" + sub, java.time.Instant.now(), java.time.Instant.now().plusSeconds(60), claims);
+    return new DefaultOidcUser(List.of(new SimpleGrantedAuthority("ROLE_USER")), token, "sub");
+  }
+
+  private JsonNode lastBroadcast(WebSocketSession session) throws Exception {
+    List<WebSocketMessage<?>> sent = new ArrayList<>(((FakeSession) session).sent);
+    assertThat(sent).isNotEmpty();
+    WebSocketMessage<?> last = sent.get(sent.size() - 1);
+    assertThat(last).isInstanceOf(TextMessage.class);
+    return objectMapper.readTree(((TextMessage) last).getPayload());
+  }
+
+  /**
+   * Hand-rolled stand-in for {@code WebSocketSession}. Records outbound messages in {@link #sent}
+   * and exposes the mutable {@link #attributes}, {@link #principal} and {@link #uri} fields tests
+   * need. All other interface methods return safe defaults; the handler under test never invokes
+   * them.
+   */
+  private static final class FakeSession implements WebSocketSession {
+    private final String id = UUID.randomUUID().toString();
+    final Map<String, Object> attributes = new HashMap<>();
+    final List<WebSocketMessage<?>> sent = new ArrayList<>();
+    boolean open;
+    URI uri;
+    Principal principal;
+    CloseStatus closeStatus;
+
+    @Override
+    public String getId() {
+      return id;
+    }
+
+    @Override
+    public URI getUri() {
+      return uri;
+    }
+
+    @Override
+    public HttpHeaders getHandshakeHeaders() {
+      return new HttpHeaders();
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+      return attributes;
+    }
+
+    @Override
+    public Principal getPrincipal() {
+      return principal;
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+      return null;
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+      return null;
+    }
+
+    @Override
+    public String getAcceptedProtocol() {
+      return null;
+    }
+
+    @Override
+    public void setTextMessageSizeLimit(int messageSizeLimit) {
+      // no-op
+    }
+
+    @Override
+    public int getTextMessageSizeLimit() {
+      return 0;
+    }
+
+    @Override
+    public void setBinaryMessageSizeLimit(int messageSizeLimit) {
+      // no-op
+    }
+
+    @Override
+    public int getBinaryMessageSizeLimit() {
+      return 0;
+    }
+
+    @Override
+    public List<WebSocketExtension> getExtensions() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public void sendMessage(WebSocketMessage<?> message) throws IOException {
+      sent.add(message);
+    }
+
+    @Override
+    public boolean isOpen() {
+      return open;
+    }
+
+    @Override
+    public void close() {
+      open = false;
+    }
+
+    @Override
+    public void close(CloseStatus status) {
+      this.closeStatus = status;
+      this.open = false;
+    }
+
+    // Suppress unused-field warnings for `closeStatus` / `ByteBuffer` import — both are part of
+    // the WebSocketSession contract we mirror but the current tests do not assert on them.
+    @SuppressWarnings("unused")
+    private void touchUnusedSymbols() {
+      ByteBuffer.allocate(0);
+    }
+  }
+}
