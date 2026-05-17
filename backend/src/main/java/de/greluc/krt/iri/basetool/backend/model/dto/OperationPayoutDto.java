@@ -15,8 +15,9 @@ import java.time.Instant;
  * #shareAmount} to the org. From the resulting gross payout ({@code personalExpenses +
  * shareAmount}) a flat 0.5% in-game transfer fee ({@link #transferFee}) is deducted to cover the
  * Star Citizen banking overhead charged on every aUEC transfer to the recipient. {@link
- * #payoutAmount} is always {@code personalExpenses + shareAmount - transferFee} so the frontend can
- * render a single number without re-deriving it.
+ * #payoutAmount} is always {@code round(personalExpenses + shareAmount - transferFee)} (HALF_UP to
+ * scale 0 — whole aUEC, since mobiGlas transfers do not accept fractional credits) so the frontend
+ * can render a single number without re-deriving it.
  *
  * <p>The {@code paidOut*} block reflects the {@link
  * de.greluc.krt.iri.basetool.backend.model.OperationPayoutStatus} row that the mission-manager
@@ -32,8 +33,9 @@ import java.time.Instant;
  * @param shareAmount totalSum × percentage / 100, or {@link BigDecimal#ZERO} for DONATE
  * @param transferFee 0.5% of {@code personalExpenses + shareAmount}, deducted to cover the in-game
  *     aUEC transfer fee — always &gt;= 0 and zero when the gross payout is zero
- * @param payoutAmount {@code personalExpenses + shareAmount - transferFee} — pre-computed for
- *     display, i.e. the net amount the participant actually receives in-game
+ * @param payoutAmount {@code round(personalExpenses + shareAmount - transferFee)} (HALF_UP to scale
+ *     0) — pre-computed for display, i.e. the net amount in whole aUEC the participant actually
+ *     receives in-game
  * @param paidOut whether the mission manager has marked this participant as already paid
  * @param paidOutAt timestamp of the last paid-out transition ({@code null} when never set)
  * @param paidOutByName effective name of the auditor that flipped the flag, or {@code null}

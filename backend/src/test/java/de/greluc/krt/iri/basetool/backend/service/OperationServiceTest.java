@@ -785,12 +785,13 @@ class OperationServiceTest {
    * costs they own) are paid back from gross income, and the remaining {@code totalSum} is split
    * per participation percentage among PAYOUT participants. DONATE participants keep their
    * reimbursement (it is their own money returned) but contribute their share. Finally an in-game
-   * banking fee is deducted from every participant's gross payout, so {@code payoutAmount =
-   * personalExpenses + shareAmount - transferFee}. The fee rate comes from the runtime-editable
-   * {@code operation.transfer_fee_rate} system setting and falls back to 0.5% when the row is
-   * missing — tests that don't stub {@code systemSettingService.getSettingValue(...)} therefore
-   * exercise the 0.5% fallback path, which is what the existing assertions are calibrated to. The
-   * combined paid-out fields are covered together because they share the same setup.
+   * banking fee is deducted from every participant's gross payout, and the resulting net is rounded
+   * HALF_UP to whole aUEC, so {@code payoutAmount = round(personalExpenses + shareAmount -
+   * transferFee)}. The fee rate comes from the runtime-editable {@code operation.transfer_fee_rate}
+   * system setting and falls back to 0.5% when the row is missing — tests that don't stub {@code
+   * systemSettingService.getSettingValue(...)} therefore exercise the 0.5% fallback path, which is
+   * what the existing assertions are calibrated to. The combined paid-out fields are covered
+   * together because they share the same setup.
    */
   @Nested
   class GetOperationPayoutsAmountTests {
@@ -825,11 +826,12 @@ class OperationServiceTest {
       assertEquals(new BigDecimal("500.00"), aliceRow.shareAmount());
       // 0.5% of 500.00 in-game banking fee deducted from the gross payout.
       assertEquals(new BigDecimal("2.50"), aliceRow.transferFee());
-      assertEquals(new BigDecimal("497.50"), aliceRow.payoutAmount());
+      // 497.50 rounded HALF_UP to whole aUEC -> 498.
+      assertEquals(new BigDecimal("498"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("500.00"), bobRow.shareAmount());
       assertEquals(new BigDecimal("2.50"), bobRow.transferFee());
-      assertEquals(new BigDecimal("497.50"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("498"), bobRow.payoutAmount());
     }
 
     @Test
@@ -837,6 +839,7 @@ class OperationServiceTest {
       // Gross income 1000, alice paid 300 in mission expenses, totalSum = 700.
       // Reimburse alice 300 first; split 700 evenly: alice 350, bob 350.
       // Gross payouts: alice 650, bob 350. After 0.5% banking fee: alice 646.75, bob 348.25.
+      // After HALF_UP whole-aUEC rounding: alice 647, bob 348.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -859,13 +862,14 @@ class OperationServiceTest {
       assertEquals(new BigDecimal("350.00"), aliceRow.shareAmount());
       assertEquals(new BigDecimal("3.25"), aliceRow.transferFee(), "0.5% of 650.00 gross");
       assertEquals(
-          new BigDecimal("646.75"),
+          new BigDecimal("647"),
           aliceRow.payoutAmount(),
-          "alice's payout = reimbursement (300) + share (350) - fee (3.25)");
+          "alice's payout = round(reimbursement (300) + share (350) - fee (3.25)) HALF_UP -> 647");
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("350.00"), bobRow.shareAmount());
       assertEquals(new BigDecimal("1.75"), bobRow.transferFee(), "0.5% of 350.00 gross");
-      assertEquals(new BigDecimal("348.25"), bobRow.payoutAmount());
+      // 348.25 rounded HALF_UP to whole aUEC -> 348.
+      assertEquals(new BigDecimal("348"), bobRow.payoutAmount());
     }
 
     @Test
@@ -874,6 +878,7 @@ class OperationServiceTest {
       // totalSum = 1300. alice gets reimbursed 700, then 50% of 1300 = 650.
       // bob gets 50% of 1300 = 650. Gross payouts: alice 1350, bob 650.
       // After 0.5% banking fee: alice 1343.25 (fee 6.75), bob 646.75 (fee 3.25).
+      // After HALF_UP whole-aUEC rounding: alice 1343, bob 647.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -897,11 +902,11 @@ class OperationServiceTest {
       assertEquals(new BigDecimal("700.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("650.00"), aliceRow.shareAmount());
       assertEquals(new BigDecimal("6.75"), aliceRow.transferFee());
-      assertEquals(new BigDecimal("1343.25"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("1343"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("0.00"), bobRow.personalExpenses());
       assertEquals(new BigDecimal("650.00"), bobRow.shareAmount());
       assertEquals(new BigDecimal("3.25"), bobRow.transferFee());
-      assertEquals(new BigDecimal("646.75"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("647"), bobRow.payoutAmount());
     }
 
     @Test
@@ -911,6 +916,7 @@ class OperationServiceTest {
       // alice's share of 350 is donated to the org and not paid out. The 0.5% banking fee
       // still applies to alice's reimbursement transfer (it is an in-game aUEC payout too).
       // Gross payouts: alice 300 -> fee 1.50 -> net 298.50; bob 350 -> fee 1.75 -> net 348.25.
+      // After HALF_UP whole-aUEC rounding: alice 299, bob 348.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       User bob = newUser("bob");
@@ -936,9 +942,9 @@ class OperationServiceTest {
           aliceRow.shareAmount(),
           "DONATE participants contribute their share; only reimbursement is paid out");
       assertEquals(new BigDecimal("1.50"), aliceRow.transferFee());
-      assertEquals(new BigDecimal("298.50"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("299"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("1.75"), bobRow.transferFee());
-      assertEquals(new BigDecimal("348.25"), bobRow.payoutAmount());
+      assertEquals(new BigDecimal("348"), bobRow.payoutAmount());
     }
 
     @Test
@@ -966,10 +972,11 @@ class OperationServiceTest {
       OperationPayoutDto row = result.get(0);
       assertTrue(row.participantId().startsWith("guest_"));
       assertEquals(new BigDecimal("250.00"), row.personalExpenses());
-      // sole participant, 100% share. totalSum = 500 - 250 = 250. Gross payout 500, fee 2.50.
+      // sole participant, 100% share. totalSum = 500 - 250 = 250. Gross payout 500, fee 2.50,
+      // net 497.50 -> HALF_UP whole aUEC -> 498.
       assertEquals(new BigDecimal("250.00"), row.shareAmount());
       assertEquals(new BigDecimal("2.50"), row.transferFee());
-      assertEquals(new BigDecimal("497.50"), row.payoutAmount());
+      assertEquals(new BigDecimal("498"), row.payoutAmount());
     }
 
     @Test
@@ -996,7 +1003,8 @@ class OperationServiceTest {
       assertEquals(new BigDecimal("0.00"), aliceRow.personalExpenses());
       assertEquals(new BigDecimal("1000.00"), aliceRow.shareAmount());
       assertEquals(new BigDecimal("5.00"), aliceRow.transferFee());
-      assertEquals(new BigDecimal("995.00"), aliceRow.payoutAmount());
+      // 995.00 already a whole-aUEC value; setScale(0, HALF_UP) collapses to "995".
+      assertEquals(new BigDecimal("995"), aliceRow.payoutAmount());
     }
 
     @Test
@@ -1024,13 +1032,14 @@ class OperationServiceTest {
           new BigDecimal("0.00"),
           aliceRow.transferFee(),
           "no gross payout means no in-game transfer happens; fee must be zero");
-      assertEquals(new BigDecimal("0.00"), aliceRow.payoutAmount());
+      assertEquals(new BigDecimal("0"), aliceRow.payoutAmount());
     }
 
     @Test
     void transferFee_roundsHalfUp_onUnevenGross() {
       // Verify HALF_UP rounding semantics. Single participant, gross = 333.33 (totalSum 333.33),
-      // 0.5% = 1.66665 -> 1.67 (HALF_UP). Net payout = 331.66.
+      // 0.5% = 1.66665 -> 1.67 (HALF_UP). Net before final rounding = 331.66; rounded HALF_UP
+      // to whole aUEC -> 332.
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
       MissionParticipant aliceP =
@@ -1046,7 +1055,7 @@ class OperationServiceTest {
       assertEquals(new BigDecimal("333.33"), row.shareAmount());
       assertEquals(
           new BigDecimal("1.67"), row.transferFee(), "333.33 * 0.005 = 1.66665 rounds to 1.67");
-      assertEquals(new BigDecimal("331.66"), row.payoutAmount());
+      assertEquals(new BigDecimal("332"), row.payoutAmount());
     }
 
     @Test
@@ -1069,7 +1078,7 @@ class OperationServiceTest {
       OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
 
       assertEquals(new BigDecimal("10.00"), row.transferFee());
-      assertEquals(new BigDecimal("990.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("990"), row.payoutAmount());
     }
 
     @Test
@@ -1091,7 +1100,7 @@ class OperationServiceTest {
       OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
 
       assertEquals(new BigDecimal("5.00"), row.transferFee());
-      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("995"), row.payoutAmount());
     }
 
     @Test
@@ -1113,7 +1122,7 @@ class OperationServiceTest {
       OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
 
       assertEquals(new BigDecimal("5.00"), row.transferFee());
-      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("995"), row.payoutAmount());
     }
 
     @Test
@@ -1136,7 +1145,7 @@ class OperationServiceTest {
       OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
 
       assertEquals(new BigDecimal("5.00"), row.transferFee());
-      assertEquals(new BigDecimal("995.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("995"), row.payoutAmount());
     }
 
     @Test
@@ -1158,7 +1167,7 @@ class OperationServiceTest {
       OperationPayoutDto row = operationService.getOperationPayouts(OPERATION_ID).get(0);
 
       assertEquals(new BigDecimal("0.00"), row.transferFee());
-      assertEquals(new BigDecimal("1000.00"), row.payoutAmount());
+      assertEquals(new BigDecimal("1000"), row.payoutAmount());
     }
 
     @Test

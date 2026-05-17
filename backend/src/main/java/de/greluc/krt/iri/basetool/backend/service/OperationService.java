@@ -216,8 +216,11 @@ public class OperationService {
    * <p>Pulls the operation with its missions / participants pre-fetched, then loads finance entries
    * and refinery orders by mission id so the percentage AND the money number can be derived in one
    * pass. The percentage is the participant's clamped attendance time over the operation's clamped
-   * attendance time (mirrors the previous behavior); the money number is {@code personalExpenses +
-   * sharePayout − transferFee} where:
+   * attendance time (mirrors the previous behavior); the money number is {@code
+   * round(personalExpenses + sharePayout − transferFee)} — final HALF_UP rounding to whole aUEC,
+   * because Star Citizen's mobiGlas does not accept fractional credits in a transfer. The
+   * components below are tracked at two-decimal precision so the breakdown sub-labels stay
+   * auditable; only the final {@code payoutAmount} is collapsed to scale 0:
    *
    * <ul>
    *   <li><b>personalExpenses</b> reimburses each participant for the expenses attributed to them —
@@ -303,7 +306,14 @@ public class OperationService {
       // >= 0), so HALF_UP rounding here mirrors the rest of the pipeline.
       BigDecimal transferFee =
           grossPayout.multiply(transferFeeRate).setScale(2, RoundingMode.HALF_UP);
-      BigDecimal payoutAmount = grossPayout.subtract(transferFee);
+      // Kaufmaennisch (HALF_UP) auf ganze aUEC runden: Star Citizen kennt im mobiGlas keine
+      // Nachkommastellen, jeder Transfer landet als Integer beim Empfaenger. Damit der angezeigte
+      // Auszahlungsbetrag dem entspricht, was der Mission Manager tatsaechlich anweisen muss,
+      // rundet das Backend hier final auf scale 0. Die Sub-Labels (Auslagen, Ueberweisungsgebuehr)
+      // behalten ihre 2 Nachkommastellen — sie bleiben transparenter Breakdown, nicht der "Pay X"-
+      // Betrag — was geringfuegige Diskrepanzen beim Nachrechnen erlaubt, dafuer aber den Hauptwert
+      // glatt haelt.
+      BigDecimal payoutAmount = grossPayout.subtract(transferFee).setScale(0, RoundingMode.HALF_UP);
 
       OperationPayoutStatus status = statusByKey.get(key);
       boolean paidOut = status != null && status.isPaidOut();
