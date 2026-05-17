@@ -503,13 +503,13 @@
                                     </td>
                                     <td class="payout-amount-cell" sec:authorize="isAuthenticated()">
                                         <span class="payout-amount-value"
-                                              th:text="${#numbers.formatDecimal(payout.payoutAmount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                              th:text="${#numbers.formatInteger(payout.payoutAmount, 3, 'POINT')} + ' aUEC'">0 aUEC</span>
                                         <span class="payout-amount-reimbursement"
                                               th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
                                               th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
                                         <span class="payout-amount-transferfee"
                                               th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatDecimal(payout.transferFee, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Überweisungsgebühr)</span>
+                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatDecimal(payout.transferFee, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(bereits abgezogene Überweisungsgebühr: 0,00 aUEC)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
