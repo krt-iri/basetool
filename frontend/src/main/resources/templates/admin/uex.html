@@ -310,8 +310,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr th:each="term : ${cityNode.terminals}"
-                                        th:replace="~{admin/uex :: terminalRow(term=${term})}"></tr>
+                                    <th:block th:each="term : ${cityNode.terminals}">
+                                        <tr th:replace="~{fragments/admin-uex :: terminalRow(term=${term})}"></tr>
+                                    </th:block>
                                 </tbody>
                             </table>
                         </div>
@@ -371,8 +372,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr th:each="term : ${stationNode.terminals}"
-                                        th:replace="~{admin/uex :: terminalRow(term=${term})}"></tr>
+                                    <th:block th:each="term : ${stationNode.terminals}">
+                                        <tr th:replace="~{fragments/admin-uex :: terminalRow(term=${term})}"></tr>
+                                    </th:block>
                                 </tbody>
                             </table>
                         </div>
@@ -484,8 +486,9 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="term : ${system.orphanTerminals}"
-                                    th:replace="~{admin/uex :: terminalRow(term=${term})}"></tr>
+                                <th:block th:each="term : ${system.orphanTerminals}">
+                                    <tr th:replace="~{fragments/admin-uex :: terminalRow(term=${term})}"></tr>
+                                </th:block>
                             </tbody>
                         </table>
                     </div>
@@ -495,79 +498,6 @@
         </details>
     </div>
 </main>
-
-<!--
-    Re-usable terminal row fragment. Mirrors the column structure of
-    the old /admin/terminals page so admins keep the same controls
-    (LoadingDock override + AutoLoad override + Hidden toggle) on
-    every terminal regardless of where it sits in the hierarchy.
--->
-<table th:fragment="terminalRow(term)" style="display: none;">
-    <tr th:id="'terminal-' + ${term.id}" class="uex-row-terminal" th:attr="data-name=${term.name}">
-        <td th:text="${term.name}">Name</td>
-        <td th:text="${term.nickname}">Nickname</td>
-        <td>
-            <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/loading-dock(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="uex">
-                    <button type="submit" class="btn" th:classappend="${!term.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
-                </form>
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/loading-dock(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="yes">
-                    <button type="submit" class="btn" th:classappend="${term.hasLoadingDockOverridden && term.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
-                </form>
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/loading-dock(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="no">
-                    <button type="submit" class="btn" th:classappend="${term.hasLoadingDockOverridden && !term.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
-                </form>
-            </div>
-            <div class="uex-source-chip"
-                 th:classappend="${term.uexHasLoadingDock != null and term.hasLoadingDock != null and term.uexHasLoadingDock != term.hasLoadingDock} ? 'mismatch' : ''"
-                 th:title="#{admin.terminal.uexValue.tooltip}">
-                <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
-                <span th:if="${term.uexHasLoadingDock != null}"
-                      class="uex-source-chip__value"
-                      th:text="${term.uexHasLoadingDock} ? #{admin.uex.flag.btn.yes} : #{admin.uex.flag.btn.no}">--</span>
-                <span th:if="${term.uexHasLoadingDock == null}"
-                      class="uex-source-chip__value unknown"
-                      th:text="#{admin.terminal.uexValue.unknown}">--</span>
-            </div>
-        </td>
-        <td>
-            <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/auto-load(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="uex">
-                    <button type="submit" class="btn" th:classappend="${!term.isAutoLoadOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
-                </form>
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/auto-load(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="yes">
-                    <button type="submit" class="btn" th:classappend="${term.isAutoLoadOverridden && term.isAutoLoad} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
-                </form>
-                <form method="post" th:action="@{/admin/uex-data/terminals/{id}/auto-load(id=${term.id})}" style="margin: 0;">
-                    <input type="hidden" name="action" value="no">
-                    <button type="submit" class="btn" th:classappend="${term.isAutoLoadOverridden && !term.isAutoLoad} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
-                </form>
-            </div>
-            <div class="uex-source-chip"
-                 th:classappend="${term.uexIsAutoLoad != null and term.isAutoLoad != null and term.uexIsAutoLoad != term.isAutoLoad} ? 'mismatch' : ''"
-                 th:title="#{admin.terminal.uexValue.tooltip}">
-                <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
-                <span th:if="${term.uexIsAutoLoad != null}"
-                      class="uex-source-chip__value"
-                      th:text="${term.uexIsAutoLoad} ? #{admin.uex.flag.btn.yes} : #{admin.uex.flag.btn.no}">--</span>
-                <span th:if="${term.uexIsAutoLoad == null}"
-                      class="uex-source-chip__value unknown"
-                      th:text="#{admin.terminal.uexValue.unknown}">--</span>
-            </div>
-        </td>
-        <td>
-            <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" style="margin: 0;">
-                <input type="hidden" name="hidden" th:value="${!term.hidden}">
-                <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'" th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>
-            </form>
-        </td>
-    </tr>
-</table>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // sessionStorage key for the page's vertical scroll position. The override
