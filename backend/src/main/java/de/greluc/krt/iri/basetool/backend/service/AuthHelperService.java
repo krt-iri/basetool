@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -91,5 +92,35 @@ public class AuthHelperService {
    */
   public boolean isLogisticianOrAbove() {
     return hasReachableRole("ROLE_LOGISTICIAN");
+  }
+
+  /**
+   * Shortcut for {@link #hasReachableRole(String) hasReachableRole("ROLE_ADMIN")}. Returns {@code
+   * true} only for principals that carry the admin role directly - the role hierarchy never grants
+   * {@code ROLE_ADMIN} downward, so this is a clean "is admin" check.
+   */
+  public boolean isAdmin() {
+    return hasReachableRole("ROLE_ADMIN");
+  }
+
+  /**
+   * Returns the UUID of the currently authenticated user, parsed from the JWT {@code sub} claim
+   * surfaced as the {@link Authentication#getName() authentication name}. Empty when the request is
+   * unauthenticated, anonymous, or the principal name is not a UUID (defence-in-depth: a malformed
+   * subject should not crash the caller).
+   */
+  @NotNull
+  public Optional<UUID> currentUserId() {
+    return currentAuthentication()
+        .map(Authentication::getName)
+        .flatMap(AuthHelperService::tryParseUuid);
+  }
+
+  private static Optional<UUID> tryParseUuid(@NotNull String value) {
+    try {
+      return Optional.of(UUID.fromString(value));
+    } catch (IllegalArgumentException ex) {
+      return Optional.empty();
+    }
   }
 }
