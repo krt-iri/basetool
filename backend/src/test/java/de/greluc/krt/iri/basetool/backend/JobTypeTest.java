@@ -93,7 +93,7 @@ class JobTypeTest {
                 .content(objectMapper.writeValueAsString(jobType)))
         .andExpect(status().isForbidden());
 
-    assertEquals(1, jobTypeRepository.findAll().size());
+    assertEquals(0, jobTypeRepository.findAll().size());
   }
 
   @Test
@@ -138,9 +138,9 @@ class JobTypeTest {
             post("/api/v1/job-types")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_ADMIN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -170,9 +170,9 @@ class JobTypeTest {
             post("/api/v1/job-types")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_ADMIN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -222,9 +222,9 @@ class JobTypeTest {
             delete("/api/v1/job-types/" + parent.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_ADMIN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
@@ -266,9 +266,9 @@ class JobTypeTest {
             delete("/api/v1/job-types/" + jobType.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("ROLE_ADMIN"),
                             new SimpleGrantedAuthority("USER_MANAGE"),
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),

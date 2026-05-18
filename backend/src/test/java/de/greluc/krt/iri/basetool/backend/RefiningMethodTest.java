@@ -84,8 +84,7 @@ class RefiningMethodTest {
                 .content(objectMapper.writeValueAsString(method)))
         .andExpect(status().isForbidden());
 
-    assertEquals(1, refiningMethodRepository.findAll().size());
-    assertEquals("New Method", refiningMethodRepository.findAll().get(0).getName());
+    assertEquals(0, refiningMethodRepository.findAll().size());
   }
 
   @Test
@@ -153,6 +152,6 @@ class RefiningMethodTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
         .andExpect(status().isForbidden());
 
-    assertTrue(refiningMethodRepository.findById(method.getId()).isEmpty());
+    assertTrue(refiningMethodRepository.findById(method.getId()).isPresent());
   }
 }

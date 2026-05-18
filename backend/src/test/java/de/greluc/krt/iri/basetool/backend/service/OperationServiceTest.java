@@ -112,7 +112,7 @@ class OperationServiceTest {
     // Given
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
-    when(operationRepository.findAll(pageable)).thenReturn(page);
+    when(operationRepository.findAllScoped(null, pageable)).thenReturn(page);
 
     // When
     Page<Operation> result = operationService.getAllOperations(pageable);

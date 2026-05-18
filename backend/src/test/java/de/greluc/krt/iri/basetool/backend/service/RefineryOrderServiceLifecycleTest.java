@@ -198,16 +198,20 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findAll(pageable)).thenReturn(page);
+      // After Phase 3 the admin "all orders" list goes through the squadron-scoped
+      // variant; the test class has no squadron stub so currentSquadronId() returns
+      // Optional.empty() and the service forwards null as the scope.
+      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(List.of(), pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByStatusIn(any(), any());
+      verify(refineryOrderRepository, never()).findByStatusInScoped(any(), any(), any());
     }
 
     @Test
     void getAllRefineryOrders_withStatuses_callsFindByStatusIn() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findByStatusIn(List.of(RefineryOrderStatus.COMPLETED), pageable))
+      when(refineryOrderRepository.findByStatusInScoped(
+              List.of(RefineryOrderStatus.COMPLETED), null, pageable))
           .thenReturn(page);
 
       assertEquals(
@@ -220,7 +224,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_secondOverload_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findAll(pageable)).thenReturn(page);
+      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(pageable).getTotalElements());
     }

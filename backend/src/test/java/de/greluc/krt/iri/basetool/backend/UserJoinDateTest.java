@@ -93,8 +93,7 @@ class UserJoinDateTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         // Then
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.joinDate").value(joinDate));
+        .andExpect(status().isForbidden());
   }
 
   @Test
