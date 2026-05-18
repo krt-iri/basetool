@@ -17154,6 +17154,103 @@
         } ]
       }
     },
+    "/api/v1/users/{id}/squadron" : {
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "updateUserSquadron",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserSquadronRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{id}/mission-manager" : {
       "patch" : {
         "tags" : [ "user-controller" ],
@@ -27088,6 +27185,21 @@
         },
         "required" : [ "rank", "version" ]
       },
+      "SquadronReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          }
+        }
+      },
       "UserDto" : {
         "type" : "object",
         "properties" : {
@@ -27146,6 +27258,9 @@
           },
           "inKeycloak" : {
             "type" : "boolean"
+          },
+          "squadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "version" : {
             "type" : "integer",
@@ -27594,21 +27709,6 @@
           }
         },
         "required" : [ "goods", "location" ]
-      },
-      "SquadronReferenceDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "shorthand" : {
-            "type" : "string"
-          }
-        }
       },
       "UserReferenceDto" : {
         "type" : "object",
@@ -29597,6 +29697,20 @@
           }
         },
         "required" : [ "amount", "missionId", "participantId", "type" ]
+      },
+      "UpdateUserSquadronRequest" : {
+        "type" : "object",
+        "properties" : {
+          "squadronId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "SpaceStationDto" : {
         "type" : "object",

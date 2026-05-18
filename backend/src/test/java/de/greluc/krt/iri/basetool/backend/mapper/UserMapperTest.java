@@ -8,12 +8,22 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class UserMapperTest {
 
-  private final UserMapper mapper = Mappers.getMapper(UserMapper.class);
+  private UserMapper mapper;
+
+  @BeforeEach
+  void setUp() {
+    // UserMapperImpl @Autowires SquadronMapper for the new `squadron` projection — wire it
+    // manually since we are not running inside a Spring context.
+    mapper = Mappers.getMapper(UserMapper.class);
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+  }
 
   @Test
   void toDto_shouldMapBasicFieldsAndAggregates() {

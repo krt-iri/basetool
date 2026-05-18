@@ -68,6 +68,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -161,6 +162,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -253,6 +255,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -344,6 +347,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =

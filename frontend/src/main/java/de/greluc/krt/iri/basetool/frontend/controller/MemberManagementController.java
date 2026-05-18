@@ -129,6 +129,7 @@ public class MemberManagementController {
     try {
       UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
       model.addAttribute("user", user);
+      UUID currentSquadronId = user.squadron() != null ? user.squadron().id() : null;
       if (!model.containsAttribute("memberEditForm")) {
         model.addAttribute(
             "memberEditForm",
@@ -138,7 +139,8 @@ public class MemberManagementController {
                 user.displayName(),
                 user.version(),
                 source,
-                user.joinDate()));
+                user.joinDate(),
+                currentSquadronId));
       } else {
         MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
         if (form != null && form.source() == null) {
@@ -150,7 +152,8 @@ public class MemberManagementController {
                   form.displayName(),
                   form.version(),
                   source,
-                  form.joinDate()));
+                  form.joinDate(),
+                  form.squadronId()));
         }
       }
       return "member-edit";
@@ -186,10 +189,27 @@ public class MemberManagementController {
       return editMember(id, form.source(), model, redirectAttributes);
     }
     try {
+      // Persist attributes first; the backend bumps @Version on success and the response is
+      // empty, so we re-fetch the user to learn the new version before issuing the optional
+      // squadron-assignment PATCH (otherwise the second call collides with 409).
       UserAttributesUpdateDto body =
           new UserAttributesUpdateDto(
               form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
       backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
+      // The squadron assignment is a separate admin operation behind its own @PreAuthorize at
+      // the backend; route it through the dedicated PATCH endpoint with the freshly-loaded
+      // version so the optimistic-lock chain stays coherent across the two calls.
+      UserDto refreshed =
+          backendApiClient.get(
+              "/api/v1/users/" + id, de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
+      UUID existingSquadronId =
+          refreshed != null && refreshed.squadron() != null ? refreshed.squadron().id() : null;
+      if (!java.util.Objects.equals(existingSquadronId, form.squadronId())) {
+        de.greluc.krt.iri.basetool.frontend.model.dto.UserSquadronUpdateDto squadronBody =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.UserSquadronUpdateDto(
+                form.squadronId(), refreshed != null ? refreshed.version() : form.version());
+        backendApiClient.patch("/api/v1/users/" + id + "/squadron", squadronBody, Void.class);
+      }
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       if ("profile".equals(form.source())) {
         return "redirect:/profile";

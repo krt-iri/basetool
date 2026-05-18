@@ -64,6 +64,7 @@ public class UserService {
   private final MissionRepository missionRepository;
   private final JobOrderRepository jobOrderRepository;
   private final MissionParticipantRepository missionParticipantRepository;
+  private final de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
   private final AuthHelperService authHelperService;
 
   /**
@@ -568,6 +569,49 @@ public class UserService {
             .findById(userId)
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
     user.setMissionManager(isMissionManager);
+    return userRepository.save(user);
+  }
+
+  /**
+   * Assigns the user to a squadron (or clears the assignment when {@code squadronId} is {@code
+   * null}). Admin-only at the controller boundary. Carries optimistic-locking via the {@code
+   * version} parameter: the caller must echo back the version they last read so two admins editing
+   * the same row simultaneously surface as 409 instead of one silently overwriting the other.
+   *
+   * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
+   * scope ({@link SquadronScopeService} reads it to decide which staffel-scoped aggregates a
+   * non-admin sees). Until V84 tightens the column to NOT NULL, {@code null} is a valid value that
+   * means "admin / unassigned" and falls back to the cross-squadron view.
+   *
+   * @param userId user primary key; must exist
+   * @param squadronId target squadron id; {@code null} clears the assignment
+   * @param version optimistic-lock version echoed back from the last read; {@code null} bypasses
+   *     the explicit check and falls back to Hibernate's UPDATE-WHERE-VERSION
+   * @return the persisted user
+   * @throws NoSuchElementException when {@code userId} does not exist
+   * @throws NoSuchElementException when {@code squadronId} is non-null but unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException on version mismatch
+   */
+  @Transactional
+  public User updateUserSquadron(
+      UUID userId, @org.jetbrains.annotations.Nullable UUID squadronId, Long version) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(User.class, userId);
+    }
+    if (squadronId == null) {
+      user.setSquadron(null);
+    } else {
+      de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
+          squadronRepository
+              .findById(squadronId)
+              .orElseThrow(
+                  () -> new NoSuchElementException("Squadron not found with id: " + squadronId));
+      user.setSquadron(squadron);
+    }
     return userRepository.save(user);
   }
 

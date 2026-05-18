@@ -370,6 +370,7 @@ public class MissionController {
         false, // isLogistician
         false, // isMissionManager
         dto.inKeycloak(),
+        null, // squadron – not exposed to guests
         dto.version(),
         null // joinDate – not exposed to guests
         );

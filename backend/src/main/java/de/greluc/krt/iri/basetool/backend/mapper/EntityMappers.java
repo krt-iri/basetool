@@ -28,6 +28,11 @@ public final class EntityMappers {
     Set<String> roleNames = u.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
     Set<String> permissions =
         u.getRoles().stream().flatMap(r -> r.getPermissions().stream()).collect(Collectors.toSet());
+    de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto squadronRef =
+        u.getSquadron() == null
+            ? null
+            : new de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto(
+                u.getSquadron().getId(), u.getSquadron().getName(), u.getSquadron().getShorthand());
     return new UserDto(
         u.getId(),
         u.getUsername(),
@@ -44,6 +49,7 @@ public final class EntityMappers {
         u.isLogistician(),
         u.isMissionManager(),
         u.isInKeycloak(),
+        squadronRef,
         u.getVersion(),
         u.getJoinDate());
   }

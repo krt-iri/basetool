@@ -118,6 +118,7 @@ class MissionControllerLifecycleTest {
             true,
             false,
             true,
+            null,
             1L,
             java.time.LocalDate.of(2024, 1, 1));
     MissionParticipantDto participant =

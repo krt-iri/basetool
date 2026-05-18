@@ -76,6 +76,7 @@ class InventoryLogisticianSyncTest {
             true,
             false,
             true,
+            null,
             1L,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
@@ -121,6 +122,7 @@ class InventoryLogisticianSyncTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
@@ -166,6 +168,7 @@ class InventoryLogisticianSyncTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);

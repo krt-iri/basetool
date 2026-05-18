@@ -110,6 +110,7 @@ class PromotionPageControllerTest {
         null,
         null,
         null,
+        null,
         0L,
         null);
   }

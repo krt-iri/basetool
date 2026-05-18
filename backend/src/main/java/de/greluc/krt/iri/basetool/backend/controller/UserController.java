@@ -211,6 +211,36 @@ public class UserController {
   }
 
   /**
+   * Assigns the user to a squadron, or clears the assignment when {@code request.squadronId} is
+   * {@code null}. Admin-only. Optimistic-locking via the {@code version} field of the body — two
+   * admins editing the same user row simultaneously surface as 409 instead of one silently winning.
+   *
+   * @param id user primary key
+   * @param request typed body carrying the target squadron id (nullable to clear) and the expected
+   *     {@code @Version}
+   * @return the persisted DTO
+   */
+  @PatchMapping("/{id}/squadron")
+  @PreAuthorize("hasRole('ADMIN')")
+  public UserDto updateUserSquadron(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid UpdateUserSquadronRequest request) {
+    return userMapper.toDto(
+        userService.updateUserSquadron(id, request.squadronId(), request.version()));
+  }
+
+  /**
+   * Body for {@link #updateUserSquadron}: the squadron the user should belong to (or {@code null}
+   * to clear), plus the optimistic-lock version echoed back from the last read.
+   *
+   * @param squadronId target squadron id, or {@code null} to unassign
+   * @param version the {@code @Version} of the user row the admin last fetched
+   */
+  public record UpdateUserSquadronRequest(
+      @org.jetbrains.annotations.Nullable UUID squadronId,
+      @jakarta.validation.constraints.NotNull Long version) {}
+
+  /**
    * ADMIN-only: deletes a user account along with all owned data (ships, inventory, refinery
    * orders, mission memberships).
    *

@@ -34,6 +34,8 @@ class JobOrderMapperTest {
     mapper = Mappers.getMapper(JobOrderMapper.class);
 
     var userMapper = Mappers.getMapper(UserMapper.class);
+    ReflectionTestUtils.setField(
+        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
     var materialMapper = Mappers.getMapper(MaterialMapper.class);
     var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);

@@ -22,5 +22,6 @@ public record UserDto(
     Boolean isLogistician,
     Boolean isMissionManager,
     Boolean inKeycloak,
+    @Nullable SquadronReferenceDto squadron,
     Long version,
     @Nullable LocalDate joinDate) {}

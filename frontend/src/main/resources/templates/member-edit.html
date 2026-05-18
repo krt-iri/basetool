@@ -102,6 +102,21 @@
                        style="min-height:44px;" />
             </div>
 
+            <!-- Squadron assignment (admin-only, since /members/{id}/edit is admin-only).
+                 SquadronContextAdvice injects `availableSquadrons` on every request. -->
+            <div class="form-group" sec:authorize="hasRole('ADMIN')">
+                <label for="member-edit-squadron" th:text="#{members.field.squadron}">Staffel</label>
+                <select id="member-edit-squadron" name="squadronId" style="min-height:44px;">
+                    <option value=""
+                            th:selected="${memberEditForm.squadronId == null}"
+                            th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                    <option th:each="sq : ${availableSquadrons}"
+                            th:value="${sq.id()}"
+                            th:selected="${memberEditForm.squadronId != null and memberEditForm.squadronId == sq.id()}"
+                            th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                </select>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
                 <a th:href="@{/members}" class="btn btn-secondary" th:text="#{profile.back}">Zurück</a>

@@ -26,7 +26,10 @@ class ShipMapperTest {
     // ShipMapperImpl @Autowires UserMapper for owner mapping — wire it
     // manually since we are running without a Spring context.
     mapper = Mappers.getMapper(ShipMapper.class);
-    ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
+    UserMapper userMapper = Mappers.getMapper(UserMapper.class);
+    ReflectionTestUtils.setField(
+        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }
 
