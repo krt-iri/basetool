@@ -58,37 +58,47 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * always applied (pass the full enum set to disable status filtering). Result is sorted by
    * planned start ascending; the {@code @EntityGraph} pre-loads participants and assigned units to
    * avoid N+1 when the caller renders the result list.
+   *
+   * <p>Multi-tenant access control: {@code scopeSquadronId} gates which missions the caller may
+   * see. When {@code null}, no scope restriction applies (admin "all squadrons" mode). When
+   * non-null, the result is restricted to missions owned by that squadron PLUS any
+   * non-internal mission of any other squadron (MULTI_SQUADRON_PLAN.md section 1: non-internal
+   * missions are visible cross-staffel).
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%')) AND (CAST(:start AS timestamp) IS NULL OR"
-          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
-          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
-          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
-          + " = :operationId) ORDER BY m.plannedStartTime ASC")
+      "SELECT m FROM Mission m WHERE (:scopeSquadronId IS NULL OR m.owningSquadron.id ="
+          + " :scopeSquadronId OR m.isInternal = false) AND (CAST(:query AS string) IS NULL OR"
+          + " m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS"
+          + " string) ILIKE CONCAT('%', CAST(:query AS string), '%')) AND (CAST(:start AS"
+          + " timestamp) IS NULL OR m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS"
+          + " NULL OR m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS"
+          + " NULL OR m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR"
+          + " m.operation.id = :operationId) ORDER BY m.plannedStartTime ASC")
   List<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
       @Param("end") Instant end,
       @Param("status") List<String> status,
       @Param("isInternal") Boolean isInternal,
-      @Param("operationId") UUID operationId);
+      @Param("operationId") UUID operationId,
+      @Param("scopeSquadronId") UUID scopeSquadronId);
 
   /**
-   * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID)} - same
-   * filter contract; sorting is delegated to {@link Pageable} so the caller can pick the column.
+   * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID, UUID)} -
+   * same filter contract; sorting is delegated to {@link Pageable} so the caller can pick the
+   * column.
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%')) AND (CAST(:start AS timestamp) IS NULL OR"
-          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
-          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
-          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
-          + " = :operationId)")
+      "SELECT m FROM Mission m WHERE (:scopeSquadronId IS NULL OR m.owningSquadron.id ="
+          + " :scopeSquadronId OR m.isInternal = false) AND (CAST(:query AS string) IS NULL OR"
+          + " m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS"
+          + " string) ILIKE CONCAT('%', CAST(:query AS string), '%')) AND (CAST(:start AS"
+          + " timestamp) IS NULL OR m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS"
+          + " NULL OR m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS"
+          + " NULL OR m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR"
+          + " m.operation.id = :operationId)")
   Page<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
@@ -96,6 +106,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("status") List<String> status,
       @Param("isInternal") Boolean isInternal,
       @Param("operationId") UUID operationId,
+      @Param("scopeSquadronId") UUID scopeSquadronId,
       Pageable pageable);
 
   @Override

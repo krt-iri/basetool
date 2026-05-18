@@ -84,6 +84,7 @@ public class InventoryItemService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -92,8 +93,9 @@ public class InventoryItemService {
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
-        .getAggregatedInventory(pageable)
+        .getAggregatedInventory(owningSquadronId, pageable)
         .map(
             obj ->
                 new AggregatedInventoryDto(
@@ -239,6 +241,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     List<InventoryItemDto> items =
         inventoryItemRepository
             .findGlobalByFilters(
@@ -249,6 +252,7 @@ public class InventoryItemService {
                 hasJobOrders ? jobOrderIds : null,
                 hasMissions,
                 hasMissions ? missionIds : null,
+                owningSquadronId,
                 Pageable.unpaged())
             .getContent()
             .stream()
@@ -341,6 +345,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
         .findGlobalByFilters(
             hasMaterials,
@@ -350,6 +355,7 @@ public class InventoryItemService {
             hasJobOrders ? jobOrderIds : null,
             hasMissions,
             hasMissions ? missionIds : null,
+            owningSquadronId,
             pageable)
         .map(inventoryItemMapper::toDto);
   }

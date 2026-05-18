@@ -123,8 +123,9 @@ public class MissionService {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
+    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return missionRepository.searchMissions(
-        query, start, end, status, isInternal, operationId, pageable);
+        query, start, end, status, isInternal, operationId, scopeSquadronId, pageable);
   }
 
   /**

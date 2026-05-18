@@ -113,7 +113,8 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    return operationRepository.findAll(pageable);
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return operationRepository.findAllScoped(owningSquadronId, pageable);
   }
 
   /**

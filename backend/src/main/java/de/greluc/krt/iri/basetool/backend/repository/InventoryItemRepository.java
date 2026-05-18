@@ -52,14 +52,21 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * boolean / nullable flag so callers can omit dimensions without building a dynamic query: {@code
    * hasMaterials}, {@code hasJobOrders} and {@code hasMissions} turn the corresponding {@code IN
    * :ids} clause on or off; a {@code null minQuality} skips the quality floor.
+   *
+   * <p>Multi-tenant: this method is the <em>Lager-View</em> entry point (MULTI_SQUADRON_PLAN.md
+   * section 4.4). {@code owningSquadronId} restricts to the caller's squadron stock; {@code null}
+   * means admin "all squadrons" mode. Items owned by another squadron NEVER surface here, even if
+   * they are linked to a job order - the Job-Order-Kontext is a separate, intentionally ungated
+   * lookup path served by {@link #findByJobOrderIdOrdered(UUID)}.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.personal = false AND (:hasMaterials = false OR"
-          + " i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)"
-          + " AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN"
-          + " :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id"
-          + " IN :missionIds))")
+      "SELECT i FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
+          + " i.owningSquadron.id = :owningSquadronId) AND (:hasMaterials = false OR i.material.id"
+          + " IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality) AND"
+          + " (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds))"
+          + " AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN"
+          + " :missionIds))")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -68,6 +75,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("hasMissions") boolean hasMissions,
       @Param("missionIds") List<UUID> missionIds,
+      @Param("owningSquadronId") UUID owningSquadronId,
       Pageable pageable);
 
   /**
@@ -98,12 +106,17 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * mean quality (so 10 units at quality 800 plus 5 units at quality 600 land at {@code (10*800 +
    * 5*600) / 15}). Used by the global "aggregated inventory" view; returns raw {@code Object[]}
    * tuples - the service layer projects them into {@code AggregatedInventoryDto}.
+   *
+   * <p>Multi-tenant: {@code owningSquadronId} restricts to the caller's squadron stock. {@code
+   * null} means admin "all squadrons" mode (aggregated across the whole org).
    */
   @Query(
       "SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS"
           + " double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount"
-          + " FROM InventoryItem i WHERE i.personal = false GROUP BY i.material")
-  Page<Object[]> getAggregatedInventory(Pageable pageable);
+          + " FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
+          + " i.owningSquadron.id = :owningSquadronId) GROUP BY i.material")
+  Page<Object[]> getAggregatedInventory(
+      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code JobOrderIdAndMaterialId}. Eagerly
