@@ -72,7 +72,7 @@ class JobTypeTest {
   }
 
   @Test
-  void testCreateJobType_Officer_Allowed() throws Exception {
+  void testCreateJobType_Officer_Forbidden() throws Exception {
     JobTypeDto jobType =
         new JobTypeDto(
             null, "Pilot", "Flies the ship", JobTypeArchetype.CREW, null, true, false, null);
@@ -91,7 +91,7 @@ class JobTypeTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     assertEquals(1, jobTypeRepository.findAll().size());
   }

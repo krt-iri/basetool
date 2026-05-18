@@ -102,7 +102,7 @@ class FeatureExpansionTest {
   }
 
   @Test
-  void testLocationCrud_Officer_Allowed() throws Exception {
+  void testLocationCrud_Officer_Forbidden() throws Exception {
     StarSystem terraSys = new StarSystem();
     terraSys.setName("Terra System");
     terraSys = starSystemRepository.save(terraSys);
@@ -120,7 +120,7 @@ class FeatureExpansionTest {
                             .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(location)))
-            .andExpect(status().isOk())
+            .andExpect(status().isForbidden())
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -139,7 +139,7 @@ class FeatureExpansionTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(saved)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     Location updated = locationRepository.findById(saved.getId()).orElseThrow();
     assertEquals("Terra Prime", updated.getName());
@@ -152,7 +152,7 @@ class FeatureExpansionTest {
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     assertTrue(locationRepository.findById(saved.getId()).isEmpty());
   }

@@ -63,7 +63,7 @@ class RefiningMethodTest {
   }
 
   @Test
-  void testCreateRefiningMethod_Officer_Allowed() throws Exception {
+  void testCreateRefiningMethod_Officer_Forbidden() throws Exception {
     RefiningMethod method = new RefiningMethod();
     method.setName("New Method");
     method.setDescription("Best method");
@@ -82,7 +82,7 @@ class RefiningMethodTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(method)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     assertEquals(1, refiningMethodRepository.findAll().size());
     assertEquals("New Method", refiningMethodRepository.findAll().get(0).getName());
@@ -106,7 +106,7 @@ class RefiningMethodTest {
   }
 
   @Test
-  void testUpdateRefiningMethod_Officer_Allowed() throws Exception {
+  void testUpdateRefiningMethod_Officer_Forbidden() throws Exception {
     RefiningMethod method = new RefiningMethod();
     method.setName("Old Name");
     method = refiningMethodRepository.save(method);
@@ -127,14 +127,14 @@ class RefiningMethodTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(method)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     RefiningMethod loaded = refiningMethodRepository.findById(method.getId()).orElseThrow();
     assertEquals("New Name", loaded.getName());
   }
 
   @Test
-  void testDeleteRefiningMethod_Officer_Allowed() throws Exception {
+  void testDeleteRefiningMethod_Officer_Forbidden() throws Exception {
     RefiningMethod method = new RefiningMethod();
     method.setName("To Delete");
     method = refiningMethodRepository.save(method);
@@ -151,7 +151,7 @@ class RefiningMethodTest {
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     assertTrue(refiningMethodRepository.findById(method.getId()).isEmpty());
   }

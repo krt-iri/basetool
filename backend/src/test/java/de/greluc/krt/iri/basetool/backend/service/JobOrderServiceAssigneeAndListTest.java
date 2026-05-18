@@ -21,6 +21,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +54,8 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
+  @Mock private SquadronRepository squadronRepository;
+  @Mock private SquadronScopeService squadronScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
 

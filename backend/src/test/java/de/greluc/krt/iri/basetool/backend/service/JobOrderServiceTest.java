@@ -11,6 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
@@ -23,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +46,12 @@ class JobOrderServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
 
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.UserRepository userRepository;
+
+  @Mock private SquadronRepository squadronRepository;
+
+  @Mock private SquadronScopeService squadronScopeService;
+
   @Mock private JobOrderMapper jobOrderMapper;
 
   @Mock private de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
@@ -61,6 +69,26 @@ class JobOrderServiceTest {
   void setUp() {
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
+
+    // Multi-tenant: every create/update path resolves the caller's current squadron via the
+    // scope service plus an optional repository lookup by shorthand. Stub lenient defaults so
+    // the existing fixtures still see the squadron string they wrote ("Alpha" / "Beta" / ...)
+    // round-tripped through requestingSquadron.shorthand back into the legacy `squadron`
+    // column. Read-path tests do not call these methods and are unaffected (lenient suppresses
+    // UnnecessaryStubbingException).
+    Squadron currentSquadron = new Squadron();
+    currentSquadron.setShorthand("Alpha");
+    org.mockito.Mockito.lenient()
+        .when(squadronScopeService.currentSquadron())
+        .thenReturn(java.util.Optional.of(currentSquadron));
+    org.mockito.Mockito.lenient()
+        .when(squadronRepository.findByShorthand(org.mockito.ArgumentMatchers.anyString()))
+        .thenAnswer(
+            inv -> {
+              Squadron s = new Squadron();
+              s.setShorthand(inv.getArgument(0));
+              return java.util.Optional.of(s);
+            });
 
     material = new Material();
     material.setId(materialId);

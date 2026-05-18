@@ -60,6 +60,7 @@ class OperationServiceTest {
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
   @Mock private SystemSettingService systemSettingService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private OperationService operationService;
 

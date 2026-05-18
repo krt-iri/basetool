@@ -97,7 +97,7 @@ class MaterialTest {
   }
 
   @Test
-  void testCreateMaterial_Officer_Allowed() throws Exception {
+  void testCreateMaterial_Officer_Forbidden() throws Exception {
     Material material = new Material();
     material.setName("Illegal Material");
     material.setType(MaterialType.REFINED);
@@ -111,7 +111,7 @@ class MaterialTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(material)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
   }
 
   @Test
