@@ -539,9 +539,17 @@ class ArchitectureTest {
    */
   @Test
   void staffelScopedServicesMustWireSquadronOrAuthHelper() {
-    // JobOrderHandoverService is intentionally NOT in the list yet: it would need an
-    // AuthHelperService dep to stamp the audit trail, but the audit-write itself is a Phase 6
-    // follow-up. Add it once that lands so the rule keeps the cross-staffel write path honest.
+    // JobOrderHandoverService is intentionally NOT in the whitelist yet. The cross-squadron
+    // item-belongs-to-order guard already lives in createHandover() (lines 116-119) and is
+    // exercised by JobOrderHandoverServiceTest.createHandover_shouldThrowException_whenItemDoesNot
+    // BelongToOrder + ...whenJobOrderIsNullOnInventoryItem, so the multi-tenant safety net is in
+    // place. The remaining piece — stamping the executing user + their squadron onto the handover
+    // record as a real audit trail — needs a column-add migration and a DTO/mapper/frontend mirror
+    // pass. That work is grouped with the V84-V86 NOT-NULL tightening + legacy-VARCHAR-drop chain
+    // (see MULTI_SQUADRON_PLAN.md section 7) and intentionally lands in the next release
+    // iteration per the two-phase rule in db/migration/README.md. Once the audit columns exist and
+    // JobOrderHandoverService injects AuthHelperService to fill them, add the service here so the
+    // ArchUnit rule keeps the cross-staffel write path honest.
     Set<String> staffelScopedServiceNames =
         Set.of(
             "MissionService",
