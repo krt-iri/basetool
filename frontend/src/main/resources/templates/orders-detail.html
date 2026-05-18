@@ -53,8 +53,20 @@
                 <span th:text="${order.priority != null ? order.priority : '-'}"></span>
             </div>
             <div>
-                <strong th:text="#{orders.detail.squadron}">Staffel</strong><br>
-                <span th:text="${order.squadron}"></span>
+                <strong th:text="#{orders.detail.squadron}">Auftraggeber-Staffel</strong><br>
+                <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
+                      th:title="${order.requestingSquadron.name()}"
+                      th:text="${order.requestingSquadron.shorthand()}">IRI</span>
+                <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted"
+                      th:text="${order.squadron != null ? order.squadron : '—'}">—</span>
+            </div>
+            <div>
+                <strong th:text="#{orders.detail.creating_squadron}">Erstellt durch</strong><br>
+                <span th:if="${order.creatingSquadron != null}"
+                      th:class="${order.requestingSquadron != null and order.creatingSquadron.id() == order.requestingSquadron.id()} ? 'squadron-badge squadron-badge-muted' : 'squadron-badge squadron-badge-foreign'"
+                      th:title="${order.creatingSquadron.name()}"
+                      th:text="${order.creatingSquadron.shorthand()}">IRI</span>
+                <span th:if="${order.creatingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
             </div>
             <div>
                 <strong th:text="#{orders.detail.handle}">Handle</strong><br>

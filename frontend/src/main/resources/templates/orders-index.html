@@ -73,6 +73,7 @@
                 <th th:text="#{orders.index.prio}" style="white-space: nowrap;">Prio</th>
                 <th th:text="#{orders.index.status}" style="white-space: nowrap;">Status</th>
                 <th th:text="#{orders.index.squadron}" style="white-space: nowrap;">Staffel</th>
+                <th th:text="#{orders.index.creating_squadron}" style="white-space: nowrap;">Erstellt durch</th>
                 <th th:text="#{orders.index.handle}" style="white-space: nowrap;">Handle</th>
                 <th th:text="#{orders.index.materials}">Materialien</th>
                 <th th:text="#{orders.index.actions}" style="white-space: nowrap;">Aktionen</th>
@@ -93,7 +94,20 @@
                 <td style="white-space: nowrap;">
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
                 </td>
-                <td th:text="${order.squadron}" style="white-space: nowrap;"></td>
+                <td style="white-space: nowrap;">
+                    <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
+                          th:title="${order.requestingSquadron.name()}"
+                          th:text="${order.requestingSquadron.shorthand()}">IRI</span>
+                    <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted"
+                          th:text="${order.squadron != null ? order.squadron : '—'}">—</span>
+                </td>
+                <td style="white-space: nowrap;">
+                    <span th:if="${order.creatingSquadron != null}"
+                          th:class="${order.requestingSquadron != null and order.creatingSquadron.id() == order.requestingSquadron.id()} ? 'squadron-badge squadron-badge-muted' : 'squadron-badge squadron-badge-foreign'"
+                          th:title="${order.creatingSquadron.name()}"
+                          th:text="${order.creatingSquadron.shorthand()}">IRI</span>
+                    <span th:if="${order.creatingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
+                </td>
                 <td th:text="${order.handle}" style="white-space: nowrap;"></td>
                 <td style="padding: 0;">
                     <div class="table-responsive">
@@ -133,7 +147,7 @@
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td colspan="7" style="text-align: center;" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
+                <td colspan="8" style="text-align: center;" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>

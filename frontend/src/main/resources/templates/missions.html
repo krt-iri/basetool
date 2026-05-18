@@ -78,6 +78,7 @@
                         <th th:text="#{mission.name}">Name</th>
                         <th th:text="#{mission.status}">Status</th>
                         <th th:text="#{mission.planned_start}">Planned Start</th>
+                        <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
                         <th th:text="#{general.action}">Aktion</th>
                     </tr>
                 </thead>
@@ -86,6 +87,12 @@
                         <td th:text="${m.name}">Name</td>
                         <td th:text="${m.status}">Status</td>
                         <td class="utc-time" th:text="${m.plannedStartTime}">Start</td>
+                        <td th:if="${isAllSquadronsMode}">
+                            <span th:if="${m.owningSquadron != null}" class="squadron-badge"
+                                  th:title="${m.owningSquadron.name()}"
+                                  th:text="${m.owningSquadron.shorthand()}">IRI</span>
+                            <span th:if="${m.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        </td>
                         <td>
                             <a th:href="@{/missions/{id}(id=${m.id})}" class="btn" th:text="#{general.open}">Open</a>
                         </td>

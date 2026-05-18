@@ -170,6 +170,7 @@
                         <th th:text="#{hangar.ship.location}">Ort</th>
                         <th th:text="#{hangar.ship.fitted}">Fitted</th>
                         <th th:text="#{hangar.ship.name}">Name</th>
+                        <th th:if="${isAllSquadronsMode}" th:text="#{hangar.ship.owning_squadron}">Staffel</th>
                         <th th:text="#{hangar.ship.action}">Aktion</th>
                     </tr>
                 </thead>
@@ -191,8 +192,14 @@
                         <td th:text="${ship.location != null ? ship.location.name : ''}">Ort</td>
                         <td th:text="${ship.fitted ? #messages.msg('hangar.ship.yes') : #messages.msg('hangar.ship.no')}">Nein</td>
                         <td th:text="${ship.name}">Name</td>
+                        <td th:if="${isAllSquadronsMode}">
+                            <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
+                                  th:title="${ship.owningSquadron.name()}"
+                                  th:text="${ship.owningSquadron.shorthand()}">IRI</span>
+                            <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        </td>
                         <td class="flex-gap-xs">
-                            <button class="btn edit-ship-btn" 
+                            <button class="btn edit-ship-btn"
                                     th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
                                     th:data-id="${ship.id}" 
                                     th:data-name="${ship.name}" 
@@ -205,7 +212,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(myShips)}">
-                        <td colspan="7" style="text-align: center;" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
+                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" style="text-align: center;" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
                     </tr>
                 </tbody>
             </table>
