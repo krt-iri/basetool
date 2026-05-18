@@ -5,20 +5,23 @@
 
 ---
 
-## Branch state at handover (2026-05-18, third session)
+## Branch state at handover (2026-05-18, fourth session)
 
 Branch `MULTI_SQUADRON` carries the multi-tenant rollout described in
-[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md). After the third
-session there are 19 signed commits. **The frontend UI is now live**
-(squadron-context chip, admin switcher dropdown, owning-squadron
-columns on the four list pages, dual squadron badges on the Job Order
-detail + index). What remains is the deferred V84–V86 migration chain
-and a few polish items (cross-squadron foreign-link marker on
-inventory rows, responsive verification on the four device classes).
+[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md). After the fourth
+session there are 20 signed commits. **Phase 5 is now closed** apart
+from two filter toggles that need a one-line backend-filter param each
+(see Suggested order of attack below). What remains in scope of this
+release: backend filter parameters for the "Nur eigene Staffel" toggle
+on `missions.html` and `orders-index.html`. The V84–V86 migration
+chain is intentionally deferred to the next release per the two-phase
+drop rule.
 
 Most recent commits (newest first):
 
 ```
+b247405 G  feat(multi-tenant): finish Phase 5 — inventory + JobOrder squadron details
+7ae9e8e G  docs(multi-tenant): update follow-up prompt for third-session handover state
 1e35484 G  feat(multi-tenant): frontend squadron UI — chip, switcher, columns, dual badges
 6084914 G  docs(multi-tenant): update follow-up prompt to second-session handover state
 6842f71 G  test(multi-tenant): SquadronScopeService unit-test matrix
@@ -68,7 +71,7 @@ Checkstyle and SpotBugs are clean on both modules.
 
 | Block | Status | What's left |
 | :--- | :--- | :--- |
-| **Frontend UI** (Phase 5) | ⚠️ | **Mostly done in `1e35484`.** Live: persistent squadron-context chip top-right for every authenticated user; admin-only sidebar switcher dropdown wired through `MeFrontendController` (auto-submits on change, `<noscript>` fallback); owning-squadron column on missions / hangar / refinery-orders gated on `isAllSquadronsMode`; dual squadron badges (Auftraggeber + Erstellt durch) on `orders-detail.html` + `orders-index.html` with the second badge muted when the two squadrons match, brand-yellow `squadron-badge-foreign` when they differ; `SquadronContextAdvice` injects `activeSquadronId` / `activeSquadron` / `availableSquadrons` / `isAllSquadronsMode` / `currentRequestUri` model attributes on every page; CSS in `styles.css` covers the chip, switcher (44 px touch target), badge variants, and an `inventory-row-foreign-jobOrder` marker class. **Still open:** (a) actually wire `inventory-row-foreign-jobOrder` to the inventory-admin nested per-item table — needs to expand `InventoryItemDto` with the linked job-order's squadron (or service-layer JOIN) since the current DTO only carries `jobOrderId` / `jobOrderDisplayId`; (b) responsive verification on smartphone / tablet / desktop / ultra-wide breakpoints (needs a browser session); (c) optional `app.title` generic-with-suffix — the context chip mostly supersedes this; revisit if user feedback asks for it. |
+| **Frontend UI** (Phase 5) | ⚠️ | **Mostly done in `1e35484` + `b247405`.** Live: persistent squadron-context chip top-right for every authenticated user; admin-only sidebar switcher dropdown wired through `MeFrontendController` (auto-submits on change, `<noscript>` fallback); owning-squadron column on `missions.html` / `hangar.html` / `refinery-orders-index.html` / `inventory-admin.html` (nested table) gated on `isAllSquadronsMode`; "all-squadrons aggregation" notice on `inventory-index.html` + `hangar-squadron.html` for the per-material / per-ship-type aggregations that can't carry a per-row column; dual squadron badges (Auftraggeber + Erstellt durch) on `orders-detail.html` + `orders-index.html` with the second badge muted when the two squadrons match, brand-yellow `squadron-badge-foreign` when they differ; the JobOrder edit modal shows the immutable `creatingSquadron` as a read-only chip next to the editable `requestingSquadron` dropdown; the AJAX per-material inventory table in `orders-detail.html` renders each item's owning squadron and applies the `inventory-row-foreign-jobOrder` border marker when the item's squadron differs from the order's requesting squadron; `SquadronContextAdvice` injects `activeSquadronId` / `activeSquadron` / `availableSquadrons` / `isAllSquadronsMode` / `currentRequestUri` model attributes on every page; CSS in `styles.css` covers the chip, switcher (44 px touch target), badge variants and the foreign-row marker. **Still open:** (a) "Nur eigene Staffel" filter toggle on `missions.html` — needs a one-line `ownSquadronOnly` param on `MissionRepository.searchMissions` that overrides the default `is_internal = false` escape clause; (b) "Nur eigene Staffel" filter toggle on `orders-index.html` — needs a `squadronFilter=own\|all` param on the orders list endpoint that matches `creating OR requesting = userSquadron`; (c) responsive verification on smartphone / tablet / desktop / ultra-wide breakpoints (needs a browser session); (d) optional `app.title` generic-with-suffix — the context chip already serves this purpose, revisit if user feedback asks for it. |
 | **Frontend DTO mirror records** (Phase 3 follow-up) | ✅ | Done in `0bc7b4c`. `SquadronReferenceDto` (id + name + shorthand) exists on both sides; `MissionListDto`, `JobOrderDto`, `InventoryItemDto`, `RefineryOrderDto`, `OperationDto`, `ShipDto` expose the owning/creating/requesting squadron via this mini-record; MapStruct wires it through `SquadronMapper.toReferenceDto` plus the `uses` chain on the six affected mappers. `openapi.json` regenerated. |
 | **JobOrderHandover cross-squadron guard** (Phase 3 follow-up) | ⚠️ | The InventoryItem-belongs-to-order guard already lives in `JobOrderHandoverService.createHandover` at lines 116-119 and is exercised by `JobOrderHandoverServiceTest.createHandover_shouldThrowException_whenItemDoesNotBelongToOrder` + `…whenJobOrderIsNullOnInventoryItem`. The remaining piece — stamping the executing user + squadron on the handover row as a real audit trail — is **deferred to the V84-V86 follow-up release** because it needs a column-add migration and a DTO/mapper/frontend mirror pass. `JobOrderHandoverService` is intentionally NOT in the `ArchitectureTest` staffel-scoped whitelist yet for the same reason; the comment at lines 542-554 documents the prerequisite. See `b089d0c`. |
 | **Test-fixture cleanup (15 failures)** | ✅ | Done in `4b190cc`. `./gradlew :backend:test :frontend:test` is fully green again. |
@@ -95,33 +98,36 @@ Checkstyle and SpotBugs are clean on both modules.
 
 ### Suggested order of attack (for the next session)
 
-1. **Phase 5 polish** (small remaining items now that the bulk is in):
-   1. **Foreign-squadron marker** on inventory-admin nested per-item
-      rows. CSS class `inventory-row-foreign-jobOrder` exists in
-      `styles.css`. Apply it via `th:classappend` on each `<tr>` in
-      `inventory-admin.html` when the item's owning squadron differs
-      from its linked job order's squadron. Needs `InventoryItemDto`
-      to expose the linked job-order's squadron — add it to the
-      backend DTO (with the frontend mirror in the same commit per
-      the [[feedback_backend_frontend_dto_mirror]] rule) and populate
-      via the InventoryItemMapper (or service-layer JOIN).
-   2. **"Nur eigene Staffel" filter** on the Job Order list page. The
-      backend filter already exists via `SquadronScopeService`; the
-      UI control is the missing piece. Add a toggle to the existing
-      filter bar in `orders-index.html`.
-   3. **Responsive verification** on smartphone (≤768 px), tablet
-      (768–1024 px), desktop (1024–1600 px), ultra-wide (1600 px+).
-      The chip already hides its label on mobile; verify nothing
-      else breaks at the four breakpoints with the new column.
-   4. (Optional) Generic `app.title` with an active-squadron suffix —
-      the context chip already serves this purpose, so this is
-      lower-priority. Revisit after user feedback.
-2. **Cross-squadron repository / integration tests** —
+1. **Two filter toggles** — the only remaining Plan §5.3 bullets that
+   need backend support:
+   1. **`missions.html` "Nur eigene Staffel"** — add a
+      `ownSquadronOnly` (boolean, default false) parameter on
+      `MissionService.searchMissions` and forward through
+      `MissionRepository.searchMissions`. When true, drop the
+      `OR is_internal = false` escape clause so the result narrows to
+      strictly own-squadron missions. Frontend: add a checkbox to the
+      existing filter form in `missions.html` (next to
+      `showPast`), persisted in a 30-day cookie like the existing
+      orders status filter.
+   2. **`orders-index.html` "Nur eigene Staffel"** — add a
+      `squadronFilter=own|all` query parameter on the `/api/v1/orders`
+      list endpoint. The backend resolves the caller's home squadron
+      (`SquadronScopeService.currentSquadronId()`) and filters
+      `WHERE creating_squadron_id = :sq OR requesting_squadron_id = :sq`.
+      Frontend: add a toggle to the existing filter form, default
+      `own` for non-admins and `all` for admins (mirrors the chip's
+      "All squadrons" semantics).
+2. **Responsive verification** on smartphone (≤768 px), tablet
+   (768–1024 px), desktop (1024–1600 px), ultra-wide (1600 px+) —
+   needs a browser session. The chip already hides its label on
+   mobile; verify nothing else breaks at the four breakpoints with
+   the new columns + dual badges.
+3. **Cross-squadron repository / integration tests** —
    `MissionRepository` `is_internal` cross-staffel positive case,
    JobOrder cross-staffel read + edit positive cases. Use the existing
    Postgres test profile, not H2; `@SpringBootTest` + `@Transactional`
    gives the cleanest fixture isolation.
-3. **PR open with the full branch.** Do NOT include the `V84`–`V86`
+4. **PR open with the full branch.** Do NOT include the `V84`–`V86`
    migrations yet.
 
 The follow-on V84–V86 migration train should bundle the NOT-NULL
