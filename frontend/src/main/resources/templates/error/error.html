@@ -8,6 +8,11 @@
             text-align: center;
             border: 2px solid var(--color-dept-combat);
             box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
+            background: rgba(20, 20, 20, 0.6);
+            padding: 2.5rem 2rem;
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
         }
         .error-code {
             font-family: var(--font-headline);
@@ -42,10 +47,29 @@
             background-color: #D41A25;
             box-shadow: 0 0 10px #D41A25;
         }
+        .btn-signin {
+            background-color: var(--color-primary);
+            color: var(--color-bg-black);
+            margin-right: 0.75rem;
+        }
+        .btn-signin:hover {
+            background-color: var(--color-accent-light);
+            box-shadow: 0 0 10px var(--color-accent-light);
+        }
+        .error-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem;
+        }
         /* Make sure main takes full screen if no sidebar */
         main {
             margin-left: 0 !important;
             padding-top: 80px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     </style>
     </th:block>
@@ -72,7 +96,10 @@
             Critical system failure detected. Technical personnel notified.
         </p>
         
-        <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>
+        <div class="error-actions">
+            <a th:if="${unauthenticated}" th:href="@{/oauth2/authorization/keycloak}" class="btn-return btn-signin" th:text="#{error.signin}">Sign in</a>
+            <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>
+        </div>
     </div>
 </main>
 <script th:attr="nonce=${cspNonce}">
