@@ -1,9 +1,5 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
-import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
-import de.greluc.krt.iri.basetool.backend.model.Mission;
-import de.greluc.krt.iri.basetool.backend.model.Operation;
-import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -132,11 +128,11 @@ public class SquadronScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may read mission {@code missionId}. Combines the
-   * generic {@link #canSeeSquadron(UUID)} check with Mission's cross-staffel-visibility rule
+   * {@code true} iff the current principal may read mission {@code missionId}. Combines the generic
+   * {@link #canSeeSquadron(UUID)} check with Mission's cross-staffel-visibility rule
    * (MULTI_SQUADRON_PLAN.md section 1): non-internal missions are visible from any squadron,
-   * internal missions only from the owning squadron and admins. Non-existent ids return
-   * {@code false}.
+   * internal missions only from the owning squadron and admins. Non-existent ids return {@code
+   * false}.
    *
    * @param missionId mission to inspect; never {@code null}.
    */
@@ -158,17 +154,16 @@ public class SquadronScopeService {
 
   /**
    * {@code true} iff the current principal may edit mission {@code missionId}. Strict
-   * owning-squadron check - {@link #canSeeMission(UUID)}'s public-mission escape clause does
-   * NOT apply to write operations (MULTI_SQUADRON_PLAN.md section 1: editing/finalising is the
-   * owning squadron's prerogative). Non-existent ids return {@code false}.
+   * owning-squadron check - {@link #canSeeMission(UUID)}'s public-mission escape clause does NOT
+   * apply to write operations (MULTI_SQUADRON_PLAN.md section 1: editing/finalising is the owning
+   * squadron's prerogative). Non-existent ids return {@code false}.
    *
    * @param missionId mission to inspect; never {@code null}.
    */
   public boolean canEditMission(@NotNull UUID missionId) {
     return missionRepository
         .findById(missionId)
-        .map(
-            m -> m.getOwningSquadron() == null || canEditSquadron(m.getOwningSquadron().getId()))
+        .map(m -> m.getOwningSquadron() == null || canEditSquadron(m.getOwningSquadron().getId()))
         .orElse(false);
   }
 
@@ -182,24 +177,22 @@ public class SquadronScopeService {
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(
-            i -> i.getOwningSquadron() == null || canSeeSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningSquadron() == null || canSeeSquadron(i.getOwningSquadron().getId()))
         .orElse(false);
   }
 
   /**
-   * {@code true} iff the current principal may edit inventory item {@code itemId} directly.
-   * Strict owning-squadron check - Job-Order-Kontext handover writes are gated separately by
-   * {@code JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard.
-   * Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may edit inventory item {@code itemId} directly. Strict
+   * owning-squadron check - Job-Order-Kontext handover writes are gated separately by {@code
+   * JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard. Non-existent ids
+   * return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    */
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(
-            i -> i.getOwningSquadron() == null || canEditSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningSquadron() == null || canEditSquadron(i.getOwningSquadron().getId()))
         .orElse(false);
   }
 
@@ -213,8 +206,7 @@ public class SquadronScopeService {
   public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(
-            o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
         .orElse(false);
   }
 
@@ -227,8 +219,7 @@ public class SquadronScopeService {
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(
-            o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
         .orElse(false);
   }
 
@@ -241,8 +232,7 @@ public class SquadronScopeService {
   public boolean canSeeOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(
-            o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
         .orElse(false);
   }
 
@@ -255,8 +245,7 @@ public class SquadronScopeService {
   public boolean canEditOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(
-            o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
         .orElse(false);
   }
 

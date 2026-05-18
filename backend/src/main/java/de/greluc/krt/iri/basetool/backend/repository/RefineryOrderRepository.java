@@ -86,8 +86,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   /**
    * Multi-tenant variant of {@link #findAll(Pageable)}: returns every refinery order whose owning
    * squadron matches {@code owningSquadronId}, or every order when {@code owningSquadronId} is
-   * {@code null} (admin "all squadrons" mode). Refinery is a strict-staffel aggregate - there is
-   * no cross-squadron escape clause like Mission's {@code is_internal = false}.
+   * {@code null} (admin "all squadrons" mode). Refinery is a strict-staffel aggregate - there is no
+   * cross-squadron escape clause like Mission's {@code is_internal = false}.
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
   @Query(

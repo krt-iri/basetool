@@ -61,9 +61,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    *
    * <p>Multi-tenant access control: {@code scopeSquadronId} gates which missions the caller may
    * see. When {@code null}, no scope restriction applies (admin "all squadrons" mode). When
-   * non-null, the result is restricted to missions owned by that squadron PLUS any
-   * non-internal mission of any other squadron (MULTI_SQUADRON_PLAN.md section 1: non-internal
-   * missions are visible cross-staffel).
+   * non-null, the result is restricted to missions owned by that squadron PLUS any non-internal
+   * mission of any other squadron (MULTI_SQUADRON_PLAN.md section 1: non-internal missions are
+   * visible cross-staffel).
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(

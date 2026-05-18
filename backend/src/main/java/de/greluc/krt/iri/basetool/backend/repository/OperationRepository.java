@@ -21,8 +21,8 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
 
   /**
    * Multi-tenant variant of {@link #findAll(org.springframework.data.domain.Pageable)}: returns
-   * every operation whose owning squadron matches {@code owningSquadronId}, or every operation
-   * when {@code owningSquadronId} is {@code null} (admin "all squadrons" mode). Operations are a
+   * every operation whose owning squadron matches {@code owningSquadronId}, or every operation when
+   * {@code owningSquadronId} is {@code null} (admin "all squadrons" mode). Operations are a
    * strict-staffel aggregate.
    */
   @org.springframework.data.jpa.repository.Query(
