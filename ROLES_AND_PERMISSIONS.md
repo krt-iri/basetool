@@ -1,5 +1,7 @@
 # Rollen- und Rechte-Matrix (IRIDIUM Basetool)
 
+> **WICHTIG (Stand 2026-05-18):** Mit dem Multi-Squadron-Umbau (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md) und CHANGELOG-Eintrag "Multi-Squadron-Umbau") aendert sich die Officer-Rolle substanziell. Officer verliert den Admin-Bereich (Stammdaten, Member-Management, Announcements, UEX, System-Settings, Promotion-System-Pflege) und behaelt nur noch squadron-interne Funktionen (Mission-Management, Hangar-Schreibrechte inklusive `resetAllFittedStatus`, Refinery-Management, Logistician-Funktionen via Rollen-Hierarchie, JobOrder cross-Staffel). Die Tabelle unten reflektiert die Implementierung **nach** dem Phase-4-Lockdown; einzelne Zellen, die fruehe (vor 2026-05-18) Officer-Zugriff zeigten, sind ggf. noch nicht durchgaengig nachgezogen — bei Diskrepanz zaehlen die `@PreAuthorize`-Annotationen in den Backend-Controllern. Vollstaendige Aktualisierung der Matrix laeuft als Phase-6-Followup.
+
 Dieses Dokument fasst die aktuelle Rollen- und Rechtekonfiguration des IRIDIUM Basetools zusammen, basierend auf der Implementierung in Backend-Controllern und der Datenbank-Initialisierung.
 
 Das System nutzt eine Kombination aus **Rollen** (abgeleitet vom Keycloak JWT und in der Datenbank synchronisiert) und zugehörigen **Berechtigungen (Permissions / Authorities)**.
@@ -36,7 +38,7 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 | **Allgemeiner Login (Authenticated)** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Hangar: Lesen** (`HANGAR_READ`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Hangar: Schreiben / Admin-Aktionen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **User Management** (`USER_MANAGE`) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| **User Management** (Roll-Flags, Rank, Attribute) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **User List / Details (Read)** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Refinery Orders (Manage All)** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Refinery Orders (Edit / Delete / Store)** (`hasRole('LOGISTICIAN')` or Owner) | ❌ | ✅ | ✅ | ✅ | ✅ |
@@ -49,10 +51,13 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 | **Missionen: Erstellen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Missionen: Verwalten (Alle)** (`hasRole('MISSION_MANAGER')`) | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Missionen: Verwalten (Eigene/Delegiert)** (`canManageMission`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Announcements (Ankündigungen)** | ❌ | ❌ | ❌ | ✅ | ✅ |
-| **Schiffsdaten (Ship Types, Manufacturers)** | ❌ | ❌ | ❌ | ✅ | ✅ |
-| **Basisdatenbank** (Locations, Materials, StarSystems, etc.) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| **Announcements (Ankündigungen) – Schreiben** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Announcements (Ankündigungen) – Lesen** | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Schiffsdaten (Ship Types, Manufacturers)** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Basisdatenbank** (Locations, Materials, StarSystems, Terminals, etc.) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Promotion-System (Verwaltung von Kategorien/Themen/Voraussetzungen)** | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Admin-Dashboard & Settings** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Aktive Staffel umschalten (Switcher)** | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 *\*Hinweis: Bei Missionen gibt es spezifische Checks (z.B. `#userId.toString() == authentication.name`), die es erlauben, dass Benutzer ihre eigenen Zuweisungen verwalten, während Officers/Admins Vollzugriff auf alle Missionen haben.*
 
