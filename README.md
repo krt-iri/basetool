@@ -180,6 +180,83 @@ backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`.
 
 ---
 
+## 3.4 Multi-squadron rollout
+
+The deployed shape on `MULTI_SQUADRON` (Flyway `V80`–`V83`) turns the
+single-tenant Basetool into a multi-squadron app while keeping a single
+production database and a single Keycloak realm. The design lives in
+[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md) (German, source of
+truth) and the full audit trail in
+[`CHANGELOG.md`](CHANGELOG.md) under the `Multi-Squadron-Umbau` heading.
+
+What changed at the data layer:
+
+* Every `app_user` row carries a `squadron_id` (FK to `squadron`). The
+  IRIDIUM squadron is seeded at the canonical UUID
+  `00000000-0000-0000-0000-000000000001` and is the default for legacy
+  rows.
+* The five staffel-scoped aggregate roots —
+  `mission` / `operation` / `ship` / `inventory_item` /
+  `refinery_order` — gain an `owning_squadron_id` column.
+* `job_order` is intentionally cross-squadron and gains two columns:
+  `creating_squadron_id` (who authored the order; immutable) and
+  `requesting_squadron_id` (on whose behalf; editable). The legacy
+  `squadron` VARCHAR is still written as a safety net and will only be
+  dropped in a follow-up release per the two-phase drop rule in
+  [`backend/.../db/migration/README.md`](backend/src/main/resources/db/migration/README.md).
+
+What changed at the authorization layer:
+
+* New [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java)
+  centralises `currentSquadron()` / `canSee…` / `canEdit…` for every
+  staffel-scoped aggregate. Read paths consult it in service / repository
+  filters, write paths stamp the owning squadron at create time, and
+  controllers use it via `@PreAuthorize("@squadronScopeService.canEdit…")`
+  on detail-view endpoints.
+* New [`MeController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MeController.java)
+  exposes `GET /api/v1/me/active-squadron` for every authenticated
+  caller plus `PUT` / `DELETE` (admin-only) to switch the session
+  context. The frontend
+  [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/MeFrontendController.java)
+  proxies the browser-side POST through to the backend.
+* MDC field `squadronId` (sentinels `all` / `none` / `anonymous`) is
+  attached by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/logging/CorrelationIdFilter.java)
+  so log lines and access-log JSON show which squadron context a
+  request ran under.
+* ArchUnit rule
+  `staffelScopedServicesMustWireSquadronOrAuthHelper` in
+  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+  fails the build if a staffel-scoped service stops injecting one of
+  the auth services.
+
+What changed for **Officers** (Phase 4 lockdown):
+
+The admin area used to be `hasAnyRole('ADMIN','OFFICER')`. It is now
+strict `hasRole('ADMIN')` everywhere — Stammdaten / Member-Management /
+Announcements / UEX / System-Settings / Promotion-System. Officers
+keep every squadron-internal capability: mission management, hangar
+write (incl. `resetAllFittedStatus`), refinery, logistician via role
+hierarchy, and the cross-squadron Job Order workspace. The full
+matrix lives in
+[`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
+
+Mission visibility for guests / cross-squadron callers stays generous:
+non-internal missions stay visible across squadrons (think public
+operations boards), but everything else respects the strict squadron
+filter.
+
+What is **deferred** to a follow-up release: the tightening migrations
+`V84`–`V86` (`SET NOT NULL` on the new columns, then the
+two-phase drop of the legacy `job_order.squadron` VARCHAR) per the
+two-phase rule. They intentionally do not ship in the same release as
+`V80`–`V83`, so a rollback to single-tenant remains possible during
+the grace window. The full frontend UI for the squadron switcher /
+context badge / squadron-column rendering is tracked as the next slice
+of work; see `MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the repo root for
+the open punch list.
+
+---
+
 ## 4. Development & Testing
 
 ### 4.1 Prerequisites

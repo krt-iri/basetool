@@ -1,6 +1,22 @@
 # Rollen- und Rechte-Matrix (IRIDIUM Basetool)
 
-> **WICHTIG (Stand 2026-05-18):** Mit dem Multi-Squadron-Umbau (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md) und CHANGELOG-Eintrag "Multi-Squadron-Umbau") aendert sich die Officer-Rolle substanziell. Officer verliert den Admin-Bereich (Stammdaten, Member-Management, Announcements, UEX, System-Settings, Promotion-System-Pflege) und behaelt nur noch squadron-interne Funktionen (Mission-Management, Hangar-Schreibrechte inklusive `resetAllFittedStatus`, Refinery-Management, Logistician-Funktionen via Rollen-Hierarchie, JobOrder cross-Staffel). Die Tabelle unten reflektiert die Implementierung **nach** dem Phase-4-Lockdown; einzelne Zellen, die fruehe (vor 2026-05-18) Officer-Zugriff zeigten, sind ggf. noch nicht durchgaengig nachgezogen — bei Diskrepanz zaehlen die `@PreAuthorize`-Annotationen in den Backend-Controllern. Vollstaendige Aktualisierung der Matrix laeuft als Phase-6-Followup.
+> **Stand 2026-05-18 (Multi-Squadron-Umbau, Phase 6 abgeschlossen):**
+> Die untenstehende Matrix wurde gegen alle `@PreAuthorize`-Annotationen
+> in den Backend-Controllern verifiziert. Mit dem Phase-4-Lockdown des
+> Multi-Squadron-Umbaus (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md)
+> und der CHANGELOG-Eintrag "Multi-Squadron-Umbau") wurde der Admin-Bereich
+> (Stammdaten, Member-Management, Announcements, UEX, System-Settings,
+> Promotion-System-Pflege) durchgaengig auf `hasRole('ADMIN')` verengt;
+> Officer haben dort keine Schreibrechte mehr. Officer behalten ihre
+> squadron-internen Funktionen — Mission-Management, Hangar-Schreibrechte
+> (inklusive `resetAllFittedStatus`), Refinery-Management,
+> Logistician-Funktionen via Rollen-Hierarchie und den
+> cross-staffel-faehigen Job-Order-Workspace. Die `USER_MANAGE`-Authority
+> bleibt aus historischen Gruenden Teil des Officer-Rollensatzes in
+> [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java),
+> wird aber von keinem Endpunkt mehr gepruft (effektiv inert). Falls die
+> Matrix von der Implementierung abweicht, zaehlen weiterhin die
+> `@PreAuthorize`-Annotationen im Backend.
 
 Dieses Dokument fasst die aktuelle Rollen- und Rechtekonfiguration des IRIDIUM Basetools zusammen, basierend auf der Implementierung in Backend-Controllern und der Datenbank-Initialisierung.
 
@@ -68,3 +84,4 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 3. **Default Role:** Wird bei der Anmeldung keine bekannte Rolle aus Keycloak übermittelt oder dem User noch keine spezifische Rolle zugewiesen, erhält der Benutzer standardmäßig die Rolle **Guest**.
 4. **Logistiker-Flag:** Die Rolle `LOGISTICIAN` kann über das `is_logistician`-Flag in der `users`-Tabelle manuell durch Admins/Offiziere vergeben werden, unabhängig von Keycloak-Rollen.
 5. **Missions-Manager-Flag:** Die Rolle `MISSION_MANAGER` kann über das `is_mission_manager`-Flag in der `users`-Tabelle manuell durch Admins/Offiziere vergeben werden, analog zur Logistiker-Rolle.
+6. **Multi-Squadron-Sichtbarkeit:** Lesepfade werden ueber [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) gefiltert. Nicht-Admins sehen ausschliesslich Daten ihrer eigenen Staffel; oeffentliche Missionen (`is_internal = false`) sind zusaetzlich cross-staffel sichtbar. Admins koennen ueber den Sidebar-Switcher (`PUT /api/v1/me/active-squadron`) den aktiven Kontext umschalten oder die "Alle Staffeln"-Sicht anwaehlen. Job-Orders sind per Design ein cross-staffel-Arbeitsbereich und werden in beiden Spalten (`creating_squadron_id` und `requesting_squadron_id`) gekennzeichnet, damit Auftraggeber und Ausfuehrender getrennt nachvollziehbar bleiben.
