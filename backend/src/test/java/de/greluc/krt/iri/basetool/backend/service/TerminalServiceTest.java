@@ -19,7 +19,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * Unit tests for {@link TerminalService}'s admin-override mutators. The visibility flip is already
  * covered indirectly by {@code TerminalControllerTest}; these tests pin the more delicate contract
  * that "set" mutators write both the value and the {@code *Overridden} flag, and that "clear"
- * mutators only flip the flag back without touching the value column.
+ * mutators flip the flag back AND revert the value column to the last UEX-reported state stored in
+ * the {@code uex*} mirror columns (so the materials-overview filter and the UEX-source chip do not
+ * keep seeing the stale admin-pinned value until the next UEX sweep runs).
  */
 @ExtendWith(MockitoExtension.class)
 class TerminalServiceTest {
@@ -45,12 +47,14 @@ class TerminalServiceTest {
   }
 
   @Test
-  void clearLoadingDockOverride_flipsFlagButLeavesValueAlone() {
+  void clearLoadingDockOverride_flipsFlagAndRevertsValueToUexMirror() {
     UUID id = UUID.randomUUID();
     Terminal terminal = new Terminal();
     terminal.setId(id);
+    // Admin pinned the value to true; the most recent UEX sweep reported false.
     terminal.setHasLoadingDock(true);
     terminal.setHasLoadingDockOverridden(true);
+    terminal.setUexHasLoadingDock(false);
     when(terminalRepository.findById(id)).thenReturn(Optional.of(terminal));
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -58,7 +62,32 @@ class TerminalServiceTest {
 
     ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
     verify(terminalRepository).save(cap.capture());
-    assertTrue(cap.getValue().getHasLoadingDock(), "value column must not be touched on clear");
+    assertFalse(
+        cap.getValue().getHasLoadingDock(),
+        "value column must revert to the UEX mirror so the materials filter and the UEX chip stop"
+            + " seeing the stale admin-pinned value");
+    assertFalse(cap.getValue().getHasLoadingDockOverridden());
+  }
+
+  @Test
+  void clearLoadingDockOverride_revertsValueToNullWhenUexMirrorIsNull() {
+    // A terminal that has never been synced yet has uexHasLoadingDock=null. The
+    // contract is to fall through to null too — every downstream consumer treats
+    // null as "unknown" and the next UEX sweep will populate the real value.
+    UUID id = UUID.randomUUID();
+    Terminal terminal = new Terminal();
+    terminal.setId(id);
+    terminal.setHasLoadingDock(true);
+    terminal.setHasLoadingDockOverridden(true);
+    terminal.setUexHasLoadingDock(null);
+    when(terminalRepository.findById(id)).thenReturn(Optional.of(terminal));
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.clearLoadingDockOverride(id);
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository).save(cap.capture());
+    assertNull(cap.getValue().getHasLoadingDock());
     assertFalse(cap.getValue().getHasLoadingDockOverridden());
   }
 
@@ -79,12 +108,13 @@ class TerminalServiceTest {
   }
 
   @Test
-  void clearAutoLoadOverride_flipsFlagButLeavesValueAlone() {
+  void clearAutoLoadOverride_flipsFlagAndRevertsValueToUexMirror() {
     UUID id = UUID.randomUUID();
     Terminal terminal = new Terminal();
     terminal.setId(id);
     terminal.setIsAutoLoad(true);
     terminal.setIsAutoLoadOverridden(true);
+    terminal.setUexIsAutoLoad(false);
     when(terminalRepository.findById(id)).thenReturn(Optional.of(terminal));
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -92,7 +122,29 @@ class TerminalServiceTest {
 
     ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
     verify(terminalRepository).save(cap.capture());
-    assertTrue(cap.getValue().getIsAutoLoad(), "value column must not be touched on clear");
+    assertFalse(
+        cap.getValue().getIsAutoLoad(),
+        "value column must revert to the UEX mirror so the materials filter and the UEX chip stop"
+            + " seeing the stale admin-pinned value");
+    assertFalse(cap.getValue().getIsAutoLoadOverridden());
+  }
+
+  @Test
+  void clearAutoLoadOverride_revertsValueToNullWhenUexMirrorIsNull() {
+    UUID id = UUID.randomUUID();
+    Terminal terminal = new Terminal();
+    terminal.setId(id);
+    terminal.setIsAutoLoad(true);
+    terminal.setIsAutoLoadOverridden(true);
+    terminal.setUexIsAutoLoad(null);
+    when(terminalRepository.findById(id)).thenReturn(Optional.of(terminal));
+    when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.clearAutoLoadOverride(id);
+
+    ArgumentCaptor<Terminal> cap = ArgumentCaptor.forClass(Terminal.class);
+    verify(terminalRepository).save(cap.capture());
+    assertNull(cap.getValue().getIsAutoLoad());
     assertFalse(cap.getValue().getIsAutoLoadOverridden());
   }
 }
