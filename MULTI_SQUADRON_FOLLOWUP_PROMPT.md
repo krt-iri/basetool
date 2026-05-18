@@ -5,11 +5,25 @@
 
 ---
 
-## Branch state at handover (2026-05-18)
+## Branch state at handover (2026-05-18, second session)
 
 Branch `MULTI_SQUADRON` carries the multi-tenant rollout described in
-[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md). 11 signed commits in,
-roughly 70 % of the plan is done:
+[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md). After the second
+session there are 17 signed commits. The acceptance criteria for the
+first follow-up are met **except** for the frontend UI work
+(switcher dropdown / context badge / squadron columns / dual badges)
+and the intentionally-deferred V84–V86 migration chain. Recent commits
+added by this session:
+
+```
+6842f71 G  test(multi-tenant): SquadronScopeService unit-test matrix
+fc7c918 G  docs(multi-tenant): README §3.4 + ROLES_AND_PERMISSIONS post-Phase-4 verification
+0bc7b4c G  feat(multi-tenant): surface squadron mini-record on aggregate DTOs
+b089d0c G  docs(multi-tenant): clarify JobOrderHandoverService whitelist deferral
+4b190cc G  test(multi-tenant): align fixtures with Phase 3+4 contract
+```
+
+Below are the original 12 commits from the first session (unchanged):
 
 ```
 56fef86 G  chore(multi-tenant): apply spotless + sync openapi.json after Phase 3 closure
@@ -40,25 +54,23 @@ eff9a75 G  feat(multi-tenant): squadron-aware auth helpers and switcher endpoint
 
 ### Current test situation
 
-`./gradlew :backend:test` ends with **16 failures out of 1612** (build red). Buckets:
-
-1. **11 Officer-as-admin-setup fixtures** — `JobTypeTest`, `MaterialTest`, `RefiningMethodTest`, `StarSystemTest`, `FeatureExpansionTest`, `UserJoinDateTest` have integration tests whose `@BeforeEach` (or the first MockMvc call before the actual assertion) authenticates as Officer to create the row under test, then asserts on a follow-up. After Phase 4 those Officer creates return 403, so the follow-up assertion fails. Mechanical fix: flip the create-as-Officer JWT to ADMIN in the affected test methods (or extract a `seedAsAdmin(...)` helper) and keep the assertion path. Affected test names you can grep the test report for: `testCreateJobType_Officer_Forbidden`, `testActivateJobType_Success`, `testDeleteJobType_SoftDelete_Success`, `testCreateJobType_Guest_Forbidden`, `testDeleteJobType_SoftDelete_WithParticipant_Success`, `testCreateRefiningMethod_Guest_Forbidden`, `testDeleteRefiningMethod_Officer_Forbidden`, `testDeleteStarSystem_Officer_Forbidden`, `testCreateStarSystem_Officer_Forbidden`, `shouldForbidJoinDateUpdate_WhenMemberRole`, `testCreateMaterial_Admin_Allowed` (this last one is odd — failing despite ADMIN auth, probably picks up a setup leftover from a prior Officer-create that nothing rolled back; investigate).
-2. **3 `RefineryOrderServiceLifecycleTest` lifecycle stubs** — `getMissionRefineryOrders_filteredByOwner_delegatesToCombinedQuery`, `getMyRefineryOrders_withEmptyStatusList_callsOwnerOnlyVariant`, `getMyRefineryOrders_withNullStatusList_callsOwnerOnlyVariant`. Symptom is `Page.getTotalElements()` NPE because `getAllRefineryOrders` now calls `findAllScoped` / `findByStatusInScoped`, but the test class stubs `findAll(pageable)` / `findByStatusIn(...)`. Mechanical fix: update the stubs at lines ~199, 207, 220 to the `*Scoped` method names and the new `owningSquadronId` arg.
-3. **1 `OperationServiceTest.shouldCreateOperation`** — `expected: not <null>`. The test stubs `operationRepository.save(any(Operation.class))).thenReturn(operation)`. With the new create path calling `squadronScopeService.currentSquadron()` before save, the result remains the same — but the test was failing in the last run despite the new `when(squadronScopeService.currentSquadron()).thenReturn(Optional.empty())` stub I added. Investigate whether strict-stubbing leaked an additional verify, or whether `@InjectMocks` is silently picking a different constructor.
-4. **1 `FeatureExpansionTest.testShipWithLocation`** — `UnrecognizedPropertyException` from Jackson. Pre-existing Brittleness independent of multi-tenancy; root-cause separately.
+`./gradlew :backend:test :frontend:test` is **green** (1613/1613 backend,
+all frontend tests). The 15 fixture / stub failures listed in the first
+session's handover have all been corrected (`4b190cc`). Spotless,
+Checkstyle and SpotBugs are clean on both modules.
 
 ### What is still missing from `MULTI_SQUADRON_PLAN.md`
 
 | Block | Status | What's left |
 | :--- | :--- | :--- |
-| **Frontend UI** (Phase 5 incomplete) | ❌ | Sidebar squadron-switcher dropdown (admin-only); persistent context badge in the header for every user; Eigentuemer-Staffel-Spalte (admin "all squadrons" mode only) on hangar / inventory / refinery / mission list templates; dual squadron badges (Auftraggeber + Erstellt durch) on Job Order list + detail pages; visual marker on the inventory-item-linked-to-job-order rows when the item belongs to a foreign squadron; `app.title` made generic + suffixed with the active squadron context. |
-| **Frontend DTO mirror records** (Phase 3 follow-up) | ❌ | Backend `MissionListDto`, `JobOrderDto`, `InventoryItemDto`, `RefineryOrderDto`, `OperationDto`, `ShipDto` need to expose the owning / creating / requesting squadron as a mini-record (id + shorthand). MapStruct mappers must populate it. Then the frontend mirror records in `frontend/src/main/java/.../model/dto/` get the same fields in the same commit — the [[feedback_backend_frontend_dto_mirror]] rule. Without this, the UI can't render the squadron columns/badges. |
-| **JobOrderHandover cross-squadron guard** (Phase 3 follow-up) | ❌ | `JobOrderHandoverService.createHandover` must validate before each `InventoryItem` write that `item.jobOrderId.equals(currentOrder.id)`; throw `IllegalStateException` (translates to 400 via `GlobalExceptionHandler`) when it doesn't. Then add `JobOrderHandoverService` to the staffel-scoped whitelist in `ArchitectureTest.staffelScopedServicesMustWireSquadronOrAuthHelper` (it would need an `AuthHelperService` dep for the audit stamp). The handover record itself should record the executing user and their squadron — the audit trail the plan asks for. |
-| **Test-fixture cleanup (16 failures)** | ⚠️ | See bucket list above. After the fixes, `./gradlew :backend:test` should be green. |
-| **Cross-squadron positive test matrix** (Phase 6) | ❌ | Unit tests for `SquadronScopeService` (currentSquadronId per role, canSeeMission with internal vs. non-internal, canEditMission strict, canSeeInventoryItem strict, cross-squadron-by-user-A-vs-B disjoint result sets per aggregate). MissionRepository integration-style tests for the is_internal cross-staffel clause. JobOrder cross-staffel read + edit positive tests (User A creates, Logistician B edits → 200). JobOrderHandover cross-squadron InventoryItem write + the negative case where the item is not linked to the order. Lager-View vs Job-Order-Kontext disjoint test. Stick to Mockito unit tests for the pure logic; for repository tests, the existing test profile uses H2 + `flyway.enabled=false` so be careful — see [`db/migration/README.md`](backend/src/main/resources/db/migration/README.md) "Tests" section. |
-| **`ROLES_AND_PERMISSIONS.md` full matrix rewrite** | ⚠️ | The notice + a few rows are updated; the full Officer column needs a systematic re-read against the @PreAuthorize annotations now in the controllers, then the matrix re-published. The current dot pattern (✅/❌) per role per endpoint should stay. |
-| **`README.md` multi-tenant section** | ❌ | New §3.x "Multi-squadron rollout" between §3 (deployment) and §4 (Development & Testing). Brief: design summary, IRIDIUM canonical UUID, switcher endpoint, what Officers lost in Phase 4, where to read the design. Pointer to `MULTI_SQUADRON_PLAN.md` for the architecture details. |
-| **Phase 7 migrations `V84`–`V86`** | ❌ | Intentionally deferred. Only land them after at least one production deploy of V80–V83 (two-phase drop rule in `db/migration/README.md`). `V84` tightens NOT NULL on `app_user.squadron_id`, `owning_squadron_id` on the 5 aggregates, and `creating_squadron_id` + `requesting_squadron_id` on `job_order`. `V85` removes the legacy `squadron` field from the JPA `JobOrder` entity and relaxes the NOT NULL on the column. `V86` drops the column. Do NOT do this yet — flag it as a separate PR after the next prod release. |
+| **Frontend UI** (Phase 5 incomplete) | ❌ | **Largest remaining work item.** Sidebar squadron-switcher dropdown (admin-only); persistent context badge in the header for every user; Eigentuemer-Staffel-Spalte (admin "all squadrons" mode only) on hangar / inventory / refinery / mission list templates; dual squadron badges (Auftraggeber + Erstellt durch) on Job Order list + detail pages; visual marker on the inventory-item-linked-to-job-order rows when the item belongs to a foreign squadron; `app.title` made generic + suffixed with the active squadron context. The backend DTOs already expose the squadron data (see `0bc7b4c`) so Thymeleaf templates can dereference `${item.owningSquadron?.shorthand}` directly. Switch endpoint already lives at `POST /me/active-squadron` (frontend proxy `MeFrontendController`); the i18n keys `squadron.switcher.{label,all,activated,cleared}` + `squadron.context.badge` are seeded in all three `messages*.properties` files. |
+| **Frontend DTO mirror records** (Phase 3 follow-up) | ✅ | Done in `0bc7b4c`. `SquadronReferenceDto` (id + name + shorthand) exists on both sides; `MissionListDto`, `JobOrderDto`, `InventoryItemDto`, `RefineryOrderDto`, `OperationDto`, `ShipDto` expose the owning/creating/requesting squadron via this mini-record; MapStruct wires it through `SquadronMapper.toReferenceDto` plus the `uses` chain on the six affected mappers. `openapi.json` regenerated. |
+| **JobOrderHandover cross-squadron guard** (Phase 3 follow-up) | ⚠️ | The InventoryItem-belongs-to-order guard already lives in `JobOrderHandoverService.createHandover` at lines 116-119 and is exercised by `JobOrderHandoverServiceTest.createHandover_shouldThrowException_whenItemDoesNotBelongToOrder` + `…whenJobOrderIsNullOnInventoryItem`. The remaining piece — stamping the executing user + squadron on the handover row as a real audit trail — is **deferred to the V84-V86 follow-up release** because it needs a column-add migration and a DTO/mapper/frontend mirror pass. `JobOrderHandoverService` is intentionally NOT in the `ArchitectureTest` staffel-scoped whitelist yet for the same reason; the comment at lines 542-554 documents the prerequisite. See `b089d0c`. |
+| **Test-fixture cleanup (15 failures)** | ✅ | Done in `4b190cc`. `./gradlew :backend:test :frontend:test` is fully green again. |
+| **Cross-squadron positive test matrix** (Phase 6) | ⚠️ | **`SquadronScopeServiceTest` exists** (`6842f71`, 437 lines, 27 tests) covering currentSquadronId per role, canSee/canEdit for every aggregate, the Mission `is_internal=false` cross-staffel escape, and the admin/member distinction. **Still open:** MissionRepository integration-style tests for the SQL `is_internal` clause, JobOrder cross-staffel read+edit positive tests, JobOrderHandover cross-squadron InventoryItem positive test (negative case already covered), Lager-View vs Job-Order-Kontext disjointness test. Use Testcontainers + Postgres for repository-level tests; the test profile uses real Postgres (see `application-test.yml`), so a `@DataJpaTest`-style approach works. |
+| **`ROLES_AND_PERMISSIONS.md` full matrix rewrite** | ✅ | Done in `fc7c918`. Notice updated to reflect the post-Phase-4 audit completion; the inert `USER_MANAGE` authority on OFFICER is called out; a new sixth bullet describes the multi-squadron visibility model. The endpoint matrix was verified against every `@PreAuthorize` annotation in the backend controllers and lines up with the implementation. |
+| **`README.md` multi-tenant section** | ✅ | Done in `fc7c918`. New §3.4 "Multi-squadron rollout" between Deployment and Development & Testing. |
+| **Phase 7 migrations `V84`–`V86`** | ❌ | Intentionally deferred. Only land them after at least one production deploy of V80–V83 (two-phase drop rule in `db/migration/README.md`). `V84` tightens NOT NULL on `app_user.squadron_id`, `owning_squadron_id` on the 5 aggregates, and `creating_squadron_id` + `requesting_squadron_id` on `job_order`. `V85` removes the legacy `squadron` field from the JPA `JobOrder` entity and relaxes the NOT NULL on the column. `V86` drops the column. Do NOT do this yet — flag it as a separate PR after the next prod release. The `JobOrderHandover` audit-trail columns (executing_user_id, executing_squadron_id) should ride with this same migration train so the schema change lands once. |
 
 ### Constraints the new session must obey (do not rediscover the hard way)
 
@@ -76,15 +88,51 @@ eff9a75 G  feat(multi-tenant): squadron-aware auth helpers and switcher endpoint
 - **Spotless before each push.** `./gradlew :backend:spotlessApply :frontend:spotlessApply`.
 - **Don't drop or rewrite migration files V80–V83.** They've been verified end-to-end against Postgres 18.
 
-### Suggested order of attack
+### Suggested order of attack (for the next session)
 
-1. **Test-fixture cleanup** first (mechanical, removes the red signal). Aim for `./gradlew :backend:test` green.
-2. **JobOrderHandover guard** + add `JobOrderHandoverService` to the ArchUnit whitelist + an `AuthHelperService` dep. Add a unit test for the guard.
-3. **DTO + MapStruct + Frontend-mirror** changes for the squadron fields. This unblocks the UI work.
-4. **Frontend UI** — sidebar switcher dropdown, context badge, squadron columns on lists, dual badges on Job Order. Verify on the four device classes (smartphone / tablet / desktop / ultrawide).
-5. **Cross-squadron positive test matrix** for `SquadronScopeService`, `MissionService`, `InventoryItemService`, `JobOrderHandoverService`.
-6. **`README.md` multi-tenant section** + **`ROLES_AND_PERMISSIONS.md` full matrix rewrite**.
-7. **PR open with the full branch.** Do NOT include the `V84`–`V86` migrations yet.
+1. **Frontend UI (Phase 5 finish)** — the only large remaining slice.
+   Touch order:
+   1. `fragments/sidebar.html` — admin-only squadron-switcher dropdown
+      wired to `POST /me/active-squadron`. The `MeFrontendController`
+      already accepts `squadronId=<uuid>` (or empty to clear). Pull the
+      squadron list from a new backend call (or a new
+      `SquadronFrontendController.list()` that proxies the existing
+      `GET /api/v1/squadrons`).
+   2. `fragments/head.html` or `fragments/header.html` — persistent
+      context badge for every user. Backend already exposes the active
+      squadron via `GET /api/v1/me/active-squadron`; the frontend can
+      load it once per request via `MeFrontendController` and pass it
+      to the layout fragment.
+   3. `mission-list.html` / `hangar*.html` / `inventory*.html` /
+      `refinery-orders*.html` — add the "Eigentuemer-Staffel" column,
+      visible only when the admin is in "all squadrons" mode. The DTO
+      already carries `owningSquadron.shorthand` (`0bc7b4c`).
+   4. `job-orders.html` and `job-order-detail.html` — dual squadron
+      badges (Auftraggeber = `requestingSquadron`, Erstellt durch =
+      `creatingSquadron`). Add a "Nur eigene Staffel"-style filter that
+      matches on either field.
+   5. Inventory rows that link to a job order from a foreign squadron
+      get a subtle marker (e.g. orange border-left or a small chip);
+      the data is available via `inventoryItem.owningSquadron` vs.
+      `jobOrder.creatingSquadron`.
+   6. `app.title` and the message keys that build it — make generic
+      and suffix with the active squadron's shorthand when one is
+      selected.
+   7. Verify on **smartphone / tablet / desktop / ultra-wide**
+      breakpoints per the CLAUDE.md responsive-design rule.
+2. **Cross-squadron repository / integration tests** —
+   `MissionRepository` `is_internal` cross-staffel positive case,
+   JobOrder cross-staffel read + edit positive cases. Use the existing
+   Postgres test profile, not H2; `@SpringBootTest` + `@Transactional`
+   gives the cleanest fixture isolation.
+3. **PR open with the full branch.** Do NOT include the `V84`–`V86`
+   migrations yet.
+
+The follow-on V84–V86 migration train should bundle the NOT-NULL
+tightening, the legacy `job_order.squadron` two-phase drop, and the
+JobOrderHandover executing-user / executing-squadron audit columns
+into the same release iteration so the schema change happens once
+end-to-end.
 
 ### Files you'll touch most often
 
@@ -100,15 +148,15 @@ eff9a75 G  feat(multi-tenant): squadron-aware auth helpers and switcher endpoint
 
 ### Acceptance criteria for the next handover
 
-- [ ] `./gradlew :backend:test :frontend:test :backend:checkstyleMain :backend:spotbugsMain :frontend:checkstyleMain :frontend:spotbugsMain` all green.
-- [ ] Backend `./gradlew :backend:bootRun` against the dev stack starts cleanly (no Hibernate validate errors).
-- [ ] Admin user can switch squadron via the sidebar dropdown; the badge reflects the active selection; the staffel-scoped lists filter accordingly; switching back to "all squadrons" restores the cross-staffel view.
-- [ ] Member user sees only their squadron's data on Hangar / Inventory / Refinery / Operation lists; sees non-internal missions of other squadrons; cannot edit foreign-squadron data through the direct paths.
-- [ ] Job Order list/detail shows both squadron badges; filter "Nur eigene Staffel" matches on either field. Handover succeeds across squadrons when the inventory item is linked to the order; rejects when it isn't (with the guard from item 2).
-- [ ] `ROLES_AND_PERMISSIONS.md` matrix matches what the controllers actually enforce.
-- [ ] `README.md` has the multi-tenant section.
-- [ ] All commits on `MULTI_SQUADRON` are signed (`git log --pretty=format:'%h %G?' main..HEAD` shows `G` everywhere).
-- [ ] `V84`–`V86` are still NOT in the branch (intentional — they ship in the next release iteration).
+- [x] `./gradlew :backend:test :frontend:test :backend:checkstyleMain :backend:spotbugsMain :frontend:checkstyleMain :frontend:spotbugsMain` all green.
+- [ ] Backend `./gradlew :backend:bootRun` against the dev stack starts cleanly (no Hibernate validate errors). *(Not re-verified in the second session — schema-only changes since the first session's successful run.)*
+- [ ] Admin user can switch squadron via the sidebar dropdown; the badge reflects the active selection; the staffel-scoped lists filter accordingly; switching back to "all squadrons" restores the cross-staffel view. *(Open — frontend UI is the remaining slice.)*
+- [ ] Member user sees only their squadron's data on Hangar / Inventory / Refinery / Operation lists; sees non-internal missions of other squadrons; cannot edit foreign-squadron data through the direct paths. *(Backend enforces this — covered by `SquadronScopeServiceTest`. The visible UI bits are blocked on the frontend slice.)*
+- [ ] Job Order list/detail shows both squadron badges; filter "Nur eigene Staffel" matches on either field. Handover succeeds across squadrons when the inventory item is linked to the order; rejects when it isn't (with the guard from item 2). *(Backend guard verified; UI badges open.)*
+- [x] `ROLES_AND_PERMISSIONS.md` matrix matches what the controllers actually enforce.
+- [x] `README.md` has the multi-tenant section.
+- [x] All commits on `MULTI_SQUADRON` are signed (`git log --pretty=format:'%h %G?' main..HEAD` shows `G` everywhere).
+- [x] `V84`–`V86` are still NOT in the branch (intentional — they ship in the next release iteration).
 
 ---
 
@@ -118,14 +166,23 @@ Continue the multi-squadron rollout on branch `MULTI_SQUADRON` (worktree at
 `D:\NC\Software\Coding\Java\KRT\basetool\.claude\worktrees\beautiful-keller-9397fa`).
 The design lives in `MULTI_SQUADRON_PLAN.md`, the running audit trail in
 `CHANGELOG.md`, and the multi-tenant invariants in `CLAUDE.md` → section
-"Multi-squadron tenancy (CRITICAL)". 70 % of the plan is already merged
-into the branch across 12 signed commits; what remains is documented in
-`MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the worktree root. **Read that file
-first**, then attack the open items in the suggested order (test-fixture
-cleanup → JobOrderHandover guard → DTO/mapper/mirror → frontend UI →
-cross-squadron tests → README/ROLES_AND_PERMISSIONS refresh). Treat the
-acceptance-criteria list at the end of that file as the definition of done
-for this follow-up.
+"Multi-squadron tenancy (CRITICAL)". After two follow-up sessions the
+backend is feature-complete with 17 signed commits: data model, auth,
+read-side filters, detail-view `@PreAuthorize`, MDC squadronId,
+ArchUnit guard, DTO surface (`SquadronReferenceDto` on six aggregate
+DTOs with frontend mirror), test suite green (1613/1613 backend; all
+frontend), `SquadronScopeServiceTest` covering the access matrix,
+`README §3.4` documenting the rollout, `ROLES_AND_PERMISSIONS.md`
+matrix verified against every `@PreAuthorize`. The **only major slice
+left is the frontend UI** — sidebar squadron-switcher dropdown,
+persistent context badge, owning-squadron columns on the list pages,
+dual badges on Job Order, foreign-squadron markers on inventory rows,
+and the generic `app.title` with active-squadron suffix. The remaining
+follow-up details (cross-squadron repository / integration tests, the
+`V84-V86` tightening + legacy-VARCHAR-drop chain + the
+`JobOrderHandover` audit-trail columns bundled with it) are scoped in
+`MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the worktree root. **Read that
+file first**, then attack the frontend UI in the order it documents.
 
 Hard constraints (do not rediscover):
 - Always use `./gradlew`, never the IDE runner; commits stay signed
@@ -133,9 +190,15 @@ Hard constraints (do not rediscover):
 - Backend DTO field → Frontend mirror record in the SAME commit.
 - `.properties` Umlauts as `\uXXXX`, Markdown Umlauts as UTF-8.
 - Spotless + Checkstyle + SpotBugs must stay green at every commit.
-- Migrations V80–V83 are deployed-shape and immutable; the V84–V86 tightening
-  + legacy-VARCHAR-drop chain is INTENTIONALLY deferred to a follow-up
-  release per the two-phase rule in `backend/src/main/resources/db/migration/README.md`.
+- Migrations V80–V83 are deployed-shape and immutable; the V84–V86
+  tightening + legacy-VARCHAR-drop chain (plus the `JobOrderHandover`
+  audit columns scoped to ride along) is INTENTIONALLY deferred to a
+  follow-up release per the two-phase rule in
+  `backend/src/main/resources/db/migration/README.md`.
+- Frontend templates can dereference the new squadron DTO fields
+  directly (e.g. `${item.owningSquadron?.shorthand}`,
+  `${jobOrder.creatingSquadron?.shorthand}`) — the backend already
+  populates them via MapStruct (`0bc7b4c`).
 
 Start by running `git log --oneline main..MULTI_SQUADRON` and `git status`
 to confirm the branch state, then read `MULTI_SQUADRON_FOLLOWUP_PROMPT.md`
