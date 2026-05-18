@@ -170,6 +170,7 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
+    order.setOwningSquadron(user.getSquadron());
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
@@ -557,6 +558,7 @@ public class RefineryOrderService {
       } else {
         InventoryItem item = new InventoryItem();
         item.setUser(assignee);
+        item.setOwningSquadron(assignee.getSquadron());
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);

@@ -71,14 +71,33 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findAll(Pageable pageable);
 
   /**
+   * Multi-tenant variant of {@link #findAll(Pageable)}: returns every ship whose owning squadron
+   * matches {@code owningSquadronId}, or every ship when {@code owningSquadronId} is {@code null}
+   * (admin "all squadrons" mode). Eagerly fetches {@code shipType}, {@code location} and {@code
+   * owner} via {@code @EntityGraph}.
+   */
+  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @Query(
+      "SELECT s FROM Ship s WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id ="
+          + " :owningSquadronId)")
+  Page<Ship> findAllScoped(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
+
+  /**
    * Aggregates ships by type for the squadron-overview page: tuple of {@code (shipType, totalCount,
    * fittedCount)} ordered alphabetically by ship-type name. Returns raw {@code Object[]} - the
-   * service projects it into the squadron-overview DTO.
+   * service projects it into the squadron-overview DTO. When {@code owningSquadronId} is {@code
+   * null} the aggregation spans every squadron (admin "all squadrons" mode); otherwise the row set
+   * is pre-filtered to that squadron's ships only.
    */
   @Query(
       "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s"
-          + " GROUP BY s.shipType ORDER BY s.shipType.name ASC")
-  Page<Object[]> countShipsByType(Pageable pageable);
+          + " WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id = :owningSquadronId) GROUP BY"
+          + " s.shipType ORDER BY s.shipType.name ASC")
+  Page<Object[]> countShipsByType(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code ShipTypeIn}. Eagerly fetches the

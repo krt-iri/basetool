@@ -421,6 +421,7 @@ public class InventoryItemService {
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
+    item.setOwningSquadron(user.getSquadron());
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
@@ -665,6 +666,7 @@ public class InventoryItemService {
 
       InventoryItem newItem = new InventoryItem();
       newItem.setUser(targetUser);
+      newItem.setOwningSquadron(targetUser.getSquadron());
       newItem.setMaterial(item.getMaterial());
       newItem.setLocation(targetLocation);
       newItem.setQuality(item.getQuality());

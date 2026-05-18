@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
@@ -16,6 +17,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +68,8 @@ public class JobOrderService {
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
+  private final SquadronRepository squadronRepository;
+  private final SquadronScopeService squadronScopeService;
   private final JobOrderMapper jobOrderMapper;
   private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
@@ -84,11 +88,17 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
+    Squadron creatingSquadron = resolveCreatingSquadron();
+    Squadron requestingSquadron =
+        resolveRequestingSquadronOrFallback(createDto.squadron(), creatingSquadron);
+
     JobOrder jobOrder =
         JobOrder.builder()
-            .squadron(createDto.squadron())
+            .squadron(requestingSquadron.getShorthand())
             .handle(createDto.handle())
             .priority(newPriority)
+            .creatingSquadron(creatingSquadron)
+            .requestingSquadron(requestingSquadron)
             .build();
 
     for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
@@ -365,7 +375,14 @@ public class JobOrderService {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
     }
 
-    jobOrder.setSquadron(updateDto.squadron());
+    Squadron creatingFallback =
+        jobOrder.getCreatingSquadron() != null
+            ? jobOrder.getCreatingSquadron()
+            : resolveCreatingSquadron();
+    Squadron newRequesting =
+        resolveRequestingSquadronOrFallback(updateDto.squadron(), creatingFallback);
+    jobOrder.setRequestingSquadron(newRequesting);
+    jobOrder.setSquadron(newRequesting.getShorthand());
     jobOrder.setHandle(updateDto.handle());
 
     List<UUID> newMaterialIds =
@@ -619,5 +636,43 @@ public class JobOrderService {
         baseDto.handovers(),
         baseDto.createdAt(),
         baseDto.version());
+  }
+
+  /**
+   * Resolves the {@code creating_squadron_id} stamp for a freshly-created job order. Uses the
+   * caller's active squadron context (the user's persistent squadron for non-admins, the session
+   * switcher selection for admins). Falls back to IRIDIUM when no context is available - admin "all
+   * squadrons" mode would otherwise produce a null stamp that V84 will reject as NOT NULL later;
+   * the IRIDIUM fallback keeps the column populated and matches the historical default.
+   */
+  @org.jetbrains.annotations.NotNull
+  private Squadron resolveCreatingSquadron() {
+    return squadronScopeService
+        .currentSquadron()
+        .orElseGet(
+            () ->
+                squadronRepository
+                    .findByShorthand("IRI")
+                    .orElseThrow(
+                        () ->
+                            new IllegalStateException(
+                                "IRIDIUM squadron not seeded - check Flyway V80")));
+  }
+
+  /**
+   * Resolves the {@code requesting_squadron_id} from the legacy free-text {@code squadron} value in
+   * the create/update DTO. Tries an exact shorthand match (the dominant case in legacy data); if no
+   * row matches falls back to {@code creatingFallback} so the requesting field stays populated.
+   * Future iterations should switch the wire to a typed {@code requestingSquadronId} UUID and
+   * remove this lookup once the legacy column is gone (V86).
+   */
+  @org.jetbrains.annotations.NotNull
+  private Squadron resolveRequestingSquadronOrFallback(
+      @org.jetbrains.annotations.Nullable String squadronText,
+      @org.jetbrains.annotations.NotNull Squadron creatingFallback) {
+    if (squadronText == null || squadronText.isBlank()) {
+      return creatingFallback;
+    }
+    return squadronRepository.findByShorthand(squadronText.trim()).orElse(creatingFallback);
   }
 }

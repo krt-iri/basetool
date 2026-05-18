@@ -82,6 +82,7 @@ public class MissionService {
   private final MissionOwnershipRepository missionOwnershipRepository;
   private final OperationRepository operationRepository;
   private final UserService userService;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns paged mission list.
@@ -185,6 +186,14 @@ public class MissionService {
     validateMissionTimes(mission);
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
+
+    if (mission.getOwningSquadron() == null) {
+      if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
+        mission.setOwningSquadron(mission.getOwner().getSquadron());
+      } else {
+        squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
+      }
+    }
 
     return missionRepository.save(mission);
   }
@@ -1189,6 +1198,11 @@ public class MissionService {
     }
 
     subMission.setParent(parent);
+
+    if (subMission.getOwningSquadron() == null) {
+      subMission.setOwningSquadron(parent.getOwningSquadron());
+    }
+
     return missionRepository.save(subMission);
   }
 

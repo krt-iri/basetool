@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -47,6 +48,7 @@ public class SquadronScopeService {
 
   private final AuthHelperService authHelper;
   private final UserRepository userRepository;
+  private final SquadronRepository squadronRepository;
   private final HttpServletRequest request;
 
   /**
@@ -68,6 +70,22 @@ public class SquadronScopeService {
         .flatMap(userRepository::findById)
         .map(User::getSquadron)
         .map(Squadron::getId);
+  }
+
+  /**
+   * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
+   * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
+   * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use
+   * this to stamp {@code owningSquadron} on newly-created aggregates that have no owner field of
+   * their own (e.g. {@code Operation}) - aggregates that DO carry an owner ({@code Ship}, {@code
+   * Mission}, ...) prefer to derive the squadron from the owner so a future user-squadron move does
+   * not silently retag history.
+   *
+   * @return the {@link Squadron} for the current effective context, or empty when none applies.
+   */
+  @NotNull
+  public Optional<Squadron> currentSquadron() {
+    return currentSquadronId().flatMap(squadronRepository::findById);
   }
 
   /**
