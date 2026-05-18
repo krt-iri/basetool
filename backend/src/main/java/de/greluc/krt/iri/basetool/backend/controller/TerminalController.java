@@ -109,8 +109,9 @@ public class TerminalController {
   }
 
   /**
-   * Clears the admin pin on the terminal's {@code hasLoadingDock} flag. The value column keeps its
-   * current state until the next UEX sweep restores the upstream value.
+   * Clears the admin pin on the terminal's {@code hasLoadingDock} flag and immediately reverts the
+   * value column to the last UEX-reported state stored in {@code uexHasLoadingDock}, so the next
+   * read sees the unpinned UEX value without waiting for the next sweep.
    *
    * @param id terminal id
    * @return the persisted terminal DTO
@@ -137,8 +138,9 @@ public class TerminalController {
   }
 
   /**
-   * Clears the admin pin on the terminal's {@code isAutoLoad} flag. The value column keeps its
-   * current state until the next UEX sweep restores the upstream value.
+   * Clears the admin pin on the terminal's {@code isAutoLoad} flag and immediately reverts the
+   * value column to the last UEX-reported state stored in {@code uexIsAutoLoad}, so the next read
+   * sees the unpinned UEX value without waiting for the next sweep.
    *
    * @param id terminal id
    * @return the persisted terminal DTO
