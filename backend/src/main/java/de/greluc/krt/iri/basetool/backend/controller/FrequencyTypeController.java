@@ -83,7 +83,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public FrequencyTypeDto createFrequencyType(
       @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     return frequencyTypeMapper.toDto(
@@ -99,7 +99,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public FrequencyTypeDto updateFrequencyType(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     return frequencyTypeMapper.toDto(
@@ -112,7 +112,7 @@ public class FrequencyTypeController {
    * @param id frequency type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.deleteFrequencyType(id);
   }

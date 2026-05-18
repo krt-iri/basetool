@@ -98,7 +98,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if the referenced topic does not exist
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
     PromotionTopic topic =
         topicRepository
@@ -127,7 +127,7 @@ public class PromotionCategoryService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PromotionCategoryResponse update(
       @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
     PromotionCategory entity = load(id);
@@ -156,7 +156,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if no category exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void delete(@NotNull UUID id) {
     PromotionCategory entity = load(id);
     repository.delete(entity);

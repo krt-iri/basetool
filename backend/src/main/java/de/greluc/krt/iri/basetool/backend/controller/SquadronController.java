@@ -71,7 +71,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
   }
@@ -84,7 +84,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public SquadronDto updateSquadron(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
@@ -96,7 +96,7 @@ public class SquadronController {
    * @param id squadron id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteSquadron(@PathVariable @NotNull UUID id) {
     squadronService.deleteSquadron(id);
   }

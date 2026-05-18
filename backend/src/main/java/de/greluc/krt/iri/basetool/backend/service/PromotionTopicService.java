@@ -77,7 +77,7 @@ public class PromotionTopicService {
    * @return the persisted topic in response form
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
     PromotionTopic entity = mapper.toEntity(request);
     PromotionTopic saved = repository.save(entity);
@@ -99,7 +99,7 @@ public class PromotionTopicService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
     PromotionTopic entity = load(id);
@@ -120,7 +120,7 @@ public class PromotionTopicService {
    * @throws EntityNotFoundException if no topic exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void delete(@NotNull UUID id) {
     PromotionTopic entity = load(id);
     repository.delete(entity);

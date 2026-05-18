@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/pois")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class PoiController {
 
   private final PoiService poiService;
@@ -85,7 +85,7 @@ public class PoiController {
    * @return the persisted POI DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PoiDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return poiMapper.toDto(poiService.setLoadingDockOverride(id, value));
@@ -99,7 +99,7 @@ public class PoiController {
    * @return the persisted POI DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public PoiDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return poiMapper.toDto(poiService.clearLoadingDockOverride(id));
   }

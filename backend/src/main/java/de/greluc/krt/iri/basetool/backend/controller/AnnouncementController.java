@@ -50,7 +50,7 @@ public class AnnouncementController {
    * @return the announcement DTO
    */
   @GetMapping("/admin")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public AnnouncementDto getAdminAnnouncement() {
     return announcementMapper.toDto(announcementService.getAdminAnnouncement());
   }
@@ -62,7 +62,7 @@ public class AnnouncementController {
    * @return the persisted DTO
    */
   @PutMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public AnnouncementDto updateAnnouncement(
       @RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
     return announcementMapper.toDto(
@@ -71,7 +71,7 @@ public class AnnouncementController {
 
   /** Removes the announcement entirely. Next PUT creates a fresh row. */
   @DeleteMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteAnnouncement() {
     announcementService.deleteAnnouncement();
   }

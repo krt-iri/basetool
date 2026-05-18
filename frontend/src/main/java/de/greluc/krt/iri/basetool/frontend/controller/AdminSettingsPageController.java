@@ -35,7 +35,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/settings")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminSettingsPageController {
 
   /** Decimal scale used when converting between DB fraction and form percentage. */

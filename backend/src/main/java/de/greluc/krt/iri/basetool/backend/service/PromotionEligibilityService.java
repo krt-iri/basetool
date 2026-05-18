@@ -135,7 +135,7 @@ public class PromotionEligibilityService {
    * @param userId the JWT-sub identifier of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull String userId) {
     return evaluateAllForUser(userId);
   }

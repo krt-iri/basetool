@@ -55,7 +55,7 @@ public class SystemSettingController {
    * @return the persisted DTO
    */
   @PutMapping("/{key}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public SystemSettingDto updateSetting(
       @PathVariable String key, @Valid @RequestBody SystemSettingUpdateDto dto) {
     return systemSettingService.updateSetting(key, dto);

@@ -74,7 +74,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
     JobType toCreate = jobTypeMapper.toEntity(jobTypeDto);
     return jobTypeMapper.toDto(jobTypeService.createJobType(toCreate));
@@ -88,7 +88,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public JobTypeDto updateJobType(
       @PathVariable @NotNull UUID id, @RequestBody @Valid JobTypeDto jobTypeDto) {
     return jobTypeMapper.toDto(jobTypeService.updateJobType(id, jobTypeDto));
@@ -101,7 +101,7 @@ public class JobTypeController {
    * @param id job type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.deleteJobType(id);
   }

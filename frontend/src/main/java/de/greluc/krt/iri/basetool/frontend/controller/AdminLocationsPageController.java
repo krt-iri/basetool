@@ -33,7 +33,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/locations")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminLocationsPageController {
 
   private final BackendApiClient backendApiClient;
@@ -83,7 +83,7 @@ public class AdminLocationsPageController {
    * @return redirect to {@code /admin/locations}
    */
   @PostMapping("/{id}/toggle-visibility")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String toggleLocationVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,

@@ -85,7 +85,7 @@ public class TerminalController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public TerminalDto updateTerminal(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull TerminalDto terminalDto) {
     // Here we just allow toggling visibility according to the requirement,
@@ -102,7 +102,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public TerminalDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setLoadingDockOverride(id, value));
@@ -116,7 +116,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public TerminalDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearLoadingDockOverride(id));
   }
@@ -130,7 +130,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/auto-load")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public TerminalDto setAutoLoadOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setAutoLoadOverride(id, value));
@@ -144,7 +144,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/auto-load-override")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public TerminalDto clearAutoLoadOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearAutoLoadOverride(id));
   }

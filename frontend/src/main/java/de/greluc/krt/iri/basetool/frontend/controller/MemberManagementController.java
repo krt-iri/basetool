@@ -38,7 +38,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/members")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+@PreAuthorize("hasRole('ADMIN')")
 public class MemberManagementController {
 
   private final BackendApiClient backendApiClient;
@@ -215,7 +215,7 @@ public class MemberManagementController {
    * @return the updated user record
    */
   @PostMapping("/{id}/logistician")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   @ResponseBody
   public UserDto toggleLogistician(@PathVariable UUID id, @RequestParam boolean isLogistician) {
     return backendApiClient.patch(
@@ -230,7 +230,7 @@ public class MemberManagementController {
    * @return the updated user record
    */
   @PostMapping("/{id}/mission-manager")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   @ResponseBody
   public UserDto toggleMissionManager(
       @PathVariable UUID id, @RequestParam boolean isMissionManager) {

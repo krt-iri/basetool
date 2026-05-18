@@ -89,7 +89,7 @@ public class RankRequirementService {
    * @throws EntityNotFoundException if a referenced topic or category does not exist
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = mapper.toEntity(request);
@@ -120,7 +120,7 @@ public class RankRequirementService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
     validateSingleRankStep(request.fromRank(), request.toRank());
@@ -144,7 +144,7 @@ public class RankRequirementService {
    * @throws EntityNotFoundException if no rank requirement exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void delete(@NotNull UUID id) {
     RankRequirement entity = load(id);
     repository.delete(entity);

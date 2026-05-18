@@ -170,7 +170,7 @@ public class PromotionPageController {
    * allCategories}, which is what the row body relies on.
    */
   @GetMapping("/manage")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String manage(Model model) {
     List<PromotionTopicDto> topics = fetchTopics();
     // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
@@ -235,7 +235,7 @@ public class PromotionPageController {
 
   /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
   @GetMapping("/admin/topics")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String adminTopics(Model model) {
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
@@ -264,7 +264,7 @@ public class PromotionPageController {
    * @return the Thymeleaf view name for the rank-requirements admin page
    */
   @GetMapping("/admin/rank-requirements")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String adminRankRequirements(Model model) {
     List<RankRequirementDto> requirements = fetchAllRankRequirements();
 

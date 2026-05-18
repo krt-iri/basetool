@@ -177,7 +177,7 @@ public class UserController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/attributes")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
@@ -196,7 +196,7 @@ public class UserController {
    * {@code ROLE_LOGISTICIAN} on the next authentication.
    */
   @PatchMapping("/{id}/logistician")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public UserDto updateLogisticianStatus(
       @PathVariable @NotNull UUID id, @RequestParam boolean isLogistician) {
     return userMapper.toDto(userService.updateLogisticianStatus(id, isLogistician));
@@ -204,7 +204,7 @@ public class UserController {
 
   /** Flips the {@code is_mission_manager} flag (mirrors {@link #updateLogisticianStatus}). */
   @PatchMapping("/{id}/mission-manager")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public UserDto updateMissionManagerStatus(
       @PathVariable @NotNull UUID id, @RequestParam boolean isMissionManager) {
     return userMapper.toDto(userService.updateMissionManagerStatus(id, isMissionManager));

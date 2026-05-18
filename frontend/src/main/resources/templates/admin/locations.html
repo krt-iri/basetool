@@ -88,7 +88,7 @@
                         <td th:text="${loc.description}">Desc</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
                                     <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
                                 </form>

@@ -17,7 +17,7 @@
         <td th:text="${term.name}">Name</td>
         <td th:text="${term.nickname}">Nickname</td>
         <td>
-            <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+            <div class="flex-gap-xs" sec:authorize="hasRole('ADMIN')">
                 <form method="post" th:action="@{/admin/uex-data/terminals/{id}/loading-dock(id=${term.id})}" style="margin: 0;">
                     <input type="hidden" name="action" value="uex">
                     <button type="submit" class="btn" th:classappend="${!term.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -44,7 +44,7 @@
             </div>
         </td>
         <td>
-            <div class="flex-gap-xs" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+            <div class="flex-gap-xs" sec:authorize="hasRole('ADMIN')">
                 <form method="post" th:action="@{/admin/uex-data/terminals/{id}/auto-load(id=${term.id})}" style="margin: 0;">
                     <input type="hidden" name="action" value="uex">
                     <button type="submit" class="btn" th:classappend="${!term.isAutoLoadOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -71,7 +71,7 @@
             </div>
         </td>
         <td>
-            <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" style="margin: 0;">
+            <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" style="margin: 0;">
                 <input type="hidden" name="hidden" th:value="${!term.hidden}">
                 <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'" th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>
             </form>
