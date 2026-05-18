@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.model;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -140,4 +141,15 @@ public class Mission extends AbstractEntity<UUID> {
       inverseJoinColumns = @JoinColumn(name = "user_id"))
   @OptimisticLock(excluded = true)
   private Set<User> managers = new HashSet<>();
+
+  /**
+   * Squadron that owns this mission. Set at creation time from the caller's active squadron and
+   * immutable afterwards. Gates read/write access together with {@link #isInternal}: non-internal
+   * missions are visible across squadrons, internal ones are restricted to the owning squadron and
+   * admins. Kept JPA-nullable for Phase 1 until Flyway V84 tightens the column to NOT NULL.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "owning_squadron_id")
+  @OptimisticLock(excluded = true)
+  private Squadron owningSquadron;
 }

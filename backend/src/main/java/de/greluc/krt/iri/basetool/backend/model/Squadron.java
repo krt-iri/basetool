@@ -21,6 +21,14 @@ import lombok.ToString;
 @AllArgsConstructor
 public class Squadron extends AbstractEntity<UUID> {
 
+  /**
+   * Canonical UUID of the IRIDIUM squadron. Seeded by Flyway migration V80 so backfills, tests, and
+   * the application code (e.g. backfilling new aggregates with the default tenant) refer to a
+   * deterministic identifier without an upfront database lookup. Do not reuse for any other
+   * squadron.
+   */
+  public static final UUID IRIDIUM_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
