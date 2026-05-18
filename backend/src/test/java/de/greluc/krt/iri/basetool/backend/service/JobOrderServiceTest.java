@@ -420,6 +420,49 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateJobOrder_ShouldNotModifyCreatingSquadron_WhenRequestingSquadronChanges() {
+    // Plan §8 + §11: creatingSquadron is immutable after the order is persisted; only
+    // requestingSquadron may be retargeted by a Logistician+ during the order's lifetime.
+    // This pins the contract that updateJobOrder NEVER touches creatingSquadron even when
+    // the inbound DTO carries a different squadron string (which only retargets requesting).
+    Squadron creatingOriginal = new Squadron();
+    creatingOriginal.setId(UUID.randomUUID());
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    Squadron requestingOriginal = new Squadron();
+    requestingOriginal.setId(UUID.randomUUID());
+    requestingOriginal.setShorthand("ALF");
+    jobOrder.setRequestingSquadron(requestingOriginal);
+
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    // The DTO carries the squadron STRING that gets looked up against shorthand and turns
+    // into requestingSquadron — "Bravo" is intentionally different from creatingOriginal/
+    // requestingOriginal's "ALF".
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto("Bravo", "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    jobOrderService.updateJobOrder(orderId, updateDto);
+
+    // The creating squadron must be the SAME reference (and same id) as before the update.
+    assertSame(
+        creatingOriginal,
+        jobOrder.getCreatingSquadron(),
+        "creatingSquadron is immutable per Plan §8 — update must not retag the authoring"
+            + " squadron.");
+    // The requesting squadron must reflect the new "Bravo" shorthand.
+    assertNotNull(jobOrder.getRequestingSquadron());
+    assertEquals("Bravo", jobOrder.getRequestingSquadron().getShorthand());
+    // Legacy squadron VARCHAR mirrors the new requestingSquadron shorthand.
+    assertEquals("Bravo", jobOrder.getSquadron());
+  }
+
+  @Test
   void updateJobOrder_ShouldUpdateFieldsAndUnlinkRemovedMaterials() {
     // Given
     UUID newMaterialId = UUID.randomUUID();
