@@ -1,12 +1,12 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Sicherheitslücke melden
+  - name: Report a Security Vulnerability
     url: https://github.com/krt-iri/basetool/security/advisories/new
     about: >-
-      Sicherheitsrelevante Funde NIE öffentlich als Issue posten.
-      Bitte vertraulich über GitHub Security Advisories einreichen.
-  - name: Frage oder Diskussion
+      NEVER post security-relevant findings publicly as an issue.
+      Please submit them confidentially via GitHub Security Advisories.
+  - name: Question or Discussion
     url: https://github.com/krt-iri/basetool/discussions
     about: >-
-      Allgemeine Fragen, Architektur-Diskussionen oder How-to-Themen
-      gehören in die Discussions, nicht in den Issue-Tracker.
+      General questions, architecture discussions, or how-to topics
+      belong in Discussions, not the issue tracker.

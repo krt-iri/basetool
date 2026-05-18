@@ -1,5 +1,5 @@
 name: Bug Report
-description: Einen reproduzierbaren Fehler im Basetool melden.
+description: Report a reproducible bug in Basetool.
 title: "[Bug] "
 labels:
   - bug
@@ -8,71 +8,72 @@ body:
   - type: markdown
     attributes:
       value: |
-        Danke für die Meldung. Bitte fülle die Felder so vollständig wie möglich aus —
-        unvollständige Reports verzögern den Fix.
+        Thanks for the report. Please fill in the fields as completely as
+        possible — incomplete reports delay the fix.
 
-        **Sicherheitslücken bitte NICHT hier melden**, sondern vertraulich über
-        [GitHub Security Advisories](https://github.com/krt-iri/basetool/security/advisories/new).
+        **Do NOT report security vulnerabilities here.** Use the confidential
+        channel via [GitHub Security Advisories](https://github.com/krt-iri/basetool/security/advisories/new)
+        instead.
 
   - type: textarea
     id: summary
     attributes:
-      label: Zusammenfassung
+      label: Summary
       description: >-
-        Was passiert in einem Satz? Z. B. "PUT /api/v1/operations/{id} liefert 409,
-        obwohl niemand sonst die Operation editiert."
+        What happens, in one sentence? E.g. "PUT /api/v1/operations/{id}
+        returns 409 even though nobody else is editing the operation."
     validations:
       required: true
 
   - type: dropdown
     id: area
     attributes:
-      label: Betroffener Bereich
+      label: Affected Area
       multiple: true
       options:
         - Backend (REST API / Service / Repository)
         - Frontend (Thymeleaf / Controller / JS)
-        - Datenbank / Flyway-Migration
-        - Security / OIDC / Keycloak / Rollen
-        - Concurrency / Locking / Transaktionen
-        - UEX-Integration
+        - Database / Flyway migration
+        - Security / OIDC / Keycloak / Roles
+        - Concurrency / Locking / Transactions
+        - UEX integration
         - Hangar / Inventory / Refinery
         - Mission Planning / Operations
-        - Inventar / Bestand
-        - i18n / UI-Texte / Styleguide
+        - Inventory / Stock
+        - i18n / UI strings / Styleguide
         - Build / Gradle / CI
         - Docker / Compose / Stack
-        - Sonstiges (im Detail erläutern)
+        - Other (describe in detail)
     validations:
       required: true
 
   - type: input
     id: version
     attributes:
-      label: Version / Commit-Hash
-      description: Welcher Build ist betroffen? Commit-SHA, Branch oder Release-Tag.
-      placeholder: "z. B. main @ 7bc6044 oder v1.4.2"
+      label: Version / Commit Hash
+      description: Which build is affected? Commit SHA, branch, or release tag.
+      placeholder: "e.g. main @ 7bc6044 or v1.4.2"
     validations:
       required: true
 
   - type: dropdown
     id: environment
     attributes:
-      label: Umgebung
+      label: Environment
       options:
-        - Lokal (./gradlew bootRun, dev profile)
-        - Lokaler Docker-Stack (--profile dev)
-        - Lokaler Test-Stack (.env.test + docker-compose.test.yml)
+        - Local (./gradlew bootRun, dev profile)
+        - Local Docker stack (--profile dev)
+        - Local test stack (.env.test + docker-compose.test.yml)
         - Staging
-        - Produktion
+        - Production
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: Reproduktionsschritte
-      description: Was muss man tun, um den Fehler zu sehen?
+      label: Steps to Reproduce
+      description: What does someone have to do to see the bug?
       value: |
         1.
         2.
@@ -83,34 +84,34 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: Erwartetes Verhalten
+      label: Expected Behavior
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: Tatsächliches Verhalten
+      label: Actual Behavior
       description: >-
-        Stacktrace, Screenshot, HTTP-Response — was zur Diagnose hilft.
-        Bitte keine Tokens, Passwörter oder personenbezogenen Daten posten.
+        Stack trace, screenshot, HTTP response — whatever helps diagnosis.
+        Please do not post tokens, passwords, or personal data.
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Logs / Correlation-ID
+      label: Logs / Correlation ID
       description: >-
-        Die `correlationId` aus dem `X-Correlation-Id`-Response-Header oder
-        aus dem MDC-Log-Feld. Wenn ein Stacktrace vorliegt, bitte vollständig
-        posten — aber sensitive Daten vorher entfernen.
+        The `correlationId` from the `X-Correlation-Id` response header or
+        from the MDC log field. If you have a stack trace, please post it in
+        full — but redact any sensitive data first.
       render: text
 
   - type: dropdown
     id: role
     attributes:
-      label: Rolle des betroffenen Users
+      label: Role of the Affected User
       options:
         - GUEST
         - SQUADRON_MEMBER
@@ -118,14 +119,14 @@ body:
         - MISSION_MANAGER
         - OFFICER
         - ADMIN
-        - Mehrere / nicht relevant
+        - Multiple / not relevant
 
   - type: dropdown
     id: browser
     attributes:
-      label: Browser (nur bei Frontend-Bugs)
+      label: Browser (frontend bugs only)
       options:
-        - nicht relevant
+        - not relevant
         - Chrome / Chromium
         - Firefox
         - Safari
@@ -134,10 +135,10 @@ body:
   - type: dropdown
     id: device
     attributes:
-      label: Endgerät (nur bei UI-Bugs)
-      description: Welche der vier KRT-Device-Klassen war betroffen?
+      label: Device (UI bugs only)
+      description: Which of the four KRT device classes was affected?
       options:
-        - nicht relevant
+        - not relevant
         - "Smartphone (<= 768px)"
         - "Tablet (768-1024px)"
         - "Desktop (1024-1600px)"
@@ -148,9 +149,9 @@ body:
     attributes:
       label: Self-Check
       options:
-        - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
+        - label: I have searched open and closed issues for duplicates.
           required: true
-        - label: Ich habe keine Tokens, Passwörter, Mail-Adressen oder Klarnamen im Report hinterlassen.
+        - label: I have not included any tokens, passwords, email addresses, or real names in this report.
           required: true
-        - label: Mir ist klar, dass Sicherheitslücken vertraulich gemeldet werden müssen — nicht hier.
+        - label: I understand that security vulnerabilities must be reported confidentially — not here.
           required: true
