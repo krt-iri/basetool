@@ -17,4 +17,5 @@ public record MissionListDto(
     Instant actualEndTime,
     Boolean isInternal,
     OperationDto operation,
+    SquadronReferenceDto owningSquadron,
     Long version) {}

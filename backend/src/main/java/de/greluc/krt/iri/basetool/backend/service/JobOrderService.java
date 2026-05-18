@@ -628,6 +628,8 @@ public class JobOrderService {
         baseDto.id(),
         baseDto.displayId(),
         baseDto.squadron(),
+        baseDto.creatingSquadron(),
+        baseDto.requestingSquadron(),
         baseDto.handle(),
         baseDto.priority(),
         baseDto.status(),

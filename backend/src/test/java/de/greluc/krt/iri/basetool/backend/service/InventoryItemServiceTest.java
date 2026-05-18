@@ -408,6 +408,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null,
+            null,
             null);
     when(inventoryItemMapper.toDto(savedItem)).thenReturn(expectedDto);
 

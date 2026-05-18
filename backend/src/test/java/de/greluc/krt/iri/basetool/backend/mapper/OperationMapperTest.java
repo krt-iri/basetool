@@ -8,12 +8,22 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class OperationMapperTest {
 
-  private final OperationMapper mapper = Mappers.getMapper(OperationMapper.class);
+  private OperationMapper mapper;
+
+  @BeforeEach
+  void setUp() {
+    // OperationMapperImpl @Autowires SquadronMapper for the owningSquadron projection — wire it
+    // manually since we are running without a Spring context.
+    mapper = Mappers.getMapper(OperationMapper.class);
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+  }
 
   @Test
   void toDto_shouldMapAllFields() {

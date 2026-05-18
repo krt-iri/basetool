@@ -130,6 +130,8 @@ class JobOrderServiceTest {
             orderId,
             1,
             "Alpha",
+            null,
+            null,
             "Tester",
             1,
             JobOrderStatus.OPEN,
@@ -499,7 +501,20 @@ class JobOrderServiceTest {
 
     InventoryItemDto itemDto =
         new InventoryItemDto(
-            item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, null, 1L);
+            item.getId(),
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -663,20 +678,72 @@ class JobOrderServiceTest {
     // Same owner "Alpha", same quality 80, different location → ArcCorp before Baijini
     InventoryItemDto dto1 =
         new InventoryItemDto(
-            i1.getId(), userAlpha, null, locB, 80, 5.0, false, null, null, null, null, null, 1L);
+            i1.getId(),
+            userAlpha,
+            null,
+            locB,
+            80,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Same owner "Alpha", higher quality 90 → comes before quality 80
     InventoryItemDto dto2 =
         new InventoryItemDto(
-            i2.getId(), userAlpha, null, locA, 90, 3.0, false, null, null, null, null, null, 1L);
+            i2.getId(),
+            userAlpha,
+            null,
+            locA,
+            90,
+            3.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Owner "Beta" → after all "Alpha" entries
     InventoryItemDto dto3 =
         new InventoryItemDto(
-            i3.getId(), userBeta, null, locA, 70, 20.0, false, null, null, null, null, null, 1L);
+            i3.getId(),
+            userBeta,
+            null,
+            locA,
+            70,
+            20.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before
     // lower amount
     InventoryItemDto dto4 =
         new InventoryItemDto(
-            i4.getId(), userAlpha, null, locA, 80, 10.0, false, null, null, null, null, null, 1L);
+            i4.getId(),
+            userAlpha,
+            null,
+            locA,
+            80,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));

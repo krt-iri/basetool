@@ -79,6 +79,8 @@ class JobOrderServiceAssigneeAndListTest {
                   o.getId(),
                   o.getDisplayId(),
                   o.getSquadron(),
+                  null,
+                  null,
                   o.getHandle(),
                   o.getPriority(),
                   o.getStatus(),

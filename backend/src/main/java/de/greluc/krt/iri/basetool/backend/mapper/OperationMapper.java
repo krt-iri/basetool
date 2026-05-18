@@ -8,7 +8,10 @@ import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 /** MapStruct mapper between Operation entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    uses = {SquadronMapper.class},
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OperationMapper {
 
   /** Maps an {@link Operation} entity to its outbound DTO. */

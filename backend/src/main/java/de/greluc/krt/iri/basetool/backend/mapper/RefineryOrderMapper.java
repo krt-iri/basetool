@@ -13,7 +13,7 @@ import org.mapstruct.Mapping;
 /** MapStruct mapper between Refinery Order entities and DTOs. */
 @Mapper(
     componentModel = "spring",
-    uses = {UserMapper.class, MaterialMapper.class},
+    uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class},
     unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface RefineryOrderMapper {
   /**

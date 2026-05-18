@@ -10,6 +10,7 @@ public record OperationDto(
     String name,
     String description,
     OperationStatus status,
+    SquadronReferenceDto owningSquadron,
     Long version,
     Instant createdAt,
     Instant updatedAt) {}

@@ -79,6 +79,8 @@ class JobOrderServicePriorityAndStatusTest {
                   o.getId(),
                   o.getDisplayId(),
                   o.getSquadron(),
+                  null,
+                  null,
                   o.getHandle(),
                   o.getPriority(),
                   o.getStatus(),

@@ -173,6 +173,7 @@ class MissionControllerLifecycleTest {
             null,
             false,
             null,
+            null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.getAllMissions(any(Pageable.class))).thenReturn(page);
@@ -205,6 +206,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
@@ -280,6 +282,7 @@ class MissionControllerLifecycleTest {
             null,
             false,
             null,
+            null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -328,6 +331,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);

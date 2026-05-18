@@ -295,6 +295,7 @@ public class RefineryOrderPageController {
               form.getStatus() != null
                   ? form.getStatus()
                   : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
+              null,
               form.getVersion());
 
       log.info("Sending refinery order DTO: {}", orderDto);
@@ -578,6 +579,7 @@ public class RefineryOrderPageController {
               form.getStatus() != null
                   ? form.getStatus()
                   : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
+              null,
               form.getVersion());
 
       backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);

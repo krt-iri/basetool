@@ -11,4 +11,5 @@ public record ShipDto(
     LocationDto location,
     Boolean fitted,
     UserDto owner,
+    SquadronReferenceDto owningSquadron,
     Long version) {}

@@ -363,6 +363,7 @@ class InventoryItemServiceAggregateTest {
               null,
               null,
               null,
+              null,
               1L);
       InventoryItemDto withLoc = newItem(mat, "ARC-L2", 200, 100.0);
 
@@ -513,6 +514,7 @@ class InventoryItemServiceAggregateTest {
         null,
         null, // missionId, missionName
         null, // note
+        null, // owningSquadron
         1L); // version
   }
 

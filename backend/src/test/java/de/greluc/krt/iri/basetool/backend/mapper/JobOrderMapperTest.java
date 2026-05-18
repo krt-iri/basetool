@@ -41,6 +41,7 @@ class JobOrderMapperTest {
     ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "materialMapper", materialMapper);
     ReflectionTestUtils.setField(mapper, "jobOrderHandoverMapper", handoverMapper);
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

@@ -13,7 +13,7 @@ import org.mapstruct.Mapper;
 /** MapStruct mapper between Ship entities and DTOs. */
 @Mapper(
     componentModel = "spring",
-    uses = {UserMapper.class})
+    uses = {UserMapper.class, SquadronMapper.class})
 public interface ShipMapper {
   /** Maps a {@link Ship} entity to its outbound DTO. */
   ShipDto toDto(Ship ship);

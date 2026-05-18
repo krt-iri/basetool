@@ -22,4 +22,5 @@ public record RefineryOrderDto(
     RefiningMethodDto refiningMethod,
     String status,
     @NotEmpty List<RefineryGoodDto> goods,
+    SquadronReferenceDto owningSquadron,
     Long version) {}

@@ -76,6 +76,7 @@ class RefineryOrderStorageCalculationTest {
             null,
             List.of(good),
             RefineryOrderStatus.OPEN,
+            null,
             0L);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class)))
@@ -130,6 +131,7 @@ class RefineryOrderStorageCalculationTest {
             null,
             List.of(good),
             RefineryOrderStatus.OPEN,
+            null,
             0L);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class)))

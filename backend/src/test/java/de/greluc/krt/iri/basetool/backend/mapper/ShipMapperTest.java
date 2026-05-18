@@ -27,6 +27,7 @@ class ShipMapperTest {
     // manually since we are running without a Spring context.
     mapper = Mappers.getMapper(ShipMapper.class);
     ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

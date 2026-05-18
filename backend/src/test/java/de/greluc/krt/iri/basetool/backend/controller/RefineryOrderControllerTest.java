@@ -415,6 +415,7 @@ class RefineryOrderControllerTest {
         null, // refiningMethod
         "OPEN",
         java.util.List.of(),
+        null,
         1L);
   }
 }

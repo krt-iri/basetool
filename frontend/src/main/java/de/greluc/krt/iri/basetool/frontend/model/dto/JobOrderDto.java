@@ -9,6 +9,8 @@ public record JobOrderDto(
     UUID id,
     Integer displayId,
     String squadron,
+    SquadronReferenceDto creatingSquadron,
+    SquadronReferenceDto requestingSquadron,
     String handle,
     Integer priority,
     String status,

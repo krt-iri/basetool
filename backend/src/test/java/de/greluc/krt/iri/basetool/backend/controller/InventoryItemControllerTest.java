@@ -77,7 +77,7 @@ class InventoryItemControllerTest {
 
   private static InventoryItemDto inventoryItem(UUID id) {
     return new InventoryItemDto(
-        id, null, null, null, 750, 10.0, false, null, null, null, null, null, 1L);
+        id, null, null, null, 750, 10.0, false, null, null, null, null, null, null, 1L);
   }
 
   // ── GET /aggregated ───────────────────────────────────────────────────

@@ -27585,12 +27585,30 @@
             },
             "minItems" : 1
           },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
           }
         },
         "required" : [ "goods", "location" ]
+      },
+      "SquadronReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          }
+        }
       },
       "UserReferenceDto" : {
         "type" : "object",
@@ -28081,6 +28099,12 @@
           "squadron" : {
             "type" : "string"
           },
+          "creatingSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "requestingSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
           "handle" : {
             "type" : "string"
           },
@@ -28264,6 +28288,9 @@
             "type" : "string",
             "enum" : [ "PLANNED", "ACTIVE", "COMPLETED", "CANCELED" ]
           },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -28403,6 +28430,9 @@
           },
           "note" : {
             "type" : "string"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "version" : {
             "type" : "integer",
@@ -28740,6 +28770,9 @@
           },
           "owner" : {
             "$ref" : "#/components/schemas/UserDto"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "version" : {
             "type" : "integer",
@@ -30675,6 +30708,9 @@
           },
           "operation" : {
             "$ref" : "#/components/schemas/OperationDto"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "version" : {
             "type" : "integer",

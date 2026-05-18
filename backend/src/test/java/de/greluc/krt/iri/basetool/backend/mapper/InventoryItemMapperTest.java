@@ -29,6 +29,7 @@ class InventoryItemMapperTest {
     // dependency manually so the nested toReferenceDto(...) call succeeds.
     mapper = Mappers.getMapper(InventoryItemMapper.class);
     ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

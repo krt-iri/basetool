@@ -1083,7 +1083,7 @@ public class MissionPageController {
 
       OperationDto operation =
           (form.operationId() != null && !form.operationId().isBlank())
-              ? new OperationDto(UUID.fromString(form.operationId()), null, null, null, null)
+              ? new OperationDto(UUID.fromString(form.operationId()), null, null, null, null, null)
               : null;
 
       MissionDto missionDto =

@@ -17,7 +17,8 @@ import org.mapstruct.Mapping;
       InventoryItemMapper.class,
       UserMapper.class,
       MaterialMapper.class,
-      JobOrderHandoverMapper.class
+      JobOrderHandoverMapper.class,
+      SquadronMapper.class
     })
 public interface JobOrderMapper {
 
