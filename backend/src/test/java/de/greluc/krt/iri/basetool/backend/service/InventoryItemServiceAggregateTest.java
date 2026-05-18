@@ -74,6 +74,7 @@ class InventoryItemServiceAggregateTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private InventoryItemService service;
 
@@ -99,6 +100,7 @@ class InventoryItemServiceAggregateTest {
               isNull(),
               eq(false),
               isNull(),
+              isNull(),
               any(Pageable.class));
     }
 
@@ -116,6 +118,7 @@ class InventoryItemServiceAggregateTest {
               eq(false),
               isNull(),
               eq(false),
+              isNull(),
               isNull(),
               any(Pageable.class));
     }
@@ -135,6 +138,7 @@ class InventoryItemServiceAggregateTest {
               eq(false),
               isNull(),
               eq(false),
+              isNull(),
               isNull(),
               any(Pageable.class));
     }
@@ -156,6 +160,7 @@ class InventoryItemServiceAggregateTest {
               eq(List.of(jobId)),
               eq(true),
               eq(List.of(missionId)),
+              isNull(),
               any(Pageable.class));
     }
 
@@ -175,6 +180,7 @@ class InventoryItemServiceAggregateTest {
               any(),
               anyBoolean(),
               any(),
+              isNull(),
               any(Pageable.class));
       assertEquals(750, captor.getValue());
     }
@@ -196,6 +202,7 @@ class InventoryItemServiceAggregateTest {
               eq(false),
               isNull(),
               eq(false),
+              isNull(),
               isNull(),
               any(Pageable.class));
     }
@@ -454,6 +461,7 @@ class InventoryItemServiceAggregateTest {
                 any(),
                 anyBoolean(),
                 any(),
+                isNull(),
                 any(Pageable.class)))
         .thenReturn(page);
   }
@@ -480,6 +488,7 @@ class InventoryItemServiceAggregateTest {
             any(),
             anyBoolean(),
             any(),
+            isNull(),
             any(Pageable.class)))
         .thenReturn(page);
   }

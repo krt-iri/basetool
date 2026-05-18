@@ -524,4 +524,63 @@ class ArchitectureTest {
     }
     return false;
   }
+
+  /**
+   * Staffel-scoped aggregate services MUST consult either {@code AuthHelperService} (for raw
+   * principal / role lookups) or {@code SquadronScopeService} (for canSee/canEdit + active-context
+   * resolution) - otherwise the data they emit might leak across squadrons. Phase 3 of
+   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift.
+   *
+   * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
+   * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
+   * operate without a squadron filter. They do depend on {@code AuthHelperService} for the owner
+   * stamp at create time, which keeps the test honest by still being satisfied for them via the
+   * AuthHelperService route.
+   */
+  @Test
+  void staffelScopedServicesMustWireSquadronOrAuthHelper() {
+    // JobOrderHandoverService is intentionally NOT in the list yet: it would need an
+    // AuthHelperService dep to stamp the audit trail, but the audit-write itself is a Phase 6
+    // follow-up. Add it once that lands so the rule keeps the cross-staffel write path honest.
+    Set<String> staffelScopedServiceNames =
+        Set.of(
+            "MissionService",
+            "InventoryItemService",
+            "RefineryOrderService",
+            "HangarService",
+            "OperationService",
+            "JobOrderService");
+
+    String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
+    String squadronScope = "de.greluc.krt.iri.basetool.backend.service.SquadronScopeService";
+
+    classes()
+        .that(
+            new DescribedPredicate<JavaClass>("is one of the staffel-scoped aggregate services") {
+              @Override
+              public boolean test(JavaClass javaClass) {
+                return staffelScopedServiceNames.contains(javaClass.getSimpleName());
+              }
+            })
+        .should(
+            new ArchCondition<>("depend on AuthHelperService or SquadronScopeService") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                boolean hasIt =
+                    javaClass.getFields().stream()
+                        .map(f -> f.getRawType().getFullName())
+                        .anyMatch(t -> t.equals(authHelper) || t.equals(squadronScope));
+                if (!hasIt) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          javaClass,
+                          javaClass.getName()
+                              + " is in the staffel-scoped service whitelist but injects neither"
+                              + " AuthHelperService nor SquadronScopeService - that means it"
+                              + " cannot enforce the multi-tenant filter / squadron stamp."));
+                }
+              }
+            })
+        .check(CLASSES);
+  }
 }

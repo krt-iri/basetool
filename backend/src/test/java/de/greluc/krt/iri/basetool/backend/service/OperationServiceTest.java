@@ -72,6 +72,7 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
+    when(squadronScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
 
     // When
     Operation result = operationService.createOperation(operation);

@@ -54,6 +54,7 @@ class InventoryItemServiceTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
 
   @Mock private MaterialMapper materialMapper;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private InventoryItemService inventoryItemService;
 
@@ -142,7 +143,8 @@ class InventoryItemServiceTest {
   void getAggregatedInventory_shouldReturnPage() {
     Object[] obj = new Object[] {new Material(), 10.0, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
-    when(inventoryItemRepository.getAggregatedInventory(any(Pageable.class))).thenReturn(page);
+    when(inventoryItemRepository.getAggregatedInventory(isNull(), any(Pageable.class)))
+        .thenReturn(page);
     when(materialMapper.toDto(any())).thenReturn(null);
 
     Page<AggregatedInventoryDto> result =
@@ -194,6 +196,7 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -221,6 +224,7 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
+            isNull(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -242,6 +246,7 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
+            isNull(),
             any(Pageable.class));
   }
 

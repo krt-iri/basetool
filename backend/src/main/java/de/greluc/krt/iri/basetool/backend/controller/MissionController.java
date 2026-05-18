@@ -222,6 +222,7 @@ public class MissionController {
    */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
+  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id, Principal principal) {
     var mission = missionService.getMissionById(id);

@@ -114,7 +114,7 @@ public class OperationController {
    * @return the operation DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
   @Operation(summary = "Get operation by ID")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation found."),
@@ -250,7 +250,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =

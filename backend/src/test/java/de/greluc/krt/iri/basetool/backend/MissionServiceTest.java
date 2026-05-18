@@ -42,6 +42,9 @@ class MissionServiceTest {
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
+  @Mock
+  private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService squadronScopeService;
+
   @InjectMocks private MissionService missionService;
 
   @Test
@@ -80,13 +83,13 @@ class MissionServiceTest {
         List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
 
     Pageable pageable = PageRequest.of(0, 10);
-    when(missionRepository.searchMissions(query, start, end, status, null, null, pageable))
+    when(missionRepository.searchMissions(query, start, end, status, null, null, null, pageable))
         .thenReturn(Page.empty());
 
     Page<Mission> result =
         missionService.searchMissions(query, start, end, null, null, null, pageable);
 
-    verify(missionRepository).searchMissions(query, start, end, status, null, null, pageable);
+    verify(missionRepository).searchMissions(query, start, end, status, null, null, null, pageable);
   }
 
   @Test

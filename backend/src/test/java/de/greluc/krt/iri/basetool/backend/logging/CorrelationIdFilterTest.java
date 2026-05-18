@@ -5,9 +5,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +37,17 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 class CorrelationIdFilterTest {
 
   private final LoggingProperties props = new LoggingProperties();
-  private final CorrelationIdFilter filter = new CorrelationIdFilter(props);
+  private final AuthHelperService authHelperService = mock(AuthHelperService.class);
+  private final SquadronScopeService squadronScopeService = mock(SquadronScopeService.class);
+  private final CorrelationIdFilter filter =
+      new CorrelationIdFilter(props, authHelperService, squadronScopeService);
+
+  {
+    // Default behaviour: anonymous traffic returns "none" through the filter's defensive
+    // fallback. Tests that assert squadronId behaviour can stub these mocks per-case.
+    when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+  }
 
   @AfterEach
   void tearDown() {

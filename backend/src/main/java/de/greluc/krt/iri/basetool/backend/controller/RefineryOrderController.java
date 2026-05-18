@@ -92,7 +92,7 @@ public class RefineryOrderController {
    * @return the refinery-order DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeRefineryOrder(#id)")
   @Transactional(readOnly = true)
   public RefineryOrderDto getRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
@@ -161,7 +161,7 @@ public class RefineryOrderController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditRefineryOrder(#id)")
   public RefineryOrderDto updateMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -195,7 +195,7 @@ public class RefineryOrderController {
    * #updateMyRefineryOrder}.
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditRefineryOrder(#id)")
   public void deleteMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     refineryOrderService.deleteRefineryOrder(
