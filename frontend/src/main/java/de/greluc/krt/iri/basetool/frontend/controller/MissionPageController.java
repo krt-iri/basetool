@@ -1247,10 +1247,10 @@ public class MissionPageController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> addManager(
       @PathVariable String id, @PathVariable String userId) {
-    log.info("[DEBUG_LOG] START addManager - id: '{}', userId: '{}'", id, userId);
+    log.debug("START addManager - id: '{}', userId: '{}'", id, userId);
     try {
       if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.error("[DEBUG_LOG] MISSING PARAMETERS - id: '{}', userId: '{}'", id, userId);
+        log.debug("MISSING PARAMETERS - id: '{}', userId: '{}'", id, userId);
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
       java.util.UUID missionUuid;
@@ -1258,31 +1258,29 @@ public class MissionPageController {
       try {
         missionUuid = java.util.UUID.fromString(id.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID MISSION ID FORMAT - id: '{}', Error: {}", id, e.getMessage());
+        log.debug("INVALID MISSION ID FORMAT - id: '{}', Error: {}", id, e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
       try {
         userUuid = java.util.UUID.fromString(userId.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID USER ID FORMAT - userId: '{}', Error: {}", userId, e.getMessage());
+        log.debug("INVALID USER ID FORMAT - userId: '{}', Error: {}", userId, e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
 
-      log.info("[DEBUG_LOG] CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
+      log.debug("CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
       try {
         backendApiClient.post(
             "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
             null,
             String.class,
             false);
-        log.info("[DEBUG_LOG] SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
+        log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
         return org.springframework.http.ResponseEntity.ok().build();
       } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-        log.error(
-            "[DEBUG_LOG] BACKEND ERROR adding manager for mission {} and user {}: Status={},"
-                + " Message={}, Readable={}",
+        log.debug(
+            "BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={},"
+                + " Readable={}",
             missionUuid,
             userUuid,
             e.getStatusCode(),
@@ -1291,8 +1289,8 @@ public class MissionPageController {
         return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
       }
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in addManager: id='{}', userId='{}', error={}",
+      log.debug(
+          "UNEXPECTED ERROR in addManager: id='{}', userId='{}', error={}",
           id,
           userId,
           e.getMessage(),
@@ -1311,11 +1309,10 @@ public class MissionPageController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> removeManager(
       @PathVariable String id, @PathVariable String userId) {
-    log.info("[DEBUG_LOG] START removeManager - id: '{}', userId: '{}'", id, userId);
+    log.debug("START removeManager - id: '{}', userId: '{}'", id, userId);
     try {
       if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.error(
-            "[DEBUG_LOG] MISSING PARAMETERS in removeManager - id: '{}', userId: '{}'", id, userId);
+        log.debug("MISSING PARAMETERS in removeManager - id: '{}', userId: '{}'", id, userId);
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
       java.util.UUID missionUuid;
@@ -1323,40 +1320,37 @@ public class MissionPageController {
       try {
         missionUuid = java.util.UUID.fromString(id.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID MISSION ID FORMAT in removeManager - id: '{}', Error: {}",
-            id,
-            e.getMessage());
+        log.debug(
+            "INVALID MISSION ID FORMAT in removeManager - id: '{}', Error: {}", id, e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
       try {
         userUuid = java.util.UUID.fromString(userId.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID USER ID FORMAT in removeManager - userId: '{}', Error: {}",
+        log.debug(
+            "INVALID USER ID FORMAT in removeManager - userId: '{}', Error: {}",
             userId,
             e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
 
-      log.info("[DEBUG_LOG] CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
+      log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
       backendApiClient.delete(
           "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
           Object.class,
           false);
-      log.info(
-          "[DEBUG_LOG] SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
+      log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
       return org.springframework.http.ResponseEntity.ok().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] BACKEND ERROR removing manager: Status={}, Message={}, Readable={}",
+      log.debug(
+          "BACKEND ERROR removing manager: Status={}, Message={}, Readable={}",
           e.getStatusCode(),
           e.getMessage(),
           e.getReadableErrorMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in removeManager: id='{}', userId='{}', error={}",
+      log.debug(
+          "UNEXPECTED ERROR in removeManager: id='{}', userId='{}', error={}",
           id,
           userId,
           e.getMessage(),
@@ -1375,13 +1369,10 @@ public class MissionPageController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Void> setMissionOwner(
       @PathVariable String id, @PathVariable String userId) {
-    log.info("[DEBUG_LOG] START setMissionOwner - id: '{}', userId: '{}'", id, userId);
+    log.debug("START setMissionOwner - id: '{}', userId: '{}'", id, userId);
     try {
       if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.error(
-            "[DEBUG_LOG] MISSING PARAMETERS in setMissionOwner - id: '{}', userId: '{}'",
-            id,
-            userId);
+        log.debug("MISSING PARAMETERS in setMissionOwner - id: '{}', userId: '{}'", id, userId);
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
       java.util.UUID missionUuid;
@@ -1389,8 +1380,8 @@ public class MissionPageController {
       try {
         missionUuid = java.util.UUID.fromString(id.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID MISSION ID FORMAT in setMissionOwner - id: '{}', Error: {}",
+        log.debug(
+            "INVALID MISSION ID FORMAT in setMissionOwner - id: '{}', Error: {}",
             id,
             e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
@@ -1398,31 +1389,30 @@ public class MissionPageController {
       try {
         userUuid = java.util.UUID.fromString(userId.trim());
       } catch (IllegalArgumentException e) {
-        log.error(
-            "[DEBUG_LOG] INVALID USER ID FORMAT in setMissionOwner - userId: '{}', Error: {}",
+        log.debug(
+            "INVALID USER ID FORMAT in setMissionOwner - userId: '{}', Error: {}",
             userId,
             e.getMessage());
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
 
-      log.info("[DEBUG_LOG] CALLING BACKEND PUT - Mission: {}, User: {}", missionUuid, userUuid);
+      log.debug("CALLING BACKEND PUT - Mission: {}, User: {}", missionUuid, userUuid);
       try {
         backendApiClient.put(
             "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class, false);
-        log.info(
-            "[DEBUG_LOG] SUCCESS - Owner of mission {} changed to user {}", missionUuid, userUuid);
+        log.debug("SUCCESS - Owner of mission {} changed to user {}", missionUuid, userUuid);
         return org.springframework.http.ResponseEntity.ok().build();
       } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-        log.error(
-            "[DEBUG_LOG] BACKEND ERROR changing owner: Status={}, Message={}, Readable={}",
+        log.debug(
+            "BACKEND ERROR changing owner: Status={}, Message={}, Readable={}",
             e.getStatusCode(),
             e.getMessage(),
             e.getReadableErrorMessage());
         return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
       }
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in setMissionOwner: id='{}', userId='{}', error={}",
+      log.debug(
+          "UNEXPECTED ERROR in setMissionOwner: id='{}', userId='{}', error={}",
           id,
           userId,
           e.getMessage(),
@@ -1500,13 +1490,13 @@ public class MissionPageController {
               "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class, false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Add/update frequency (AJAX) failed: status={}, msg={}",
+      log.debug(
+          "Add/update frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error("[DEBUG_LOG] UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
+      log.debug("UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1530,17 +1520,12 @@ public class MissionPageController {
               false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Delete frequency (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug(
+          "Delete frequency (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}",
-          id,
-          frequencyId,
-          e);
+      log.debug(
+          "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1564,13 +1549,10 @@ public class MissionPageController {
               "/api/v1/missions/" + id + "/units/slim", body, Object.class, false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Add unit (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error("[DEBUG_LOG] UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
+      log.debug("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1594,14 +1576,10 @@ public class MissionPageController {
               "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class, false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Update unit (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
+      log.debug("UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1619,14 +1597,10 @@ public class MissionPageController {
           "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class, false);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Delete unit (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
+      log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1658,13 +1632,11 @@ public class MissionPageController {
               "/api/v1/missions/" + id + "/participants/slim", body, Object.class, isPublic);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Add participant (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug(
+          "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error("[DEBUG_LOG] UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
+      log.debug("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1696,14 +1668,12 @@ public class MissionPageController {
               isPublic);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Update participant (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug(
+          "Update participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}",
+      log.debug(
+          "UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}",
           id,
           participantId,
           e);
@@ -1731,14 +1701,12 @@ public class MissionPageController {
           isPublic);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Delete participant (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug(
+          "Delete participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}",
+      log.debug(
+          "UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}",
           id,
           participantId,
           e);
@@ -1768,14 +1736,14 @@ public class MissionPageController {
               isPublic);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Check-in participant (AJAX) failed: status={}, msg={}",
+      log.debug(
+          "Check-in participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}",
+      log.debug(
+          "UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}",
           id,
           participantId,
           e);
@@ -1805,14 +1773,14 @@ public class MissionPageController {
               isPublic);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Check-out participant (AJAX) failed: status={}, msg={}",
+      log.debug(
+          "Check-out participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}",
+      log.debug(
+          "UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}",
           id,
           participantId,
           e);
@@ -1842,14 +1810,10 @@ public class MissionPageController {
               false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Add crew (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
+      log.debug("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1877,14 +1841,11 @@ public class MissionPageController {
               false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Update crew (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}",
+      log.debug(
+          "UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}",
           id,
           unitId,
           crewId,
@@ -1913,14 +1874,11 @@ public class MissionPageController {
           false);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Delete crew (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
+      log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}",
+      log.debug(
+          "UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}",
           id,
           unitId,
           crewId,
@@ -1948,14 +1906,13 @@ public class MissionPageController {
               false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
-      log.error(
-          "[DEBUG_LOG] Get unassigned participants (AJAX) failed: status={}, msg={}",
+      log.debug(
+          "Get unassigned participants (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
+      log.debug("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

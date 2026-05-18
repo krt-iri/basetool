@@ -996,8 +996,8 @@ public class MissionController {
     if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
       List<User> matches = userService.findMatchesByExactName(finalGuestName);
       if (matches.size() > 1) {
-        log.info(
-            "[DEBUG_LOG] Participant name '{}' is ambiguous ({} matches) for mission {}",
+        log.debug(
+            "Participant name '{}' is ambiguous ({} matches) for mission {}",
             finalGuestName,
             matches.size(),
             id);
@@ -1008,7 +1008,7 @@ public class MissionController {
           finalUserId = matches.get(0).getId();
           finalGuestName = null;
           log.debug(
-              "[DEBUG_LOG] Resolved free-text participant name '{}' to userId {} for mission {}",
+              "Resolved free-text participant name '{}' to userId {} for mission {}",
               request.guestName(),
               finalUserId,
               id);
@@ -1085,9 +1085,9 @@ public class MissionController {
   }
 
   /**
-   * Legacy add-manager endpoint. Wraps the service call in try/catch with DEBUG_LOG markers to help
-   * debug intermittent test-environment failures — kept until the slim replacement absorbs
-   * production load.
+   * Legacy add-manager endpoint. Wraps the service call in try/catch with debug-level tracing to
+   * aid diagnosis of intermittent test-environment failures — kept until the slim replacement
+   * absorbs production load.
    *
    * @param id mission id
    * @param userId user id to add as manager
@@ -1107,14 +1107,14 @@ public class MissionController {
               + " which returns only the updated manager list.",
       deprecated = true)
   public MissionDto addManager(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    log.info("[DEBUG_LOG] MissionController.addManager START - id: {}, userId: {}", id, userId);
+    log.debug("MissionController.addManager START - id: {}, userId: {}", id, userId);
     try {
       var mission = missionService.addManager(id, userId);
-      log.info("[DEBUG_LOG] MissionController.addManager SUCCESS - id: {}, userId: {}", id, userId);
+      log.debug("MissionController.addManager SUCCESS - id: {}, userId: {}", id, userId);
       return missionMapper.toDto(mission);
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] MissionController.addManager ERROR - id: {}, userId: {}, error: {}",
+      log.debug(
+          "MissionController.addManager ERROR - id: {}, userId: {}, error: {}",
           id,
           userId,
           e.getMessage(),
@@ -1182,21 +1182,14 @@ public class MissionController {
       deprecated = true)
   public MissionDto setMissionOwnerLegacy(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    log.info(
-        "[DEBUG_LOG] MissionController.setMissionOwnerLegacy START - id: {}, userId: {}",
-        id,
-        userId);
+    log.debug("MissionController.setMissionOwnerLegacy START - id: {}, userId: {}", id, userId);
     try {
       var mission = missionService.setMissionOwner(id, userId);
-      log.info(
-          "[DEBUG_LOG] MissionController.setMissionOwnerLegacy SUCCESS - id: {}, userId: {}",
-          id,
-          userId);
+      log.debug("MissionController.setMissionOwnerLegacy SUCCESS - id: {}, userId: {}", id, userId);
       return missionMapper.toDto(mission);
     } catch (Exception e) {
-      log.error(
-          "[DEBUG_LOG] MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error:"
-              + " {}",
+      log.debug(
+          "MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error: {}",
           id,
           userId,
           e.getMessage(),
