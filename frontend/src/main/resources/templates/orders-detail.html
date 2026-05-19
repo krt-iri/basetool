@@ -57,8 +57,7 @@
                 <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
                       th:title="${order.requestingSquadron.name()}"
                       th:text="${order.requestingSquadron.shorthand()}">IRI</span>
-                <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted"
-                      th:text="${order.squadron != null ? order.squadron : '—'}">—</span>
+                <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
             </div>
             <div>
                 <strong th:text="#{orders.detail.creating_squadron}">Erstellt durch</strong><br>
@@ -234,10 +233,10 @@
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
-                <label for="squadron" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
-                <select id="squadron" th:field="*{squadron}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="requestingSquadronId" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
+                <select id="requestingSquadronId" th:field="*{requestingSquadronId}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
                     <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
-                    <option th:each="s : ${squadrons}" th:value="${s.shorthand}" th:text="${s.name}"></option>
+                    <option th:each="s : ${squadrons}" th:value="${s.id}" th:text="${s.name}"></option>
                 </select>
             </div>
 

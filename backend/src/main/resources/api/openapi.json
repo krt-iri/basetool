@@ -28227,9 +28227,6 @@
       "CreateJobOrderDto" : {
         "type" : "object",
         "properties" : {
-          "squadron" : {
-            "type" : "string"
-          },
           "creatingSquadronId" : {
             "type" : "string",
             "format" : "uuid"
@@ -28288,9 +28285,6 @@
           "displayId" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "squadron" : {
-            "type" : "string"
           },
           "creatingSquadron" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
@@ -30781,9 +30775,6 @@
           "displayId" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "squadron" : {
-            "type" : "string"
           },
           "handle" : {
             "type" : "string"

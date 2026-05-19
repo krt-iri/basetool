@@ -84,7 +84,6 @@ class JobOrderHandoverButtonLayoutTest {
         new JobOrderDto(
             orderId,
             1,
-            "SQR",
             null,
             null,
             "Handle",
