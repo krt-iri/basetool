@@ -21,6 +21,10 @@ If you only have a couple of minutes, the very short version is:
    pushed.
 5. **Every user-visible change updates
    [`CHANGELOG.md`](CHANGELOG.md)** under `## [Unreleased]`.
+6. **Sign the [Contributor License Agreement](CLA.md) once** before
+   Your first PR, and **add a `Signed-off-by:` trailer
+   ([DCO](#developer-certificate-of-origin-dco-sign-off)) to every
+   commit** (`git commit -s`).
 
 The rest of this document goes into detail.
 
@@ -37,6 +41,8 @@ The rest of this document goes into detail.
 - [Your first code contribution](#your-first-code-contribution)
 - [Local development setup](#local-development-setup)
 - [Pull requests](#pull-requests)
+- [Contributor License Agreement (CLA)](#contributor-license-agreement-cla)
+- [Developer Certificate of Origin (DCO) sign-off](#developer-certificate-of-origin-dco-sign-off)
 - [Commit messages](#commit-messages)
 - [Branch names](#branch-names)
 - [Style guides](#style-guides)
@@ -48,7 +54,7 @@ The rest of this document goes into detail.
   - [Git and GitHub language](#git-and-github-language)
 - [Architectural invariants to know before you change code](#architectural-invariants-to-know-before-you-change-code)
 - [Before-you-push checklist](#before-you-push-checklist)
-- [License and sign-off](#license-and-sign-off)
+- [License](#license)
 
 ---
 
@@ -245,6 +251,164 @@ address it before merge.
 
 ---
 
+## Contributor License Agreement (CLA)
+
+Before Your first contribution is merged, You must sign the
+[IRIDIUM Basetool Individual Contributor License Agreement](CLA.md).
+
+The CLA grants the Project Maintainers a perpetual, worldwide,
+royalty-free license to distribute Your contributions under GPL-3.0
+and any later GPL-compatible license the Project may adopt, together
+with a parallel patent license to defend the Project against IP
+claims. **You retain copyright in Your contributions** — the CLA does
+not transfer ownership.
+
+The CLA is signed **once** and covers all of Your present and future
+contributions to the Project unless and until You explicitly withdraw.
+There are two signing paths, both documented in
+[§ 11 of the CLA](CLA.md#11-how-to-sign):
+
+- **Signature PR** — open a PR titled `cla: sign — <your-github-handle>` that appends Your name, GitHub handle, commit email, the current date in ISO-8601, and the CLA version to [`docs/cla-signatures.md`](docs/cla-signatures.md). Include the verbatim acceptance sentence from § 11 in the PR description.
+- **CLA-Assistant** — if the maintainers have enabled [CLA-Assistant](https://cla-assistant.io/) on the repository, sign electronically by adding a single comment to Your first PR; follow the in-PR instructions.
+
+If You contribute on behalf of an employer or other legal entity, a
+separate **Entity CLA** is required. Contact
+[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me) to obtain the
+template. Until the Entity CLA is countersigned, Your employer-funded
+contributions cannot be merged.
+
+A pending PR from an author without a signed CLA will be put on hold
+until the CLA is signed; maintainers will leave a friendly reminder
+comment linking to the signing instructions. This is not a punishment —
+it just means the Project cannot legally accept Your code yet.
+
+### What about contributions to non-code areas?
+
+The CLA applies to **every** Contribution as defined in § 1 of the
+CLA — source code, build configuration, Flyway migrations, Keycloak
+theme assets, documentation, translations, GitHub Actions workflows,
+issue comments that the maintainers later commit verbatim, and so on.
+The bar for "needs a signed CLA" is "the change ends up in a commit on
+`main` under Your authorship," not "it touches Java code."
+
+Typo-fix PRs and other trivial changes still require a signed CLA,
+purely to keep the rule unambiguous. The signing procedure takes about
+two minutes; once done, it is never needed again.
+
+---
+
+## Developer Certificate of Origin (DCO) sign-off
+
+In addition to the one-time CLA, **every individual commit** in a
+pull request must carry a `Signed-off-by` trailer that certifies the
+[Developer Certificate of Origin, version 1.1](https://developercertificate.org/).
+
+### Why both a CLA and a DCO?
+
+- The **CLA is a one-time legal grant** signed once per contributor. It defines the IP terms under which the Project may use Your code in perpetuity.
+- The **DCO sign-off is a per-commit attestation** that this specific commit is Your own work (or third-party work You are allowed to forward). It is much lighter-weight than the CLA and easy to audit — every commit either has a `Signed-off-by:` line or it does not.
+
+Together they give the Project a clear legal foundation (CLA) and a
+verifiable per-contribution chain of custody (DCO) without slowing
+contributors down on each PR.
+
+### What the DCO certifies
+
+By adding a `Signed-off-by` line to a commit, You certify that:
+
+> **Developer Certificate of Origin, Version 1.1**
+>
+> (a) The contribution was created in whole or in part by me and I
+> have the right to submit it under the open-source license indicated
+> in the file; or
+>
+> (b) The contribution is based upon previous work that, to the best
+> of my knowledge, is covered under an appropriate open-source license
+> and I have the right under that license to submit that work with
+> modifications, whether created in whole or in part by me, under the
+> same open-source license (unless I am permitted to submit under a
+> different license), as indicated in the file; or
+>
+> (c) The contribution was provided directly to me by some other
+> person who certified (a), (b), or (c) and I have not modified it.
+>
+> (d) I understand and agree that this project and the contribution
+> are public and that a record of the contribution (including all
+> personal information I submit with it, including my sign-off) is
+> maintained indefinitely and may be redistributed consistent with
+> this project or the open-source license(s) involved.
+
+The canonical text lives at <https://developercertificate.org/>.
+
+### How to sign off
+
+Pass `-s` to `git commit`:
+
+```bash
+git commit -s -m "feat(missions): add CSV export of mission roster"
+```
+
+That appends a trailer of the form
+`Signed-off-by: Your Name <you@example.org>` to the commit message.
+The name and email **must** match Your `git config user.name` and
+`user.email` and must be a real, reachable identity — anonymized
+addresses or `noreply` aliases are not accepted as DCO sign-off,
+because they cannot be matched against Your CLA signature.
+
+To sign off **every** future commit in this repository automatically,
+opt in once:
+
+```bash
+git config format.signOff true
+```
+
+### Retroactively signing off existing commits
+
+If You have already made commits without `-s`, rewrite them before
+pushing:
+
+- **Last commit only:**
+  ```bash
+  git commit --amend --signoff --no-edit
+  ```
+- **All commits since branching from `main`:**
+  ```bash
+  git rebase --signoff main
+  ```
+
+Force-push the rewritten branch with
+`git push --force-with-lease origin <your-branch>` to update the PR.
+Never force-push to `main` itself.
+
+### Enforcement
+
+The [`.github/workflows/dco.yml`](.github/workflows/dco.yml) workflow
+runs on every pull request and verifies that every commit in the PR
+carries a `Signed-off-by` trailer whose name and email match the
+commit's author (case-insensitive on the email). Merge commits and
+commits authored by well-known bots (Dependabot, Renovate, GitHub
+Actions) are skipped — see the workflow header for the exact
+exemption list.
+
+If the check fails:
+
+1. Fix it with the rebase / amend commands above.
+2. `git push --force-with-lease origin "$(git branch --show-current)"` to refresh the PR.
+3. The check re-runs automatically.
+
+We block at **merge** time (the check is wired up as a required status
+check via branch protection on `main`), not at commit time. If You
+forget the `-s` flag a few times, the rebase fix is one command — no
+harm done.
+
+> [!NOTE]
+> The DCO requirement applies to commits authored **after** this
+> policy lands. Pre-existing commits in `main` are grandfathered in
+> and do not need to be retroactively rewritten — `git log` history
+> stays as it is.
+
+---
+
 ## Commit messages
 
 The repository follows **[Conventional Commits](https://www.conventionalcommits.org/)**.
@@ -265,7 +429,7 @@ apply there.
 - **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `promotion`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
 - **`<short summary>`** — imperative mood (*"add foo"*, not *"added foo"* or *"adds foo"*), lower-case start, no trailing period, ≤ 72 characters including the prefix.
 - **Body** — explain the *why*. Reference Issues / PRs (`closes #123`, `refs #456`). Keep lines ≤ 100 characters.
-- **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, etc.
+- **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, and — required on every commit — the `Signed-off-by:` trailer from `git commit -s` (see [DCO sign-off](#developer-certificate-of-origin-dco-sign-off)).
 
 ### Examples (taken from real history)
 
@@ -594,6 +758,8 @@ the PR — every box should be reasonably tickable.
 - [ ] No production credentials in test artefacts, stack spin-ups, or screenshots.
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` in the correct category (`Added` / `Changed` / `Fixed` / `Removed` / `Security`).
 - [ ] No tokens, passwords, real names, emails, or JWTs in the diff or in logs.
+- [ ] My [CLA](CLA.md) is on file (one-time, signature in [`docs/cla-signatures.md`](docs/cla-signatures.md) or via CLA-Assistant).
+- [ ] **Every** commit in the PR carries a `Signed-off-by:` trailer (DCO; `git commit -s`).
 - [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
 - [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
 - [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
@@ -605,17 +771,25 @@ instead of silently shipping the gap.
 
 ---
 
-## License and sign-off
+## License
 
 IRIDIUM Basetool is released under the
 [GNU General Public License v3.0](LICENSE.md). By contributing, you
-agree that your contribution is licensed under the same terms.
+agree that your contribution is distributed under GPL-3.0.
 
-There is no formal Contributor License Agreement (CLA) or DCO sign-off
-required. Standard good faith applies: only contribute code you wrote,
-or for which you have the right to grant a GPL-3.0 license. If you
-incorporate third-party code, make sure the upstream license is
-compatible with GPL-3.0 and call it out in the PR description.
+Two contributor agreements complement the GPL-3.0 license and are
+covered in their own sections above:
+
+- The one-time [Contributor License Agreement](#contributor-license-agreement-cla) — defines the IP terms under which the Project may use Your contributions in perpetuity. Full text in [`CLA.md`](CLA.md).
+- The per-commit [Developer Certificate of Origin sign-off](#developer-certificate-of-origin-dco-sign-off) — certifies that this specific commit is Your own work (or third-party work You are allowed to forward).
+
+If You incorporate third-party code, make sure the upstream license is
+compatible with GPL-3.0 and disclose it in the PR description
+(see [§ 6 of the CLA](CLA.md#6-third-party-material)). Common
+GPL-compatible upstream licenses include MIT, BSD-2/3-Clause, Apache
+2.0 (with caveats), and ISC; LGPL and AGPL are compatible in
+context-sensitive ways. When in doubt, ask in the PR or via
+[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me) before submitting.
 
 ---
 
