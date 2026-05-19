@@ -47,7 +47,7 @@ class PromotionTopicControllerTest {
 
   private static PromotionTopicResponse topic(String name) {
     Instant ts = Instant.parse("2026-05-15T12:00:00Z");
-    return new PromotionTopicResponse(UUID.randomUUID(), 1L, name, "desc", 1, ts, ts);
+    return new PromotionTopicResponse(UUID.randomUUID(), 1L, name, "desc", 1, null, ts, ts);
   }
 
   @Test

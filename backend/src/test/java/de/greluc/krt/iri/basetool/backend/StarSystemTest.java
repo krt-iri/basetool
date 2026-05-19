@@ -62,34 +62,28 @@ class StarSystemTest {
   }
 
   @Test
-  void testCreateStarSystem_Officer_Allowed() throws Exception {
+  void testCreateStarSystem_Officer_Forbidden() throws Exception {
     StarSystem system = new StarSystem();
     system.setName("Stanton");
     system.setDescription("A corporate owned system.");
 
-    String response =
-        mockMvc
-            .perform(
-                post("/api/v1/star-systems")
-                    .with(
-                        jwt()
-                            .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                            .authorities(
-                                new SimpleGrantedAuthority("ROLE_OFFICER"),
-                                new SimpleGrantedAuthority("USER_MANAGE"),
-                                new SimpleGrantedAuthority("MISSION_MANAGE"),
-                                new SimpleGrantedAuthority("HANGAR_MANAGE"),
-                                new SimpleGrantedAuthority("REFINERY_MANAGE")))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(system)))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+    mockMvc
+        .perform(
+            post("/api/v1/star-systems")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_OFFICER"),
+                            new SimpleGrantedAuthority("USER_MANAGE"),
+                            new SimpleGrantedAuthority("MISSION_MANAGE"),
+                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(system)))
+        .andExpect(status().isForbidden());
 
-    StarSystem saved = objectMapper.readValue(response, StarSystem.class);
-    assertNotNull(saved.getId());
-    assertEquals("Stanton", saved.getName());
+    assertEquals(0, starSystemRepository.findAll().size());
   }
 
   @Test
@@ -110,7 +104,7 @@ class StarSystemTest {
   }
 
   @Test
-  void testUpdateStarSystem_Officer_Allowed() throws Exception {
+  void testUpdateStarSystem_Officer_Forbidden() throws Exception {
     StarSystem system = new StarSystem();
     system.setName("Stanton");
     system = starSystemRepository.save(system);
@@ -131,14 +125,14 @@ class StarSystemTest {
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(system)))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
     StarSystem updated = starSystemRepository.findById(system.getId()).orElseThrow();
     assertEquals("Stanton System", updated.getName());
   }
 
   @Test
-  void testDeleteStarSystem_Officer_Allowed() throws Exception {
+  void testDeleteStarSystem_Officer_Forbidden() throws Exception {
     StarSystem system = new StarSystem();
     system.setName("Nyx");
     system = starSystemRepository.save(system);
@@ -155,8 +149,8 @@ class StarSystemTest {
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
 
-    assertTrue(starSystemRepository.findById(system.getId()).isEmpty());
+    assertTrue(starSystemRepository.findById(system.getId()).isPresent());
   }
 }

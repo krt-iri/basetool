@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.mapper.PromotionTopicMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionTopicResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionTopicUpdateRequest;
@@ -13,6 +14,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,15 +29,31 @@ class PromotionTopicServiceTest {
 
   @Mock private PromotionTopicMapper mapper;
 
+  @Mock private SquadronScopeService squadronScopeService;
+
   @InjectMocks private PromotionTopicService service;
+
+  /**
+   * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
+   * "happy path" do not get short-circuited to empty by the new gate. {@code lenient()} keeps
+   * Mockito from failing tests that never trigger the gate (e.g. the validation paths that throw
+   * before the gate check).
+   */
+  @BeforeEach
+  void enablePromotionFeatureFlag() {
+    lenient()
+        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .thenReturn(true);
+  }
 
   @Test
   void listAll_shouldReturnMappedTopics() {
     // Given
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
-        new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null);
-    when(repository.findAllByOrderBySortOrderAsc()).thenReturn(List.of(topic));
+        new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(repository.findAllScoped((UUID) null)).thenReturn(List.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
     // When
@@ -52,7 +70,7 @@ class PromotionTopicServiceTest {
     UUID id = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
-        new PromotionTopicResponse(id, 0L, "Grundlagen", null, 0, null, null);
+        new PromotionTopicResponse(id, 0L, "Grundlagen", null, 0, null, null, null);
     when(repository.findById(id)).thenReturn(Optional.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
@@ -79,7 +97,11 @@ class PromotionTopicServiceTest {
     PromotionTopicCreateRequest request = new PromotionTopicCreateRequest("Grundlagen", null, 0);
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
-        new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null);
+        new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
+    Squadron squadron = new Squadron();
+    squadron.setId(UUID.randomUUID());
+    squadron.setShorthand("IRI");
+    when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
     when(mapper.toEntity(request)).thenReturn(entity);
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
@@ -115,7 +137,7 @@ class PromotionTopicServiceTest {
     PromotionTopicUpdateRequest request =
         new PromotionTopicUpdateRequest(0L, "Grundlagen neu", null, 1);
     PromotionTopicResponse response =
-        new PromotionTopicResponse(id, 1L, "Grundlagen neu", null, 1, null, null);
+        new PromotionTopicResponse(id, 1L, "Grundlagen neu", null, 1, null, null, null);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);

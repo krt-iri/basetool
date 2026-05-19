@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class RankRequirementService {
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns a paginated slice of every {@link RankRequirementResponse} across all rank transitions.
@@ -51,6 +53,9 @@ public class RankRequirementService {
    * @return a page of rank requirements
    */
   public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
@@ -64,6 +69,9 @@ public class RankRequirementService {
    * @return the rank requirements applicable to that transition
    */
   public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByFromRankAndToRankOrderByIdAsc(fromRank, toRank).stream()
         .map(mapper::toResponse)
         .toList();
@@ -77,6 +85,7 @@ public class RankRequirementService {
    * @throws EntityNotFoundException if no rank requirement exists for that id
    */
   public RankRequirementResponse get(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -91,10 +100,14 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = mapper.toEntity(request);
-    entity.setTopic(resolveTopic(request.topicId()));
-    entity.setCategory(resolveCategory(request.categoryId()));
+    PromotionTopic resolvedTopic = resolveTopic(request.topicId());
+    PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
+    assertCallerMayEditScope(resolvedTopic, resolvedCategory);
+    entity.setTopic(resolvedTopic);
+    entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
     log.info(
         "Created RankRequirement id={} {}->{}",
@@ -123,14 +136,19 @@ public class RankRequirementService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
+    assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
     if (!entity.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(RankRequirement.class, id);
     }
     mapper.updateEntity(entity, request);
-    entity.setTopic(resolveTopic(request.topicId()));
-    entity.setCategory(resolveCategory(request.categoryId()));
+    PromotionTopic resolvedTopic = resolveTopic(request.topicId());
+    PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
+    assertCallerMayEditScope(resolvedTopic, resolvedCategory);
+    entity.setTopic(resolvedTopic);
+    entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
     log.info("Updated RankRequirement id={}", id);
     return mapper.toResponse(saved);
@@ -146,9 +164,24 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     RankRequirement entity = load(id);
+    assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
     repository.delete(entity);
     log.info("Deleted RankRequirement id={}", id);
+  }
+
+  private void assertCallerMayEditScope(
+      @Nullable PromotionTopic topic, @Nullable PromotionCategory category) {
+    PromotionTopic effectiveTopic =
+        topic != null ? topic : category != null ? category.getTopic() : null;
+    if (effectiveTopic == null || effectiveTopic.getOwningSquadron() == null) {
+      return;
+    }
+    if (!squadronScopeService.canEditSquadron(effectiveTopic.getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing rank requirements of this scope");
+    }
   }
 
   /**

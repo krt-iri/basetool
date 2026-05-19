@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
@@ -16,6 +17,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +68,9 @@ public class JobOrderService {
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
+  private final SquadronRepository squadronRepository;
+  private final SquadronScopeService squadronScopeService;
+  private final AuthHelperService authHelperService;
   private final JobOrderMapper jobOrderMapper;
   private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
@@ -84,11 +89,18 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
+    Squadron creatingSquadron = resolveCreatingSquadronForCreate(createDto.creatingSquadronId());
+    Squadron requestingSquadron =
+        resolveRequestingSquadron(
+            createDto.requestingSquadronId(), createDto.squadron(), creatingSquadron);
+
     JobOrder jobOrder =
         JobOrder.builder()
-            .squadron(createDto.squadron())
+            .squadron(requestingSquadron.getShorthand())
             .handle(createDto.handle())
             .priority(newPriority)
+            .creatingSquadron(creatingSquadron)
+            .requestingSquadron(requestingSquadron)
             .build();
 
     for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
@@ -118,15 +130,45 @@ public class JobOrderService {
    * Paged list with optional status filter. Status is the primary discriminator the UI offers as a
    * filter; without it the call returns every status.
    *
+   * <p>Delegates to {@link #getAllJobOrders(List, UUID, Pageable)} with a {@code null} squadron
+   * filter for backwards compatibility — existing callers (and admin views in "all squadrons" mode)
+   * keep their cross-staffel result set.
+   *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
    * @return paged job orders as DTOs
    */
   public Page<JobOrderDto> getAllJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
+    return getAllJobOrders(statuses, null, pageable);
+  }
+
+  /**
+   * Paged list with optional status + squadron filters. Job Orders are a cross-staffel workspace
+   * (MULTI_SQUADRON_PLAN.md section 4.4) so the squadron filter is a UI display preference, not an
+   * access-control gate — the list endpoint accepts the parameter so the frontend can default the
+   * orders-index page to "my squadron only" (matching either {@code creatingSquadron} OR {@code
+   * requestingSquadron} per section 5.3) while still allowing the user to flip back to "all
+   * squadrons".
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param squadronId optional squadron filter (matches creating OR requesting); null means "no
+   *     squadron restriction"
+   * @param pageable page request
+   * @return paged job orders as DTOs
+   */
+  public Page<JobOrderDto> getAllJobOrders(
+      List<JobOrderStatus> statuses, UUID squadronId, Pageable pageable) {
     if (statuses == null || statuses.isEmpty()) {
-      return jobOrderRepository.findAll(pageable).map(this::mapToDtoWithStock);
+      if (squadronId == null) {
+        return jobOrderRepository.findAll(pageable).map(this::mapToDtoWithStock);
+      }
+      return jobOrderRepository
+          .findBySquadronInvolved(squadronId, pageable)
+          .map(this::mapToDtoWithStock);
     }
-    return jobOrderRepository.findByStatusIn(statuses, pageable).map(this::mapToDtoWithStock);
+    return jobOrderRepository
+        .findByStatusInAndSquadronInvolved(statuses, squadronId, pageable)
+        .map(this::mapToDtoWithStock);
   }
 
   /**
@@ -365,7 +407,26 @@ public class JobOrderService {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
     }
 
-    jobOrder.setSquadron(updateDto.squadron());
+    // creatingSquadron is immutable post-create (MULTI_SQUADRON_PLAN.md section 8 + section 11
+    // expectation that a creatingSquadronId change rejects with 400/409). Reject explicitly so
+    // misbehaving clients learn about the contract instead of silently dropping the field. The
+    // legacy fallback resolution remains for pre-V83 rows that have no creator stamp yet — in
+    // that case the column is filled in for the first time, which counts as initial stamping
+    // rather than a mutation of an existing value.
+    Squadron existingCreator = jobOrder.getCreatingSquadron();
+    if (existingCreator != null
+        && updateDto.creatingSquadronId() != null
+        && !existingCreator.getId().equals(updateDto.creatingSquadronId())) {
+      throw new BadRequestException(
+          "creatingSquadronId is immutable post-create; pass null or the unchanged id.");
+    }
+    Squadron creatingFallback =
+        existingCreator != null ? existingCreator : resolveCreatingSquadronForCreate(null);
+    Squadron newRequesting =
+        resolveRequestingSquadron(
+            updateDto.requestingSquadronId(), updateDto.squadron(), creatingFallback);
+    jobOrder.setRequestingSquadron(newRequesting);
+    jobOrder.setSquadron(newRequesting.getShorthand());
     jobOrder.setHandle(updateDto.handle());
 
     List<UUID> newMaterialIds =
@@ -611,6 +672,8 @@ public class JobOrderService {
         baseDto.id(),
         baseDto.displayId(),
         baseDto.squadron(),
+        baseDto.creatingSquadron(),
+        baseDto.requestingSquadron(),
         baseDto.handle(),
         baseDto.priority(),
         baseDto.status(),
@@ -619,5 +682,92 @@ public class JobOrderService {
         baseDto.handovers(),
         baseDto.createdAt(),
         baseDto.version());
+  }
+
+  /**
+   * Resolves the {@code creating_squadron_id} stamp for a freshly-created job order.
+   *
+   * <p>Resolution order (MULTI_SQUADRON_PLAN.md section 4.4):
+   *
+   * <ol>
+   *   <li>Explicit {@code creatingSquadronIdOverride} from the create DTO — only honored when the
+   *       caller is an admin (admin override path).
+   *   <li>Caller's active squadron context ({@link SquadronScopeService#currentSquadron()}).
+   *   <li>Admin in "all squadrons" mode without override → {@link BadRequestException} (400). The
+   *       Plan is explicit on this: a focused stamp is required so the column is populated
+   *       correctly for the V86 NOT NULL tightening; silently falling back to IRIDIUM would mask a
+   *       real misconfiguration.
+   * </ol>
+   *
+   * @param creatingSquadronIdOverride optional explicit value from the create DTO; rejected for
+   *     non-admins.
+   * @return the resolved squadron; never {@code null}.
+   * @throws BadRequestException when the caller is an admin in all-squadrons mode and did not
+   *     supply an explicit {@code creatingSquadronId}, or when a non-admin tried to override.
+   */
+  @org.jetbrains.annotations.NotNull
+  private Squadron resolveCreatingSquadronForCreate(
+      @org.jetbrains.annotations.Nullable UUID creatingSquadronIdOverride) {
+    if (creatingSquadronIdOverride != null) {
+      if (!authHelperService.isAdmin()) {
+        throw new BadRequestException(
+            "Only admins may set creatingSquadronId explicitly; non-admins are stamped from"
+                + " their active squadron context.");
+      }
+      return squadronRepository
+          .findById(creatingSquadronIdOverride)
+          .orElseThrow(
+              () ->
+                  new BadRequestException(
+                      "creatingSquadronId does not resolve to a known squadron: "
+                          + creatingSquadronIdOverride));
+    }
+    java.util.Optional<Squadron> active = squadronScopeService.currentSquadron();
+    if (active.isPresent()) {
+      return active.orElseThrow();
+    }
+    // No active context AND no explicit override. Plan-compliant 400: admin in all-squadrons
+    // mode must pick a creator explicitly so the audit trail stays meaningful.
+    throw new BadRequestException(
+        "No active squadron context — admins in 'all squadrons' mode must supply"
+            + " creatingSquadronId explicitly when creating a job order.");
+  }
+
+  /**
+   * Resolves the {@code requesting_squadron_id} for create / update.
+   *
+   * <p>Preference order:
+   *
+   * <ol>
+   *   <li>Typed {@code requestingSquadronId} UUID from the DTO (the new, plan-compliant path).
+   *   <li>Legacy free-text {@code squadron} shorthand string (backwards compat for clients that
+   *       have not migrated yet — resolved against {@code squadron.shorthand} case-insensitively).
+   *   <li>Fallback to {@code creatingFallback} (the creating squadron) so the requesting field
+   *       stays populated even on minimal payloads. Mirrors the V83 backfill rule.
+   * </ol>
+   *
+   * @param requestingSquadronId typed UUID from the DTO; preferred when present.
+   * @param squadronText legacy free-text fallback from the DTO; resolved against shorthand.
+   * @param creatingFallback the creating squadron used as the ultimate fallback.
+   * @return the resolved squadron; never {@code null}.
+   */
+  @org.jetbrains.annotations.NotNull
+  private Squadron resolveRequestingSquadron(
+      @org.jetbrains.annotations.Nullable UUID requestingSquadronId,
+      @org.jetbrains.annotations.Nullable String squadronText,
+      @org.jetbrains.annotations.NotNull Squadron creatingFallback) {
+    if (requestingSquadronId != null) {
+      return squadronRepository
+          .findById(requestingSquadronId)
+          .orElseThrow(
+              () ->
+                  new BadRequestException(
+                      "requestingSquadronId does not resolve to a known squadron: "
+                          + requestingSquadronId));
+    }
+    if (squadronText != null && !squadronText.isBlank()) {
+      return squadronRepository.findByShorthand(squadronText.trim()).orElse(creatingFallback);
+    }
+    return creatingFallback;
   }
 }

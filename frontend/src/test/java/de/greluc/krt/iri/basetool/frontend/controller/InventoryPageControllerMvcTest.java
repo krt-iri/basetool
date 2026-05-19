@@ -188,6 +188,7 @@ class InventoryPageControllerMvcTest {
             missionId,
             missionName,
             null,
+            null,
             1L);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
@@ -245,6 +246,7 @@ class InventoryPageControllerMvcTest {
             null,
             missionId,
             missionName,
+            null,
             null,
             1L);
     GroupedInventoryDto group =

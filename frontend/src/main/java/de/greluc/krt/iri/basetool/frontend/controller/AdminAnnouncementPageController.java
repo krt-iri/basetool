@@ -29,7 +29,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/announcement")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminAnnouncementPageController {
 
   private final BackendApiClient backendApiClient;

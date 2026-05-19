@@ -75,7 +75,7 @@ class UserJoinDateTest {
   }
 
   @Test
-  void shouldSetJoinDate_WhenOfficerUpdatesAttributes() throws Exception {
+  void shouldForbidJoinDateUpdate_WhenOfficerRole() throws Exception {
     // Given
     String joinDate = "2023-06-01";
     String updateJson =
@@ -93,8 +93,7 @@ class UserJoinDateTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         // Then
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.joinDate").value(joinDate));
+        .andExpect(status().isForbidden());
   }
 
   @Test

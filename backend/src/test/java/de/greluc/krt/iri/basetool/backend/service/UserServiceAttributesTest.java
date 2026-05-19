@@ -75,7 +75,10 @@ class UserServiceAttributesTest {
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
+
   @Mock private AuthHelperService authHelperService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private UserService userService;
 
@@ -393,9 +396,8 @@ class UserServiceAttributesTest {
 
     @Test
     void searchByUsername_unpaged_delegatesToRepository() {
-      when(userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-              "ali", "ali"))
-          .thenReturn(List.of(newUser(USER_ID)));
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.searchScopedList("ali", null)).thenReturn(List.of(newUser(USER_ID)));
 
       assertEquals(1, userService.searchByUsername("ali").size());
     }
@@ -404,9 +406,8 @@ class UserServiceAttributesTest {
     void searchByUsername_paged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-              "ali", "ali", pr))
-          .thenReturn(page);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.searchScoped("ali", null, pr)).thenReturn(page);
 
       assertEquals(1, userService.searchByUsername("ali", pr).getTotalElements());
     }
@@ -414,7 +415,8 @@ class UserServiceAttributesTest {
     @Test
     void findAllReference_delegatesToRepository() {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(userRepository.findAllReference()).thenReturn(List.of(dto));
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
@@ -423,9 +425,20 @@ class UserServiceAttributesTest {
     void findAllPaged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(userRepository.findAll(pr)).thenReturn(page);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.findAllScoped(null, pr)).thenReturn(page);
 
       assertSame(page, userService.findAll(pr));
+    }
+
+    @Test
+    void findAllReference_inFocusedMode_passesScopeToRepository() {
+      UUID scope = UUID.randomUUID();
+      UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
+      when(userRepository.findAllReferenceScoped(scope)).thenReturn(List.of(dto));
+
+      assertEquals(List.of(dto), userService.findAllReference());
     }
   }
 
@@ -512,6 +525,84 @@ class UserServiceAttributesTest {
   // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
+
+  // ---------------------------------------------------------------
+  // updateUserSquadron — admin-only squadron assignment
+  // ---------------------------------------------------------------
+
+  /**
+   * Pins the contract for {@link UserService#updateUserSquadron}: admin-only at the controller
+   * boundary, optimistic-locking via the {@code version} arg, repository lookup for the squadron
+   * id, {@code null} clears the assignment. The four cases collectively exercise every branch in
+   * the service method.
+   */
+  @Nested
+  class UpdateUserSquadronTests {
+
+    @Test
+    void assignsSquadron_whenVersionMatches() {
+      UUID squadronId = UUID.randomUUID();
+      User user = newUser(USER_ID);
+      user.setVersion(3L);
+      de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      squadron.setId(squadronId);
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
+      when(userRepository.save(user)).thenReturn(user);
+
+      User result = userService.updateUserSquadron(USER_ID, squadronId, 3L);
+
+      assertSame(squadron, result.getSquadron(), "squadron must be the looked-up entity");
+      verify(userRepository).save(user);
+    }
+
+    @Test
+    void clearsAssignment_whenSquadronIdIsNull() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      de.greluc.krt.iri.basetool.backend.model.Squadron existing =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      existing.setId(UUID.randomUUID());
+      user.setSquadron(existing);
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      User result = userService.updateUserSquadron(USER_ID, null, 1L);
+
+      assertNull(result.getSquadron(), "passing null must clear the assignment");
+      verify(squadronRepository, never()).findById(any());
+      verify(userRepository).save(user);
+    }
+
+    @Test
+    void throwsOptimisticLockingFailure_whenVersionMismatch() {
+      User user = newUser(USER_ID);
+      user.setVersion(5L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () -> userService.updateUserSquadron(USER_ID, UUID.randomUUID(), 2L));
+      verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void throwsNoSuchElement_whenSquadronUnknown() {
+      User user = newUser(USER_ID);
+      user.setVersion(1L);
+      UUID squadronId = UUID.randomUUID();
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(squadronRepository.findById(squadronId)).thenReturn(Optional.empty());
+
+      assertThrows(
+          java.util.NoSuchElementException.class,
+          () -> userService.updateUserSquadron(USER_ID, squadronId, 1L));
+      verify(userRepository, never()).save(any());
+    }
+  }
 
   private static User newUser(UUID id) {
     User u = new User();

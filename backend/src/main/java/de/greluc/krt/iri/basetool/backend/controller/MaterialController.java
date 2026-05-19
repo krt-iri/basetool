@@ -216,7 +216,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialDto material) {
     // stripServerManaged drops client-supplied id / version / refinedMaterial /
     // category so JPA performs a clean INSERT instead of merging onto an existing
@@ -234,7 +234,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public MaterialDto updateMaterial(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
     return materialMapper.toDto(
@@ -247,7 +247,7 @@ public class MaterialController {
    * @param id material id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteMaterial(@PathVariable @NotNull UUID id) {
     materialService.deleteMaterial(id);
   }

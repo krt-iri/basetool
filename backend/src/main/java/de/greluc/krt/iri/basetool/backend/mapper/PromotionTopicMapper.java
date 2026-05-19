@@ -10,7 +10,10 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 
 /** Entity ↔ DTO mapper for {@link PromotionTopic}. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    unmappedTargetPolicy = ReportingPolicy.IGNORE,
+    uses = {SquadronMapper.class})
 public interface PromotionTopicMapper {
 
   /**
@@ -30,6 +33,7 @@ public interface PromotionTopicMapper {
    * @return a transient entity ready to be persisted
    */
   @Mapping(target = "categories", ignore = true)
+  @Mapping(target = "owningSquadron", ignore = true)
   PromotionTopic toEntity(PromotionTopicCreateRequest request);
 
   /**
@@ -45,5 +49,6 @@ public interface PromotionTopicMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "categories", ignore = true)
+  @Mapping(target = "owningSquadron", ignore = true)
   void updateEntity(@MappingTarget PromotionTopic entity, PromotionTopicUpdateRequest request);
 }

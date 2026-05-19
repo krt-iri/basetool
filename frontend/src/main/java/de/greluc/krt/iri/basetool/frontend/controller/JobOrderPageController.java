@@ -74,16 +74,42 @@ public class JobOrderPageController {
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
 
   /**
-   * Renders the job-order list ({@code /orders}). The status filter follows a three-stage
-   * precedence: explicit query parameter wins, otherwise a persisted cookie ({@code
-   * orders_filter_status}, validated against {@link #VALID_STATUSES}), otherwise the default of
-   * {@code OPEN} + {@code IN_PROGRESS}. When the user sets an explicit filter, it gets written back
-   * into the cookie with a 30-day TTL.
+   * Accepted values for the orders-index squadron-scope toggle (MULTI_SQUADRON_PLAN.md section
+   * 5.3). {@code mine} restricts to orders whose creating OR requesting squadron equals the
+   * caller's active squadron; {@code all} returns the cross-staffel union (the backend's natural
+   * behaviour for Job Orders). Persisted in the {@code orders_filter_scope} cookie alongside the
+   * status filter.
+   */
+  private static final List<String> VALID_SQUADRON_SCOPES = List.of("mine", "all");
+
+  /**
+   * Renders the job-order list ({@code /orders}). Two persisted filters drive the view:
+   *
+   * <ul>
+   *   <li>Status filter — three-stage precedence: explicit query parameter wins, otherwise the
+   *       {@code orders_filter_status} cookie (validated against {@link #VALID_STATUSES}),
+   *       otherwise the default of {@code OPEN} + {@code IN_PROGRESS}.
+   *   <li>Squadron scope toggle — explicit {@code scope} query parameter wins ({@code mine} = only
+   *       orders whose creating OR requesting squadron equals the caller's active squadron, {@code
+   *       all} = cross-staffel union), otherwise the {@code orders_filter_scope} cookie, otherwise
+   *       the plan-mandated default of {@code mine} for users with an active squadron context
+   *       (MULTI_SQUADRON_PLAN.md section 5.3). Callers with no active context (admins in "all
+   *       squadrons" mode, anonymous) collapse silently to {@code all} regardless of the requested
+   *       scope.
+   * </ul>
+   *
+   * <p>Cookie updates: both filters write a 30-day cookie scoped to {@code /orders} whenever the
+   * user changes them explicitly. Re-rendering the page without an explicit value preserves the
+   * cookie untouched so back/forward navigation keeps the persisted state.
    *
    * @param status optional explicit status filter
-   * @param cookieStatus previous persisted filter from the cookie
-   * @param response servlet response, used to update the persistence cookie
-   * @param model Thymeleaf model populated with orders, selected statuses and the aging thresholds
+   * @param scope optional explicit squadron-scope filter ({@code mine}/{@code all})
+   * @param cookieStatus previous persisted status filter from the cookie
+   * @param cookieScope previous persisted squadron-scope filter from the cookie
+   * @param activeSquadronId active squadron context surfaced by {@code SquadronContextAdvice}; used
+   *     to translate {@code scope=mine} into a backend {@code squadronId} param.
+   * @param response servlet response, used to update the persistence cookies
+   * @param model Thymeleaf model populated with orders, selected filters and the aging thresholds
    *     for the row-color rendering
    * @return the {@code orders-index} view name
    */
@@ -91,7 +117,10 @@ public class JobOrderPageController {
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false) String scope,
       @CookieValue(name = "orders_filter_status", required = false) String cookieStatus,
+      @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
+      @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       HttpServletResponse response,
       Model model) {
     if (status == null || status.isEmpty()) {
@@ -115,14 +144,37 @@ public class JobOrderPageController {
       response.addCookie(cookie);
     }
 
+    // Resolve the squadron-scope filter with the same three-stage precedence (param > cookie >
+    // default). "mine" is the plan-mandated default per section 5.3; only callers with a resolvable
+    // active squadron can act on it, so admins in "all squadrons" mode silently collapse to "all"
+    // regardless of cookie / param value (no squadron context to filter on).
+    String resolvedScope;
+    if (scope != null && !scope.isBlank() && VALID_SQUADRON_SCOPES.contains(scope)) {
+      resolvedScope = scope;
+      Cookie scopeCookie = new Cookie("orders_filter_scope", resolvedScope);
+      scopeCookie.setPath("/orders");
+      scopeCookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
+      scopeCookie.setHttpOnly(true);
+      scopeCookie.setSecure(true);
+      response.addCookie(scopeCookie);
+    } else if (cookieScope != null
+        && !cookieScope.isBlank()
+        && VALID_SQUADRON_SCOPES.contains(cookieScope)) {
+      resolvedScope = cookieScope;
+    } else {
+      resolvedScope = "mine";
+    }
+    boolean filterToOwnSquadron = "mine".equals(resolvedScope) && activeSquadronId != null;
+
     List<JobOrderDto> orders = new ArrayList<>();
     int yellowDays = 30;
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
+      String squadronParam = filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
       PageResponse<JobOrderDto> p =
           backendApiClient.get(
-              "/api/v1/orders?size=1000&sort=priority,asc&status=" + statusParam,
+              "/api/v1/orders?size=1000&sort=priority,asc&status=" + statusParam + squadronParam,
               new ParameterizedTypeReference<>() {});
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
@@ -163,6 +215,11 @@ public class JobOrderPageController {
 
     model.addAttribute("orders", orders);
     model.addAttribute("selectedStatuses", status);
+    model.addAttribute("selectedScope", resolvedScope);
+    // Effective state, after collapsing "mine" to "all" when there is no active squadron context
+    // (admin all-squadrons mode). The template uses this to render the toggle as informational-
+    // only rather than active when the user cannot meaningfully act on "mine".
+    model.addAttribute("scopeFilterApplied", filterToOwnSquadron);
     model.addAttribute("ageYellowDays", yellowDays);
     model.addAttribute("ageRedDays", redDays);
     return "orders-index";
@@ -306,7 +363,8 @@ public class JobOrderPageController {
       }
 
       CreateJobOrderDto dto =
-          new CreateJobOrderDto(form.getSquadron(), form.getHandle(), materials, form.getVersion());
+          new CreateJobOrderDto(
+              form.getSquadron(), null, null, form.getHandle(), materials, form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -408,7 +466,8 @@ public class JobOrderPageController {
       }
 
       CreateJobOrderDto dto =
-          new CreateJobOrderDto(form.getSquadron(), form.getHandle(), materials, form.getVersion());
+          new CreateJobOrderDto(
+              form.getSquadron(), null, null, form.getHandle(), materials, form.getVersion());
       backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;

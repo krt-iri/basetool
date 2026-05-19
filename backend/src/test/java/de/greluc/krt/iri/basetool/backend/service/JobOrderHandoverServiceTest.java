@@ -37,6 +37,7 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
+  @Mock private UserService userService;
 
   @InjectMocks private JobOrderHandoverService service;
 
@@ -186,9 +187,11 @@ class JobOrderHandoverServiceTest {
 
     // When & Then — before fix: this threw "Inventory item does not belong to this JobOrder"
     // because jobOrder was null (not eagerly loaded). After fix (@EntityGraph on findByIdForUpdate)
-    // the jobOrder is always loaded and the check works correctly.
-    BadRequestException ex =
-        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    // the jobOrder is always loaded and the check works correctly. The cross-staffel pre-write
+    // guard (MULTI_SQUADRON_PLAN.md §4.4) now raises IllegalStateException — GlobalExceptionHandler
+    // maps it to 400 so the wire format is unchanged.
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
   }
 
@@ -380,9 +383,10 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then
-    BadRequestException ex =
-        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    // When & Then — plan §4.4 cross-staffel pre-write guard raises IllegalStateException
+    // (GlobalExceptionHandler maps it to HTTP 400).
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
   }
 
@@ -497,5 +501,48 @@ class JobOrderHandoverServiceTest {
     // Inventory item must NOT be modified
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
+  void createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron() {
+    // The cross-staffel Job-Order workspace is the central reason JobOrder lives
+    // un-filtered: a Logistician from squadron C must be able to fulfil an order
+    // authored by squadron A using an InventoryItem that is owned by squadron B,
+    // as long as the item is linked to the order. The Phase-3 guard at
+    // JobOrderHandoverService:116-119 only checks the linkage, NOT the squadron
+    // identity, and this test pins that contract. Plan §11 "JobOrderHandoverService".
+    de.greluc.krt.iri.basetool.backend.model.Squadron squadronA =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    squadronA.setId(UUID.randomUUID());
+    squadronA.setShorthand("ALF");
+    de.greluc.krt.iri.basetool.backend.model.Squadron squadronB =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    squadronB.setId(UUID.randomUUID());
+    squadronB.setShorthand("BRV");
+
+    order.setCreatingSquadron(squadronA);
+    order.setRequestingSquadron(squadronA);
+    inventoryItem.setOwningSquadron(squadronB);
+
+    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 3.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(), "CrossSquadronHandler", "BRV", List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When — no exception even though item.owningSquadron != order.requestingSquadron
+    service.createHandover(orderId, createDto);
+
+    // Then — handover applied to the foreign-squadron item exactly like a same-squadron one
+    assertEquals(7.0, inventoryItem.getAmount());
+    assertEquals(7.0, jobOrderMaterial.getAmount());
+    verify(inventoryItemRepository).save(inventoryItem);
+    verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
   }
 }

@@ -345,7 +345,8 @@ class MissionPageControllerTest {
             1L,
             1L,
             0,
-            0);
+            0,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
@@ -412,7 +413,8 @@ class MissionPageControllerTest {
             1L,
             1L,
             0,
-            0);
+            0,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))

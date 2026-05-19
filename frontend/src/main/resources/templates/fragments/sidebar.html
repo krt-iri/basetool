@@ -2,6 +2,22 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 <th:block th:fragment="sidebar">
+    <!-- Persistent squadron-context chip (always visible top-right). Shows the active
+         squadron shorthand for every authenticated user, or "ALL" for admins viewing
+         the cross-staffel union. Anonymous callers see nothing. -->
+    <div sec:authorize="isAuthenticated()" id="squadron-context-chip" class="squadron-context-chip"
+         th:title="${isAllSquadronsMode ? #messages.msg('squadron.badge.admin') : #messages.msg('squadron.context.badge')}">
+        <span class="squadron-context-chip-label" th:text="#{squadron.context.badge}">Squadron context</span>
+        <span class="squadron-context-chip-value"
+              th:if="${activeSquadron != null}"
+              th:text="${activeSquadron.shorthand()}">IRI</span>
+        <span class="squadron-context-chip-value squadron-context-chip-all"
+              th:if="${activeSquadron == null and isAllSquadronsMode}"
+              th:text="#{squadron.switcher.all}">All squadrons</span>
+        <span class="squadron-context-chip-value squadron-context-chip-empty"
+              th:if="${activeSquadron == null and !isAllSquadronsMode}"
+              th:text="#{squadron.context.none}">No squadron context</span>
+    </div>
     <div id="sidebar" class="sidebar">
         <div class="sidebar-content">
             <button id="close-sidebar" class="close-sidebar-btn">&times;</button>
@@ -23,7 +39,7 @@
                 </details>
                 <a th:href="@{/hangar}" th:text="#{nav.hangar}">Hangar</a>
                 <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory}">Persönliches Inventar</a>
-                <details class="sidebar-group">
+                <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/promotion/overview}" th:text="#{nav.promotion.overview}">Bef\u00f6rderungssystem</a>
@@ -34,7 +50,7 @@
                     </div>
                 </details>
                 <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
-                <details class="sidebar-group" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+                <details class="sidebar-group" sec:authorize="hasRole('ADMIN')">
                     <summary th:text="#{nav.administration}">Administration</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/admin/announcement}" th:text="#{info.title}">Informationen</a>
@@ -63,6 +79,35 @@
                 </details>
                 <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
             </div>
+            <!-- Admin-only squadron switcher. The Spring Session-backed backend store carries
+                 the active selection across page loads (Redis in dev/prod); leaving the select
+                 on the blank "All squadrons" option DELETEs the selection via the frontend
+                 proxy. Non-admins do not see this control - they always operate in their
+                 persistent home squadron. -->
+            <!-- `no-track` excludes this form from unsaved-changes.js — the switcher is a
+                 navigation control, not a form the user is filling out, and a change event
+                 on the dropdown must not arm the beforeunload guard. The auto-submit JS calls
+                 form.submit() programmatically, which (per HTML spec) does NOT fire the
+                 submit event that would otherwise reset isDirty, so without `no-track` the
+                 native browser "Leave site?" dialog appears every time. -->
+            <form id="squadron-switcher-form" sec:authorize="hasRole('ADMIN')"
+                  th:action="@{/me/active-squadron}" method="post" class="squadron-switcher no-track">
+                <input type="hidden" name="_referer" th:value="${currentRequestUri}" />
+                <label for="squadron-switcher-select" class="squadron-switcher-label"
+                       th:text="#{squadron.switcher.label}">Active squadron</label>
+                <select id="squadron-switcher-select" name="squadronId" class="squadron-switcher-select">
+                    <option value=""
+                            th:selected="${activeSquadronId == null}"
+                            th:text="#{squadron.switcher.all}">All squadrons</option>
+                    <option th:each="sq : ${availableSquadrons}"
+                            th:value="${sq.id()}"
+                            th:selected="${activeSquadronId != null and activeSquadronId == sq.id()}"
+                            th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                </select>
+                <noscript>
+                    <button type="submit" class="squadron-switcher-submit">&#x2713;</button>
+                </noscript>
+            </form>
             <div class="dropdown">
                 <button class="dropbtn">
                 <span th:if="${#locale.language == 'de'}" class="flex-gap-sm">
@@ -149,6 +194,19 @@
                     }
                 }
             });
+
+            // Auto-submit the admin-only squadron switcher when the dropdown
+            // selection changes - no separate submit click required. The
+            // <noscript> button stays as the no-JS fallback.
+            const switcherForm = document.getElementById('squadron-switcher-form');
+            if (switcherForm) {
+                const switcherSelect = document.getElementById('squadron-switcher-select');
+                if (switcherSelect) {
+                    switcherSelect.addEventListener('change', function() {
+                        switcherForm.submit();
+                    });
+                }
+            }
 
             // Generic Auto-Submit for filter forms
             const filterForm = document.getElementById('filter-form');

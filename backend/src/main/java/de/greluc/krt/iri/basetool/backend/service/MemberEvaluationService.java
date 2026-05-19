@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Domain service for {@link MemberEvaluation}.
  *
  * <p>Data isolation: read operations for personal views are filtered by {@code userId} (JWT sub).
- * Write operations (assign/update level) are restricted to ADMIN and OFFICER roles.
+ * Write operations (assign/update level) are restricted to ADMIN and OFFICER callers, with an
+ * additional squadron-scope guard: an Officer of squadron X may only manage evaluations whose
+ * category belongs to a topic owned by squadron X. Admins span every squadron unless they have
+ * focused the sidebar switcher.
  */
 @Service
 @RequiredArgsConstructor
@@ -40,27 +44,37 @@ public class MemberEvaluationService {
   private final MemberEvaluationRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
+  private final SquadronScopeService squadronScopeService;
 
   /** Returns all evaluations for the given user (JWT-sub filtered – data isolation). */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByUserId(userId).stream().map(mapper::toResponse).toList();
   }
 
   /** Returns paginated evaluations for the given user. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull String userId, @NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAllByUserId(userId, pageable).map(mapper::toResponse);
   }
 
   /** Returns all evaluations (admin view, all users). */
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
   /**
-   * Upserts (create or update) an evaluation for a user/category combination. Restricted to ADMIN
-   * and OFFICER.
+   * Upserts (create or update) an evaluation for a user/category combination. ADMIN or OFFICER of
+   * the category's owning squadron.
    */
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
@@ -68,11 +82,13 @@ public class MemberEvaluationService {
       @NotNull String userId,
       @NotNull UUID categoryId,
       @NotNull MemberEvaluationUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
             .findById(categoryId)
             .orElseThrow(
                 () -> new EntityNotFoundException("PromotionCategory not found: " + categoryId));
+    assertCallerMayEditCategory(category);
 
     MemberEvaluation entity =
         repository
@@ -97,11 +113,25 @@ public class MemberEvaluationService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =
         repository
             .findById(id)
             .orElseThrow(() -> new EntityNotFoundException("MemberEvaluation not found: " + id));
+    assertCallerMayEditCategory(entity.getCategory());
     repository.delete(entity);
     log.info("Deleted MemberEvaluation id={}", id);
+  }
+
+  private void assertCallerMayEditCategory(PromotionCategory category) {
+    if (category == null
+        || category.getTopic() == null
+        || category.getTopic().getOwningSquadron() == null) {
+      return;
+    }
+    if (!squadronScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing evaluations of this scope");
+    }
   }
 }

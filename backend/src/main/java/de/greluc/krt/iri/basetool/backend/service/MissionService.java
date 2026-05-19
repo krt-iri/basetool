@@ -82,6 +82,7 @@ public class MissionService {
   private final MissionOwnershipRepository missionOwnershipRepository;
   private final OperationRepository operationRepository;
   private final UserService userService;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns paged mission list.
@@ -122,8 +123,9 @@ public class MissionService {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
+    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return missionRepository.searchMissions(
-        query, start, end, status, isInternal, operationId, pageable);
+        query, start, end, status, isInternal, operationId, scopeSquadronId, pageable);
   }
 
   /**
@@ -185,6 +187,14 @@ public class MissionService {
     validateMissionTimes(mission);
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
+
+    if (mission.getOwningSquadron() == null) {
+      if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
+        mission.setOwningSquadron(mission.getOwner().getSquadron());
+      } else {
+        squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
+      }
+    }
 
     return missionRepository.save(mission);
   }
@@ -611,8 +621,20 @@ public class MissionService {
               .findById(effectiveUserId)
               .orElseThrow(() -> new NotFoundException("User not found"));
       participant.setUser(user);
-      // Registered users always belong to IRI
-      squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
+      // Registered users carry the squadron they belong to at participate-time
+      // (MULTI_SQUADRON_PLAN.md section 3.2: `mission_participant.squadron_id` is the
+      // squadron the member participates *for* — usually their own home squadron, may
+      // differ from `mission.owning_squadron` when a non-internal mission attracts
+      // cross-staffel members). Falls back to IRIDIUM only when the user has no
+      // squadron assigned (admins / brand-new accounts), so finance/reporting still
+      // produces a valid bucket.
+      if (user.getSquadron() != null) {
+        participant.setSquadron(user.getSquadron());
+      } else {
+        squadronRepository
+            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+            .ifPresent(participant::setSquadron);
+      }
     } else {
       participant.setGuestName(effectiveGuestName);
       if (squadronId != null) {
@@ -767,8 +789,18 @@ public class MissionService {
     }
 
     if (participant.getUser() != null) {
-      // Registered users always belong to IRI
-      squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
+      // Registered users carry the squadron they belong to at participate-time. Mirror the
+      // logic from addParticipant — same semantics, same fallback (MULTI_SQUADRON_PLAN.md
+      // section 3.2). Re-reads `user.getSquadron()` on every update so a freshly-assigned
+      // squadron on the user record propagates into the participant row.
+      User registeredUser = participant.getUser();
+      if (registeredUser.getSquadron() != null) {
+        participant.setSquadron(registeredUser.getSquadron());
+      } else {
+        squadronRepository
+            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+            .ifPresent(participant::setSquadron);
+      }
     } else {
       log.info("Updating guest participant: {} with name: {}", participant.getId(), guestName);
       if (guestName != null) {
@@ -1189,6 +1221,11 @@ public class MissionService {
     }
 
     subMission.setParent(parent);
+
+    if (subMission.getOwningSquadron() == null) {
+      subMission.setOwningSquadron(parent.getOwningSquadron());
+    }
+
     return missionRepository.save(subMission);
   }
 

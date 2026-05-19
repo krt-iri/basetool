@@ -85,7 +85,7 @@ class PromotionManagePageControllerMvcTest {
     UserDto member =
         new UserDto(
             memberId, "alice", null, "alice", null, null, null, 20, null, Set.of(), Set.of(), null,
-            null, null, null, 0L, null);
+            null, null, null, null, 0L, null);
     MemberEvaluationDto eval =
         new MemberEvaluationDto(
             UUID.randomUUID(),
@@ -111,7 +111,9 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(
             contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(eval), 0, 10000, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"),
+            any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(member), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
             contains("/api/v1/promotion/eligibility/user/" + memberId),

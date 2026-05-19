@@ -19,6 +19,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
@@ -26,6 +27,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,6 +57,8 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
+  @Mock private SquadronRepository squadronRepository;
+  @Mock private SquadronScopeService squadronScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
 
@@ -75,6 +79,8 @@ class JobOrderServicePriorityAndStatusTest {
                   o.getId(),
                   o.getDisplayId(),
                   o.getSquadron(),
+                  null,
+                  null,
                   o.getHandle(),
                   o.getPriority(),
                   o.getStatus(),
@@ -84,6 +90,15 @@ class JobOrderServicePriorityAndStatusTest {
                   null,
                   o.getVersion());
             });
+
+    // Multi-tenant: createJobOrder + updateJobOrder resolve the caller's squadron through
+    // SquadronScopeService. Stub a lenient default so the update path (which touches the
+    // resolver when jobOrder.creatingSquadron is unset, as in these mock-built fixtures)
+    // does not NPE; read paths leave the stub unused and the lenient() suppresses the
+    // UnnecessaryStubbingException.
+    Squadron testSquadron = new Squadron();
+    testSquadron.setShorthand("Alpha");
+    lenient().when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(testSquadron));
   }
 
   // ---------------------------------------------------------------
@@ -371,7 +386,12 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)), 1L);
+              "alpha",
+              null,
+              null,
+              "OP-1",
+              List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)),
+              1L);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -387,7 +407,12 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)), 1L);
+              "alpha",
+              null,
+              null,
+              "OP-1",
+              List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)),
+              1L);
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));
     }
@@ -398,7 +423,7 @@ class JobOrderServicePriorityAndStatusTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.save(o)).thenReturn(o);
 
-      CreateJobOrderDto dto = new CreateJobOrderDto("a", "b", List.of(), null);
+      CreateJobOrderDto dto = new CreateJobOrderDto("a", null, null, "b", List.of(), null);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -592,6 +617,6 @@ class JobOrderServicePriorityAndStatusTest {
   }
 
   private CreateJobOrderDto newUpdateDto(Long version) {
-    return new CreateJobOrderDto("squad", "OP-X", List.of(), version);
+    return new CreateJobOrderDto("squad", null, null, "OP-X", List.of(), version);
   }
 }

@@ -4,9 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import java.util.HashSet;
@@ -45,4 +48,13 @@ public class Operation extends AbstractEntity<UUID> {
   @OneToMany(mappedBy = "operation")
   @OrderBy("plannedStartTime DESC")
   private Set<Mission> missions = new HashSet<>();
+
+  /**
+   * Squadron that owns this operation. Set at creation time from the caller's active squadron and
+   * immutable afterwards. Gates read/write access at the service layer; admins can see all
+   * squadrons. Kept JPA-nullable for Phase 1 until Flyway V86 tightens the column to NOT NULL.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "owning_squadron_id")
+  private Squadron owningSquadron;
 }

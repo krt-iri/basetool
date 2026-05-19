@@ -189,9 +189,14 @@ public class JobOrderController {
 
   /**
    * Paged job-order list. Default sort is by {@code priority,asc} (lowest priority = top of queue),
-   * filterable by one or more statuses.
+   * filterable by one or more statuses and optionally by squadron involvement (creating OR
+   * requesting). The squadron filter is a UI display preference rather than an access-control gate
+   * — Job Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 4.4), and any
+   * authenticated caller is allowed to ask for the cross-staffel union by omitting the parameter.
    *
    * @param status optional status filter (logical OR across values)
+   * @param squadronId optional squadron filter; matches orders whose creating OR requesting
+   *     squadron equals this id. {@code null} means "no squadron restriction" (cross-staffel view).
    * @return paged job-order DTOs
    */
   @GetMapping
@@ -202,13 +207,14 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
+      @RequestParam(required = false) UUID squadronId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
-    Page<JobOrderDto> p = jobOrderService.getAllJobOrders(status, pageable);
+    Page<JobOrderDto> p = jobOrderService.getAllJobOrders(status, squadronId, pageable);
     return new PageResponse<>(
         p.getContent(),
         p.getNumber(),

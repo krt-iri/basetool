@@ -60,6 +60,7 @@ class OperationServiceTest {
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
   @Mock private SystemSettingService systemSettingService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private OperationService operationService;
 
@@ -71,6 +72,7 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
+    when(squadronScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
 
     // When
     Operation result = operationService.createOperation(operation);
@@ -110,7 +112,7 @@ class OperationServiceTest {
     // Given
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
-    when(operationRepository.findAll(pageable)).thenReturn(page);
+    when(operationRepository.findAllScoped(null, pageable)).thenReturn(page);
 
     // When
     Page<Operation> result = operationService.getAllOperations(pageable);

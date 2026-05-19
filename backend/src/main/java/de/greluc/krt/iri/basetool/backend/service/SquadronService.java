@@ -150,4 +150,28 @@ public class SquadronService {
     squadron.setActive(true);
     squadronRepository.save(squadron);
   }
+
+  /**
+   * Toggles the per-squadron promotion-feature flag. Kept as a dedicated mutator separate from
+   * {@link #updateSquadron(UUID, SquadronDto)} so the flag cannot be flipped as an accidental
+   * side-effect of editing the squadron's name/shorthand/description, and so the audit trail in the
+   * access log can clearly attribute "X disabled promotion for squadron Y" to the admin who pressed
+   * the toggle. Flipping the flag never touches the promotion data — categories, ranks, and
+   * evaluations stay in the DB and become visible again as soon as the flag goes back to {@code
+   * true}.
+   *
+   * @param id squadron primary key
+   * @param enabled new value of {@code is_promotion_enabled}; {@code true} re-exposes a previously
+   *     hidden squadron, {@code false} hides the promotion menu for the squadron's non-admin
+   *     members.
+   * @return the persisted squadron
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no matching row.
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
+  public Squadron setPromotionEnabled(@NotNull UUID id, boolean enabled) {
+    Squadron squadron = getSquadronById(id);
+    squadron.setPromotionEnabled(enabled);
+    return squadronRepository.save(squadron);
+  }
 }

@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{admin.locations.title} + ' - ' + #{app.title}">Orte - IRIDIUM Basetool</title>
+    <title th:text="#{admin.locations.title} + ' - ' + ${appTitle}">Orte - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .data-section {
@@ -41,7 +41,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -88,7 +88,7 @@
                         <td th:text="${loc.description}">Desc</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
                                     <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
                                 </form>

@@ -72,6 +72,7 @@ class MissionServiceLifecycleTest {
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private UserService userService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private MissionService service;
 

@@ -26,6 +26,22 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   void resetAllFitted();
 
   /**
+   * Squadron-scoped variant of {@link #resetAllFitted()}. Used by the admin/officer "reset fitted"
+   * action so a focused-mode caller only wipes the {@code fitted} flag on ships of their own
+   * squadron (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict eigene Staffel). {@code
+   * owningSquadronId} {@code null} signals admin "all squadrons" mode and falls back to the
+   * cross-staffel reset.
+   *
+   * @param owningSquadronId squadron to scope the reset to, or {@code null} for cross-staffel wipe.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE Ship s SET s.fitted = false WHERE :owningSquadronId IS NULL OR s.owningSquadron.id ="
+          + " :owningSquadronId")
+  void resetAllFittedScoped(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId);
+
+  /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * ShipTypeId}.
    */
@@ -71,14 +87,33 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findAll(Pageable pageable);
 
   /**
+   * Multi-tenant variant of {@link #findAll(Pageable)}: returns every ship whose owning squadron
+   * matches {@code owningSquadronId}, or every ship when {@code owningSquadronId} is {@code null}
+   * (admin "all squadrons" mode). Eagerly fetches {@code shipType}, {@code location} and {@code
+   * owner} via {@code @EntityGraph}.
+   */
+  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @Query(
+      "SELECT s FROM Ship s WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id ="
+          + " :owningSquadronId)")
+  Page<Ship> findAllScoped(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
+
+  /**
    * Aggregates ships by type for the squadron-overview page: tuple of {@code (shipType, totalCount,
    * fittedCount)} ordered alphabetically by ship-type name. Returns raw {@code Object[]} - the
-   * service projects it into the squadron-overview DTO.
+   * service projects it into the squadron-overview DTO. When {@code owningSquadronId} is {@code
+   * null} the aggregation spans every squadron (admin "all squadrons" mode); otherwise the row set
+   * is pre-filtered to that squadron's ships only.
    */
   @Query(
       "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s"
-          + " GROUP BY s.shipType ORDER BY s.shipType.name ASC")
-  Page<Object[]> countShipsByType(Pageable pageable);
+          + " WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id = :owningSquadronId) GROUP BY"
+          + " s.shipType ORDER BY s.shipType.name ASC")
+  Page<Object[]> countShipsByType(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code ShipTypeIn}. Eagerly fetches the

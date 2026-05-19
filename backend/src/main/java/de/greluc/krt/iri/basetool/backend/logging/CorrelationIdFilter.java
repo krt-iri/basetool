@@ -1,6 +1,8 @@
 package de.greluc.krt.iri.basetool.backend.logging;
 
 import de.greluc.krt.iri.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +53,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   private static final String ANONYMOUS = "anonymous";
 
   private final LoggingProperties loggingProperties;
+  private final AuthHelperService authHelperService;
+  private final SquadronScopeService squadronScopeService;
 
   @Override
   protected void doFilterInternal(
@@ -60,15 +64,41 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       throws ServletException, IOException {
     final String correlationId = resolveCorrelationId(request);
     final String userId = resolveUserId();
+    final String squadronId = resolveSquadronId();
 
     MDC.put(loggingProperties.getCorrelationIdMdcKey(), correlationId);
     MDC.put(loggingProperties.getUserIdMdcKey(), userId);
+    MDC.put(loggingProperties.getSquadronIdMdcKey(), squadronId);
     response.setHeader(loggingProperties.getCorrelationIdHeader(), correlationId);
     try {
       filterChain.doFilter(request, response);
     } finally {
       MDC.remove(loggingProperties.getCorrelationIdMdcKey());
       MDC.remove(loggingProperties.getUserIdMdcKey());
+      MDC.remove(loggingProperties.getSquadronIdMdcKey());
+    }
+  }
+
+  /**
+   * Resolves the squadron context for the MDC: the active switcher selection for admins, the
+   * persistent home squadron for everyone else, or one of the sentinels {@code all} (admin without
+   * active selection) / {@code none} (unauthenticated / no squadron assigned / lookup failed).
+   * Defensive try-catch so a transient DB hiccup or a missing transaction context never brings down
+   * the request - logs just degrade to {@code none}.
+   */
+  @NotNull
+  private String resolveSquadronId() {
+    try {
+      if (!authHelperService.isAuthenticated()) {
+        return ANONYMOUS;
+      }
+      return squadronScopeService
+          .currentSquadronId()
+          .map(UUID::toString)
+          .orElseGet(() -> authHelperService.isAdmin() ? "all" : "none");
+    } catch (RuntimeException ex) {
+      log.debug("squadronId MDC resolution failed, falling back to 'none'", ex);
+      return "none";
     }
   }
 

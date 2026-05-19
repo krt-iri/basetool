@@ -68,6 +68,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -113,7 +114,8 @@ class MissionSecurityRenderingTest {
             1L,
             1L,
             0,
-            1);
+            1,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -161,6 +163,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -206,7 +209,8 @@ class MissionSecurityRenderingTest {
             1L,
             1L,
             0,
-            1);
+            1,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -253,6 +257,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -298,7 +303,8 @@ class MissionSecurityRenderingTest {
             1L,
             1L,
             0,
-            1);
+            1,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -344,6 +350,7 @@ class MissionSecurityRenderingTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     MissionParticipantDto participant =
@@ -389,7 +396,8 @@ class MissionSecurityRenderingTest {
             1L,
             1L,
             0,
-            1);
+            1,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),

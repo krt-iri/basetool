@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{members.edit.title} + ' - ' + #{app.title}">Mitglied bearbeiten - IRIDIUM Basetool</title>
+    <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .form-group {
@@ -56,7 +56,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -100,6 +100,21 @@
                 <input type="date" name="joinDate"
                        th:value="*{joinDate}"
                        style="min-height:44px;" />
+            </div>
+
+            <!-- Squadron assignment (admin-only, since /members/{id}/edit is admin-only).
+                 SquadronContextAdvice injects `availableSquadrons` on every request. -->
+            <div class="form-group" sec:authorize="hasRole('ADMIN')">
+                <label for="member-edit-squadron" th:text="#{members.field.squadron}">Staffel</label>
+                <select id="member-edit-squadron" name="squadronId" style="min-height:44px;">
+                    <option value=""
+                            th:selected="${memberEditForm.squadronId == null}"
+                            th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                    <option th:each="sq : ${availableSquadrons}"
+                            th:value="${sq.id()}"
+                            th:selected="${memberEditForm.squadronId != null and memberEditForm.squadronId == sq.id()}"
+                            th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                </select>
             </div>
 
             <div class="form-actions">

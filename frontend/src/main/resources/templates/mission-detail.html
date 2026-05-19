@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{missions.title} + ' - ' + #{app.title}">Mission Details - IRIDIUM Basetool</title>
+    <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
     <style>
@@ -255,7 +255,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -264,9 +264,12 @@
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
             <div class="greeting hud-box flex-between">
-                <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                     <h1 style="margin: 0;" th:if="${isNew}" th:text="#{mission.create}">New Mission</h1>
                     <h1 style="margin: 0;" th:unless="${isNew}" th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
+                    <span th:unless="${isNew}" th:if="${mission?.owningSquadron != null}" class="squadron-badge"
+                          th:title="${mission.owningSquadron.name()}"
+                          th:text="${mission.owningSquadron.shorthand()}">IRI</span>
                 </div>
                 <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
             </div>

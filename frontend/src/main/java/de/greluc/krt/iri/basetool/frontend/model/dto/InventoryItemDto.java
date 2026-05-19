@@ -16,4 +16,5 @@ public record InventoryItemDto(
     UUID missionId,
     String missionName,
     String note,
+    SquadronReferenceDto owningSquadron,
     Long version) {}

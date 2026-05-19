@@ -11,7 +11,9 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** MapStruct mapper between User entities and DTOs. */
-@Mapper(componentModel = "spring")
+@Mapper(
+    componentModel = "spring",
+    uses = {SquadronMapper.class})
 public interface UserMapper {
 
   /**

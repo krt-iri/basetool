@@ -84,6 +84,34 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Page<RefineryOrder> findAll(Pageable pageable);
 
   /**
+   * Multi-tenant variant of {@link #findAll(Pageable)}: returns every refinery order whose owning
+   * squadron matches {@code owningSquadronId}, or every order when {@code owningSquadronId} is
+   * {@code null} (admin "all squadrons" mode). Refinery is a strict-staffel aggregate - there is no
+   * cross-squadron escape clause like Mission's {@code is_internal = false}.
+   */
+  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
+  @Query(
+      "SELECT r FROM RefineryOrder r WHERE (:owningSquadronId IS NULL OR r.owningSquadron.id ="
+          + " :owningSquadronId)")
+  Page<RefineryOrder> findAllScoped(
+      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+
+  /**
+   * Scoped variant of {@link #findByStatusIn(List, Pageable)}: filters by owning squadron when
+   * {@code owningSquadronId} is non-null. Used by the refinery list page when an admin selected an
+   * active squadron via the switcher.
+   */
+  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod"})
+  @Query(
+      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND (:owningSquadronId IS NULL OR"
+          + " r.owningSquadron.id = :owningSquadronId)")
+  Page<RefineryOrder> findByStatusInScoped(
+      @Param("statuses")
+          List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
+      @Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
+
+  /**
    * Bulk-clears the {@code mission} reference on every refinery order tied to one of the given
    * missions so the orders survive a mission delete as unassigned (see CLAUDE.md "Operation delete
    * keeps missions intact" rule for the broader pattern).

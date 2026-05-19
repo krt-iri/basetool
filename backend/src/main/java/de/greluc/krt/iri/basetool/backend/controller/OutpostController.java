@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/outposts")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class OutpostController {
 
   private final OutpostService outpostService;
@@ -85,7 +85,7 @@ public class OutpostController {
    * @return the persisted outpost DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public OutpostDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return outpostMapper.toDto(outpostService.setLoadingDockOverride(id, value));
@@ -99,7 +99,7 @@ public class OutpostController {
    * @return the persisted outpost DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public OutpostDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return outpostMapper.toDto(outpostService.clearLoadingDockOverride(id));
   }

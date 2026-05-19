@@ -10,7 +10,7 @@ import org.mapstruct.Mapping;
 /** MapStruct mapper between Inventory Item entities and DTOs. */
 @Mapper(
     componentModel = "spring",
-    uses = {UserMapper.class, MaterialMapper.class})
+    uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
 public interface InventoryItemMapper {
 
   /**

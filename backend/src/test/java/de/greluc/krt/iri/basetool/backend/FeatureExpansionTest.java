@@ -102,59 +102,63 @@ class FeatureExpansionTest {
   }
 
   @Test
-  void testLocationCrud_Officer_Allowed() throws Exception {
-    StarSystem terraSys = new StarSystem();
-    terraSys.setName("Terra System");
-    terraSys = starSystemRepository.save(terraSys);
+  void testLocationCrud_Officer_Forbidden() throws Exception {
+    // Seed a Location directly via the repository so the PUT/DELETE paths have a
+    // real id to target. The whole point of this test is to verify that an
+    // Officer JWT is rejected by the controller layer on every CRUD verb after
+    // Phase 4 — none of these calls are allowed to mutate the seeded row.
+    Location seeded = new Location();
+    seeded.setName("Terra");
+    seeded = locationRepository.save(seeded);
+    locationRepository.flush();
+    UUID seededId = seeded.getId();
+    long countBefore = locationRepository.count();
 
-    Location location = new Location();
-    location.setName("Terra");
-
-    String response =
-        mockMvc
-            .perform(
-                post("/api/v1/locations")
-                    .with(
-                        jwt()
-                            .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(location)))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    Location saved = objectMapper.readValue(response, Location.class);
-    assertEquals("Terra", saved.getName());
-
-    // Update
-    saved.setName("Terra Prime");
+    // POST as Officer → 403, nothing created.
+    Location toCreate = new Location();
+    toCreate.setName("Terra Prime");
     mockMvc
         .perform(
-            put("/api/v1/locations/" + saved.getId())
+            post("/api/v1/locations")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(saved)))
-        .andExpect(status().isOk());
+                .content(objectMapper.writeValueAsString(toCreate)))
+        .andExpect(status().isForbidden());
+    assertEquals(countBefore, locationRepository.count());
 
-    Location updated = locationRepository.findById(saved.getId()).orElseThrow();
-    assertEquals("Terra Prime", updated.getName());
-
-    // Delete
+    // PUT as Officer → 403, seeded row stays "Terra". Build the request body as
+    // a fresh detached entity so Hibernate dirty-checking on the managed
+    // {@code seeded} does NOT flush the renamed value into the DB before the
+    // post-PUT assertion (which would silently mask a forbidden bypass).
+    Location updatePayload = new Location();
+    updatePayload.setId(seededId);
+    updatePayload.setName("Terra Prime");
     mockMvc
         .perform(
-            delete("/api/v1/locations/" + saved.getId())
+            put("/api/v1/locations/" + seededId)
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+        .andExpect(status().isForbidden());
+    Location afterPut = locationRepository.findById(seededId).orElseThrow();
+    assertEquals("Terra", afterPut.getName());
+
+    // DELETE as Officer → 403, row still present.
+    mockMvc
+        .perform(
+            delete("/api/v1/locations/" + seededId)
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
-        .andExpect(status().isOk());
-
-    assertTrue(locationRepository.findById(saved.getId()).isEmpty());
+        .andExpect(status().isForbidden());
+    assertTrue(locationRepository.findById(seededId).isPresent());
   }
 
   @Test

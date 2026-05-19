@@ -11,6 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
@@ -23,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +46,12 @@ class JobOrderServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
 
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.UserRepository userRepository;
+
+  @Mock private SquadronRepository squadronRepository;
+
+  @Mock private SquadronScopeService squadronScopeService;
+
   @Mock private JobOrderMapper jobOrderMapper;
 
   @Mock private de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
@@ -61,6 +69,26 @@ class JobOrderServiceTest {
   void setUp() {
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
+
+    // Multi-tenant: every create/update path resolves the caller's current squadron via the
+    // scope service plus an optional repository lookup by shorthand. Stub lenient defaults so
+    // the existing fixtures still see the squadron string they wrote ("Alpha" / "Beta" / ...)
+    // round-tripped through requestingSquadron.shorthand back into the legacy `squadron`
+    // column. Read-path tests do not call these methods and are unaffected (lenient suppresses
+    // UnnecessaryStubbingException).
+    Squadron currentSquadron = new Squadron();
+    currentSquadron.setShorthand("Alpha");
+    org.mockito.Mockito.lenient()
+        .when(squadronScopeService.currentSquadron())
+        .thenReturn(java.util.Optional.of(currentSquadron));
+    org.mockito.Mockito.lenient()
+        .when(squadronRepository.findByShorthand(org.mockito.ArgumentMatchers.anyString()))
+        .thenAnswer(
+            inv -> {
+              Squadron s = new Squadron();
+              s.setShorthand(inv.getArgument(0));
+              return java.util.Optional.of(s);
+            });
 
     material = new Material();
     material.setId(materialId);
@@ -102,6 +130,8 @@ class JobOrderServiceTest {
             orderId,
             1,
             "Alpha",
+            null,
+            null,
             "Tester",
             1,
             JobOrderStatus.OPEN,
@@ -117,7 +147,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -154,7 +184,7 @@ class JobOrderServiceTest {
     // Given — DTO carries 700 (the only valid value), service must persist exactly 700
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -183,7 +213,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -376,7 +406,8 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(updateMat), 1L); // version mismatch
+        new CreateJobOrderDto(
+            "Alpha", null, null, "Tester", List.of(updateMat), 1L); // version mismatch
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -390,6 +421,104 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateJobOrder_ShouldNotModifyCreatingSquadron_WhenRequestingSquadronChanges() {
+    // Plan §8 + §11: creatingSquadron is immutable after the order is persisted; only
+    // requestingSquadron may be retargeted by a Logistician+ during the order's lifetime.
+    // This pins the contract that updateJobOrder NEVER touches creatingSquadron even when
+    // the inbound DTO carries a different squadron string (which only retargets requesting).
+    Squadron creatingOriginal = new Squadron();
+    creatingOriginal.setId(UUID.randomUUID());
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    Squadron requestingOriginal = new Squadron();
+    requestingOriginal.setId(UUID.randomUUID());
+    requestingOriginal.setShorthand("ALF");
+    jobOrder.setRequestingSquadron(requestingOriginal);
+
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    // The DTO carries the squadron STRING that gets looked up against shorthand and turns
+    // into requestingSquadron — "Bravo" is intentionally different from creatingOriginal/
+    // requestingOriginal's "ALF".
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto("Bravo", null, null, "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    jobOrderService.updateJobOrder(orderId, updateDto);
+
+    // The creating squadron must be the SAME reference (and same id) as before the update.
+    assertSame(
+        creatingOriginal,
+        jobOrder.getCreatingSquadron(),
+        "creatingSquadron is immutable per Plan §8 — update must not retag the authoring"
+            + " squadron.");
+    // The requesting squadron must reflect the new "Bravo" shorthand.
+    assertNotNull(jobOrder.getRequestingSquadron());
+    assertEquals("Bravo", jobOrder.getRequestingSquadron().getShorthand());
+    // Legacy squadron VARCHAR mirrors the new requestingSquadron shorthand.
+    assertEquals("Bravo", jobOrder.getSquadron());
+  }
+
+  @Test
+  void updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges() {
+    // Plan §8 + §11: passing a different creatingSquadronId on update must reject with 400
+    // rather than silently dropping the field. Pins the strict-reject contract that the prior
+    // "silently ignore" implementation violated.
+    Squadron creatingOriginal = new Squadron();
+    creatingOriginal.setId(UUID.randomUUID());
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    UUID attemptedOverride = UUID.randomUUID();
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, attemptedOverride, null, "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> jobOrderService.updateJobOrder(orderId, updateDto));
+    assertTrue(
+        ex.getMessage().contains("creatingSquadronId"),
+        "Error message should reference creatingSquadronId: " + ex.getMessage());
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void updateJobOrder_ShouldAccept_WhenCreatingSquadronIdMatchesExisting() {
+    // Companion to updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges: passing the SAME
+    // creatingSquadronId (i.e. echoing the unchanged value back from a read DTO) is a no-op
+    // and must NOT trip the immutability guard.
+    Squadron creatingOriginal = new Squadron();
+    UUID creatingId = UUID.randomUUID();
+    creatingOriginal.setId(creatingId);
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    Squadron requestingOriginal = new Squadron();
+    requestingOriginal.setId(UUID.randomUUID());
+    requestingOriginal.setShorthand("ALF");
+    jobOrder.setRequestingSquadron(requestingOriginal);
+
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto("ALF", creatingId, null, "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    assertDoesNotThrow(() -> jobOrderService.updateJobOrder(orderId, updateDto));
+    assertSame(creatingOriginal, jobOrder.getCreatingSquadron());
+  }
+
+  @Test
   void updateJobOrder_ShouldUpdateFieldsAndUnlinkRemovedMaterials() {
     // Given
     UUID newMaterialId = UUID.randomUUID();
@@ -398,7 +527,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Beta", "NewTester", List.of(updateMat), null);
+        new CreateJobOrderDto("Beta", null, null, "NewTester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
@@ -471,7 +600,20 @@ class JobOrderServiceTest {
 
     InventoryItemDto itemDto =
         new InventoryItemDto(
-            item.getId(), null, null, null, 100, 10.0, false, null, null, null, null, null, 1L);
+            item.getId(),
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -635,20 +777,72 @@ class JobOrderServiceTest {
     // Same owner "Alpha", same quality 80, different location → ArcCorp before Baijini
     InventoryItemDto dto1 =
         new InventoryItemDto(
-            i1.getId(), userAlpha, null, locB, 80, 5.0, false, null, null, null, null, null, 1L);
+            i1.getId(),
+            userAlpha,
+            null,
+            locB,
+            80,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Same owner "Alpha", higher quality 90 → comes before quality 80
     InventoryItemDto dto2 =
         new InventoryItemDto(
-            i2.getId(), userAlpha, null, locA, 90, 3.0, false, null, null, null, null, null, 1L);
+            i2.getId(),
+            userAlpha,
+            null,
+            locA,
+            90,
+            3.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Owner "Beta" → after all "Alpha" entries
     InventoryItemDto dto3 =
         new InventoryItemDto(
-            i3.getId(), userBeta, null, locA, 70, 20.0, false, null, null, null, null, null, 1L);
+            i3.getId(),
+            userBeta,
+            null,
+            locA,
+            70,
+            20.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
     // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before
     // lower amount
     InventoryItemDto dto4 =
         new InventoryItemDto(
-            i4.getId(), userAlpha, null, locA, 80, 10.0, false, null, null, null, null, null, 1L);
+            i4.getId(),
+            userAlpha,
+            null,
+            locA,
+            80,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));

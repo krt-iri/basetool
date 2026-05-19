@@ -100,7 +100,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -227,6 +227,7 @@
                                 <thead>
                                     <tr>
                                         <th style="padding-left: 2rem; width: 15%;">Nutzer</th>
+                                        <th th:if="${isAllSquadronsMode}" style="width: 8%;" th:text="#{inventory.owning_squadron}">Staffel</th>
                                         <th style="width: 15%;">Ort</th>
                                         <th style="width: 10%;">Qualität</th>
                                         <th style="width: 10%;">Menge</th>
@@ -238,6 +239,12 @@
                                 <tbody>
                                     <tr th:each="item : ${group.items}">
                                         <td style="padding-left: 2rem;" th:text="${item.user.effectiveName}">User</td>
+                                        <td th:if="${isAllSquadronsMode}">
+                                            <span th:if="${item.owningSquadron != null}" class="squadron-badge"
+                                                  th:title="${item.owningSquadron.name()}"
+                                                  th:text="${item.owningSquadron.shorthand()}">IRI</span>
+                                            <span th:if="${item.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                        </td>
                                         <td th:text="${item.location.name}">Ort</td>
                                         <td th:text="${item.quality}">100</td>
                                         <td th:switch="${item.material.quantityType}">

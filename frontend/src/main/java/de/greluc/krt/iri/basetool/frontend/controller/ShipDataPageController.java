@@ -156,7 +156,7 @@ public class ShipDataPageController {
    * @return redirect to {@code /ship-data}
    */
   @PostMapping("/reset-fitted")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String resetAllFitted(RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);

@@ -98,6 +98,7 @@ class RefineryOrderDurationTest {
             null,
             Collections.emptyList(),
             null,
+            null,
             1L);
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
@@ -167,6 +168,7 @@ class RefineryOrderDurationTest {
             0d,
             null,
             Collections.emptyList(),
+            null,
             null,
             1L);
 

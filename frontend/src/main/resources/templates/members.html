@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="#{members.title} + ' - ' + #{app.title}">Mitgliederverwaltung - IRIDIUM Basetool</title>
+    <title th:text="#{members.title} + ' - ' + ${appTitle}">Mitgliederverwaltung - IRIDIUM Basetool</title>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -15,7 +15,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -45,8 +45,7 @@
             <thead>
                 <tr>
                     <th th:text="#{profile.username}">Username</th>
-                    <th th:text="#{profile.firstname}">Vorname</th>
-                    <th th:text="#{profile.lastname}">Nachname</th>
+                    <th th:text="#{members.field.squadron}">Staffel</th>
                     <th th:text="#{profile.rank}">Rang</th>
                     <th th:text="#{members.is_logistician}">Logistiker</th>
                     <th th:text="#{members.is_mission_manager}">Missions-Manager</th>
@@ -57,8 +56,12 @@
             <tbody>
                 <tr th:each="user : ${users}">
                     <td th:text="${user.effectiveName}">Username</td>
-                    <td th:text="${user.firstName}">Vorname</td>
-                    <td th:text="${user.lastName}">Nachname</td>
+                    <td>
+                        <span th:if="${user.squadron != null}" class="squadron-badge"
+                              th:title="${user.squadron.name()}"
+                              th:text="${user.squadron.shorthand()}">IRI</span>
+                        <span th:if="${user.squadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                    </td>
                     <td th:text="${user.rank}">Rang</td>
                     <td>
                         <input type="checkbox"

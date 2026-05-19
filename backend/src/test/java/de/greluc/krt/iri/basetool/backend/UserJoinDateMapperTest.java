@@ -2,17 +2,30 @@ package de.greluc.krt.iri.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.iri.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapperImpl;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class UserJoinDateMapperTest {
 
-  private final UserMapper userMapper = new UserMapperImpl();
+  private UserMapper userMapper;
+
+  @BeforeEach
+  void setUp() {
+    // UserMapperImpl @Autowires SquadronMapper for the squadron projection — wire it manually
+    // since this test does not load a Spring context.
+    userMapper = new UserMapperImpl();
+    ReflectionTestUtils.setField(
+        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+  }
 
   @Test
   void shouldMapJoinDate_WhenSet() {

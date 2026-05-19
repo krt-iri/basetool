@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{nav.hangar_data} + ' - ' + #{app.title}">Schiffsdaten - IRIDIUM Basetool</title>
+    <title th:text="#{nav.hangar_data} + ' - ' + ${appTitle}">Schiffsdaten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .data-section {
@@ -41,7 +41,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -49,7 +49,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.hangar_data}">Schiffsdaten</h1>
-        <form sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
+        <form sec:authorize="hasRole('ADMIN')" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
             <button type="button" class="btn btn-secondary" data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
         </form>
     </div>
@@ -152,7 +152,7 @@
 </main>
 
 <!-- Modals -->
-<div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')">
+<div sec:authorize="hasRole('ADMIN')">
     <!-- Reset Fitted Confirmation Modal -->
     <div id="reset-fitted-confirm-modal" class="modal" style="display:none;">
         <div class="modal-content" style="max-width:480px; text-align:center;">

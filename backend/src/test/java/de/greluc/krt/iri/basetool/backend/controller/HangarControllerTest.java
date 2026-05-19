@@ -59,7 +59,7 @@ class HangarControllerTest {
   @InjectMocks private HangarController controller;
 
   private static ShipDto shipDto(String name) {
-    return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, 1L);
+    return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L);
   }
 
   private static Jwt jwt(String sub) {

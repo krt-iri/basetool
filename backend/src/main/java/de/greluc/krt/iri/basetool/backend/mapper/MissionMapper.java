@@ -8,7 +8,6 @@ import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
-import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionCrewDto;
@@ -19,7 +18,6 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionUnitDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import org.mapstruct.Mapper;
@@ -34,7 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
       UserMapper.class,
       InventoryItemMapper.class,
       RefineryOrderMapper.class,
-      OperationMapper.class
+      OperationMapper.class,
+      SquadronMapper.class
     },
     unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public abstract class MissionMapper {
@@ -91,9 +90,6 @@ public abstract class MissionMapper {
   @Mapping(target = "parentId", source = "parent.id")
   @Mapping(target = "isLeadershipRole", source = "leadershipRole")
   public abstract JobTypeDto toDto(JobType jobType);
-
-  /** Maps a {@link Squadron} entity nested inside a mission to its outbound DTO. */
-  public abstract SquadronDto toDto(Squadron squadron);
 
   /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */
   public abstract MissionReferenceDto toReferenceDto(Mission mission);

@@ -524,4 +524,221 @@ class ArchitectureTest {
     }
     return false;
   }
+
+  /**
+   * {@code true} iff one of the method's request-mapping annotations declares a path that contains
+   * the literal {@code "{id}"} placeholder. Used by {@link
+   * #staffelScopedWriteEndpointsMustGateOnSquadronScopeService()} to scope the rule to endpoints
+   * that target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
+   * endpoints whose only {@code UUID} path variable is a related entity like {@code userId}).
+   */
+  private static boolean mappingPathContainsIdPlaceholder(JavaMethod method) {
+    String[] candidateAnnotations = {POST_MAPPING, PUT_MAPPING, PATCH_MAPPING, DELETE_MAPPING};
+    for (String fqn : candidateAnnotations) {
+      if (!method.isAnnotatedWith(fqn)) {
+        continue;
+      }
+      JavaAnnotation<?> ann = method.getAnnotationOfType(fqn);
+      Object raw = ann.tryGetExplicitlyDeclaredProperty("value").orElse(null);
+      if (raw == null) {
+        continue;
+      }
+      if (raw instanceof String s) {
+        if (s.contains("{id}")) {
+          return true;
+        }
+      } else if (raw instanceof Object[] arr) {
+        for (Object o : arr) {
+          if (o instanceof String s && s.contains("{id}")) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Staffel-scoped aggregate services MUST consult either {@code AuthHelperService} (for raw
+   * principal / role lookups) or {@code SquadronScopeService} (for canSee/canEdit + active-context
+   * resolution) - otherwise the data they emit might leak across squadrons. Phase 3 of
+   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift.
+   *
+   * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
+   * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
+   * operate without a squadron filter. They do depend on {@code AuthHelperService} for the owner
+   * stamp at create time, which keeps the test honest by still being satisfied for them via the
+   * AuthHelperService route.
+   */
+  @Test
+  void staffelScopedServicesMustWireSquadronOrAuthHelper() {
+    // JobOrderService AND JobOrderHandoverService are intentionally excluded — Job Orders are a
+    // cross-staffel workspace by design (MULTI_SQUADRON_PLAN.md section 1 + 4.6), so the squadron
+    // filter does not apply. Both services do inject AuthHelperService anyway for the owner stamp
+    // (JobOrderService) and the audit stamp on the handover record (JobOrderHandoverService) —
+    // verified by their own unit tests rather than by this rule.
+    Set<String> staffelScopedServiceNames =
+        Set.of(
+            "MissionService",
+            "InventoryItemService",
+            "RefineryOrderService",
+            "HangarService",
+            "OperationService");
+
+    String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
+    String squadronScope = "de.greluc.krt.iri.basetool.backend.service.SquadronScopeService";
+
+    classes()
+        .that(
+            new DescribedPredicate<JavaClass>("is one of the staffel-scoped aggregate services") {
+              @Override
+              public boolean test(JavaClass javaClass) {
+                return staffelScopedServiceNames.contains(javaClass.getSimpleName());
+              }
+            })
+        .should(
+            new ArchCondition<>("depend on AuthHelperService or SquadronScopeService") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                boolean hasIt =
+                    javaClass.getFields().stream()
+                        .map(f -> f.getRawType().getFullName())
+                        .anyMatch(t -> t.equals(authHelper) || t.equals(squadronScope));
+                if (!hasIt) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          javaClass,
+                          javaClass.getName()
+                              + " is in the staffel-scoped service whitelist but injects neither"
+                              + " AuthHelperService nor SquadronScopeService - that means it"
+                              + " cannot enforce the multi-tenant filter / squadron stamp."));
+                }
+              }
+            })
+        .check(CLASSES);
+  }
+
+  /**
+   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6): write endpoints on
+   * staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression that calls into the
+   * {@code SquadronScopeService} (canEdit* / canSee*). A bare
+   * {@code @PreAuthorize("isAuthenticated()")} on POST / PUT / PATCH / DELETE for {@code
+   * /api/v1/missions}, {@code /api/v1/operations}, {@code /api/v1/hangar}, {@code
+   * /api/v1/inventory} or {@code /api/v1/refinery-orders} would silently allow cross-staffel writes
+   * — exactly the regression class this rule prevents.
+   *
+   * <p>The rule inspects all write methods (POST/PUT/PATCH/DELETE) on the affected controllers but
+   * only fires when the URL path carries a primary-resource id placeholder (i.e. {@code /{id}}).
+   * POSTs that do not target a specific resource (top-level create, bulk operations,
+   * cross-user-administrative endpoints like {@code /users/{userId}/...}) are skipped — the service
+   * layer enforces ownership there and a per-id squadron gate has nothing to bind to.
+   *
+   * <ul>
+   *   <li>Read endpoints stay free of the rule — list endpoints lean on service-layer filtering
+   *       rather than per-row {@code @PreAuthorize}.
+   *   <li>{@code /api/v1/orders} (job orders) and {@code /api/v1/admin/**} are excluded — job
+   *       orders are a cross-staffel workspace by design, admin endpoints already require {@code
+   *       hasRole('ADMIN')} which carries no squadron component.
+   *   <li>Endpoints that use a role-only check ({@code hasRole('LOGISTICIAN')} etc.) without
+   *       additionally calling the squadron-scope service still violate — the rule looks for the
+   *       literal {@code squadronScopeService} reference in the SpEL expression.
+   * </ul>
+   */
+  @Test
+  void staffelScopedWriteEndpointsMustGateOnSquadronScopeService() {
+    Set<String> staffelScopedControllerSimpleNames =
+        Set.of(
+            "MissionController",
+            "OperationController",
+            "HangarController",
+            "InventoryItemController",
+            "RefineryOrderController");
+
+    noMethods()
+        .that()
+        .areDeclaredInClassesThat(
+            new DescribedPredicate<JavaClass>("are staffel-scoped aggregate REST controllers") {
+              @Override
+              public boolean test(JavaClass javaClass) {
+                return staffelScopedControllerSimpleNames.contains(javaClass.getSimpleName());
+              }
+            })
+        .and()
+        .areAnnotatedWith(
+            new DescribedPredicate<JavaAnnotation<?>>(
+                "are a modify-mapping annotation (POST/PUT/PATCH/DELETE)") {
+              @Override
+              public boolean test(JavaAnnotation<?> annotation) {
+                // POST is included alongside PUT/PATCH/DELETE because POST /{id}/<action> can
+                // mutate a specific resource (e.g. /inventory/{id}/book-out,
+                // /refinery-orders/{id}/store, /missions/{id}/join) — without a squadron gate a
+                // Logistician of squadron A could trigger the action on a squadron-B resource.
+                // The inner check filters out POSTs whose path does not target a primary resource
+                // id so create / bulk / administrative endpoints are not falsely flagged.
+                String fqcn = annotation.getRawType().getFullName();
+                return POST_MAPPING.equals(fqcn)
+                    || PUT_MAPPING.equals(fqcn)
+                    || PATCH_MAPPING.equals(fqcn)
+                    || DELETE_MAPPING.equals(fqcn);
+              }
+            })
+        .and()
+        .areAnnotatedWith(PRE_AUTHORIZE)
+        .should(
+            new ArchCondition<JavaMethod>(
+                "gate on @squadronScopeService in the @PreAuthorize SpEL expression") {
+              @Override
+              public void check(JavaMethod method, ConditionEvents events) {
+                // Skip endpoints that do not target a specific resource id in their path. The
+                // condition is two-fold:
+                //   * the method must accept a UUID @PathVariable (a primary-resource id), AND
+                //   * the request mapping path must literally contain "{id}" (the canonical
+                //     placeholder for the aggregate root's id; avoids false positives on
+                //     administrative endpoints like POST /users/{userId}/ships where the path
+                //     variable is a related user, not the aggregate id being mutated).
+                boolean takesResourceIdPathVariable =
+                    method.getParameters().stream()
+                        .anyMatch(
+                            p ->
+                                p.isAnnotatedWith(
+                                        "org.springframework.web.bind.annotation.PathVariable")
+                                    && p.getRawType().getFullName().equals("java.util.UUID"));
+                if (!takesResourceIdPathVariable) {
+                  return;
+                }
+                if (!mappingPathContainsIdPlaceholder(method)) {
+                  return;
+                }
+
+                JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
+                String value =
+                    ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
+                // Accepted gate references:
+                //   - @squadronScopeService.canSee*/canEdit* — the direct squadron-scope check;
+                //   - @missionSecurityService.canManage*/canAccessParticipant/canChangeOwner —
+                //     mission-aggregate gate that itself folds in canEditMission() for elevated
+                //     authorities (see MissionSecurityService — squadron-scope-aware as of the
+                //     Phase 6 follow-up);
+                //   - hasRole('ADMIN') alone — admin always passes the squadron filter, no extra
+                //     scope check needed (MULTI_SQUADRON_PLAN.md section 1).
+                boolean hasSquadronScope = value.contains("squadronScopeService");
+                boolean hasMissionSecurity = value.contains("missionSecurityService");
+                boolean hasAdminOnly =
+                    value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
+                if (!hasSquadronScope && !hasMissionSecurity && !hasAdminOnly) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          method,
+                          method.getFullName()
+                              + " is a write endpoint on a staffel-scoped aggregate but its"
+                              + " @PreAuthorize expression does not gate on @squadronScopeService"
+                              + " (or @missionSecurityService / hasRole('ADMIN')) - that means"
+                              + " cross-staffel writes are not blocked. Add `and"
+                              + " @squadronScopeService.canEdit*(#id)` to the SpEL"
+                              + " (MULTI_SQUADRON_PLAN.md section 4.6)."));
+                }
+              }
+            })
+        .check(CLASSES);
+  }
 }

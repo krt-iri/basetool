@@ -64,7 +64,8 @@ class SquadronServiceTest {
     s = squadronService.createSquadron(s);
 
     SquadronDto update =
-        new SquadronDto(s.getId(), "Updated Name", "NEW", "Updated Desc", true, s.getVersion());
+        new SquadronDto(
+            s.getId(), "Updated Name", "NEW", "Updated Desc", true, true, s.getVersion());
 
     Squadron updated = squadronService.updateSquadron(s.getId(), update);
 

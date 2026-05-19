@@ -58,7 +58,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     MaterialCategory saved = service.create(category);
@@ -73,7 +73,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public MaterialCategoryDto update(@PathVariable UUID id, @RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     MaterialCategory updated = service.update(id, category);
@@ -86,7 +86,7 @@ public class MaterialCategoryController {
    * @param id category id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void delete(@PathVariable UUID id) {
     service.delete(id);
   }

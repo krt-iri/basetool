@@ -104,6 +104,7 @@ public class OperationService {
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
   private final SystemSettingService systemSettingService;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns paged operation list.
@@ -112,7 +113,8 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    return operationRepository.findAll(pageable);
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return operationRepository.findAllScoped(owningSquadronId, pageable);
   }
 
   /**
@@ -136,6 +138,9 @@ public class OperationService {
    */
   @Transactional
   public Operation createOperation(@NotNull Operation operation) {
+    if (operation.getOwningSquadron() == null) {
+      squadronScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+    }
     return operationRepository.save(operation);
   }
 

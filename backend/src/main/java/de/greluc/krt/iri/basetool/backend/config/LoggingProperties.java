@@ -42,6 +42,15 @@ public class LoggingProperties {
   @NotBlank private String userIdMdcKey = "userId";
 
   /**
+   * MDC key under which the resolved squadron context of the current request is stored - either the
+   * caller's persistent {@code app_user.squadron_id}, the admin's active switcher selection, or the
+   * sentinel {@code none}/{@code all} when no squadron applies. Mirrors the MULTI_SQUADRON_PLAN.md
+   * section 7 logging requirement; keep this in sync with the {@code %X{squadronId}} placeholder in
+   * {@code logback-spring.xml}.
+   */
+  @NotBlank private String squadronIdMdcKey = "squadronId";
+
+  /**
    * Requests taking longer than this threshold (in milliseconds) are logged at {@code WARN} instead
    * of {@code INFO} by {@code RequestLoggingFilter}. Set to a large value to disable.
    */

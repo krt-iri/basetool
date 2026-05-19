@@ -229,7 +229,7 @@ public class InventoryItemController {
    * @return the persisted DTO or 204
    */
   @PostMapping("/{id}/book-out")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditInventoryItem(#id)")
   public org.springframework.http.ResponseEntity<InventoryItemDto> bookOutInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -250,7 +250,7 @@ public class InventoryItemController {
    * locking is enforced via the {@code version} field in the request.
    */
   @PutMapping("/{id}/note")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditInventoryItem(#id)")
   public InventoryItemDto updateInventoryItemNote(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -305,7 +305,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PatchMapping("/{id}/delivered")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditInventoryItem(#id)")
   public InventoryItemDto updateDelivered(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -322,7 +322,7 @@ public class InventoryItemController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditInventoryItem(#id)")
   public InventoryItemDto updateInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,

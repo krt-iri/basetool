@@ -1042,7 +1042,7 @@ public class MissionPageController {
         "mission",
         new MissionDto(
             null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
-            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0));
+            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
     return "mission-detail";
@@ -1083,7 +1083,7 @@ public class MissionPageController {
 
       OperationDto operation =
           (form.operationId() != null && !form.operationId().isBlank())
-              ? new OperationDto(UUID.fromString(form.operationId()), null, null, null, null)
+              ? new OperationDto(UUID.fromString(form.operationId()), null, null, null, null, null)
               : null;
 
       MissionDto missionDto =
@@ -1115,7 +1115,8 @@ public class MissionPageController {
               null, // scheduleVersion (server-assigned)
               null, // flagsVersion (server-assigned)
               0, // checkedInParticipants
-              0 // registeredParticipants
+              0, // registeredParticipants
+              null // owningSquadron (server-assigned)
               );
 
       backendApiClient.post("/api/v1/missions", missionDto, Void.class);

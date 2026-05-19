@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -71,7 +72,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
   }
@@ -84,7 +85,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public SquadronDto updateSquadron(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
@@ -96,7 +97,7 @@ public class SquadronController {
    * @param id squadron id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteSquadron(@PathVariable @NotNull UUID id) {
     squadronService.deleteSquadron(id);
   }
@@ -111,4 +112,29 @@ public class SquadronController {
   public void activateSquadron(@PathVariable @NotNull UUID id) {
     squadronService.activateSquadron(id);
   }
+
+  /**
+   * Per-squadron promotion-system feature toggle. Admins flip the flag to hide / re-expose the
+   * promotion menu for a whole squadron without losing any data. ADMIN-only — the regular {@code
+   * PUT /api/v1/squadrons/{id}} update path intentionally does NOT touch this flag so an accidental
+   * description edit cannot disable the feature.
+   *
+   * @param id squadron id
+   * @param body request payload {@code { "enabled": true|false }}
+   * @return the updated squadron DTO with the new flag value
+   */
+  @PatchMapping("/{id}/promotion-enabled")
+  @PreAuthorize("hasRole('ADMIN')")
+  public SquadronDto setPromotionEnabled(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronPromotionToggleRequest body) {
+    return squadronMapper.toDto(squadronService.setPromotionEnabled(id, body.enabled()));
+  }
+
+  /**
+   * Request body for the per-squadron promotion-feature toggle endpoint. Carries a single boolean
+   * so a future expansion (e.g. effective-from date) can be added without breaking the wire format.
+   *
+   * @param enabled new value of {@code Squadron.isPromotionEnabled}
+   */
+  public record SquadronPromotionToggleRequest(boolean enabled) {}
 }

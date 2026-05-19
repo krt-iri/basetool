@@ -72,6 +72,7 @@ class OfficerRefineryAccessTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
@@ -94,6 +95,7 @@ class OfficerRefineryAccessTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     PageResponse<UserDto> userPage =
@@ -155,6 +157,7 @@ class OfficerRefineryAccessTest {
             false,
             false,
             true,
+            null,
             1L,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(officerDto);
@@ -175,6 +178,7 @@ class OfficerRefineryAccessTest {
             null,
             Collections.emptyList(),
             RefineryOrderStatus.OPEN,
+            null,
             1L);
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(orderDto);

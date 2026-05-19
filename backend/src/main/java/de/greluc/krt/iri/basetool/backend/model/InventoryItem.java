@@ -77,4 +77,17 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   @Column(nullable = false)
   private Boolean delivered = false;
+
+  /**
+   * Squadron that owns this inventory item (i.e., the squadron whose physical stock this row
+   * represents). Set at creation time from the caller's active squadron and immutable afterwards.
+   * The direct Lager-View filters by this column; an item linked to a job order via {@link
+   * #jobOrder} additionally surfaces in that order's UI for ALL squadrons (cross-squadron
+   * workspace, see MULTI_SQUADRON_PLAN.md). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
+   * the column to NOT NULL.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "owning_squadron_id")
+  @ToString.Exclude
+  private Squadron owningSquadron;
 }

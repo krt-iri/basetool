@@ -81,7 +81,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public RefiningMethodDto createRefiningMethod(
       @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     return refiningMethodMapper.toDto(
@@ -97,7 +97,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public RefiningMethodDto updateRefiningMethod(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     return refiningMethodMapper.toDto(
@@ -111,7 +111,7 @@ public class RefiningMethodController {
    * @param id refining method id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteRefiningMethod(@PathVariable @NotNull UUID id) {
     refiningMethodService.deleteRefiningMethod(id);
   }

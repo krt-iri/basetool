@@ -45,7 +45,7 @@ class OperationControllerTest {
     Operation operation = new Operation();
     OperationDto operationDto =
         new OperationDto(
-            UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, 0L, null, null);
+            UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, null, 0L, null, null);
 
     when(operationMapper.toEntity(createDto)).thenReturn(operation);
     when(operationService.createOperation(operation)).thenReturn(operation);
@@ -132,7 +132,8 @@ class OperationControllerTest {
   void getAllOperations_wrapsServicePageIntoPageResponse() {
     Operation entity = new Operation();
     OperationDto dto =
-        new OperationDto(UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, 0L, null, null);
+        new OperationDto(
+            UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, null, 0L, null, null);
     // Echo the incoming Pageable back through the PageImpl so the
     // Sort survives the .map() in the controller — otherwise getSort()
     // would default to Sort.unsorted() and the assertion below loses

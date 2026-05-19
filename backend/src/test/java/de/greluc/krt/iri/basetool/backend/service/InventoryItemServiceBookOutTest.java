@@ -616,6 +616,19 @@ class InventoryItemServiceBookOutTest {
 
   private static InventoryItemDto sentinelDto(Double amount) {
     return new InventoryItemDto(
-        UUID.randomUUID(), null, null, null, 500, amount, false, null, null, null, null, null, 1L);
+        UUID.randomUUID(),
+        null,
+        null,
+        null,
+        500,
+        amount,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        1L);
   }
 }

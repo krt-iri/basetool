@@ -52,7 +52,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/uex-data")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminUexPageController {
 
   /** URL segments accepted as the {@code kind} path variable for the loading-dock dispatcher. */
@@ -121,7 +121,7 @@ public class AdminUexPageController {
    * @return redirect back to {@code /admin/uex}
    */
   @PostMapping("/{kind}/{id}/loading-dock")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String updateLoadingDockOverride(
       @PathVariable @NotNull String kind,
       @PathVariable @NotNull UUID id,
@@ -149,7 +149,7 @@ public class AdminUexPageController {
    * @return redirect back to {@code /admin/uex}
    */
   @PostMapping("/terminals/{id}/auto-load")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String updateTerminalAutoLoadOverride(
       @PathVariable @NotNull UUID id,
       @RequestParam String action,
@@ -169,7 +169,7 @@ public class AdminUexPageController {
    * @return redirect to {@code /admin/uex} (optionally with {@code ?error=...})
    */
   @PostMapping("/terminals/{id}/toggle-visibility")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public String toggleTerminalVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,

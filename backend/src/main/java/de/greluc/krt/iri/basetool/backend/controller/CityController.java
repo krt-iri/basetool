@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/cities")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class CityController {
 
   private final CityService cityService;
@@ -85,7 +85,7 @@ public class CityController {
    * @return the persisted city DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public CityDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return cityMapper.toDto(cityService.setLoadingDockOverride(id, value));
@@ -99,7 +99,7 @@ public class CityController {
    * @return the persisted city DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public CityDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return cityMapper.toDto(cityService.clearLoadingDockOverride(id));
   }

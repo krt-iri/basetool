@@ -18,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class PromotionCategoryService {
   private final PromotionCategoryRepository repository;
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryMapper mapper;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns a paginated slice of every {@link PromotionCategoryResponse} across all topics. The
@@ -49,6 +51,9 @@ public class PromotionCategoryService {
    * @return a page of categories
    */
   public Page<PromotionCategoryResponse> list(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
@@ -62,6 +67,9 @@ public class PromotionCategoryService {
    */
   public Page<PromotionCategoryResponse> listByTopic(
       @NotNull UUID topicId, @NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAllByTopicId(topicId, pageable).map(mapper::toResponse);
   }
 
@@ -73,6 +81,9 @@ public class PromotionCategoryService {
    * @return the topic's categories in display order
    */
   public List<PromotionCategoryResponse> listAllByTopic(@NotNull UUID topicId) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByTopicIdOrderBySortOrderAsc(topicId).stream()
         .map(mapper::toResponse)
         .toList();
@@ -86,6 +97,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if no category exists for that id
    */
   public PromotionCategoryResponse get(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -100,12 +112,14 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionTopic topic =
         topicRepository
             .findById(request.topicId())
             .orElseThrow(
                 () ->
                     new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+    assertCallerMayEditTopic(topic);
     PromotionCategory entity = mapper.toEntity(request);
     entity.setTopic(topic);
     PromotionCategory saved = repository.save(entity);
@@ -130,7 +144,9 @@ public class PromotionCategoryService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionCategoryResponse update(
       @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
+    assertCallerMayEditTopic(entity.getTopic());
     if (!entity.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(PromotionCategory.class, id);
     }
@@ -140,6 +156,7 @@ public class PromotionCategoryService {
             .orElseThrow(
                 () ->
                     new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+    assertCallerMayEditTopic(topic);
     mapper.updateEntity(entity, request);
     entity.setTopic(topic);
     PromotionCategory saved = repository.save(entity);
@@ -158,7 +175,9 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
+    assertCallerMayEditTopic(entity.getTopic());
     repository.delete(entity);
     log.info("Deleted PromotionCategory id={}", id);
   }
@@ -168,5 +187,15 @@ public class PromotionCategoryService {
     return repository
         .findById(id)
         .orElseThrow(() -> new EntityNotFoundException("PromotionCategory not found: " + id));
+  }
+
+  private void assertCallerMayEditTopic(PromotionTopic topic) {
+    if (topic == null || topic.getOwningSquadron() == null) {
+      return;
+    }
+    if (!squadronScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing this promotion topic's children");
+    }
   }
 }

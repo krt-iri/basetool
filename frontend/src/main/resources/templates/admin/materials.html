@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::style})}">
-    <title th:text="#{admin.materials.title} + ' - ' + #{app.title}">Materialien verwalten - IRIDIUM Basetool</title>
+    <title th:text="#{admin.materials.title} + ' - ' + ${appTitle}">Materialien verwalten - IRIDIUM Basetool</title>
     <style>
         .data-section {
             margin-bottom: 3rem;
@@ -49,7 +49,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -138,13 +138,13 @@
                             <div style="white-space: nowrap;">
                                 <span th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
                             </div>
-                            <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
+                            <div sec:authorize="hasRole('ADMIN')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
                                 <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
                                     <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
                                 </label>
                             </div>
-                            <div sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
+                            <div sec:authorize="hasRole('ADMIN')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
                                 <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
                                     <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.job_order}">Auftrag</span>
@@ -165,11 +165,11 @@
                         </td>
                         <td>
                             <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
-                                <select sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" style="width: 100%;">
+                                <select sec:authorize="hasRole('ADMIN')" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" style="width: 100%;">
                                     <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
                                     <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                 </select>
-                                <span sec:authorize="!hasAnyRole('ADMIN', 'OFFICER')" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
+                                <span sec:authorize="!hasRole('ADMIN')" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
                             </th:block>
                             <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
                                 <span>-</span>

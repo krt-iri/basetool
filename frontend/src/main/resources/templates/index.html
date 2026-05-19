@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{app.title}">IRIDIUM Basetool</title>
+    <title th:text="${appTitle}">IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <script th:src="@{/js/vendor/marked-18.0.3.min.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/vendor/dompurify-3.4.2.min.js}" th:attr="nonce=${cspNonce}"></script>
@@ -19,7 +19,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>

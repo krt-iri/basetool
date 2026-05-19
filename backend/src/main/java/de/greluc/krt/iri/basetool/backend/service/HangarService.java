@@ -48,19 +48,25 @@ public class HangarService {
   private final MissionUnitRepository missionUnitRepository;
   private final ShipMapper shipMapper;
   private final EntityManager entityManager;
+  private final SquadronScopeService squadronScopeService;
 
   /**
-   * Returns paged list of all ships across all users (admin-level read).
+   * Returns the paged ship list scoped to the caller's squadron context: admin without an active
+   * squadron selection sees every ship; everyone else (including admins in switcher mode) sees only
+   * ships of their effective squadron.
    *
    * @param pageable page request
-   * @return paged list of all ships across all users (admin-level read)
+   * @return paged list of ships in the caller's squadron context
    */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    return shipRepository.findAll(pageable);
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return shipRepository.findAllScoped(owningSquadronId, pageable);
   }
 
   /**
-   * Adds a ship to a user's hangar.
+   * Adds a ship to a user's hangar. The ship's owning squadron is derived from the user's home
+   * squadron at the time of the call - subsequent user-squadron moves do NOT cascade to existing
+   * ships (a ship physically belongs to whichever squadron it was added in).
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location)
@@ -77,6 +83,7 @@ public class HangarService {
     ship.setInsurance(dto.insurance());
     ship.setFitted(dto.fitted());
     ship.setOwner(user);
+    ship.setOwningSquadron(user.getSquadron());
     ship.setShipType(
         shipTypeRepository
             .findById(dto.shipTypeId())
@@ -113,7 +120,8 @@ public class HangarService {
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails) {
-    Page<Object[]> p = shipRepository.countShipsByType(pageable);
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    Page<Object[]> p = shipRepository.countShipsByType(owningSquadronId, pageable);
 
     List<de.greluc.krt.iri.basetool.backend.model.ShipType> types =
         includeOwnerDetails
@@ -267,11 +275,15 @@ public class HangarService {
   }
 
   /**
-   * Squadron-wide bulk reset of the {@code fitted} flag on every ship. Used by admins after a major
-   * event (patch wipe etc.) so members re-fit their ships instead of carrying stale state.
+   * Squadron-scoped bulk reset of the {@code fitted} flag on every ship. Used by admins/officers
+   * after a major event (patch wipe etc.) so members re-fit their ships instead of carrying stale
+   * state. In focused mode only ships of the caller's squadron are reset; admin "all squadrons"
+   * mode falls back to the cross-staffel reset (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict
+   * eigene Staffel).
    */
   @Transactional
   public void resetAllFittedStatus() {
-    shipRepository.resetAllFitted();
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    shipRepository.resetAllFittedScoped(owningSquadronId);
   }
 }

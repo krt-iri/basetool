@@ -114,7 +114,7 @@ public class OperationController {
    * @return the operation DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
   @Operation(summary = "Get operation by ID")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation found."),
@@ -132,7 +132,7 @@ public class OperationController {
    * @return finance summary DTO
    */
   @GetMapping("/{id}/finances")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
   @Operation(
       summary = "Get aggregated finances for an operation",
       description =
@@ -157,7 +157,7 @@ public class OperationController {
    * @return payout rows sorted by participant name
    */
   @GetMapping("/{id}/payouts")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
   @Operation(
       summary = "Get participation payout breakdown with amounts and paid-out status",
       description =
@@ -194,7 +194,7 @@ public class OperationController {
    *     its table without re-fetching the whole breakdown
    */
   @PutMapping("/{id}/payouts/paid-out")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
       description =
@@ -250,7 +250,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =
@@ -292,7 +292,7 @@ public class OperationController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('ADMIN') and @squadronScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Delete an operation",
       description =

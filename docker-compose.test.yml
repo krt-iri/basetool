@@ -65,5 +65,16 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
+      # application-prod.yml hardcodes `spring.data.redis.host: redis`, but
+      # application-dev.yml (activated by the SPRING_PROFILES_ACTIVE override
+      # above) reads `${REDIS_HOST:localhost}` instead. Inside the container
+      # stack `localhost:6379` is the JVM itself, not the redis-dev service,
+      # so explicitly point the dev profile at the Docker network alias.
+      REDIS_HOST: redis
+      # application-dev.yml uses `backend.base-url: ${BACKEND_URL:http://localhost:11261}`;
+      # the prod template already exports BACKEND_URL=https://backend:11261 so
+      # this only needs to flip back to the in-container alias when the dev
+      # profile activates inside Docker.
+      BACKEND_URL: https://backend:11261
     extra_hosts:
       - "host.docker.internal:host-gateway"

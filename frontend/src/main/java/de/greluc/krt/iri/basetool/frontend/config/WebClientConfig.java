@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
+import de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import de.greluc.krt.iri.basetool.frontend.logging.WebClientLoggingFilter;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -46,6 +47,7 @@ public class WebClientConfig {
   private final AppBackendProperties backendProperties;
   private final AppHttpProperties httpProperties;
   private final WebClientLoggingFilter webClientLoggingFilter;
+  private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
 
   private ReactorClientHttpConnector connector() {
     try {
@@ -173,6 +175,7 @@ public class WebClientConfig {
         .clientConnector(connector())
         .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
+        .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import java.util.Collections;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 
+/** Verifies that {@link UserService#findAll()} requests case-insensitive username sorting. */
 @ExtendWith(MockitoExtension.class)
 class UserServiceSortTest {
 
@@ -28,6 +30,9 @@ class UserServiceSortTest {
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private SquadronRepository squadronRepository;
+  @Mock private AuthHelperService authHelperService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private UserService userService;
 
@@ -36,8 +41,12 @@ class UserServiceSortTest {
 
   @Test
   void findAll_shouldRequestSortedUsers() {
-    // Given
-    when(userRepository.findAll(org.mockito.ArgumentMatchers.<Sort>any()))
+    // Given: admin in "all squadrons" mode — squadron scope is empty so the repository receives
+    // a null filter alongside the case-insensitive sort.
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(userRepository.findAllScopedList(
+            org.mockito.ArgumentMatchers.<java.util.UUID>any(),
+            org.mockito.ArgumentMatchers.<Sort>any()))
         .thenReturn(Collections.emptyList());
 
     // When
@@ -45,7 +54,8 @@ class UserServiceSortTest {
 
     // Then
     ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
-    verify(userRepository).findAll(sortCaptor.capture());
+    verify(userRepository)
+        .findAllScopedList(org.mockito.ArgumentMatchers.isNull(), sortCaptor.capture());
 
     Sort capturedSort = sortCaptor.getValue();
     Sort.Order order = capturedSort.getOrderFor("username");

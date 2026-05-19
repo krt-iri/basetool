@@ -18,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class PromotionLevelContentService {
   private final PromotionLevelContentRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Returns a paginated slice of every {@link PromotionLevelContentResponse} across all categories.
@@ -45,6 +47,9 @@ public class PromotionLevelContentService {
    * @return a page of level contents
    */
   public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
@@ -57,6 +62,9 @@ public class PromotionLevelContentService {
    * @return the category's level contents in display order
    */
   public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByCategoryIdOrderByLevel(categoryId).stream()
         .map(mapper::toResponse)
         .toList();
@@ -70,6 +78,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if no level content exists for that id
    */
   public PromotionLevelContentResponse get(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -84,6 +93,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentCreateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
             .findById(request.categoryId())
@@ -91,6 +101,7 @@ public class PromotionLevelContentService {
                 () ->
                     new EntityNotFoundException(
                         "PromotionCategory not found: " + request.categoryId()));
+    assertCallerMayEditCategory(category);
     PromotionLevelContent entity = mapper.toEntity(request);
     entity.setCategory(category);
     PromotionLevelContent saved = repository.save(entity);
@@ -115,7 +126,9 @@ public class PromotionLevelContentService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
+    assertCallerMayEditCategory(entity.getCategory());
     if (!entity.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(PromotionLevelContent.class, id);
     }
@@ -126,6 +139,7 @@ public class PromotionLevelContentService {
                 () ->
                     new EntityNotFoundException(
                         "PromotionCategory not found: " + request.categoryId()));
+    assertCallerMayEditCategory(category);
     mapper.updateEntity(entity, request);
     entity.setCategory(category);
     PromotionLevelContent saved = repository.save(entity);
@@ -143,7 +157,9 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
+    assertCallerMayEditCategory(entity.getCategory());
     repository.delete(entity);
     log.info("Deleted PromotionLevelContent id={}", id);
   }
@@ -153,5 +169,17 @@ public class PromotionLevelContentService {
     return repository
         .findById(id)
         .orElseThrow(() -> new EntityNotFoundException("PromotionLevelContent not found: " + id));
+  }
+
+  private void assertCallerMayEditCategory(PromotionCategory category) {
+    if (category == null
+        || category.getTopic() == null
+        || category.getTopic().getOwningSquadron() == null) {
+      return;
+    }
+    if (!squadronScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing level contents of this scope");
+    }
   }
 }

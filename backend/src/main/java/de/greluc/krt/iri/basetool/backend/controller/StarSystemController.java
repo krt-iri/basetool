@@ -79,7 +79,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
     return starSystemMapper.toDto(
         starSystemService.createStarSystem(starSystemMapper.toEntity(starSystem)));
@@ -93,7 +93,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public StarSystemDto updateStarSystem(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
     return starSystemMapper.toDto(
@@ -106,7 +106,7 @@ public class StarSystemController {
    * @param id star system id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasAnyRole('OFFICER', 'ADMIN')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void deleteStarSystem(@PathVariable @NotNull UUID id) {
     starSystemService.deleteStarSystem(id);
   }

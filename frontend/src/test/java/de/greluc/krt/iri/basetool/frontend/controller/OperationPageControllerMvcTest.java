@@ -70,7 +70,8 @@ class OperationPageControllerMvcTest {
     // Backend returns one operation with the raw enum status. The previous
     // bug rendered this verbatim in the table cell — we now expect the
     // German translation "GEPLANT".
-    OperationDto op = new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", 0L);
+    OperationDto op =
+        new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
@@ -91,7 +92,8 @@ class OperationPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_rendersOperationStatusViaI18n_inEnglish() throws Exception {
-    OperationDto op = new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", 0L);
+    OperationDto op =
+        new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
@@ -116,7 +118,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "SQUADRON_MEMBER")
   void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", 0L));
+    stubDetailEndpoints(opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -133,7 +135,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void operationDetail_missionManager_seesEnabledFormAndSaveButton() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", 0L));
+    stubDetailEndpoints(opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", null, 0L));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -171,7 +173,7 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
 
     // Operation: status COMPLETED → German "ABGESCHLOSSEN".
-    OperationDto operation = new OperationDto(opId, "Completed Op", "", "COMPLETED", 0L);
+    OperationDto operation = new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L);
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
         .thenReturn(operation);
@@ -187,6 +189,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             "CANCELLED",
+            null,
             null,
             null,
             null,
