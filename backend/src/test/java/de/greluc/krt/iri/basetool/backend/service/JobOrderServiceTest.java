@@ -112,7 +112,13 @@ class JobOrderServiceTest {
 
     jobOrder = new JobOrder();
     jobOrder.setId(orderId);
-    jobOrder.setSquadron("Alpha");
+    // V88 removed JobOrder.squadron (legacy VARCHAR). Pre-V88 fixtures used
+    // setSquadron("Alpha") as the only squadron stamp; post-V88 tests must set
+    // requestingSquadron / creatingSquadron explicitly.
+    Squadron alpha = new Squadron();
+    alpha.setShorthand("Alpha");
+    jobOrder.setRequestingSquadron(alpha);
+    jobOrder.setCreatingSquadron(alpha);
     jobOrder.setHandle("Tester");
     jobOrder.setPriority(1);
 
@@ -459,8 +465,9 @@ class JobOrderServiceTest {
     // The requesting squadron must reflect the new "Bravo" shorthand.
     assertNotNull(jobOrder.getRequestingSquadron());
     assertEquals("Bravo", jobOrder.getRequestingSquadron().getShorthand());
-    // Legacy squadron VARCHAR mirrors the new requestingSquadron shorthand.
-    assertEquals("Bravo", jobOrder.getSquadron());
+    // V88 removed the legacy `squadron` VARCHAR mirror from the entity; the wire-shape
+    // assertion against the DTO `squadron` field lives in JobOrderMapperTest now, sourced
+    // from requestingSquadron.shorthand via @Mapping.
   }
 
   @Test
@@ -537,8 +544,9 @@ class JobOrderServiceTest {
     // When
     jobOrderService.updateJobOrder(orderId, updateDto);
 
-    // Then
-    assertEquals("Beta", jobOrder.getSquadron());
+    // Then — requesting squadron updated (legacy `squadron` VARCHAR mirror is gone post-V88).
+    assertNotNull(jobOrder.getRequestingSquadron());
+    assertEquals("Beta", jobOrder.getRequestingSquadron().getShorthand());
     assertEquals("NewTester", jobOrder.getHandle());
 
     // Check if the old material was unlinked

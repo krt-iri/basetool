@@ -96,7 +96,6 @@ public class JobOrderService {
 
     JobOrder jobOrder =
         JobOrder.builder()
-            .squadron(requestingSquadron.getShorthand())
             .handle(createDto.handle())
             .priority(newPriority)
             .creatingSquadron(creatingSquadron)
@@ -185,7 +184,13 @@ public class JobOrderService {
                 new de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto(
                     o.getId(),
                     o.getDisplayId(),
-                    o.getSquadron(),
+                    // Wire-shape compatibility: the legacy `squadron` DTO field is fed from
+                    // requestingSquadron.shorthand now that JobOrder.squadron (entity field) was
+                    // removed in this commit. Clients on the v1 contract still see the same
+                    // string until V89 drops the DTO field entirely in the next-but-one release.
+                    o.getRequestingSquadron() != null
+                        ? o.getRequestingSquadron().getShorthand()
+                        : null,
                     o.getHandle(),
                     o.getStatus(),
                     o.getMaterials() != null
@@ -426,7 +431,6 @@ public class JobOrderService {
         resolveRequestingSquadron(
             updateDto.requestingSquadronId(), updateDto.squadron(), creatingFallback);
     jobOrder.setRequestingSquadron(newRequesting);
-    jobOrder.setSquadron(newRequesting.getShorthand());
     jobOrder.setHandle(updateDto.handle());
 
     List<UUID> newMaterialIds =

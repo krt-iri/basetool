@@ -63,6 +63,10 @@ class JobOrderHandoverMixedFlowIntegrationTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private UserRepository userRepository;
+
+  @Autowired
+  private de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
+
   @Autowired private TransactionTemplate transactionTemplate;
 
   private record Fixture(UUID jobOrderId, UUID invItem1Id, UUID invItem2Id) {}
@@ -91,7 +95,14 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           JobOrder jobOrder =
               JobOrder.builder()
-                  .squadron("KARTELL")
+                  .creatingSquadron(
+                      squadronRepository
+                          .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                          .orElseThrow())
+                  .requestingSquadron(
+                      squadronRepository
+                          .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                          .orElseThrow())
                   .handle("requester")
                   .status(JobOrderStatus.OPEN)
                   .build();

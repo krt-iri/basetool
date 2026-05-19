@@ -9,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto;
@@ -74,7 +75,11 @@ class JobOrderMapperTest {
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(id);
     jobOrder.setDisplayId(42);
-    jobOrder.setSquadron("Iridium");
+    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
+    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
+    Squadron iridium = new Squadron();
+    iridium.setShorthand("Iridium");
+    jobOrder.setRequestingSquadron(iridium);
     jobOrder.setHandle("recipient");
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
@@ -122,7 +127,11 @@ class JobOrderMapperTest {
     // Given — entity with no collections set (legacy fixture)
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    jobOrder.setSquadron("Iridium");
+    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
+    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
+    Squadron iridium = new Squadron();
+    iridium.setShorthand("Iridium");
+    jobOrder.setRequestingSquadron(iridium);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setMaterials(null);
     jobOrder.setAssignees(null);
@@ -143,7 +152,11 @@ class JobOrderMapperTest {
     // Given
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    jobOrder.setSquadron("Iridium");
+    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
+    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
+    Squadron iridium = new Squadron();
+    iridium.setShorthand("Iridium");
+    jobOrder.setRequestingSquadron(iridium);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
 
     JobOrderHandover handover = new JobOrderHandover();
