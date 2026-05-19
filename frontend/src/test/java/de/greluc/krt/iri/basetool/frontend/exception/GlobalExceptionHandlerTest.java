@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -20,6 +21,10 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -41,6 +46,30 @@ class GlobalExceptionHandlerTest {
     when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     handler = new GlobalExceptionHandler(messageSource);
+    // Default to an authenticated principal so legacy 403 assertions still target the
+    // "authenticated but lacks role" path. The anonymous branch is exercised by dedicated
+    // tests further down that clear or replace the context.
+    setAuthenticatedUser();
+  }
+
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+  }
+
+  private static void setAuthenticatedUser() {
+    TestingAuthenticationToken auth =
+        new TestingAuthenticationToken(
+            "test-user", "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    auth.setAuthenticated(true);
+    SecurityContextHolder.getContext().setAuthentication(auth);
+  }
+
+  private static void setAnonymousUser() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new AnonymousAuthenticationToken(
+                "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
   }
 
   private HttpServletRequest jsonRequest() {
@@ -385,6 +414,112 @@ class GlobalExceptionHandlerTest {
     assertEquals("error.403.title", model.getAttribute("error"));
     assertEquals("error.forbidden", model.getAttribute("message"));
     assertEquals("403", model.getAttribute("status"));
+    // Default @BeforeEach context is authenticated → the sign-in CTA must stay hidden.
+    assertEquals(Boolean.FALSE, model.getAttribute("unauthenticated"));
+  }
+
+  @Test
+  void accessDenied_anonymousUser_htmlRequest_usesUnauthenticatedMessageAndFlag() {
+    // Issue #108: an anonymous caller hitting a @PreAuthorize gate behind a permitAll() route
+    // must see "please sign in and try again" rather than the generic "you lack permission",
+    // and the template needs the `unauthenticated` flag to render the Sign-in CTA.
+    setAnonymousUser();
+    org.springframework.security.authorization.AuthorizationDeniedException ex =
+        new org.springframework.security.authorization.AuthorizationDeniedException("denied");
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleAccessDenied(ex, htmlRequest(), model);
+
+    assertEquals("error/error", result);
+    assertEquals("error.403.title", model.getAttribute("error"));
+    assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
+    assertEquals("403", model.getAttribute("status"));
+    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+  }
+
+  @Test
+  void accessDenied_noAuthentication_htmlRequest_usesUnauthenticatedMessageAndFlag() {
+    // Belt-and-suspenders for the AnonymousAuthenticationToken case: when no Authentication
+    // is present at all (e.g. AnonymousAuthenticationFilter disabled, programmatic clearContext),
+    // the handler must still classify the caller as unauthenticated.
+    SecurityContextHolder.clearContext();
+    org.springframework.security.access.AccessDeniedException ex =
+        new org.springframework.security.access.AccessDeniedException("denied");
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleAccessDenied(ex, htmlRequest(), model);
+
+    assertEquals("error/error", result);
+    assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
+    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+  }
+
+  @Test
+  void accessDenied_anonymousUser_jsonRequest_setsUnauthenticatedFlagInBody() {
+    // The JSON branch is consumed by the toast renderer — it relies on `body.unauthenticated`
+    // to surface a sign-in hint instead of the default "no permission" copy.
+    setAnonymousUser();
+    org.springframework.security.access.AccessDeniedException ex =
+        new org.springframework.security.access.AccessDeniedException("denied");
+
+    Object result = handler.handleAccessDenied(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("error.forbidden.unauthenticated", body.get("message"));
+    assertEquals(Boolean.TRUE, body.get("unauthenticated"));
+  }
+
+  @Test
+  void backendAccessDenied_anonymousUser_usesUnauthenticatedMessage() {
+    // Mirror of the @PreAuthorize-derived branch for backend-originated 403s. In practice the
+    // backend would return 401 UNAUTHENTICATED for a missing JWT, but this guards the edge case
+    // where the backend forwards ACCESS_DENIED to an anonymous frontend caller — the user-facing
+    // wording must still be "please sign in" rather than "you lack permission".
+    setAnonymousUser();
+    BackendServiceException ex =
+        new BackendServiceException(
+            "forbidden", null, 403, "ACCESS_DENIED", "corr-403", List.of(), null);
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleBackendServiceException(ex, htmlRequest(), model);
+
+    assertEquals("error/error", result);
+    assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
+    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+  }
+
+  @Test
+  void backendUnauthenticatedCode_alwaysSetsUnauthenticatedFlag() {
+    // UNAUTHENTICATED keeps its dedicated "your session has expired" wording, but the flag must
+    // still be set so the error page renders the Sign-in CTA next to the message.
+    BackendServiceException ex =
+        new BackendServiceException(
+            "session expired", null, 401, "UNAUTHENTICATED", null, List.of(), null);
+    Model model = new ConcurrentModel();
+
+    handler.handleBackendServiceException(ex, htmlRequest(), model);
+
+    assertEquals("error.unauthenticated", model.getAttribute("message"));
+    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+  }
+
+  @Test
+  void backendAccessDenied_authenticatedUser_keepsForbiddenMessage() {
+    // Authenticated user without the required role must still see the generic forbidden message;
+    // adding the anonymous branch must not regress this path.
+    BackendServiceException ex =
+        new BackendServiceException("forbidden", null, 403, "ACCESS_DENIED", null, List.of(), null);
+    Model model = new ConcurrentModel();
+
+    handler.handleBackendServiceException(ex, htmlRequest(), model);
+
+    assertEquals("error.forbidden", model.getAttribute("message"));
+    assertEquals(Boolean.FALSE, model.getAttribute("unauthenticated"));
   }
 
   // ─── handleException (generic catch-all) ────────────────────────────────

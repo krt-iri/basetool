@@ -1,131 +1,130 @@
 <!--
-Danke für den PR. Bitte fülle die unten markierten Pflichtbereiche aus
-und arbeite die Checkliste so weit ab, wie sie zutrifft. Sektionen mit
-"(falls betroffen)" sind optional — der Reviewer prüft die Naht zum Code.
+Thanks for the PR. Please fill in the required sections below and work
+through the checklist as far as it applies. Sections marked "(if affected)"
+are optional — the reviewer will check them against the code.
 
-Falls dies ein Draft-PR ist: markiere ihn als Draft und kennzeichne den
-Titel mit "WIP".
+If this is a draft PR: mark it as Draft and prefix the title with "WIP".
 -->
 
-## Worum geht's?
+## What's this about?
 
 <!--
-1-3 Sätze: Was ändert dieser PR und WARUM (nicht WAS — das zeigt der Diff).
-Verlinke verwandte Issues (z. B. `closes #123`, `refs #456`).
+1-3 sentences: what does this PR change and WHY (not WHAT — the diff shows
+that). Link related issues (e.g. `closes #123`, `refs #456`).
 -->
 
-## Art der Änderung
+## Type of Change
 
-- [ ] Bug Fix (nicht-breaking, behebt ein konkretes Problem)
-- [ ] Feature (nicht-breaking, fügt Funktionalität hinzu)
-- [ ] Breaking Change (bestehende API/Verhalten ändert sich — neue API-Version oder Migration nötig)
-- [ ] Refactor / Tech-Debt (keine user-sichtbare Änderung)
-- [ ] Dokumentation
+- [ ] Bug fix (non-breaking, fixes a specific problem)
+- [ ] Feature (non-breaking, adds functionality)
+- [ ] Breaking change (existing API/behavior changes — new API version or migration required)
+- [ ] Refactor / tech debt (no user-visible change)
+- [ ] Documentation
 - [ ] Build / CI / Dependencies
-- [ ] Test-Coverage / Test-Infrastruktur
+- [ ] Test coverage / test infrastructure
 
-## Betroffene Module
+## Affected Modules
 
 - [ ] `backend`
 - [ ] `frontend`
-- [ ] Beide
-- [ ] Sonstiges (Build / Compose / Docs / Workflows)
+- [ ] Both
+- [ ] Other (build / Compose / docs / workflows)
 
-## Wie wurde getestet?
+## How was this tested?
 
 <!--
-Konkret: Was wurde verifiziert? Welche Profile, welche Stack-Variante
-(Gradle bootRun, dev-Compose, Test-Stack mit `.env.test`)? Bei UI-Änderungen:
-welche Geräteklassen (Smartphone / Tablet / Desktop / Ultra-wide) und
-welche Browser? Falls UI-Tests nicht möglich waren, das EXPLIZIT sagen —
-nicht "Tests passen" als Stellvertreter benutzen.
+Be concrete: what was verified? Which profiles, which stack variant
+(Gradle bootRun, dev Compose, test stack with `.env.test`)? For UI changes:
+which device classes (Smartphone / Tablet / Desktop / Ultra-wide) and
+which browsers? If UI tests were not possible, say so EXPLICITLY —
+don't use "tests pass" as a stand-in.
 -->
 
 - 
 
-## Checkliste
+## Checklist
 
-### Allgemein
+### General
 
-- [ ] PR-Titel folgt Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`, `docs(...)`, `refactor(...)`, `test(...)`).
-- [ ] Branch ist aktuell mit `main` (rebased oder gemergt, kein Stale-Diff).
-- [ ] `CHANGELOG.md` wurde unter `## [Unreleased]` aktualisiert (passende Kategorie: Added / Changed / Fixed / Removed / Security).
-- [ ] Verwandte Issues sind verlinkt (`closes #...`, `refs #...`).
-- [ ] Keine echten Secrets, Tokens, Passwörter, Keystores oder personenbezogenen Daten im Diff.
+- [ ] PR title follows Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`, `docs(...)`, `refactor(...)`, `test(...)`).
+- [ ] Branch is up to date with `main` (rebased or merged, no stale diff).
+- [ ] `CHANGELOG.md` has been updated under `## [Unreleased]` (correct category: Added / Changed / Fixed / Removed / Security).
+- [ ] Related issues are linked (`closes #...`, `refs #...`).
+- [ ] No real secrets, tokens, passwords, keystores, or personal data in the diff.
 
-### Code-Qualität
+### Code Quality
 
-- [ ] `./gradlew check` läuft lokal grün (Checkstyle, SpotBugs, Tests).
-- [ ] Alle Checkstyle- und SpotBugs-Findings im **geänderten Code** sind behoben — keine neuen Warnungen on top.
-- [ ] Keine `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle-Suppressions ohne One-Line-Kommentar, der die Begründung für dieses spezifische Call-Site nennt.
-- [ ] Konstruktor-Injection über Lombok `@RequiredArgsConstructor`, kein Field-`@Autowired`.
-- [ ] Logger ausschließlich via `@Slf4j`, nicht manuell instanziiert.
-- [ ] Records für DTOs und immutable Config-Wrapper, kein POJO-Boilerplate.
-- [ ] Javadoc auf jeder neuen/geänderten Klasse, jedem Interface, Enum, Record und public/protected Methode — konkret und code-spezifisch, kein generisches "Returns the value".
+- [ ] `./gradlew check` passes locally (Checkstyle, SpotBugs, tests).
+- [ ] All Checkstyle and SpotBugs findings in the **changed code** are fixed — no new warnings on top.
+- [ ] No `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle suppressions without a one-line comment that explains the justification for this specific call site.
+- [ ] Constructor injection via Lombok `@RequiredArgsConstructor`, no field `@Autowired`.
+- [ ] Loggers exclusively via `@Slf4j`, not instantiated manually.
+- [ ] Records for DTOs and immutable config wrappers, no POJO boilerplate.
+- [ ] Javadoc on every new/changed class, interface, enum, record, and public/protected method — concrete and code-specific, no generic "Returns the value".
 
 ### Tests
 
-- [ ] Neue Features / Fixes haben Tests (Naming: `*Test`, Given/When/Then-Struktur).
-- [ ] Tests laufen **ausschließlich** über `./gradlew test` — kein IDE-Test-Runner.
-- [ ] Bei Concurrency-/Locking-Änderungen: Optimistic-Lock-Pfade getestet, `*WithinTransaction`-Pattern respektiert (siehe CLAUDE.md > Concurrency).
-- [ ] Keine produktiven Credentials in Tests oder in lokal hochgezogenen Test-Stacks (`.env.test` + Throwaway-Keystore + gestripptes Realm verwenden).
+- [ ] New features / fixes have tests (naming: `*Test`, Given/When/Then structure).
+- [ ] Tests run **exclusively** via `./gradlew test` — no IDE test runner.
+- [ ] For concurrency/locking changes: optimistic-lock paths tested, `*WithinTransaction` pattern respected (see CLAUDE.md > Concurrency).
+- [ ] No production credentials in tests or in locally spun-up test stacks (use `.env.test` + throwaway keystore + stripped realm).
 
-### API & Datenbank (falls betroffen)
+### API & Database (if affected)
 
-- [ ] Neue REST-Endpoints unter `/api/v1/...`; Breaking Changes erzeugen `/api/v2/...` plus `@ApiDeprecation(sunset=..., replacement=...)` auf dem alten Endpoint.
-- [ ] Jeder neue/geänderte `@RestController`-Endpoint trägt `@PreAuthorize` und vollständige SpringDoc-Annotationen (`@Operation` mit Summary/Description, `@ApiResponses` mit fachlichen Beschreibungen pro Status-Code).
-- [ ] DTOs (Records) an der Controller-Boundary, MapStruct-Mapper für Entity<->DTO — **keine JPA-Entities** im Response.
-- [ ] `@Valid` auf jedem `@RequestBody` (POST/PUT/PATCH); Write-DTOs tragen Jakarta-Validation-Annotationen.
-- [ ] Listen-Endpoints akzeptieren `Pageable` und liefern `PageResponse`; Sort-Felder sind in einer **Whitelist** im Service beschränkt (kein User-Input direkt in `Sort`).
-- [ ] Zeitstempel als `Instant` / `OffsetDateTime` in UTC; Timezone-Umrechnung passiert ausschließlich in der Display-Schicht.
-- [ ] `backend/src/main/resources/api/openapi.json` ist synchron zu den Controller-Änderungen.
-- [ ] Neue DB-Änderungen liegen als `V<n>__<desc>.sql`-Flyway-Migration vor; `ddl-auto` bleibt `validate`.
-- [ ] Destruktive DB-Operationen folgen dem Two-Phase-Pattern aus `backend/src/main/resources/db/migration/README.md`.
+- [ ] New REST endpoints under `/api/v1/...`; breaking changes produce `/api/v2/...` plus `@ApiDeprecation(sunset=..., replacement=...)` on the old endpoint.
+- [ ] Every new/changed `@RestController` endpoint carries `@PreAuthorize` and complete SpringDoc annotations (`@Operation` with summary/description, `@ApiResponses` with domain descriptions per status code).
+- [ ] DTOs (records) at the controller boundary, MapStruct mapper for Entity<->DTO — **no JPA entities** in the response.
+- [ ] `@Valid` on every `@RequestBody` (POST/PUT/PATCH); write DTOs carry Jakarta validation annotations.
+- [ ] List endpoints accept `Pageable` and return `PageResponse`; sort fields are limited via a **whitelist** in the service (no user input passed directly into `Sort`).
+- [ ] Timestamps as `Instant` / `OffsetDateTime` in UTC; timezone conversion happens exclusively in the display layer.
+- [ ] `backend/src/main/resources/api/openapi.json` is in sync with the controller changes.
+- [ ] New DB changes are provided as a `V<n>__<desc>.sql` Flyway migration; `ddl-auto` stays `validate`.
+- [ ] Destructive DB operations follow the two-phase pattern from `backend/src/main/resources/db/migration/README.md`.
 
-### Security & Datenisolation (falls betroffen)
+### Security & Data Isolation (if affected)
 
-- [ ] Lese-/Schreib-Operationen filtern im Service-Layer nach JWT-`sub`, außer der Caller hat eine erhöhte Rolle (`ADMIN`, `OFFICER`, ...).
-- [ ] Für Guests: sensible Felder werden explizit in der Controller-Schicht entfernt (`cleanupForGuest`-Style).
-- [ ] Kein direkter `SecurityContextHolder`-Zugriff außerhalb des Auth-Helper-Service (wird per ArchUnit erzwungen).
-- [ ] Frontend hängt nicht an Spring Data JPA und greift nicht direkt auf DB oder Keycloak Admin API zu (ArchUnit-Regel).
-- [ ] Keine Tokens, Mails oder Klarnamen in Logs.
+- [ ] Read/write operations filter by JWT `sub` in the service layer, unless the caller has an elevated role (`ADMIN`, `OFFICER`, ...).
+- [ ] For guests: sensitive fields are explicitly removed in the controller layer (`cleanupForGuest`-style).
+- [ ] No direct `SecurityContextHolder` access outside the auth-helper service (enforced via ArchUnit).
+- [ ] Frontend does not depend on Spring Data JPA and does not access the DB or Keycloak Admin API directly (ArchUnit rule).
+- [ ] No tokens, emails, or real names in logs.
 
-### UI / Frontend (falls betroffen)
+### UI / Frontend (if affected)
 
-- [ ] Layout funktioniert auf Smartphone (<=768px), Tablet (768-1024px), Desktop (1024-1600px) und Ultra-wide (1600px+); Touch-Targets >= 44px.
-- [ ] Styleguide eingehalten (Brand-Orange `#E77E23`, `Ethnocentric`/`Lato`-Fonts, Departement-Farben semantisch korrekt).
-- [ ] Keine `confirm()` / `alert()` / nativen Browser-Dialoge — stattdessen KRT-Modals/Toasts.
-- [ ] Jede user-sichtbare Zeichenkette kommt aus `messages.properties` (de + en + Fallback); Umlaute in `.properties` als `\uXXXX`, in Markdown literal UTF-8.
-- [ ] DOM-`data-version`-Attribute werden nach AJAX-Updates konsistent in **alle** verwandten Elemente propagiert (Edit-Buttons, Modals, Action-Buttons in derselben `<tr>`/Container) — sonst 409 beim nächsten Klick.
-- [ ] Resilience4j-Pfade bei neuen Backend-Calls bedacht (Timeout / Retry / CircuitBreaker / Bulkhead).
+- [ ] Layout works on Smartphone (<=768px), Tablet (768-1024px), Desktop (1024-1600px), and Ultra-wide (1600px+); touch targets >= 44px.
+- [ ] Styleguide respected (brand orange `#E77E23`, `Ethnocentric`/`Lato` fonts, department colors semantically correct).
+- [ ] No `confirm()` / `alert()` / native browser dialogs — KRT modals/toasts instead.
+- [ ] Every user-visible string comes from `messages.properties` (de + en + fallback); umlauts in `.properties` as `\uXXXX`, in Markdown literal UTF-8.
+- [ ] DOM `data-version` attributes are consistently propagated after AJAX updates to **all** related elements (edit buttons, modals, action buttons in the same `<tr>`/container) — otherwise 409 on the next click.
+- [ ] Resilience4j paths considered for new backend calls (Timeout / Retry / CircuitBreaker / Bulkhead).
 
-### Konfiguration & Dependencies (falls betroffen)
+### Configuration & Dependencies (if affected)
 
-- [ ] Dependency-Updates ausschließlich in `versions.properties` / `gradle/libs.versions.toml` (nicht direkt in `build.gradle.kts`).
-- [ ] Neue Env-Vars / Properties sind dokumentiert (`README.md`, `application-*.yml`, `@ConfigurationProperties` mit `@Validated`).
-- [ ] Refresh-Versions / Dependabot-Reviewer haben keine konkurrierenden offenen PRs auf denselben Konfigurationsbereich.
+- [ ] Dependency updates exclusively in `versions.properties` / `gradle/libs.versions.toml` (not directly in `build.gradle.kts`).
+- [ ] New env vars / properties are documented (`README.md`, `application-*.yml`, `@ConfigurationProperties` with `@Validated`).
+- [ ] Refresh-Versions / Dependabot reviewers do not have competing open PRs on the same configuration area.
 
-## Migrations- und Deployment-Hinweise
+## Migration and Deployment Notes
 
 <!--
-Wenn dieser PR beim Deploy besondere Aufmerksamkeit braucht, hier notieren:
-- neue Pflicht-Env-Var
-- Reihenfolge beim Ausrollen (z. B. Flyway-Schritt 1 vor Backend-Deploy, Schritt 2 nach Frontend-Deploy)
-- Cache zu invalidieren / Redis-Keys zu löschen
-- manuelle Schritte für Admins (Keycloak-Realm, UEX-API-Key, ...)
-- Backwards-Compat-Zeitfenster und Sunset-Datum
+If this PR needs special attention on deploy, note it here:
+- new required env var
+- rollout ordering (e.g. Flyway step 1 before backend deploy, step 2 after frontend deploy)
+- cache to invalidate / Redis keys to delete
+- manual steps for admins (Keycloak realm, UEX API key, ...)
+- backwards-compat window and sunset date
 
-Wenn nichts zu beachten ist: "Keine."
+If there is nothing to consider: "None."
 -->
 
 ## Screenshots / Demos (optional)
 
-<!-- Für UI-Änderungen: vorher/nachher, möglichst pro Device-Klasse. -->
+<!-- For UI changes: before/after, ideally per device class. -->
 
-## Reviewer-Hinweise
+## Reviewer Notes
 
 <!--
-Worauf sollte der Reviewer besonders schauen? Welche Teile sind subtil?
-Wo wurden bewusst Trade-offs gemacht? Was ist explizit NICHT Teil dieses
-PRs und kommt später (mit Link auf das Folge-Issue)?
+What should the reviewer pay particular attention to? Which parts are
+subtle? Where were trade-offs made deliberately? What is explicitly NOT
+part of this PR and comes later (with a link to the follow-up issue)?
 -->
