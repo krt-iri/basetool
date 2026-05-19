@@ -7,7 +7,6 @@ import java.util.UUID;
 public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,
-    String squadron,
     String handle,
     String status,
     List<JobOrderMaterialDto> materials) {}

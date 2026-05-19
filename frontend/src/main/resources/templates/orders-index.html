@@ -112,8 +112,7 @@
                     <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
                           th:title="${order.requestingSquadron.name()}"
                           th:text="${order.requestingSquadron.shorthand()}">IRI</span>
-                    <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted"
-                          th:text="${order.squadron != null ? order.squadron : '—'}">—</span>
+                    <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
                 </td>
                 <td style="white-space: nowrap;">
                     <span th:if="${order.creatingSquadron != null}"

@@ -71,24 +71,13 @@ class JobOrderServiceTest {
     materialId = UUID.randomUUID();
 
     // Multi-tenant: every create/update path resolves the caller's current squadron via the
-    // scope service plus an optional repository lookup by shorthand. Stub lenient defaults so
-    // the existing fixtures still see the squadron string they wrote ("Alpha" / "Beta" / ...)
-    // round-tripped through requestingSquadron.shorthand back into the legacy `squadron`
-    // column. Read-path tests do not call these methods and are unaffected (lenient suppresses
-    // UnnecessaryStubbingException).
+    // scope service. Stub a lenient default — read-path tests do not touch it and the
+    // lenient() call suppresses UnnecessaryStubbingException there.
     Squadron currentSquadron = new Squadron();
     currentSquadron.setShorthand("Alpha");
     org.mockito.Mockito.lenient()
         .when(squadronScopeService.currentSquadron())
         .thenReturn(java.util.Optional.of(currentSquadron));
-    org.mockito.Mockito.lenient()
-        .when(squadronRepository.findByShorthand(org.mockito.ArgumentMatchers.anyString()))
-        .thenAnswer(
-            inv -> {
-              Squadron s = new Squadron();
-              s.setShorthand(inv.getArgument(0));
-              return java.util.Optional.of(s);
-            });
 
     material = new Material();
     material.setId(materialId);
@@ -135,7 +124,6 @@ class JobOrderServiceTest {
         new JobOrderDto(
             orderId,
             1,
-            "Alpha",
             null,
             null,
             "Tester",
@@ -153,7 +141,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -175,7 +163,6 @@ class JobOrderServiceTest {
     // Then
     assertNotNull(result);
     assertEquals(orderId, result.id());
-    assertEquals("Alpha", result.squadron());
     assertEquals(1, result.priority());
     assertEquals(1, result.materials().size());
     assertEquals(25L, result.materials().get(0).currentStock());
@@ -190,7 +177,7 @@ class JobOrderServiceTest {
     // Given — DTO carries 700 (the only valid value), service must persist exactly 700
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -219,7 +206,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -412,8 +399,7 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(
-            "Alpha", null, null, "Tester", List.of(updateMat), 1L); // version mismatch
+        new CreateJobOrderDto(null, null, "Tester", List.of(updateMat), 1L); // version mismatch
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -431,7 +417,9 @@ class JobOrderServiceTest {
     // Plan §8 + §11: creatingSquadron is immutable after the order is persisted; only
     // requestingSquadron may be retargeted by a Logistician+ during the order's lifetime.
     // This pins the contract that updateJobOrder NEVER touches creatingSquadron even when
-    // the inbound DTO carries a different squadron string (which only retargets requesting).
+    // the inbound DTO carries a different requestingSquadronId (which only retargets
+    // requesting). Post Phase 7 part 3 / V90, the resolver path is UUID-only — the legacy
+    // String shorthand fallback has been removed together with the DTO field.
     Squadron creatingOriginal = new Squadron();
     creatingOriginal.setId(UUID.randomUUID());
     creatingOriginal.setShorthand("ALF");
@@ -442,14 +430,20 @@ class JobOrderServiceTest {
     requestingOriginal.setShorthand("ALF");
     jobOrder.setRequestingSquadron(requestingOriginal);
 
+    // The new requesting target ("Bravo") is intentionally different from creatingOriginal /
+    // requestingOriginal so the assertions below distinguish creating-untouched from
+    // requesting-flipped.
+    UUID bravoId = UUID.randomUUID();
+    Squadron bravo = new Squadron();
+    bravo.setId(bravoId);
+    bravo.setShorthand("Bravo");
+
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
-    // The DTO carries the squadron STRING that gets looked up against shorthand and turns
-    // into requestingSquadron — "Bravo" is intentionally different from creatingOriginal/
-    // requestingOriginal's "ALF".
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Bravo", null, null, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(null, bravoId, "Tester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(squadronRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
@@ -462,12 +456,9 @@ class JobOrderServiceTest {
         jobOrder.getCreatingSquadron(),
         "creatingSquadron is immutable per Plan §8 — update must not retag the authoring"
             + " squadron.");
-    // The requesting squadron must reflect the new "Bravo" shorthand.
+    // The requesting squadron must reflect the new "Bravo" target.
     assertNotNull(jobOrder.getRequestingSquadron());
     assertEquals("Bravo", jobOrder.getRequestingSquadron().getShorthand());
-    // V88 removed the legacy `squadron` VARCHAR mirror from the entity; the wire-shape
-    // assertion against the DTO `squadron` field lives in JobOrderMapperTest now, sourced
-    // from requestingSquadron.shorthand via @Mapping.
   }
 
   @Test
@@ -483,7 +474,7 @@ class JobOrderServiceTest {
     UUID attemptedOverride = UUID.randomUUID();
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, attemptedOverride, null, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(attemptedOverride, null, "Tester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -514,7 +505,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("ALF", creatingId, null, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(creatingId, null, "Tester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -532,11 +523,20 @@ class JobOrderServiceTest {
     Material newMaterial = new Material();
     newMaterial.setId(newMaterialId);
 
+    // Post Phase 7 part 3 / V90 the resolver is UUID-only; pass a typed `requestingSquadronId`
+    // and stub the repository to map it to a "Beta" squadron so the assertion below pins the
+    // requesting-squadron-flip contract.
+    UUID betaId = UUID.randomUUID();
+    Squadron beta = new Squadron();
+    beta.setId(betaId);
+    beta.setShorthand("Beta");
+
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Beta", null, null, "NewTester", List.of(updateMat), null);
+        new CreateJobOrderDto(null, betaId, "NewTester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(squadronRepository.findById(betaId)).thenReturn(Optional.of(beta));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
@@ -544,7 +544,7 @@ class JobOrderServiceTest {
     // When
     jobOrderService.updateJobOrder(orderId, updateDto);
 
-    // Then — requesting squadron updated (legacy `squadron` VARCHAR mirror is gone post-V88).
+    // Then — requesting squadron flipped to the resolved "Beta" target.
     assertNotNull(jobOrder.getRequestingSquadron());
     assertEquals("Beta", jobOrder.getRequestingSquadron().getShorthand());
     assertEquals("NewTester", jobOrder.getHandle());

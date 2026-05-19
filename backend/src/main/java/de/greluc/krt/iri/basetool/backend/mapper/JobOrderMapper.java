@@ -23,13 +23,11 @@ import org.mapstruct.Mapping;
 public interface JobOrderMapper {
 
   /**
-   * Maps a {@link JobOrder} entity to its outbound DTO. The DTO's legacy {@code squadron} string is
-   * fed from {@code requestingSquadron.shorthand} so wire-shape clients that haven't migrated to
-   * the structured {@code requestingSquadron} reference still see a non-null value after V88
-   * dropped the entity-side legacy field. V90 (next-but-one release) removes the DTO component
-   * entirely.
+   * Maps a {@link JobOrder} entity to its outbound DTO. The legacy free-text {@code squadron} field
+   * was removed from the DTO together with the V90 DROP COLUMN migration; clients consume the
+   * structured {@code requestingSquadron} reference (and its {@code shorthand} sub-field) for a
+   * human-readable label.
    */
-  @Mapping(target = "squadron", source = "requestingSquadron.shorthand")
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**
