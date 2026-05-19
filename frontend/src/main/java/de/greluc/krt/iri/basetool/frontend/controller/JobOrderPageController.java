@@ -658,7 +658,8 @@ public class JobOrderPageController {
       List<MaterialDto> list =
           backendApiClient.getCached(
               "/api/v1/materials/job-order",
-              new ParameterizedTypeReference<List<MaterialDto>>() {});
+              new ParameterizedTypeReference<List<MaterialDto>>() {},
+              true);
       if (list != null) {
         return new ArrayList<>(list);
       }
