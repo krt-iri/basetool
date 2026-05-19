@@ -714,8 +714,8 @@ public class JobOrderPageController {
 
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
-    log.info(
-        "[DEBUG_LOG] JobOrder: Checking logistician status for user {}. Original authorities: {}."
+    log.debug(
+        "JobOrder: Checking logistician status for user {}. Original authorities: {}."
             + " Reachable authorities: {}",
         principal.getName(),
         authorities,
@@ -727,7 +727,7 @@ public class JobOrderPageController {
                     a.getAuthority().equals("ROLE_LOGISTICIAN")
                         || a.getAuthority().equals("ROLE_ADMIN")
                         || a.getAuthority().equals("ROLE_OFFICER"));
-    log.info("[DEBUG_LOG] JobOrder: Is logistician: {}", result);
+    log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }
 }
