@@ -11621,6 +11621,14 @@
             }
           }
         }, {
+          "name" : "squadronId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -28142,8 +28150,15 @@
         "type" : "object",
         "properties" : {
           "squadron" : {
+            "type" : "string"
+          },
+          "creatingSquadronId" : {
             "type" : "string",
-            "minLength" : 1
+            "format" : "uuid"
+          },
+          "requestingSquadronId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "handle" : {
             "type" : "string"
@@ -28160,7 +28175,7 @@
             "format" : "int64"
           }
         },
-        "required" : [ "materials", "squadron" ]
+        "required" : [ "materials" ]
       },
       "CreateJobOrderMaterialDto" : {
         "type" : "object",
@@ -28264,6 +28279,12 @@
           },
           "recipientSquadron" : {
             "type" : "string"
+          },
+          "executingUser" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "executingSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "items" : {
             "type" : "array",
@@ -28749,6 +28770,9 @@
           "registeredParticipants" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           }
         },
         "required" : [ "name" ]

@@ -61,6 +61,50 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
 
   /**
+   * List variant that additionally filters on the dual-squadron model (MULTI_SQUADRON_PLAN.md
+   * section 5.3): only orders whose {@code creatingSquadron} OR {@code requestingSquadron} equals
+   * {@code squadronId} are returned. Used by the UI's default "only my squadron" toggle on the job-
+   * order list view — Job Orders themselves are a cross-staffel workspace, so this filter is a
+   * display preference rather than an access-control gate (the service layer applies no implicit
+   * squadron filter on Job Orders, see section 4.4).
+   *
+   * <p>{@code squadronId} {@code null} short-circuits the squadron predicate and behaves
+   * identically to {@link #findByStatusIn(List, Pageable)} — kept as a separate method so the SpEL
+   * gate on the list endpoint stays simple and call-sites with both filters do not need to fork
+   * their query builder.
+   *
+   * @param statuses status filter; may be empty but must be non-null per the Spring Data contract.
+   * @param squadronId squadron to constrain to via creating- OR requesting-side match; {@code null}
+   *     disables the squadron filter.
+   * @param pageable page request.
+   * @return paged job-orders matching both predicates.
+   */
+  @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
+  @Query(
+      "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND (:squadronId IS NULL OR"
+          + " o.creatingSquadron.id = :squadronId OR o.requestingSquadron.id = :squadronId)")
+  Page<JobOrder> findByStatusInAndSquadronInvolved(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("squadronId") UUID squadronId,
+      Pageable pageable);
+
+  /**
+   * All-status variant of {@link #findByStatusInAndSquadronInvolved(List, UUID, Pageable)}. Returns
+   * every job-order whose {@code creatingSquadron} OR {@code requestingSquadron} equals {@code
+   * squadronId}; {@code null} squadronId returns everything (identical to {@code findAll(pageable)}
+   * but emits the squadron-aware JPQL anyway, so the service layer's branch stays predictable).
+   *
+   * @param squadronId squadron to constrain to; {@code null} disables the filter.
+   * @param pageable page request.
+   * @return paged job-orders.
+   */
+  @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
+  @Query(
+      "SELECT o FROM JobOrder o WHERE :squadronId IS NULL OR o.creatingSquadron.id = :squadronId"
+          + " OR o.requestingSquadron.id = :squadronId")
+  Page<JobOrder> findBySquadronInvolved(@Param("squadronId") UUID squadronId, Pageable pageable);
+
+  /**
    * Returns the current maximum priority across all job-orders (used to assign the next priority
    * slot when creating a new order); {@link Optional#empty} when the table is empty.
    */

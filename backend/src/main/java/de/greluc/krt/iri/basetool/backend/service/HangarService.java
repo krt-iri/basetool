@@ -275,11 +275,15 @@ public class HangarService {
   }
 
   /**
-   * Squadron-wide bulk reset of the {@code fitted} flag on every ship. Used by admins after a major
-   * event (patch wipe etc.) so members re-fit their ships instead of carrying stale state.
+   * Squadron-scoped bulk reset of the {@code fitted} flag on every ship. Used by admins/officers
+   * after a major event (patch wipe etc.) so members re-fit their ships instead of carrying stale
+   * state. In focused mode only ships of the caller's squadron are reset; admin "all squadrons"
+   * mode falls back to the cross-staffel reset (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict
+   * eigene Staffel).
    */
   @Transactional
   public void resetAllFittedStatus() {
-    shipRepository.resetAllFitted();
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    shipRepository.resetAllFittedScoped(owningSquadronId);
   }
 }

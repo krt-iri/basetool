@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{promotion.my.title} + ' - ' + #{app.title}">Meine Bewertungen - IRIDIUM Basetool</title>
+    <title th:text="#{promotion.my.title} + ' - ' + ${appTitle}">Meine Bewertungen - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
     <style>
         .eval-topic { margin-bottom: 2rem; }
@@ -200,7 +200,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>

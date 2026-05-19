@@ -37,6 +37,7 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
+  @Mock private UserService userService;
 
   @InjectMocks private JobOrderHandoverService service;
 
@@ -186,9 +187,11 @@ class JobOrderHandoverServiceTest {
 
     // When & Then — before fix: this threw "Inventory item does not belong to this JobOrder"
     // because jobOrder was null (not eagerly loaded). After fix (@EntityGraph on findByIdForUpdate)
-    // the jobOrder is always loaded and the check works correctly.
-    BadRequestException ex =
-        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    // the jobOrder is always loaded and the check works correctly. The cross-staffel pre-write
+    // guard (MULTI_SQUADRON_PLAN.md §4.4) now raises IllegalStateException — GlobalExceptionHandler
+    // maps it to 400 so the wire format is unchanged.
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
   }
 
@@ -380,9 +383,10 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then
-    BadRequestException ex =
-        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    // When & Then — plan §4.4 cross-staffel pre-write guard raises IllegalStateException
+    // (GlobalExceptionHandler maps it to HTTP 400).
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
   }
 

@@ -621,8 +621,20 @@ public class MissionService {
               .findById(effectiveUserId)
               .orElseThrow(() -> new NotFoundException("User not found"));
       participant.setUser(user);
-      // Registered users always belong to IRI
-      squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
+      // Registered users carry the squadron they belong to at participate-time
+      // (MULTI_SQUADRON_PLAN.md section 3.2: `mission_participant.squadron_id` is the
+      // squadron the member participates *for* — usually their own home squadron, may
+      // differ from `mission.owning_squadron` when a non-internal mission attracts
+      // cross-staffel members). Falls back to IRIDIUM only when the user has no
+      // squadron assigned (admins / brand-new accounts), so finance/reporting still
+      // produces a valid bucket.
+      if (user.getSquadron() != null) {
+        participant.setSquadron(user.getSquadron());
+      } else {
+        squadronRepository
+            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+            .ifPresent(participant::setSquadron);
+      }
     } else {
       participant.setGuestName(effectiveGuestName);
       if (squadronId != null) {
@@ -777,8 +789,18 @@ public class MissionService {
     }
 
     if (participant.getUser() != null) {
-      // Registered users always belong to IRI
-      squadronRepository.findByShorthand("IRI").ifPresent(participant::setSquadron);
+      // Registered users carry the squadron they belong to at participate-time. Mirror the
+      // logic from addParticipant — same semantics, same fallback (MULTI_SQUADRON_PLAN.md
+      // section 3.2). Re-reads `user.getSquadron()` on every update so a freshly-assigned
+      // squadron on the user record propagates into the participant row.
+      User registeredUser = participant.getUser();
+      if (registeredUser.getSquadron() != null) {
+        participant.setSquadron(registeredUser.getSquadron());
+      } else {
+        squadronRepository
+            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+            .ifPresent(participant::setSquadron);
+      }
     } else {
       log.info("Updating guest participant: {} with name: {}", participant.getId(), guestName);
       if (guestName != null) {

@@ -6,6 +6,7 @@ import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,6 +58,7 @@ public class SquadronScopeService {
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationRepository operationRepository;
+  private final ShipRepository shipRepository;
   private final HttpServletRequest request;
 
   /**
@@ -246,6 +248,33 @@ public class SquadronScopeService {
     return operationRepository
         .findById(operationId)
         .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .orElse(false);
+  }
+
+  /**
+   * {@code true} iff the current principal may read ship {@code shipId}. Strict owning-squadron
+   * check (Hangar = strict eigene Staffel per MULTI_SQUADRON_PLAN.md section 1). Non-existent ids
+   * return {@code false}.
+   *
+   * @param shipId ship to inspect; never {@code null}.
+   */
+  public boolean canSeeShip(@NotNull UUID shipId) {
+    return shipRepository
+        .findById(shipId)
+        .map(s -> s.getOwningSquadron() == null || canSeeSquadron(s.getOwningSquadron().getId()))
+        .orElse(false);
+  }
+
+  /**
+   * {@code true} iff the current principal may edit ship {@code shipId}. Strict owning-squadron
+   * check. Non-existent ids return {@code false}.
+   *
+   * @param shipId ship to inspect; never {@code null}.
+   */
+  public boolean canEditShip(@NotNull UUID shipId) {
+    return shipRepository
+        .findById(shipId)
+        .map(s -> s.getOwningSquadron() == null || canEditSquadron(s.getOwningSquadron().getId()))
         .orElse(false);
   }
 

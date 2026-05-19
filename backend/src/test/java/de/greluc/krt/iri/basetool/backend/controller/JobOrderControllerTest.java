@@ -114,7 +114,8 @@ class JobOrderControllerTest {
 
   @Test
   void createJobOrder_permitAll_neverConsultsJwtOrRoleHelper() {
-    CreateJobOrderDto request = new CreateJobOrderDto("DAS KARTELL", "alice", List.of(), null);
+    CreateJobOrderDto request =
+        new CreateJobOrderDto("DAS KARTELL", null, null, "alice", List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
@@ -138,30 +139,53 @@ class JobOrderControllerTest {
             List.of(dto),
             PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("priority")),
             1);
-    when(jobOrderService.getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class)))
+    when(jobOrderService.getAllJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), 0, 20, "priority,asc");
+        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), null, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     assertThat(result.sort()).isNotEmpty();
-    verify(jobOrderService).getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class));
+    verify(jobOrderService)
+        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class));
   }
 
   @Test
   void getAllJobOrders_nullStatusFilter_reachesServiceAsNullNotEmptyList() {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
-    when(jobOrderService.getAllJobOrders(eq(null), any(Pageable.class))).thenReturn(page);
+    when(jobOrderService.getAllJobOrders(eq(null), eq(null), any(Pageable.class))).thenReturn(page);
 
-    PageResponse<JobOrderDto> result = controller.getAllJobOrders(null, 0, 20, "priority,asc");
+    PageResponse<JobOrderDto> result =
+        controller.getAllJobOrders(null, null, 0, 20, "priority,asc");
 
     // The status filter MUST reach the service as null when absent — coercing it to an empty list
     // here would produce SQL "WHERE status IN ()" which never matches any row, leaving the queue
     // page perpetually empty. Pin the verbatim null pass-through.
     assertThat(result.content()).containsExactly(dto);
-    verify(jobOrderService).getAllJobOrders(eq(null), any(Pageable.class));
+    verify(jobOrderService).getAllJobOrders(eq(null), eq(null), any(Pageable.class));
+  }
+
+  @Test
+  void getAllJobOrders_forwardsSquadronIdFilter() {
+    JobOrderDto dto = jobOrderDto(UUID.randomUUID());
+    UUID squadronId = UUID.randomUUID();
+    Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(jobOrderService.getAllJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<JobOrderDto> result =
+        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, 0, 20, "priority,asc");
+
+    // The squadronId param MUST reach the service verbatim — the orders-index "Nur eigene Staffel"
+    // toggle (MULTI_SQUADRON_PLAN.md §5.3) relies on this pass-through to short-circuit the
+    // cross-staffel union to the caller's own squadron on creating- or requesting-side match.
+    assertThat(result.content()).containsExactly(dto);
+    verify(jobOrderService)
+        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class));
   }
 
   // ── GET /api/v1/orders/lookup ────────────────────────────────────────
@@ -259,7 +283,8 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto = new CreateJobOrderDto("DAS KARTELL", "bob", List.of(), 1L);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto("DAS KARTELL", null, null, "bob", List.of(), 1L);
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 
@@ -421,6 +446,8 @@ class JobOrderControllerTest {
             dto.handoverTime(),
             "alice",
             "DAS KARTELL",
+            null,
+            null,
             List.of(),
             1L);
     when(jobOrderHandoverService.createHandover(jobOrderId, dto)).thenReturn(persisted);

@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::style})}">
-    <title th:text="#{admin.materials.title} + ' - ' + #{app.title}">Materialien verwalten - IRIDIUM Basetool</title>
+    <title th:text="#{admin.materials.title} + ' - ' + ${appTitle}">Materialien verwalten - IRIDIUM Basetool</title>
     <style>
         .data-section {
             margin-bottom: 3rem;
@@ -49,7 +49,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>

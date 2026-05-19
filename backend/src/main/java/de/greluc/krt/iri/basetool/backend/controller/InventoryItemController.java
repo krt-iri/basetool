@@ -229,7 +229,7 @@ public class InventoryItemController {
    * @return the persisted DTO or 204
    */
   @PostMapping("/{id}/book-out")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditInventoryItem(#id)")
   public org.springframework.http.ResponseEntity<InventoryItemDto> bookOutInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,

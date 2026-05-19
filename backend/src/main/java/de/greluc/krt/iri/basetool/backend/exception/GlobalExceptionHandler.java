@@ -608,6 +608,34 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * Maps {@link IllegalStateException} (service-layer invariant guard — typically the multi-tenant
+   * cross-staffel pre-write check in {@code JobOrderHandoverService}, MULTI_SQUADRON_PLAN.md
+   * section 4.4) to 400. The exception message is generic and safe to echo because these checks
+   * never embed user input or implementation details — they describe the violated invariant (e.g.
+   * "Inventory item does not belong to this JobOrder"). The message goes through {@link
+   * #resolveDetail(String, String)} so callers can keep raising it with either an i18n key or a
+   * literal string.
+   *
+   * @param ex thrown {@link IllegalStateException}
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response
+   */
+  @ExceptionHandler(IllegalStateException.class)
+  public ResponseEntity<ProblemDetail> handleIllegalState(
+      IllegalStateException ex, HttpServletRequest request) {
+    ProblemDetail pd =
+        problem(
+            HttpStatus.BAD_REQUEST,
+            tr("problem.bad_request.title"),
+            resolveDetail(ex.getMessage(), "problem.bad_request.detail"),
+            request,
+            "bad-request",
+            CODE_BAD_REQUEST);
+    logProblem(request, pd, "Illegal state", null);
+    return toEntity(pd);
+  }
+
+  /**
    * Catch-all for {@link ResponseStatusException} thrown by callers (or framework code) that prefer
    * Spring's lightweight status-only exception. Maps the carried status to a matching RFC&nbsp;7807
    * problem; the {@code code} is derived from the status via {@link #codeForStatus(HttpStatus)}.

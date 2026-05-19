@@ -6,7 +6,7 @@
          squadron shorthand for every authenticated user, or "ALL" for admins viewing
          the cross-staffel union. Anonymous callers see nothing. -->
     <div sec:authorize="isAuthenticated()" id="squadron-context-chip" class="squadron-context-chip"
-         th:title="#{squadron.context.badge}">
+         th:title="${isAllSquadronsMode ? #messages.msg('squadron.badge.admin') : #messages.msg('squadron.context.badge')}">
         <span class="squadron-context-chip-label" th:text="#{squadron.context.badge}">Squadron context</span>
         <span class="squadron-context-chip-value"
               th:if="${activeSquadron != null}"
@@ -15,7 +15,8 @@
               th:if="${activeSquadron == null and isAllSquadronsMode}"
               th:text="#{squadron.switcher.all}">All squadrons</span>
         <span class="squadron-context-chip-value squadron-context-chip-empty"
-              th:if="${activeSquadron == null and !isAllSquadronsMode}">&mdash;</span>
+              th:if="${activeSquadron == null and !isAllSquadronsMode}"
+              th:text="#{squadron.context.none}">No squadron context</span>
     </div>
     <div id="sidebar" class="sidebar">
         <div class="sidebar-content">

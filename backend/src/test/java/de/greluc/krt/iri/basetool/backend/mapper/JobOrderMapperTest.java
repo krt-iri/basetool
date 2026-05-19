@@ -39,6 +39,12 @@ class JobOrderMapperTest {
     var materialMapper = Mappers.getMapper(MaterialMapper.class);
     var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);
+    // Post-fix #13: handover audit fields project user + squadron through their reference mappers
+    // (see JobOrderHandoverMapper.uses). MapStruct injects them at runtime; wire them manually
+    // here so the standalone mapper test does not NPE on the audit projection.
+    ReflectionTestUtils.setField(handoverMapper, "userMapper", userMapper);
+    ReflectionTestUtils.setField(
+        handoverMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
 
     ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "materialMapper", materialMapper);

@@ -173,7 +173,8 @@ class RefineryOrderMapperTest {
             null,
             null, // coreVersion, scheduleVersion, flagsVersion
             null,
-            null // checkedInParticipants, registeredParticipants
+            null, // checkedInParticipants, registeredParticipants
+            null // owningSquadron
             );
 
     // When

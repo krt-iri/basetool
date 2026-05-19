@@ -78,6 +78,7 @@ class UserServiceAttributesTest {
   @Mock private de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
 
   @Mock private AuthHelperService authHelperService;
+  @Mock private SquadronScopeService squadronScopeService;
 
   @InjectMocks private UserService userService;
 
@@ -395,9 +396,8 @@ class UserServiceAttributesTest {
 
     @Test
     void searchByUsername_unpaged_delegatesToRepository() {
-      when(userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-              "ali", "ali"))
-          .thenReturn(List.of(newUser(USER_ID)));
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.searchScopedList("ali", null)).thenReturn(List.of(newUser(USER_ID)));
 
       assertEquals(1, userService.searchByUsername("ali").size());
     }
@@ -406,9 +406,8 @@ class UserServiceAttributesTest {
     void searchByUsername_paged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-              "ali", "ali", pr))
-          .thenReturn(page);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.searchScoped("ali", null, pr)).thenReturn(page);
 
       assertEquals(1, userService.searchByUsername("ali", pr).getTotalElements());
     }
@@ -416,7 +415,8 @@ class UserServiceAttributesTest {
     @Test
     void findAllReference_delegatesToRepository() {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(userRepository.findAllReference()).thenReturn(List.of(dto));
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
@@ -425,9 +425,20 @@ class UserServiceAttributesTest {
     void findAllPaged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(userRepository.findAll(pr)).thenReturn(page);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(userRepository.findAllScoped(null, pr)).thenReturn(page);
 
       assertSame(page, userService.findAll(pr));
+    }
+
+    @Test
+    void findAllReference_inFocusedMode_passesScopeToRepository() {
+      UUID scope = UUID.randomUUID();
+      UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
+      when(userRepository.findAllReferenceScoped(scope)).thenReturn(List.of(dto));
+
+      assertEquals(List.of(dto), userService.findAllReference());
     }
   }
 

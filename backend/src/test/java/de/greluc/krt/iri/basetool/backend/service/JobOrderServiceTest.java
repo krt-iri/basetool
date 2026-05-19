@@ -147,7 +147,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -184,7 +184,7 @@ class JobOrderServiceTest {
     // Given — DTO carries 700 (the only valid value), service must persist exactly 700
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -213,7 +213,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(createMat), null);
+        new CreateJobOrderDto("Alpha", null, null, "Tester", List.of(createMat), null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -406,7 +406,8 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Alpha", "Tester", List.of(updateMat), 1L); // version mismatch
+        new CreateJobOrderDto(
+            "Alpha", null, null, "Tester", List.of(updateMat), 1L); // version mismatch
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -440,7 +441,7 @@ class JobOrderServiceTest {
     // into requestingSquadron — "Bravo" is intentionally different from creatingOriginal/
     // requestingOriginal's "ALF".
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Bravo", "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto("Bravo", null, null, "Tester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -471,7 +472,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("Beta", "NewTester", List.of(updateMat), null);
+        new CreateJobOrderDto("Beta", null, null, "NewTester", List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));

@@ -160,7 +160,11 @@ class InventoryItemServiceTest {
   void getInventoryByMaterial_shouldReturnPage() {
     UUID materialId = UUID.randomUUID();
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(inventoryItemRepository.findByMaterialAndPersonalFalse(any(), any()))
+    // Post-fix #5: getInventoryByMaterial routes through the scoped repository variant so
+    // a Lager-direct drilldown stays strictly squadron-isolated.
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
+            any(), org.mockito.ArgumentMatchers.isNull(), any()))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
@@ -1073,27 +1077,42 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
-    // Given
-    when(inventoryItemRepository.deleteAllNonPersonal()).thenReturn(42);
+    // Given: admin in "all squadrons" mode (no active scope) — null scope = cross-staffel wipe.
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(42);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(42, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal();
+    verify(inventoryItemRepository).deleteAllNonPersonal(null);
   }
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
     // Given
-    when(inventoryItemRepository.deleteAllNonPersonal()).thenReturn(0);
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(0);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(0, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal();
+    verify(inventoryItemRepository).deleteAllNonPersonal(null);
+  }
+
+  @Test
+  void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
+    // Given: focused admin / member in squadron A — only their own stock gets wiped.
+    UUID scope = UUID.randomUUID();
+    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
+    when(inventoryItemRepository.deleteAllNonPersonal(scope)).thenReturn(7);
+
+    int removed = inventoryItemService.deleteAllGlobalInventory();
+
+    assertEquals(7, removed);
+    verify(inventoryItemRepository).deleteAllNonPersonal(scope);
   }
 }

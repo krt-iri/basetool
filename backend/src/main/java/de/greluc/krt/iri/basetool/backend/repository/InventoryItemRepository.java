@@ -44,6 +44,22 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
   Page<InventoryItem> findByMaterialAndPersonalFalse(Material material, Pageable pageable);
 
+  /**
+   * Squadron-scoped variant of {@link #findByMaterialAndPersonalFalse(Material, Pageable)}. Used by
+   * the per-material drilldown so the Lager-direct path stays strictly staffel-isolated
+   * (MULTI_SQUADRON_PLAN.md section 1: Inventory direct view = strict eigene Staffel). {@code
+   * owningSquadronId} {@code null} = admin "all squadrons" mode (no filter applied); a non-null id
+   * restricts to that squadron.
+   */
+  @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
+  @Query(
+      "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND"
+          + " (:owningSquadronId IS NULL OR i.owningSquadron.id = :owningSquadronId)")
+  Page<InventoryItem> findByMaterialAndPersonalFalseScoped(
+      @Param("material") Material material,
+      @Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
+
   /** Derived Spring-Data query - returns entities matching {@code PersonalFalse}. */
   Page<InventoryItem> findByPersonalFalse(Pageable pageable);
 
@@ -232,9 +248,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * inventory_item} FK was removed in {@code V64} (the handover row already snapshots the relevant
    * material data), so a single bulk-delete is safe — no pre-cleanup loop is required.
    *
+   * <p>Multi-tenant: when {@code owningSquadronId} is non-null only items of that squadron are
+   * removed (focused admin mode). When {@code null} the delete is global across all squadrons
+   * (admin "all squadrons" mode). Service-layer enforces the access check before reaching this
+   * method.
+   *
+   * @param owningSquadronId squadron to scope the delete to, or {@code null} for cross-staffel
+   *     wipe.
    * @return number of deleted rows
    */
   @Modifying
-  @Query("DELETE FROM InventoryItem i WHERE i.personal = false")
-  int deleteAllNonPersonal();
+  @Query(
+      "DELETE FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
+          + " i.owningSquadron.id = :owningSquadronId)")
+  int deleteAllNonPersonal(@Param("owningSquadronId") UUID owningSquadronId);
 }

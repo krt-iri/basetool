@@ -21,12 +21,88 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective
    * name with username fallback, rank) ordered by display name. Used to populate user pickers
    * without pulling the full User aggregate.
+   *
+   * <p>Multi-tenant: {@code scopeSquadronId} restricts the result to members of that squadron
+   * (MULTI_SQUADRON_PLAN.md section 4.4: list/search for normal users sees own squadron only).
+   * {@code null} signals admin "all squadrons" mode and falls back to the cross-staffel list. Users
+   * that have no squadron assigned (admins, guests) are always included so an admin in focused mode
+   * still sees the unassigned bucket alongside the squadron members.
+   */
+  @Query(
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username,"
+          + " u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN"
+          + " u.displayName ELSE u.username END, u.rank) FROM User u WHERE :scopeSquadronId IS"
+          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId ORDER BY"
+          + " u.displayName")
+  List<UserReferenceDto> findAllReferenceScoped(
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);
+
+  /**
+   * Unscoped variant used internally by JWT sync flows where access is always implicit. Kept for
+   * backwards compatibility — every caller-facing path should go through {@link
+   * #findAllReferenceScoped(UUID)} instead.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username,"
           + " u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN"
           + " u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY u.displayName")
   List<UserReferenceDto> findAllReference();
+
+  /**
+   * Squadron-scoped paged listing. Filters the {@code findAll} variant by {@code u.squadron.id =
+   * :scopeSquadronId} (or no filter when {@code null}). Same null-handling rule as {@link
+   * #findAllReferenceScoped(UUID)} — unassigned users are always visible so the focused admin can
+   * manage them.
+   */
+  @EntityGraph(attributePaths = {"roles"})
+  @Query(
+      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR u.squadron IS NULL OR"
+          + " u.squadron.id = :scopeSquadronId")
+  Page<User> findAllScoped(
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      Pageable pageable);
+
+  /**
+   * Unpaged squadron-scoped listing. Same predicate as {@link #findAllScoped(UUID, Pageable)}
+   * without pagination — used by the legacy {@code findAll()} call sites that still expect a plain
+   * {@link List}.
+   */
+  @EntityGraph(attributePaths = {"roles"})
+  @Query(
+      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR u.squadron IS NULL OR"
+          + " u.squadron.id = :scopeSquadronId")
+  List<User> findAllScopedList(
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      org.springframework.data.domain.Sort sort);
+
+  /**
+   * Squadron-scoped substring search. Mirrors {@link
+   * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
+   * but adds the {@code u.squadron.id = :scopeSquadronId OR :scopeSquadronId IS NULL OR u.squadron
+   * IS NULL} clause.
+   */
+  @EntityGraph(attributePaths = {"roles"})
+  @Query(
+      "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
+          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
+          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId)")
+  Page<User> searchScoped(
+      @org.springframework.data.repository.query.Param("query") String query,
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      Pageable pageable);
+
+  /**
+   * Squadron-scoped substring search returning a plain list. Same predicate as {@link
+   * #searchScoped(String, UUID, Pageable)} without pagination.
+   */
+  @EntityGraph(attributePaths = {"roles"})
+  @Query(
+      "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
+          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
+          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId)")
+  List<User> searchScopedList(
+      @org.springframework.data.repository.query.Param("query") String query,
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the

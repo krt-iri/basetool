@@ -26,6 +26,22 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   void resetAllFitted();
 
   /**
+   * Squadron-scoped variant of {@link #resetAllFitted()}. Used by the admin/officer "reset fitted"
+   * action so a focused-mode caller only wipes the {@code fitted} flag on ships of their own
+   * squadron (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict eigene Staffel). {@code
+   * owningSquadronId} {@code null} signals admin "all squadrons" mode and falls back to the
+   * cross-staffel reset.
+   *
+   * @param owningSquadronId squadron to scope the reset to, or {@code null} for cross-staffel wipe.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE Ship s SET s.fitted = false WHERE :owningSquadronId IS NULL OR s.owningSquadron.id ="
+          + " :owningSquadronId")
+  void resetAllFittedScoped(
+      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId);
+
+  /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * ShipTypeId}.
    */

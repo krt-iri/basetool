@@ -12,6 +12,10 @@ import java.util.UUID;
  * counters {@code coreVersion}, {@code scheduleVersion} and {@code flagsVersion} drive the
  * section-scoped patch endpoints; carrying them on the frontend DTO lets the mission detail page
  * pin the correct counter into each hidden form input independently.
+ *
+ * <p>{@code owningSquadron} mirrors the backend's squadron reference so the detail template can
+ * render the owner-squadron badge consistently with the list view (MULTI_SQUADRON_PLAN.md section
+ * 4.5). {@code null} for historic rows persisted before V82.
  */
 public record MissionDto(
     UUID id,
@@ -41,4 +45,5 @@ public record MissionDto(
     Long scheduleVersion,
     Long flagsVersion,
     Integer checkedInParticipants,
-    Integer registeredParticipants) {}
+    Integer registeredParticipants,
+    SquadronReferenceDto owningSquadron) {}

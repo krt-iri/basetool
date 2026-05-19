@@ -133,7 +133,21 @@ public class MissionController {
               .searchMissions(null, null, null, List.of("PLANNED", "ACTIVE"), false, null, pageable)
               .map(missionMapper::toListDto);
     } else {
-      pageResult = missionService.getAllMissions(pageable).map(missionMapper::toListDto);
+      // Authenticated callers MUST go through searchMissions so the squadron scope (own
+      // squadron OR is_internal=false cross-staffel public) is applied — getAllMissions
+      // would call missionRepository.findAll() unfiltered and leak internal missions of
+      // other squadrons to every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
+      pageResult =
+          missionService
+              .searchMissions(
+                  null,
+                  null,
+                  null,
+                  List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
+                  null,
+                  null,
+                  pageable)
+              .map(missionMapper::toListDto);
     }
     return toPageResponse(pageResult);
   }
@@ -318,7 +332,10 @@ public class MissionController {
         dto.scheduleVersion(),
         dto.flagsVersion(),
         dto.checkedInParticipants(),
-        dto.registeredParticipants());
+        dto.registeredParticipants(),
+        // Squadron shorthand is not sensitive (MULTI_SQUADRON_PLAN.md section 7) — forward
+        // through to guests so the public detail view shows the owning-squadron badge.
+        dto.owningSquadron());
   }
 
   /**
@@ -544,7 +561,12 @@ public class MissionController {
    */
   @PostMapping("/{id}/join")
   @Operation(summary = "Join a mission")
-  @PreAuthorize("isAuthenticated()")
+  // SecurityConfig falls through to `anyRequest().authenticated()` for this path, but the
+  // explicit `isAuthenticated()` keeps the controller honest if the URL filter is later loosened
+  // — anonymous reaches the handler with a null JWT and would NPE in `getUserIdFromJwt`.
+  // `canSeeMission` enforces MULTI_SQUADRON_PLAN.md §1: members of another squadron may join
+  // only non-internal missions, own-squadron members + admins may join anything.
+  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeMission(#id)")
   public MissionDto joinMission(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     return missionMapper.toDto(
         missionService.addParticipant(id, userService.getUserIdFromJwt(jwt)));
@@ -972,7 +994,12 @@ public class MissionController {
         responseCode = "409",
         description = "Participant name is ambiguous and matches more than one registered user")
   })
-  @PreAuthorize("permitAll()")
+  // MULTI_SQUADRON_PLAN.md §1: "Anmelde-Sicht" is open to anonymous + cross-staffel callers only
+  // for NON-internal missions; internal missions of a foreign squadron must reject sign-ups.
+  // `canSeeMission` returns true for own-squadron, admin, and non-internal-anywhere — exactly
+  // the matrix we need. Without this gate, an anonymous user could create a guest participant
+  // on an internal mission of any squadron (the URL is `permitAll` in SecurityConfig).
+  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
@@ -1582,7 +1609,10 @@ public class MissionController {
               + " guestName (case-insensitive resolution against registered users). Authenticated"
               + " users may always add themselves; adding other registered users is restricted to"
               + " managers/officers/admins. Anonymous users may only add guest entries.")
-  @PreAuthorize("permitAll()")
+  // MULTI_SQUADRON_PLAN.md §1: same gate as the legacy `/participants/add` endpoint — only
+  // non-internal missions accept cross-staffel / anonymous sign-ups. Internal missions are
+  // gated even though the URL is `permitAll` in SecurityConfig.
+  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,

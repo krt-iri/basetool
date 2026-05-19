@@ -45,6 +45,7 @@ public class JobOrderHandoverService {
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
+  private final UserService userService;
 
   /**
    * Creates a JobOrder handover and atomically applies the resulting effects:
@@ -98,6 +99,18 @@ public class JobOrderHandoverService {
     handover.setRecipientHandle(dto.recipientHandle());
     handover.setRecipientSquadron(dto.recipientSquadron());
 
+    // Audit trail: capture the executing user + their squadron snapshot at handover time.
+    // Cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 4.4) means the executing user may
+    // belong to a different squadron than the order's owning one — without this stamp the audit
+    // trail does not record who actually performed the write on a foreign squadron's items.
+    userService
+        .getCurrentUser()
+        .ifPresent(
+            current -> {
+              handover.setExecutingUser(current);
+              handover.setExecutingSquadron(current.getSquadron());
+            });
+
     // Materials whose remaining open amount drops to (effectively) zero in this handover.
     // The corresponding inventory rows are unlinked AFTER the loop so that no
     // {@code clearAutomatically=true} bulk update detaches the aggregate mid-iteration.
@@ -115,7 +128,12 @@ public class JobOrderHandoverService {
 
       if (inventoryItem.getJobOrder() == null
           || !inventoryItem.getJobOrder().getId().equals(jobOrderId)) {
-        throw new BadRequestException("Inventory item does not belong to this JobOrder");
+        // Plan §4.4 cross-staffel pre-write guard: the handover may only mutate inventory items
+        // that are bound to the current order via job_order_id. A mismatch means either a stale
+        // client payload or a concurrent unlink — in both cases the handover cannot proceed and
+        // the application is in an inconsistent state for this request. GlobalExceptionHandler
+        // maps IllegalStateException to 400 so the wire format stays the same as before.
+        throw new IllegalStateException("Inventory item does not belong to this JobOrder");
       }
 
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {

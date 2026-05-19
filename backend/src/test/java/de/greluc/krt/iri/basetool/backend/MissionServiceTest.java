@@ -62,8 +62,9 @@ class MissionServiceTest {
     when(userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase("TestUser", "TestUser"))
         .thenReturn(Optional.of(existingUser));
     when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
-    when(squadronRepository.findByShorthand("IRI")).thenReturn(Optional.of(new Squadron()));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // Post-fix #10 fallback path: when the resolved user has no squadron, MissionService
+    // looks up IRIDIUM by its canonical UUID (not by shorthand) and stamps the participant.
+    when(squadronRepository.findById(Squadron.IRIDIUM_ID)).thenReturn(Optional.of(new Squadron()));
 
     Mission result = missionService.addParticipant(missionId, null, "TestUser", null, "No comment");
 

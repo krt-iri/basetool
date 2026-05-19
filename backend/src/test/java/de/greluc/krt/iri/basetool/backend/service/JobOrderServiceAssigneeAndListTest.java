@@ -124,14 +124,49 @@ class JobOrderServiceAssigneeAndListTest {
     }
 
     @Test
-    void populatedStatusList_routedToFindByStatusIn() {
+    void populatedStatusList_routedToFindByStatusInAndSquadronInvolved() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      when(jobOrderRepository.findByStatusIn(List.of(JobOrderStatus.OPEN), pageable))
+      // After the dual-squadron list filter (MULTI_SQUADRON_PLAN.md §5.3) the service routes
+      // every populated-status call through findByStatusInAndSquadronInvolved with a {@code null}
+      // squadronId for the legacy two-arg entry point — the JPQL {@code :squadronId IS NULL OR
+      // ...} branch makes that equivalent to the old findByStatusIn for callers that did not
+      // opt into the squadron filter.
+      when(jobOrderRepository.findByStatusInAndSquadronInvolved(
+              List.of(JobOrderStatus.OPEN), null, pageable))
           .thenReturn(page);
 
       service.getAllJobOrders(List.of(JobOrderStatus.OPEN), pageable);
 
-      verify(jobOrderRepository).findByStatusIn(List.of(JobOrderStatus.OPEN), pageable);
+      verify(jobOrderRepository)
+          .findByStatusInAndSquadronInvolved(List.of(JobOrderStatus.OPEN), null, pageable);
+      verify(jobOrderRepository, never()).findAll(pageable);
+    }
+
+    @Test
+    void populatedStatusListWithSquadronId_passesSquadronIdToRepository() {
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      java.util.UUID squadronId = java.util.UUID.randomUUID();
+      when(jobOrderRepository.findByStatusInAndSquadronInvolved(
+              List.of(JobOrderStatus.OPEN), squadronId, pageable))
+          .thenReturn(page);
+
+      service.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, pageable);
+
+      verify(jobOrderRepository)
+          .findByStatusInAndSquadronInvolved(List.of(JobOrderStatus.OPEN), squadronId, pageable);
+    }
+
+    @Test
+    void emptyStatusListWithSquadronId_callsFindBySquadronInvolved() {
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      java.util.UUID squadronId = java.util.UUID.randomUUID();
+      when(jobOrderRepository.findBySquadronInvolved(squadronId, pageable)).thenReturn(page);
+
+      service.getAllJobOrders(List.of(), squadronId, pageable);
+
+      // With an empty status filter, the squadron filter alone routes through the dedicated
+      // findBySquadronInvolved query rather than degrading to findAll.
+      verify(jobOrderRepository).findBySquadronInvolved(squadronId, pageable);
       verify(jobOrderRepository, never()).findAll(pageable);
     }
   }

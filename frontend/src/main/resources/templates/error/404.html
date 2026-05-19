@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{error.404.title} + ' - ' + #{app.title}">Signal Lost - IRIDIUM Basetool</title>
+    <title th:text="#{error.404.title} + ' - ' + ${appTitle}">Signal Lost - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <style>
         .error-container {
@@ -65,7 +65,7 @@
     <nav>
         <a th:href="@{/}" class="brand" style="margin-left: 1rem;">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>

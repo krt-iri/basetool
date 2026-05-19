@@ -120,8 +120,9 @@ public class InventoryItemService {
         materialRepository
             .findById(materialId)
             .orElseThrow(() -> new NotFoundException("Material not found"));
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
-        .findByMaterialAndPersonalFalse(material, pageable)
+        .findByMaterialAndPersonalFalseScoped(material, owningSquadronId, pageable)
         .map(inventoryItemMapper::toDto);
   }
 
@@ -737,9 +738,13 @@ public class InventoryItemService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
-    log.info("Bulk delete of global inventory requested");
-    int removed = inventoryItemRepository.deleteAllNonPersonal();
-    log.info("Bulk delete of global inventory completed: {} item(s) removed", removed);
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    log.info("Bulk delete of global inventory requested (scope={})", owningSquadronId);
+    int removed = inventoryItemRepository.deleteAllNonPersonal(owningSquadronId);
+    log.info(
+        "Bulk delete of global inventory completed: {} item(s) removed (scope={})",
+        removed,
+        owningSquadronId);
     return removed;
   }
 

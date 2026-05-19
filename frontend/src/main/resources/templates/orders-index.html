@@ -15,7 +15,7 @@
         </button>
         <a th:href="@{/}" class="brand">
             <img th:src="@{/logos/iridium.svg}" alt="Logo" height="50">
-            <span class="logo-text" th:text="#{app.title}">IRIDIUM Basetool</span>
+            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
         </a>
     </nav>
 </header>
@@ -44,6 +44,20 @@
             <label style="display: flex; align-items: center; gap: 0.25rem;">
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
+            </label>
+            <!-- Squadron scope toggle (MULTI_SQUADRON_PLAN.md §5.3): default "mine" (matches
+                 creating OR requesting = active squadron); flip to "all" for the cross-staffel
+                 union. Collapses silently to "all" for users with no active squadron context
+                 (admins in "all squadrons" mode) — the backend filter is a display preference,
+                 not an access-control gate. -->
+            <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary); margin-left: 1rem;">Staffel:</span>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
+                <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="radio" name="scope" value="all" th:checked="${selectedScope == 'all'}">
+                <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
             </label>
             <button type="submit" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>

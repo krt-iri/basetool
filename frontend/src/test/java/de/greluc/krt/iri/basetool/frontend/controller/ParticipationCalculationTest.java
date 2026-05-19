@@ -73,7 +73,8 @@ class ParticipationCalculationTest {
             1L,
             1L,
             1,
-            1);
+            1,
+            null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     when(backendApiClient.get(
@@ -167,7 +168,8 @@ class ParticipationCalculationTest {
             1L,
             1L,
             1,
-            2);
+            2,
+            null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     when(backendApiClient.get(

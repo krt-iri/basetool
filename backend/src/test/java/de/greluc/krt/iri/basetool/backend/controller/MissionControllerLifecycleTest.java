@@ -152,13 +152,14 @@ class MissionControllerLifecycleTest {
         5L, // scheduleVersion
         6L, // flagsVersion
         1,
-        1);
+        1,
+        null);
   }
 
   // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
 
   @Test
-  void getAllMissions_authenticatedCaller_seesEverything() {
+  void getAllMissions_authenticatedCaller_routesThroughSearchMissionsForSquadronScope() {
     Mission m = new Mission();
     MissionListDto listDto =
         new MissionListDto(
@@ -177,18 +178,35 @@ class MissionControllerLifecycleTest {
             null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
-    when(missionService.getAllMissions(any(Pageable.class))).thenReturn(page);
+    // Post-fix #1: authenticated callers now go through searchMissions so the service-layer
+    // squadron filter (owning OR is_internal=false) is applied. getAllMissions/findAll without
+    // a scope would leak internal missions of foreign squadrons.
+    when(missionService.searchMissions(
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
+        .thenReturn(page);
     when(missionMapper.toListDto(m)).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
         controller.getAllMissions(0, 20, null, () -> "alice"); // non-null Principal
 
     assertThat(result.content()).containsExactly(listDto);
-    verify(missionService).getAllMissions(any(Pageable.class));
-    // Authenticated callers must NOT go through the anonymous-search filter — pin the fact that
-    // searchMissions is never invoked.
-    verify(missionService, never())
-        .searchMissions(any(), any(), any(), any(), any(), any(), any(Pageable.class));
+    verify(missionService)
+        .searchMissions(
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
+    // The legacy unfiltered getAllMissions() path must never be hit for authenticated callers.
+    verify(missionService, never()).getAllMissions(any(Pageable.class));
   }
 
   @Test

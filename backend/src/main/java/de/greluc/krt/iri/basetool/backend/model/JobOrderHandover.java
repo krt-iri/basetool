@@ -49,6 +49,30 @@ public class JobOrderHandover extends AbstractEntity<UUID> {
   @Column(name = "recipient_squadron")
   private String recipientSquadron;
 
+  /**
+   * Audit field: the user who executed the handover (the logistician+ who clicked the button).
+   * Stamped automatically by {@link
+   * de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService} at create time from the
+   * current JWT principal; {@code null} on rows created before the audit columns were introduced
+   * and for anonymous executions (cross-staffel workspaces allow guest creates of the order itself,
+   * but a handover always goes through an authenticated user). Cross-staffel workspace: the
+   * executing user may belong to a different squadron than the order's owning one — see
+   * MULTI_SQUADRON_PLAN.md section 4.4 / 7.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "executing_user_id")
+  private User executingUser;
+
+  /**
+   * Audit field: the squadron the executing user belonged to at handover time. Captured as a
+   * snapshot (rather than re-resolving via {@link #executingUser}) so a later squadron change on
+   * that user does not retroactively rewrite the audit trail. {@code null} when the executing user
+   * had no squadron assigned (admins / brand-new accounts).
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "executing_squadron_id")
+  private Squadron executingSquadron;
+
   @OneToMany(
       mappedBy = "jobOrderHandover",
       cascade = CascadeType.ALL,

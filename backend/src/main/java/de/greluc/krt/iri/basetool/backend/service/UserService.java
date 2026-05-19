@@ -66,6 +66,7 @@ public class UserService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
   private final AuthHelperService authHelperService;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -451,54 +452,63 @@ public class UserService {
   }
 
   /**
-   * Returns all users sorted case-insensitively by username.
+   * Returns all users sorted case-insensitively by username, scoped to the caller's squadron
+   * context. Admin in "all squadrons" mode receives the cross-staffel list; everyone else only sees
+   * members of their own squadron (plus unassigned admins/guests). Reads {@link
+   * SquadronScopeService#currentSquadronId()} once per call (MULTI_SQUADRON_PLAN.md section 4.4).
    *
-   * @return all users sorted case-insensitively by username
+   * @return scoped user list, case-insensitively sorted by username
    */
   public List<User> findAll() {
-    return userRepository.findAll(Sort.by(Sort.Order.asc("username").ignoreCase()));
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.findAllScopedList(
+        scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
 
   /**
-   * Returns paged user list.
+   * Returns paged user list, squadron-scoped (see {@link #findAll()}).
    *
    * @param pageable page request
-   * @return paged user list
+   * @return scoped paged user list
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    return userRepository.findAll(pageable);
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.findAllScoped(scope, pageable);
   }
 
   /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
+   * Squadron-scoped via {@link SquadronScopeService#currentSquadronId()} — non-admins only see
+   * their own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
    *
-   * @return lightweight reference projection used by typeaheads (id + username + displayName)
+   * @return lightweight reference projection used by typeaheads
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
-    return userRepository.findAllReference();
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.findAllReferenceScoped(scope);
   }
 
   /**
-   * Unpaged username/displayName substring search.
+   * Unpaged username/displayName substring search, squadron-scoped.
    *
    * @param query free-text filter
-   * @return matching users
+   * @return matching users in the caller's squadron context
    */
   public List<User> searchByUsername(@NotNull String query) {
-    return userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-        query, query);
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.searchScopedList(query, scope);
   }
 
   /**
-   * Paged username/displayName substring search.
+   * Paged username/displayName substring search, squadron-scoped.
    *
    * @param query free-text filter
    * @param pageable page request
-   * @return matching users
+   * @return matching users in the caller's squadron context
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    return userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-        query, query, pageable);
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.searchScoped(query, scope, pageable);
   }
 
   /**

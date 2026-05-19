@@ -28,6 +28,8 @@ class JobOrderHandoverMapperTest {
     // of a Spring context.
     mapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(mapper, "materialMapper", Mappers.getMapper(MaterialMapper.class));
+    ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
+    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

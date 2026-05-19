@@ -44,6 +44,7 @@ public class MissionSecurityService {
   private final RoleHierarchy roleHierarchy;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
+  private final SquadronScopeService squadronScopeService;
 
   /**
    * Authorizes access to a single participant of a mission.
@@ -168,14 +169,26 @@ public class MissionSecurityService {
 
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    if (reachable.stream()
-        .anyMatch(
-            a ->
-                a.getAuthority().equals("ROLE_MISSION_MANAGER")
-                    || a.getAuthority().equals("MISSION_MANAGER")
-                    || a.getAuthority().equals("MISSION_MANAGE")
-                    || a.getAuthority().equals("ROLE_OFFICER")
-                    || a.getAuthority().equals("ROLE_ADMIN"))) {
+    boolean isAdmin = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    // ROLE_ADMIN bypasses every gate (admin always sees / edits across squadrons; see
+    // MULTI_SQUADRON_PLAN.md section 1).
+    if (isAdmin) {
+      return true;
+    }
+
+    // Elevated mission roles (MISSION_MANAGER, OFFICER, MISSION_MANAGE) need to ADDITIONALLY
+    // pass the squadron-scope check on the target mission — otherwise an Officer or
+    // Mission-Manager from squadron A could edit missions of squadron B
+    // (MULTI_SQUADRON_PLAN.md section 1: editing is the owning squadron's prerogative).
+    boolean hasElevatedMissionAuthority =
+        reachable.stream()
+            .anyMatch(
+                a ->
+                    a.getAuthority().equals("ROLE_MISSION_MANAGER")
+                        || a.getAuthority().equals("MISSION_MANAGER")
+                        || a.getAuthority().equals("MISSION_MANAGE")
+                        || a.getAuthority().equals("ROLE_OFFICER"));
+    if (hasElevatedMissionAuthority && squadronScopeService.canEditMission(missionId)) {
       return true;
     }
 
@@ -207,19 +220,30 @@ public class MissionSecurityService {
     log.debug(
         "User {} authorities: {}, Reachable: {}", authentication.getName(), authorities, reachable);
 
-    boolean hasAuthority =
+    boolean isAdmin = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    if (isAdmin) {
+      log.debug(
+          "Access granted for user {} via ROLE_ADMIN for mission {}",
+          authentication.getName(),
+          missionId);
+      return true;
+    }
+
+    // Elevated mission roles need an additional squadron-scope check before they may edit the
+    // manager list of a mission that does not belong to their squadron
+    // (MULTI_SQUADRON_PLAN.md section 1).
+    boolean hasElevatedAuthority =
         reachable.stream()
             .anyMatch(
                 a ->
                     a.getAuthority().equals("ROLE_MISSION_MANAGER")
                         || a.getAuthority().equals("MISSION_MANAGER")
                         || a.getAuthority().equals("MISSION_MANAGE")
-                        || a.getAuthority().equals("ROLE_OFFICER")
-                        || a.getAuthority().equals("ROLE_ADMIN"));
+                        || a.getAuthority().equals("ROLE_OFFICER"));
 
-    if (hasAuthority) {
+    if (hasElevatedAuthority && squadronScopeService.canEditMission(missionId)) {
       log.debug(
-          "Access granted for user {} via authority for mission {}",
+          "Access granted for user {} via elevated authority + squadron scope for mission {}",
           authentication.getName(),
           missionId);
       return true;
@@ -262,13 +286,14 @@ public class MissionSecurityService {
 
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    boolean isAdminOrOfficer =
-        reachable.stream()
-            .anyMatch(
-                a ->
-                    a.getAuthority().equals("ROLE_ADMIN")
-                        || a.getAuthority().equals("ROLE_OFFICER"));
-    if (isAdminOrOfficer) {
+    boolean isAdmin = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    if (isAdmin) {
+      return true;
+    }
+    // Officer: same squadron-scope gate as canManageMission. Without it an officer from
+    // squadron A could transfer ownership of squadron B's missions.
+    boolean isOfficer = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_OFFICER"));
+    if (isOfficer && squadronScopeService.canEditMission(missionId)) {
       return true;
     }
 

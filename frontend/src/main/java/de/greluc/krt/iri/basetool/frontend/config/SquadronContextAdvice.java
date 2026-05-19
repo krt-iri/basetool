@@ -5,9 +5,12 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,6 +49,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class SquadronContextAdvice {
 
   private final BackendApiClient backendApiClient;
+  private final MessageSource messageSource;
 
   /**
    * The {@code GET /api/v1/me/active-squadron} response body. Mirrors the backend's {@code
@@ -138,6 +142,37 @@ public class SquadronContextAdvice {
   @ModelAttribute("isAllSquadronsMode")
   public boolean isAllSquadronsMode(@ModelAttribute("activeSquadronId") UUID activeSquadronId) {
     return isAdmin() && activeSquadronId == null;
+  }
+
+  /**
+   * Composes the dynamic application title for the {@code <title>} tag and the sidebar logo: a
+   * plain "Basetool" when no squadron context applies, "Basetool – &lt;shorthand&gt;" when a
+   * concrete squadron is active, and "Basetool – Alle Staffeln" when an admin is in the
+   * cross-staffel view. Replaces the previous hardcoded "IRIDIUM Basetool" title
+   * (MULTI_SQUADRON_PLAN.md section 5.4: app.title generic or dynamic).
+   *
+   * <p>Resolution uses the request locale via {@link LocaleContextHolder} so the squadron suffix is
+   * localised consistently with the rest of the page (the message-format pattern {@code {0}} is
+   * filled with the squadron shorthand or the localised "all squadrons" label).
+   *
+   * @param activeSquadron resolved squadron, or {@code null}.
+   * @param isAllSquadronsMode whether the current viewer is an admin without a selection.
+   * @return the rendered title string, never {@code null}.
+   */
+  @ModelAttribute("appTitle")
+  public String appTitle(
+      @ModelAttribute("activeSquadron") SquadronDto activeSquadron,
+      @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode) {
+    Locale locale = LocaleContextHolder.getLocale();
+    if (activeSquadron != null) {
+      return messageSource.getMessage(
+          "app.title.with.squadron", new Object[] {activeSquadron.shorthand()}, locale);
+    }
+    if (isAllSquadronsMode) {
+      String allLabel = messageSource.getMessage("squadron.switcher.all", null, locale);
+      return messageSource.getMessage("app.title.all.squadrons", new Object[] {allLabel}, locale);
+    }
+    return messageSource.getMessage("app.title", null, locale);
   }
 
   /**

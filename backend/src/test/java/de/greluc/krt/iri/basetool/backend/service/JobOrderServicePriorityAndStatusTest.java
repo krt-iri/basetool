@@ -386,7 +386,12 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)), 1L);
+              "alpha",
+              null,
+              null,
+              "OP-1",
+              List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)),
+              1L);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -402,7 +407,12 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              "alpha", "OP-1", List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)), 1L);
+              "alpha",
+              null,
+              null,
+              "OP-1",
+              List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)),
+              1L);
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));
     }
@@ -413,7 +423,7 @@ class JobOrderServicePriorityAndStatusTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(jobOrderRepository.save(o)).thenReturn(o);
 
-      CreateJobOrderDto dto = new CreateJobOrderDto("a", "b", List.of(), null);
+      CreateJobOrderDto dto = new CreateJobOrderDto("a", null, null, "b", List.of(), null);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -607,6 +617,6 @@ class JobOrderServicePriorityAndStatusTest {
   }
 
   private CreateJobOrderDto newUpdateDto(Long version) {
-    return new CreateJobOrderDto("squad", "OP-X", List.of(), version);
+    return new CreateJobOrderDto("squad", null, null, "OP-X", List.of(), version);
   }
 }

@@ -15,6 +15,11 @@ import java.util.UUID;
  * {@code /schedule}, {@code /flags}) the dedicated counters {@code coreVersion}, {@code
  * scheduleVersion} and {@code flagsVersion} are the source of truth — they allow concurrent edits
  * on disjoint sections of the same mission without spurious 409 conflicts.
+ *
+ * <p>{@code owningSquadron} surfaces the mission's squadron ownership on the detail endpoint,
+ * matching the column already exposed by {@link MissionListDto} on the list endpoint
+ * (MULTI_SQUADRON_PLAN.md section 4.5: read DTOs of staffel-scoped aggregates carry the squadron
+ * mini-record). May be {@code null} for historic rows persisted before V82.
  */
 public record MissionDto(
     UUID id,
@@ -44,4 +49,5 @@ public record MissionDto(
     Long scheduleVersion,
     Long flagsVersion,
     Integer checkedInParticipants,
-    Integer registeredParticipants) {}
+    Integer registeredParticipants,
+    SquadronReferenceDto owningSquadron) {}
