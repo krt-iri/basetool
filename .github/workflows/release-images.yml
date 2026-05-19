@@ -66,6 +66,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # `git describe --tags` in the `Compute application version` step
+          # below needs the full tag set and enough history to reach the most
+          # recent tag from any non-tag commit. The default `fetch-depth: 1`
+          # is a shallow clone without any tags, which would force the version
+          # resolution to fall back to a bare short SHA on every main-branch
+          # build. `0` = full history.
+          fetch-depth: 0
+
+      # Compute the human-readable version string baked into the frontend
+      # image's `META-INF/build-info.properties` (and, transitively, the
+      # sidebar's discreet version chip rendered by `AppVersionAdvice`).
+      #   - Tag pushes resolve to the tag name verbatim (e.g. `v0.2.3`).
+      #   - Branch pushes resolve to `vX.Y.Z-<n>-g<sha>` where `n` is the
+      #     number of commits since the last reachable tag — auditable
+      #     reference back to a release boundary plus the exact commit.
+      #   - Initial-state repositories without any tag yet fall back to the
+      #     bare short SHA via `--always`.
+      # `--dirty` is intentionally omitted here: a GitHub Actions runner
+      # always builds from a clean checkout, so an unexpected `-dirty`
+      # suffix would point at a CI bug, not a legitimate state. The
+      # developer-side `git describe` in `frontend/build.gradle.kts` does
+      # add `--dirty` because local incremental builds against a modified
+      # worktree are a normal flow.
+      - name: Compute application version
+        id: app-version
+        run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
 
       # QEMU is only strictly required if we cross-build for arm64. We currently
       # only build linux/amd64 (the production host architecture), so this is a
@@ -129,6 +156,12 @@ jobs:
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Forwarded to both module Dockerfiles. The frontend consumes it via
+          # `-PappVersion=...` to override `bootBuildInfo`'s default version;
+          # the backend just declares the ARG to silence BuildKit's "unused
+          # build arg" warning (it has no UI to render a version chip on).
+          build-args: |
+            APP_VERSION=${{ steps.app-version.outputs.version }}
           # GitHub Actions cache backend. `mode=max` caches all build stages
           # including the multi-stage `build` layer (Gradle dependency
           # download), which is the slowest part of the build. Scoped per
