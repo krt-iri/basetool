@@ -10,12 +10,10 @@ import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,9 +25,13 @@ import org.springframework.stereotype.Service;
  *
  * <ul>
  *   <li>For a non-admin user, the persistent {@code app_user.squadron_id} they were assigned to.
- *   <li>For an admin, the Spring Session attribute {@link #ACTIVE_SQUADRON_SESSION_KEY} written by
- *       the frontend's squadron switcher. {@code null}/missing means "all squadrons" - admins are
- *       not constrained when no active selection exists.
+ *   <li>For an admin, the {@link #ACTIVE_SQUADRON_HEADER} request header relayed by the frontend's
+ *       WebClient ({@code ActiveSquadronRelayFilter} reads the admin's choice from the frontend's
+ *       Redis-backed Spring Session and attaches it to every outbound backend call). {@code
+ *       null}/missing means "all squadrons" - admins are not constrained when no active selection
+ *       exists. The backend deliberately does NOT keep its own session for this preference: REST
+ *       calls from the frontend do not relay session cookies (only the OAuth2 bearer token), so a
+ *       backend {@code HttpSession.setAttribute} would not survive between calls.
  * </ul>
  *
  * <p>The split keeps {@link AuthHelperService} narrow (its only job is being the single seam to
@@ -44,12 +46,14 @@ import org.springframework.stereotype.Service;
 public class SquadronScopeService {
 
   /**
-   * HTTP session attribute name under which the admin's currently selected squadron is stored. A
-   * {@code null}/missing value means "no active selection" (admin sees all squadrons). The session
-   * is Redis-backed via Spring Session in {@code dev}/{@code prod} so a frontend restart preserves
-   * the selection.
+   * Name of the HTTP request header through which the frontend relays the admin's active squadron
+   * selection. A {@code null}/missing value means "no active selection" (admin sees all squadrons);
+   * a non-blank UUID restricts the admin to that squadron's data for the duration of this request.
+   * Source of truth lives on the frontend (Redis-backed Spring Session via {@code
+   * MeFrontendController}); the backend treats the header as untrusted-but-bounded input — only
+   * honoured for principals that already carry {@code ROLE_ADMIN}.
    */
-  public static final String ACTIVE_SQUADRON_SESSION_KEY = "iridium.activeSquadronId";
+  public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
 
   private final AuthHelperService authHelper;
   private final UserRepository userRepository;
@@ -62,10 +66,11 @@ public class SquadronScopeService {
   private final HttpServletRequest request;
 
   /**
-   * Returns the squadron context that filters the current request. For admins this reads the
-   * session-stored "active squadron" (the frontend's squadron switcher); for everyone else this
-   * loads the user's persistent home squadron. Empty result means "no filter" for admins ("all
-   * squadrons") and "no access" for non-admins (typically unauthenticated/anonymous).
+   * Returns the squadron context that filters the current request. For admins this reads the {@code
+   * X-Active-Squadron-Id} request header (the frontend's squadron switcher pushed there via {@code
+   * ActiveSquadronRelayFilter}); for everyone else this loads the user's persistent home squadron.
+   * Empty result means "no filter" for admins ("all squadrons") and "no access" for non-admins
+   * (typically unauthenticated/anonymous).
    *
    * <p>The call hits the DB for non-admin requests (one {@code userRepository.findById} per call).
    * Callers in hot paths should resolve it once per request rather than per filtered row.
@@ -73,7 +78,7 @@ public class SquadronScopeService {
   @NotNull
   public Optional<UUID> currentSquadronId() {
     if (authHelper.isAdmin()) {
-      return readActiveSquadronFromSession();
+      return readActiveSquadronFromHeader();
     }
     return authHelper
         .currentUserId()
@@ -102,9 +107,9 @@ public class SquadronScopeService {
    * {@code true} iff the current principal may see data owned by {@code squadronId}.
    *
    * <ul>
-   *   <li>Admin without an active squadron selection (session empty): always {@code true}.
-   *   <li>Admin with an active squadron selection: {@code true} only for the selected squadron -
-   *       the admin opted into the focused view and must switch back to "all" to break out.
+   *   <li>Admin without an active squadron header: always {@code true}.
+   *   <li>Admin with an active squadron header: {@code true} only for the selected squadron - the
+   *       admin opted into the focused view and must switch back to "all" to break out.
    *   <li>Non-admin: {@code true} only for the user's home squadron.
    * </ul>
    *
@@ -112,7 +117,7 @@ public class SquadronScopeService {
    */
   public boolean canSeeSquadron(@NotNull UUID squadronId) {
     if (authHelper.isAdmin()) {
-      return readActiveSquadronFromSession().map(active -> active.equals(squadronId)).orElse(true);
+      return readActiveSquadronFromHeader().map(active -> active.equals(squadronId)).orElse(true);
     }
     return readPersistentSquadronFromUser().map(active -> active.equals(squadronId)).orElse(false);
   }
@@ -278,36 +283,20 @@ public class SquadronScopeService {
         .orElse(false);
   }
 
-  /**
-   * Writes the admin's active squadron selection to the session. {@code null} clears the selection
-   * (admin returns to the "all squadrons" view). Non-admins are rejected with {@link
-   * IllegalStateException}: the switcher is an admin-only convenience.
-   *
-   * @param squadronId the squadron to activate, or {@code null} to clear; non-admins always reject.
-   * @throws IllegalStateException when called by a principal that does not carry {@code
-   *     ROLE_ADMIN}.
-   */
-  public void setActiveSquadron(@Nullable UUID squadronId) {
-    if (!authHelper.isAdmin()) {
-      throw new IllegalStateException(
-          "Only admins may switch squadron context; current principal is not admin.");
-    }
-    HttpSession session = request.getSession(true);
-    if (squadronId == null) {
-      session.removeAttribute(ACTIVE_SQUADRON_SESSION_KEY);
-    } else {
-      session.setAttribute(ACTIVE_SQUADRON_SESSION_KEY, squadronId);
-    }
-  }
-
   @NotNull
-  private Optional<UUID> readActiveSquadronFromSession() {
-    HttpSession session = request.getSession(false);
-    if (session == null) {
+  private Optional<UUID> readActiveSquadronFromHeader() {
+    String raw = request.getHeader(ACTIVE_SQUADRON_HEADER);
+    if (raw == null || raw.isBlank()) {
       return Optional.empty();
     }
-    Object value = session.getAttribute(ACTIVE_SQUADRON_SESSION_KEY);
-    return value instanceof UUID uuid ? Optional.of(uuid) : Optional.empty();
+    try {
+      return Optional.of(UUID.fromString(raw.trim()));
+    } catch (IllegalArgumentException ex) {
+      // Malformed header → treat as "no selection". Logging at debug so a stray client cannot
+      // spam the WARN channel; the effective behaviour ("admin sees all") matches what the
+      // admin gets when they have not chosen a squadron yet.
+      return Optional.empty();
+    }
   }
 
   @NotNull

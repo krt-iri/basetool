@@ -84,8 +84,14 @@
                  on the blank "All squadrons" option DELETEs the selection via the frontend
                  proxy. Non-admins do not see this control - they always operate in their
                  persistent home squadron. -->
+            <!-- `no-track` excludes this form from unsaved-changes.js — the switcher is a
+                 navigation control, not a form the user is filling out, and a change event
+                 on the dropdown must not arm the beforeunload guard. The auto-submit JS calls
+                 form.submit() programmatically, which (per HTML spec) does NOT fire the
+                 submit event that would otherwise reset isDirty, so without `no-track` the
+                 native browser "Leave site?" dialog appears every time. -->
             <form id="squadron-switcher-form" sec:authorize="hasRole('ADMIN')"
-                  th:action="@{/me/active-squadron}" method="post" class="squadron-switcher">
+                  th:action="@{/me/active-squadron}" method="post" class="squadron-switcher no-track">
                 <input type="hidden" name="_referer" th:value="${currentRequestUri}" />
                 <label for="squadron-switcher-select" class="squadron-switcher-label"
                        th:text="#{squadron.switcher.label}">Active squadron</label>

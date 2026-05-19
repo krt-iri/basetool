@@ -2,12 +2,8 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
@@ -23,7 +19,6 @@ import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,9 +31,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Mockito unit tests for {@link SquadronScopeService}. Covers the squadron-context resolution paths
- * (admin via session, non-admin via persistent user record), the aggregate-specific access checks
- * for the five staffel-scoped roots, and the Mission cross-staffel-visibility escape clause
- * (`is_internal = false`).
+ * (admin via {@code X-Active-Squadron-Id} request header, non-admin via persistent user record),
+ * the aggregate-specific access checks for the five staffel-scoped roots, and the Mission
+ * cross-staffel-visibility escape clause (`is_internal = false`).
  */
 @ExtendWith(MockitoExtension.class)
 class SquadronScopeServiceTest {
@@ -51,7 +46,6 @@ class SquadronScopeServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private HttpServletRequest request;
-  @Mock private HttpSession session;
 
   @InjectMocks private SquadronScopeService service;
 
@@ -82,28 +76,34 @@ class SquadronScopeServiceTest {
   class CurrentSquadronIdTests {
 
     @Test
-    void adminWithoutSession_returnsEmpty_admin_seesAllSquadrons() {
+    void adminWithoutHeader_returnsEmpty_admin_seesAllSquadrons() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(null);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
 
     @Test
-    void adminWithActiveSquadron_returnsThatSquadron() {
+    void adminWithActiveSquadronHeader_returnsThatSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(session);
-      when(session.getAttribute(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY))
-          .thenReturn(SQUADRON_B_ID);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
 
       assertEquals(Optional.of(SQUADRON_B_ID), service.currentSquadronId());
     }
 
     @Test
-    void adminWithSessionButNoSquadronAttribute_returnsEmpty() {
+    void adminWithBlankHeader_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(session);
-      when(session.getAttribute(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY)).thenReturn(null);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("");
+
+      assertTrue(service.currentSquadronId().isEmpty());
+    }
+
+    @Test
+    void adminWithMalformedHeader_returnsEmpty() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("not-a-uuid");
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -155,7 +155,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminInAllSquadronsMode_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(null);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadron().isEmpty());
     }
@@ -167,7 +167,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithoutSelection_canSeeAnySquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(null);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertTrue(service.canSeeSquadron(SQUADRON_B_ID));
@@ -176,9 +176,8 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithSelection_seesOnlySelectedSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(session);
-      when(session.getAttribute(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY))
-          .thenReturn(SQUADRON_A_ID);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
@@ -377,45 +376,10 @@ class SquadronScopeServiceTest {
       order.setOwningSquadron(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(false)).thenReturn(null);
+      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeRefineryOrder(orderId));
       assertTrue(service.canEditRefineryOrder(orderId));
-    }
-  }
-
-  @Nested
-  class SetActiveSquadronTests {
-
-    @Test
-    void admin_canActivateSquadron() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(true)).thenReturn(session);
-
-      service.setActiveSquadron(SQUADRON_A_ID);
-
-      verify(session).setAttribute(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY, SQUADRON_A_ID);
-      verify(session, never())
-          .removeAttribute(eq(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY));
-    }
-
-    @Test
-    void admin_canClearActiveSquadron_byPassingNull() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getSession(true)).thenReturn(session);
-
-      service.setActiveSquadron(null);
-
-      verify(session).removeAttribute(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY);
-      verify(session, never())
-          .setAttribute(eq(SquadronScopeService.ACTIVE_SQUADRON_SESSION_KEY), eq(SQUADRON_A_ID));
-    }
-
-    @Test
-    void nonAdmin_rejectedWithIllegalState() {
-      when(authHelper.isAdmin()).thenReturn(false);
-
-      assertThrows(IllegalStateException.class, () -> service.setActiveSquadron(SQUADRON_A_ID));
     }
   }
 

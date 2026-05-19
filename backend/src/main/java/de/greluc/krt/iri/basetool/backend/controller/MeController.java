@@ -1,24 +1,26 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for "me" - per-request preferences of the currently authenticated principal that
- * live in the Spring Session rather than in a JPA entity. Today there is exactly one such
- * preference: the admin's squadron switcher (the squadron context the admin opted into).
+ * Read-only echo of the squadron context that the backend currently applies to staffel-scoped
+ * queries. The active squadron preference is owned by the frontend (Redis-backed Spring Session via
+ * {@code MeFrontendController}); the backend learns about the admin's choice on every API call
+ * through the {@code X-Active-Squadron-Id} header relayed by the frontend's WebClient.
+ *
+ * <p>This controller used to expose {@code PUT}/{@code DELETE} mutators that stored the selection
+ * in the backend's {@code HttpSession}, but that was effectively a no-op: REST calls from the
+ * frontend do not relay session cookies (only the OAuth2 bearer token), so each call created a
+ * fresh backend session and the attribute was lost between requests. The mutators are gone; the
+ * only remaining surface is the {@code GET} which reflects what the header for the current request
+ * says.
  */
 @RestController
 @RequestMapping("/api/v1/me")
@@ -30,9 +32,9 @@ public class MeController {
 
   /**
    * Returns the squadron context that the backend currently applies to staffel-scoped queries for
-   * this request. For admins this is the session-stored switcher selection; for everyone else this
-   * is the user's persistent home squadron. The {@code squadronId} is {@code null} when the admin
-   * is in "all squadrons" mode or the user has no assigned squadron.
+   * this request. For admins this is the {@code X-Active-Squadron-Id} header value relayed by the
+   * frontend; for everyone else this is the user's persistent home squadron. The {@code squadronId}
+   * is {@code null} when the admin is in "all squadrons" mode or the user has no assigned squadron.
    *
    * @return current effective squadron context, never {@code null}.
    */
@@ -40,42 +42,6 @@ public class MeController {
   public ActiveSquadronResponse getActiveSquadron() {
     return new ActiveSquadronResponse(squadronScopeService.currentSquadronId().orElse(null));
   }
-
-  /**
-   * Sets the admin's active squadron. Admin-only - the squadron switcher is an admin convenience;
-   * non-admins always operate in their persistent home squadron and cannot deviate.
-   *
-   * @param request typed body carrying the squadron UUID; never {@code null}.
-   * @return empty 204 response on success.
-   */
-  @PutMapping("/active-squadron")
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<Void> setActiveSquadron(
-      @RequestBody @Valid @NotNull SetActiveSquadronRequest request) {
-    squadronScopeService.setActiveSquadron(request.squadronId());
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Clears the admin's active squadron selection so the admin returns to the "all squadrons" view.
-   * Admin-only for the same reason as {@link #setActiveSquadron(SetActiveSquadronRequest)}.
-   *
-   * @return empty 204 response on success.
-   */
-  @DeleteMapping("/active-squadron")
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<Void> clearActiveSquadron() {
-    squadronScopeService.setActiveSquadron(null);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Body for {@code PUT /api/v1/me/active-squadron}: the squadron UUID the admin wants to operate
-   * in. Use {@code DELETE} (not a body with {@code null}) to clear the selection.
-   *
-   * @param squadronId UUID of the squadron to activate; required.
-   */
-  public record SetActiveSquadronRequest(@NotNull UUID squadronId) {}
 
   /**
    * Response for {@code GET /api/v1/me/active-squadron}: the resolved effective squadron context

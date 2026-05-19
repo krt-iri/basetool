@@ -1,10 +1,12 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
+import de.greluc.krt.iri.basetool.frontend.controller.MeFrontendController;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -52,34 +54,28 @@ public class SquadronContextAdvice {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * The {@code GET /api/v1/me/active-squadron} response body. Mirrors the backend's {@code
-   * MeController.ActiveSquadronResponse} record - kept local to avoid a frontend dependency on the
-   * backend module just for one wire-shape.
+   * Resolves {@code activeSquadronId} for the current request directly from the frontend's
+   * Redis-backed Spring Session. The state is owned by the frontend (see {@link
+   * MeFrontendController}) because backend REST calls do not relay session cookies, so a backend-
+   * side {@code HttpSession} would not survive across calls. {@code null} when the call is
+   * anonymous, when the admin has not chosen a specific squadron ("all squadrons" mode), or when
+   * the user is not an admin (members do not own this preference and their effective squadron is
+   * resolved by the backend from {@code app_user.squadron_id}).
    *
-   * @param squadronId resolved squadron UUID, or {@code null} when none applies.
-   */
-  public record ActiveSquadronResponse(UUID squadronId) {}
-
-  /**
-   * Resolves {@code activeSquadronId} for the current request by calling the backend's {@code
-   * /me/active-squadron} GET endpoint. {@code null} when the call is anonymous, when the admin is
-   * in "all squadrons" mode, or when the backend round-trip fails.
-   *
+   * @param request the current HTTP servlet request; never {@code null}.
    * @return the active squadron UUID, or {@code null}.
    */
   @ModelAttribute("activeSquadronId")
-  public UUID activeSquadronId() {
+  public UUID activeSquadronId(HttpServletRequest request) {
     if (!authHelper.isAuthenticated()) {
       return null;
     }
-    try {
-      ActiveSquadronResponse resp =
-          backendApiClient.get("/api/v1/me/active-squadron", ActiveSquadronResponse.class);
-      return resp != null ? resp.squadronId() : null;
-    } catch (Exception ex) {
-      log.debug("Failed to resolve active squadron for current request", ex);
+    HttpSession session = request.getSession(false);
+    if (session == null) {
       return null;
     }
+    return de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
+        session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
   }
 
   /**
