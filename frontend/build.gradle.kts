@@ -20,6 +20,66 @@ java {
   }
 }
 
+// Resolve the version string that ends up in `META-INF/build-info.properties`
+// (consumed by `AppVersionAdvice` to render the sidebar's discreet version
+// chip). Priority chain — first non-blank wins:
+//
+//   1. `-PappVersion=<value>` on the Gradle command line. Used by the CI
+//      Docker build, where `.git` is excluded from the build context via
+//      `.dockerignore`: the GitHub Actions workflow computes the version on
+//      the runner and forwards it as a `--build-arg APP_VERSION=...` which
+//      the Dockerfile relays to Gradle via this property.
+//   2. `git describe --tags --always --dirty` against the worktree's `.git`.
+//      Used by local developer builds, where the host has both `.git` and
+//      a `git` binary on PATH. `--tags` matches lightweight tags (the
+//      project uses `vX.Y.Z` tags); `--always` falls back to a short SHA
+//      when no tag is reachable; `--dirty` appends a marker if the worktree
+//      has uncommitted changes so a half-committed build never claims to
+//      be the clean tag. Drains stderr to `Redirect.DISCARD` so a chatty
+//      git binary cannot block on a full pipe buffer.
+//   3. `project.version` (currently `0.0.1-SNAPSHOT`) as the final fallback
+//      for Docker builds without an injected `-PappVersion` and for hosts
+//      without git installed.
+//
+// The leading `v` from a canonical tag (e.g. `v0.2.3`) is stripped at the
+// end so the sidebar's i18n template `v{0}` does not produce `vv0.2.3`. The
+// SNAPSHOT fallback has no `v` prefix and surfaces as `v0.0.1-SNAPSHOT`,
+// SHA-only fallback surfaces as `vabc1234` — both consistent with the
+// canonical-tag rendering.
+val resolvedAppVersion: String by lazy {
+  val override = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() }
+  val gitDescribed: String? =
+      runCatching {
+            val proc =
+                ProcessBuilder("git", "describe", "--tags", "--always", "--dirty")
+                    .directory(rootDir)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+            val stdout = proc.inputStream.bufferedReader().readText().trim()
+            if (proc.waitFor() == 0 && stdout.isNotBlank()) stdout else null
+          }
+          .getOrNull()
+  val raw = override ?: gitDescribed ?: project.version.toString()
+  raw.removePrefix("v")
+}
+
+// Generate `META-INF/build-info.properties` at build time so Spring Boot's
+// `ProjectInfoAutoConfiguration` auto-wires a `BuildProperties` bean. The bean
+// feeds the sidebar's discreet version label (rendered by `AppVersionAdvice`)
+// without forcing every Thymeleaf template to read a Gradle-substituted token
+// directly. `bootBuildInfo` is wired into `processResources`, so the file is on
+// the test/runtime classpath without an extra task dependency.
+springBoot {
+  buildInfo {
+    properties {
+      // Override the default `project.version` value with the chain resolved
+      // above so the deployed image's sidebar reflects the actual git tag of
+      // the commit it was built from.
+      version.set(resolvedAppVersion)
+    }
+  }
+}
+
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")

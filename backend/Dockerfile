@@ -1,6 +1,12 @@
 FROM eclipse-temurin:25-jdk-alpine AS build
 WORKDIR /app
 
+# Declared (but unused) so the shared CI matrix in `release-images.yml` can
+# pass `--build-arg APP_VERSION=...` to both module builds without BuildKit
+# warning about an unconsumed arg. Only the frontend module renders a version
+# label today; the backend is API-only and has no UI to surface it.
+ARG APP_VERSION=
+
 # Gradle-Wrapper und Konfigurationsdateien für Dependency-Caching kopieren
 COPY gradlew .
 COPY gradle/ gradle/
