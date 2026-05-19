@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import de.greluc.krt.iri.basetool.backend.service.HangarService;
 import java.util.ArrayList;
@@ -63,6 +65,10 @@ class OptimisticLockingTest {
   private static final int START_TIMEOUT_SECONDS = 5;
   private static final int FINISH_TIMEOUT_SECONDS = 30;
 
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
+
   @Autowired private HangarService hangarService;
 
   @Autowired private ShipRepository shipRepository;
@@ -97,9 +103,11 @@ class OptimisticLockingTest {
 
   @BeforeEach
   void seedShip() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     User owner = new User();
     owner.setId(UUID.randomUUID());
     owner.setUsername("oltest-" + owner.getId());
+    owner.setSquadron(iridium);
     userRepository.save(owner);
     ownerId = owner.getId();
 
@@ -108,6 +116,8 @@ class OptimisticLockingTest {
     shipTypeId = shipTypeRepository.save(type).getId();
 
     Ship ship = new Ship();
+
+    ship.setOwningSquadron(iridium);
     ship.setName("Concurrent Ship " + UUID.randomUUID());
     ship.setInsurance("LTI");
     ship.setShipType(type);

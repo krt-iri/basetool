@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.Collections;
@@ -37,6 +39,10 @@ class MissionManagerRoleTest {
 
   private MockMvc mockMvc;
 
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
+
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
@@ -57,25 +63,31 @@ class MissionManagerRoleTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     owner = new User();
     owner.setId(UUID.randomUUID());
     owner.setUsername("owner");
+    owner.setSquadron(iridium);
     userRepository.save(owner);
 
     otherMember = new User();
     otherMember.setId(UUID.randomUUID());
     otherMember.setUsername("other");
+    otherMember.setSquadron(iridium);
     userRepository.save(otherMember);
 
     managerMember = new User();
     managerMember.setId(UUID.randomUUID());
     managerMember.setUsername("manager");
     managerMember.setMissionManager(true);
+    managerMember.setSquadron(iridium);
     userRepository.save(managerMember);
 
     mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission");
     mission.setOwner(owner);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));
@@ -130,11 +142,17 @@ class MissionManagerRoleTest {
 
   @Test
   void missionManagerShouldBeAbleToUpdateMission() throws Exception {
+    // Post-V89 every Mission carries a non-null owning_squadron_id, so the canManageMission
+    // gate now ALWAYS evaluates the squadron-scope check on top of the role check. The
+    // ROLE_MISSION_MANAGER authority alone is no longer enough — the JWT subject must
+    // resolve to a User whose squadron matches the mission's. managerMember is in IRIDIUM
+    // (see @BeforeEach), same as the test mission.
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId())
                 .with(
                     jwt()
+                        .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER")))
@@ -201,11 +219,15 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditTrueForMissionManager() throws Exception {
+    // Same V89-driven contract change as missionManagerShouldBeAbleToUpdateMission: the
+    // squadron-scope gate runs on every canEditMission evaluation now that the column is
+    // NOT NULL, so the JWT subject must resolve to a User in the mission's squadron.
     mockMvc
         .perform(
             get("/api/v1/missions/" + mission.getId())
                 .with(
                     jwt()
+                        .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER"))))
@@ -234,6 +256,7 @@ class MissionManagerRoleTest {
     user.setId(userId);
     user.setUsername("manager_user");
     user.setMissionManager(true);
+    user.setSquadron(iridium);
     userRepository.save(user);
     userRepository.flush();
 

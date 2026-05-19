@@ -8,10 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddParticipantPublicRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import java.util.Set;
 import java.util.UUID;
@@ -52,6 +54,8 @@ class MissionValidationTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
+  private Squadron iridium;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -65,11 +69,13 @@ class MissionValidationTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer1");
+    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
 
     testSquadron = new Squadron();
@@ -82,6 +88,8 @@ class MissionValidationTest {
     shipTypeRepository.save(st);
 
     Ship ship = new Ship();
+
+    ship.setOwningSquadron(iridium);
     ship.setName("Test Ship");
     ship.setInsurance("10");
     ship.setOwner(officerUser);
@@ -89,6 +97,8 @@ class MissionValidationTest {
     shipRepository.save(ship);
 
     mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -216,11 +226,13 @@ class MissionValidationTest {
     User lordAdley = new User();
     lordAdley.setId(UUID.randomUUID());
     lordAdley.setUsername("lord_adley");
+    lordAdley.setSquadron(iridium);
     userRepository.save(lordAdley);
 
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("caller");
+    caller.setSquadron(iridium);
     userRepository.save(caller);
 
     // Intentionally mixed case + whitespace to verify case-insensitive, trimmed match.
@@ -256,17 +268,20 @@ class MissionValidationTest {
     u1.setId(UUID.randomUUID());
     u1.setUsername("ambig_a");
     u1.setDisplayName("Shared Alias");
+    u1.setSquadron(iridium);
     userRepository.save(u1);
 
     User u2 = new User();
     u2.setId(UUID.randomUUID());
     u2.setUsername("ambig_b");
     u2.setDisplayName("Shared Alias");
+    u2.setSquadron(iridium);
     userRepository.save(u2);
 
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("caller2");
+    caller.setSquadron(iridium);
     userRepository.save(caller);
 
     AddParticipantPublicRequest request =

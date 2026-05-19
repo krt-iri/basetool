@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +52,10 @@ class ConcurrencyTest {
   private static final int START_TIMEOUT_SECONDS = 5;
   private static final int FINISH_TIMEOUT_SECONDS = 30;
 
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
+
   @Autowired private MissionRepository missionRepository;
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -69,7 +75,9 @@ class ConcurrencyTest {
 
   @Test
   void missionUpdate_underRealConcurrentContention_exactlyOneThreadWins() throws Exception {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     Mission seed = new Mission();
+    seed.setOwningSquadron(iridium);
     seed.setName("Concurrency Mission " + UUID.randomUUID());
     seed.setStatus("PLANNED");
     seedMissionId = missionRepository.save(seed).getId();

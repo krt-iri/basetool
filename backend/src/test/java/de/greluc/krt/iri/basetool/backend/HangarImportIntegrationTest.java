@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -34,6 +36,10 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional
 class HangarImportIntegrationTest {
 
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
+
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
@@ -54,11 +60,13 @@ class HangarImportIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("importuser");
+    user1.setSquadron(iridium);
     userRepository.save(user1);
 
     type135c = new ShipType();
@@ -184,6 +192,7 @@ class HangarImportIntegrationTest {
   void importFleetview_reImport_noNewShipCreatedWhenAlreadyPresent() throws Exception {
     // Given: 135c is already in user's hangar (1 existing)
     Ship existing = new Ship();
+    existing.setOwningSquadron(iridium);
     existing.setShipType(type135c);
     existing.setOwner(user1);
     existing.setInsurance("LTI");
@@ -228,6 +237,7 @@ class HangarImportIntegrationTest {
   void importFleetview_partialDuplicate_createsOnlyMissingShips() throws Exception {
     // Given: 1× 135c already in hangar
     Ship existing = new Ship();
+    existing.setOwningSquadron(iridium);
     existing.setShipType(type135c);
     existing.setOwner(user1);
     existing.setInsurance("LTI");

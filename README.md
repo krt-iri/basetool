@@ -246,11 +246,16 @@ operations boards), but everything else respects the strict squadron
 filter.
 
 What is **deferred** to a follow-up release: the tightening migrations
-`V87`–`V89` (`SET NOT NULL` on the new columns, then the
-two-phase drop of the legacy `job_order.squadron` VARCHAR) per the
-two-phase rule. They intentionally do not ship in the same release as
-`V80`–`V85`, so a rollback to single-tenant remains possible during
-the grace window. The full frontend UI for the squadron switcher /
+`V88`/`V89`/`V90` (Phase 7 chain — `V88` stop-write of the legacy
+`job_order.squadron` VARCHAR, `V89` `SET NOT NULL` on the new
+columns, `V90` final `DROP COLUMN` per the two-phase rule). They
+intentionally do not ship in the same release as `V80`–`V86`, so a
+rollback to single-tenant remains possible during the grace window.
+The chain was originally numbered `V87`/`V88`/`V89`; the solo-deploy
+of `V88` (Phase 7 Part 1) before its `V87` companion pushed the
+NOT NULL tightening into the `V89` slot and the DROP COLUMN into
+`V90` (Flyway `out-of-order=false` rejects any later-discovered
+migration with `version <= latest_applied`). The full frontend UI for the squadron switcher /
 context badge / squadron-column rendering is tracked as the next slice
 of work; see `MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the repo root for
 the open punch list.

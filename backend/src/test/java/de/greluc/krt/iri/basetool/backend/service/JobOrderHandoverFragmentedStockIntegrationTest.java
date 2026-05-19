@@ -135,6 +135,10 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           List<UUID> aslariteIds = new ArrayList<>();
           for (double a : aslariteAmounts) {
             InventoryItem inv = new InventoryItem();
+            inv.setOwningSquadron(
+                squadronRepository
+                    .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                    .orElseThrow());
             inv.setUser(user);
             inv.setLocation(location);
             inv.setMaterial(aslarite);
@@ -148,6 +152,10 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           List<UUID> ouratiteIds = new ArrayList<>();
           for (double a : ouratiteAmounts) {
             InventoryItem inv = new InventoryItem();
+            inv.setOwningSquadron(
+                squadronRepository
+                    .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                    .orElseThrow());
             inv.setUser(user);
             inv.setLocation(location);
             inv.setMaterial(ouratite);

@@ -62,7 +62,7 @@ public class PromotionTopic extends AbstractEntity<UUID> {
    */
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id")
+  @JoinColumn(name = "owning_squadron_id", nullable = false)
   private Squadron owningSquadron;
 
   // Excluded from {@code @ToString} because {@code List<PromotionCategory>} is a LAZY association

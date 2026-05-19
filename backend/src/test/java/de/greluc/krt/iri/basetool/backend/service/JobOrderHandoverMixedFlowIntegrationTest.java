@@ -116,6 +116,11 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           jobOrder = jobOrderRepository.save(jobOrder);
 
           InventoryItem inv1 = new InventoryItem();
+
+          inv1.setOwningSquadron(
+              squadronRepository
+                  .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                  .orElseThrow());
           inv1.setUser(user);
           inv1.setLocation(location);
           inv1.setMaterial(aslarite);
@@ -125,6 +130,11 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           inv1 = inventoryItemRepository.save(inv1);
 
           InventoryItem inv2 = new InventoryItem();
+
+          inv2.setOwningSquadron(
+              squadronRepository
+                  .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
+                  .orElseThrow());
           inv2.setUser(user);
           inv2.setLocation(location);
           inv2.setMaterial(ouratite);
