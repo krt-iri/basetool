@@ -88,8 +88,20 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID, UUID)} -
    * same filter contract; sorting is delegated to {@link Pageable} so the caller can pick the
    * column.
+   *
+   * <p><strong>EntityGraph contract differs from the non-paged variant on purpose.</strong> The
+   * controller maps the page result through {@code MissionMapper.toListDto}, which reads only
+   * scalar columns plus the two {@code @ManyToOne} associations {@code operation} and {@code
+   * owningSquadron} — it never touches {@code participants} or {@code assignedUnits}. Eager-loading
+   * those collections via {@code @EntityGraph} forces Hibernate into in-memory pagination ({@code
+   * HHH000104: firstResult/maxResults specified with collection fetch; applying in memory}) because
+   * SQL-level {@code OFFSET}/{@code LIMIT} cannot be combined with a collection join. The resulting
+   * cartesian {@code mission x participant x unit} fetch + JVM-side slicing was the dominant cost
+   * of the missions list page after the multi-squadron rollout. Eager-loading only the two
+   * {@code @ManyToOne} associations here keeps Hibernate on SQL pagination and resolves the per-row
+   * mapping in a single query.
    */
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  @EntityGraph(attributePaths = {"operation", "owningSquadron"})
   @Query(
       "SELECT m FROM Mission m WHERE (:scopeSquadronId IS NULL OR m.owningSquadron.id ="
           + " :scopeSquadronId OR m.isInternal = false) AND (CAST(:query AS string) IS NULL OR"

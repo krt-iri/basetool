@@ -103,7 +103,7 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_mission_id")
   @com.fasterxml.jackson.annotation.JsonIgnore
   private Mission parent;
@@ -124,12 +124,12 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Set<RefineryOrder> refineryOrders = new LinkedHashSet<>();
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "operation_id")
   @OptimisticLock(excluded = true)
   private Operation operation;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_id")
   @OptimisticLock(excluded = true)
   private User owner;
