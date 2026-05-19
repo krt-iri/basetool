@@ -142,11 +142,17 @@ class MissionManagerRoleTest {
 
   @Test
   void missionManagerShouldBeAbleToUpdateMission() throws Exception {
+    // Post-V87 every Mission carries a non-null owning_squadron_id, so the canManageMission
+    // gate now ALWAYS evaluates the squadron-scope check on top of the role check. The
+    // ROLE_MISSION_MANAGER authority alone is no longer enough — the JWT subject must
+    // resolve to a User whose squadron matches the mission's. managerMember is in IRIDIUM
+    // (see @BeforeEach), same as the test mission.
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId())
                 .with(
                     jwt()
+                        .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER")))
@@ -213,11 +219,15 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditTrueForMissionManager() throws Exception {
+    // Same V87-driven contract change as missionManagerShouldBeAbleToUpdateMission: the
+    // squadron-scope gate runs on every canEditMission evaluation now that the column is
+    // NOT NULL, so the JWT subject must resolve to a User in the mission's squadron.
     mockMvc
         .perform(
             get("/api/v1/missions/" + mission.getId())
                 .with(
                     jwt()
+                        .jwt(builder -> builder.subject(managerMember.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER"))))
