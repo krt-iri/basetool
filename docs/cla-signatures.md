@@ -18,7 +18,7 @@ addresses, phone numbers, or any other personal data.
 
 | Full legal name | GitHub handle | Commit email | Signed on | CLA version |
 | :--- | :--- | :--- | :--- | :--- |
-| <!-- first signature goes here --> | | | | |
+| Lucas Greuloch | [@greluc](https://github.com/greluc) | lucas.greuloch@pm.me | 2026-05-19 | 1.0 |
 
 ## Entity (corporate) signatures
 
