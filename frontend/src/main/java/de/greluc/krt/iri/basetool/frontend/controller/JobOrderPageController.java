@@ -251,7 +251,8 @@ public class JobOrderPageController {
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
-          form.setSquadron(order.squadron());
+          form.setRequestingSquadronId(
+              order.requestingSquadron() != null ? order.requestingSquadron().id() : null);
           form.setHandle(order.handle());
           form.setVersion(order.version());
           form.getMaterials().clear();
@@ -299,7 +300,8 @@ public class JobOrderPageController {
         // The time is pre-filled client-side in the user's browser
         // (see orders-detail.html, openHandoverModal) so that the user's
         // browser timezone (not the server/container) is used.
-        handoverForm.setRecipientSquadron(order.squadron());
+        handoverForm.setRecipientSquadron(
+            order.requestingSquadron() != null ? order.requestingSquadron().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
     } catch (Exception e) {
@@ -364,7 +366,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              form.getSquadron(), null, null, form.getHandle(), materials, form.getVersion());
+              null, form.getRequestingSquadronId(), form.getHandle(), materials, form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -467,7 +469,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              form.getSquadron(), null, null, form.getHandle(), materials, form.getVersion());
+              null, form.getRequestingSquadronId(), form.getHandle(), materials, form.getVersion());
       backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;

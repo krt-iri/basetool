@@ -91,8 +91,7 @@ public class JobOrderService {
 
     Squadron creatingSquadron = resolveCreatingSquadronForCreate(createDto.creatingSquadronId());
     Squadron requestingSquadron =
-        resolveRequestingSquadron(
-            createDto.requestingSquadronId(), createDto.squadron(), creatingSquadron);
+        resolveRequestingSquadron(createDto.requestingSquadronId(), creatingSquadron);
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -184,13 +183,6 @@ public class JobOrderService {
                 new de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto(
                     o.getId(),
                     o.getDisplayId(),
-                    // Wire-shape compatibility: the legacy `squadron` DTO field is fed from
-                    // requestingSquadron.shorthand now that JobOrder.squadron (entity field) was
-                    // removed in this commit. Clients on the v1 contract still see the same
-                    // string until V90 drops the DTO field entirely in the next-but-one release.
-                    o.getRequestingSquadron() != null
-                        ? o.getRequestingSquadron().getShorthand()
-                        : null,
                     o.getHandle(),
                     o.getStatus(),
                     o.getMaterials() != null
@@ -428,8 +420,7 @@ public class JobOrderService {
     Squadron creatingFallback =
         existingCreator != null ? existingCreator : resolveCreatingSquadronForCreate(null);
     Squadron newRequesting =
-        resolveRequestingSquadron(
-            updateDto.requestingSquadronId(), updateDto.squadron(), creatingFallback);
+        resolveRequestingSquadron(updateDto.requestingSquadronId(), creatingFallback);
     jobOrder.setRequestingSquadron(newRequesting);
     jobOrder.setHandle(updateDto.handle());
 
@@ -675,7 +666,6 @@ public class JobOrderService {
     return new JobOrderDto(
         baseDto.id(),
         baseDto.displayId(),
-        baseDto.squadron(),
         baseDto.creatingSquadron(),
         baseDto.requestingSquadron(),
         baseDto.handle(),
@@ -740,25 +730,25 @@ public class JobOrderService {
   /**
    * Resolves the {@code requesting_squadron_id} for create / update.
    *
-   * <p>Preference order:
+   * <p>Preference order (post Phase 7 part 3 / V90):
    *
    * <ol>
-   *   <li>Typed {@code requestingSquadronId} UUID from the DTO (the new, plan-compliant path).
-   *   <li>Legacy free-text {@code squadron} shorthand string (backwards compat for clients that
-   *       have not migrated yet — resolved against {@code squadron.shorthand} case-insensitively).
+   *   <li>Typed {@code requestingSquadronId} UUID from the DTO. Required value path for any client
+   *       that has migrated to the structured contract.
    *   <li>Fallback to {@code creatingFallback} (the creating squadron) so the requesting field
-   *       stays populated even on minimal payloads. Mirrors the V83 backfill rule.
+   *       stays populated even on minimal payloads — mirrors the V83 backfill rule.
    * </ol>
    *
+   * <p>The legacy shorthand-string path (Phase 6 / Phase 7 part 1) was removed together with the
+   * {@code squadron} field on {@code CreateJobOrderDto} and the V90 DROP COLUMN migration.
+   *
    * @param requestingSquadronId typed UUID from the DTO; preferred when present.
-   * @param squadronText legacy free-text fallback from the DTO; resolved against shorthand.
-   * @param creatingFallback the creating squadron used as the ultimate fallback.
+   * @param creatingFallback the creating squadron used as the fallback when the UUID is absent.
    * @return the resolved squadron; never {@code null}.
    */
   @org.jetbrains.annotations.NotNull
   private Squadron resolveRequestingSquadron(
       @org.jetbrains.annotations.Nullable UUID requestingSquadronId,
-      @org.jetbrains.annotations.Nullable String squadronText,
       @org.jetbrains.annotations.NotNull Squadron creatingFallback) {
     if (requestingSquadronId != null) {
       return squadronRepository
@@ -768,9 +758,6 @@ public class JobOrderService {
                   new BadRequestException(
                       "requestingSquadronId does not resolve to a known squadron: "
                           + requestingSquadronId));
-    }
-    if (squadronText != null && !squadronText.isBlank()) {
-      return squadronRepository.findByShorthand(squadronText.trim()).orElse(creatingFallback);
     }
     return creatingFallback;
   }

@@ -96,7 +96,8 @@ class JobOrderMapperTest {
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals(42, dto.displayId());
-    assertEquals("Iridium", dto.squadron());
+    assertNotNull(dto.requestingSquadron());
+    assertEquals("Iridium", dto.requestingSquadron().shorthand());
     assertEquals("recipient", dto.handle());
     assertEquals(3, dto.priority());
     assertEquals(JobOrderStatus.IN_PROGRESS, dto.status());

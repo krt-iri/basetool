@@ -8,7 +8,14 @@ import lombok.Data;
 /** Form-binding object for Job Order input. */
 @Data
 public class JobOrderForm {
-  private String squadron;
+  /**
+   * UUID of the squadron the order is executed for. Replaces the legacy free-text {@code squadron}
+   * field that backed {@code job_order.squadron} VARCHAR before the V90 DROP COLUMN migration. The
+   * Thymeleaf form binds a {@code <select>} of available squadrons to this field; the controller
+   * forwards it as {@code requestingSquadronId} on the backend {@code CreateJobOrderDto}.
+   */
+  private UUID requestingSquadronId;
+
   private String handle;
   private Long version;
   private String source;

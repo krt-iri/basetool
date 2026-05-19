@@ -1,0 +1,57 @@
+-- =====================================================================
+-- V90 - Phase 7 part 3: drop the legacy job_order.squadron VARCHAR
+-- =====================================================================
+-- Final step of the two-phase drop of the legacy free-text squadron
+-- column on job_order. See MULTI_SQUADRON_PLAN.md section 10 +
+-- db/migration/README.md (destructive-ops two-phase rule).
+--
+-- Phase chain:
+--   * V83 (Phase 6): added creating_squadron_id + requesting_squadron_id
+--     UUID columns alongside the legacy `squadron` VARCHAR. Backfill
+--     populated requesting_squadron_id from the VARCHAR via case-
+--     insensitive squadron.name/shorthand lookup with IRIDIUM fallback.
+--   * V88 (Phase 7 part 1, PR #132, already in prod): stop-write — the
+--     code no longer reads or writes the VARCHAR column, Hibernate
+--     ignores it on `ddl-auto=validate`, NOT NULL constraint relaxed
+--     so a stale replica / out-of-process INSERT does not block writes
+--     on the absent column. **Must have soaked one full release cycle**
+--     before this migration runs, so a rollback to the V88 release stays
+--     viable for the entire window (the writers are removed but the
+--     column is still present).
+--   * V89 (Phase 7 part 2, PR #134): NOT-NULL tightening on the
+--     squadron-FK UUID columns. Lives on a separate row of the migration
+--     train and is unrelated to the legacy VARCHAR — listed here only to
+--     document the slot ordering after the V87 -> V89 renumber.
+--   * V90 (this file, Phase 7 part 3): final DROP COLUMN.
+--
+-- Operation: a single `ALTER TABLE ... DROP COLUMN` against the
+-- `job_order` table. Postgres rewrites the table's row format on the
+-- spot (the column data is reclaimed by the next VACUUM); for a
+-- single-tenant prod with O(thousands) of job orders this is cheap.
+-- For very large tables the operation would still hold an ACCESS
+-- EXCLUSIVE lock for the duration of the statement; basetool is far
+-- below that threshold today so the simple form is fine.
+--
+-- Post-V90 invariants:
+--   * Hibernate `ddl-auto=validate` (project default) continues to
+--     pass: no entity references `squadron` on `JobOrder` anymore (V88
+--     removed the @Column field), so the absence of the DB column is
+--     simply not noticed.
+--   * REST contract: `JobOrderDto.squadron`, `JobOrderReferenceDto
+--     .squadron` and `CreateJobOrderDto.squadron` are gone from the
+--     wire shape on this release. The DTO wire-shape removal ships
+--     **together with** this migration so a /api/v1 client posting the
+--     legacy `squadron` field receives a 400 from Jackson's strict
+--     unknown-property handling (or a no-op if leniency is on),
+--     **not** silent data loss; clients that have already migrated to
+--     the typed `requestingSquadronId` UUID are unaffected.
+--
+-- Rollback: dropping a column is destructive — there is no automatic
+-- rollback to V89. If a rollback is required after V90 has applied,
+-- the operator must either restore from a backup taken before this
+-- migration or re-add the column manually + backfill it from
+-- `requesting_squadron_id` (LEFT JOIN squadron) before re-deploying a
+-- pre-V90 application release. The two-phase rule + Phase-6 backfill
+-- audit make rollback unnecessary in practice.
+
+ALTER TABLE job_order DROP COLUMN squadron;

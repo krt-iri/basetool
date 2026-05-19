@@ -97,7 +97,6 @@ class JobOrderControllerTest {
     return new JobOrderDto(
         id,
         1,
-        "DAS KARTELL",
         null,
         null,
         "alice",
@@ -114,8 +113,7 @@ class JobOrderControllerTest {
 
   @Test
   void createJobOrder_permitAll_neverConsultsJwtOrRoleHelper() {
-    CreateJobOrderDto request =
-        new CreateJobOrderDto("DAS KARTELL", null, null, "alice", List.of(), null);
+    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
@@ -193,8 +191,7 @@ class JobOrderControllerTest {
   @Test
   void lookupJobOrders_delegatesToServiceReferenceQuery() {
     JobOrderReferenceDto ref =
-        new JobOrderReferenceDto(
-            UUID.randomUUID(), 42, "DAS KARTELL", "alice", JobOrderStatus.OPEN, List.of());
+        new JobOrderReferenceDto(UUID.randomUUID(), 42, "alice", JobOrderStatus.OPEN, List.of());
     when(jobOrderService.findAllActiveReference()).thenReturn(List.of(ref));
 
     List<JobOrderReferenceDto> result = controller.lookupJobOrders();
@@ -283,8 +280,7 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto =
-        new CreateJobOrderDto("DAS KARTELL", null, null, "bob", List.of(), 1L);
+    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", List.of(), 1L);
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 
