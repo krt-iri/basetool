@@ -1,12 +1,17 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -123,8 +128,37 @@ public class AdminSettingsPageController {
     model.addAttribute("refineryRoundingVersion", refineryRoundingVersion);
     model.addAttribute("transferFeePercent", transferFeePercent.toPlainString());
     model.addAttribute("transferFeeVersion", transferFeeVersion);
+    model.addAttribute("squadrons", fetchSquadronsForPromotionToggle());
 
     return "admin-settings";
+  }
+
+  /**
+   * Loads every active squadron (alphabetical) for the "Beförderungssystem pro Staffel" toggle
+   * section on the admin-settings page. Inactive (soft-deleted) squadrons are filtered out — the
+   * admin re-activates them through the existing squadron CRUD before toggling features. A backend
+   * failure degrades to an empty list with a logged warning so the rest of the page still renders.
+   *
+   * @return active squadrons sorted by name, never {@code null}.
+   */
+  private List<SquadronDto> fetchSquadronsForPromotionToggle() {
+    try {
+      PageResponse<SquadronDto> page =
+          backendApiClient.get(
+              "/api/v1/squadrons?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<PageResponse<SquadronDto>>() {});
+      if (page == null || page.content() == null) {
+        return List.of();
+      }
+      return page.content().stream()
+          .sorted(
+              Comparator.comparing(
+                  s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+          .toList();
+    } catch (Exception e) {
+      log.warn("Could not fetch squadrons for admin-settings promotion toggle: {}", e.getMessage());
+      return List.of();
+    }
   }
 
   /**

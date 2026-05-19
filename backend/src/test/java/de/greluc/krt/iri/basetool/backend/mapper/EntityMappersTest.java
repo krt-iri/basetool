@@ -177,6 +177,7 @@ class EntityMappersTest {
     s.setShorthand("VAN");
     s.setDescription("Test squad");
     s.setActive(true);
+    s.setPromotionEnabled(false);
     s.setVersion(2L);
 
     // When
@@ -188,6 +189,10 @@ class EntityMappersTest {
     assertEquals("VAN", dto.shorthand());
     assertEquals("Test squad", dto.description());
     assertTrue(dto.active());
+    // toDto must mirror the per-squadron promotion-feature flag — the admin
+    // UI / sidebar visibility uses this value to decide whether the
+    // promotion menu is exposed to a non-admin caller.
+    assertFalse(dto.isPromotionEnabled());
     assertEquals(2L, dto.version());
   }
 
@@ -195,7 +200,7 @@ class EntityMappersTest {
   void squadronToEntity_shouldCopyScalars_butIgnoreActiveAndVersion() {
     // Given
     UUID id = UUID.randomUUID();
-    SquadronDto dto = new SquadronDto(id, "Alpha", "ALP", "First squad", true, 5L);
+    SquadronDto dto = new SquadronDto(id, "Alpha", "ALP", "First squad", true, true, 5L);
 
     // When
     Squadron s = EntityMappers.toEntity(dto);

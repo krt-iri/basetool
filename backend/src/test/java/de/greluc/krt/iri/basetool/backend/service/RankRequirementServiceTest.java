@@ -16,6 +16,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,6 +34,20 @@ class RankRequirementServiceTest {
   @Mock private PromotionCategoryRepository categoryRepository;
 
   @Mock private RankRequirementMapper mapper;
+
+  @Mock private SquadronScopeService squadronScopeService;
+
+  /**
+   * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
+   * "happy path" do not get short-circuited to empty by the new gate. {@code lenient()} keeps
+   * Mockito from failing tests that never trigger the gate.
+   */
+  @BeforeEach
+  void enablePromotionFeatureFlag() {
+    lenient()
+        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .thenReturn(true);
+  }
 
   @InjectMocks private RankRequirementService service;
 

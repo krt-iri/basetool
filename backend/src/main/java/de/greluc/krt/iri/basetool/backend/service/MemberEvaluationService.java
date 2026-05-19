@@ -48,18 +48,27 @@ public class MemberEvaluationService {
 
   /** Returns all evaluations for the given user (JWT-sub filtered – data isolation). */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByUserId(userId).stream().map(mapper::toResponse).toList();
   }
 
   /** Returns paginated evaluations for the given user. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull String userId, @NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAllByUserId(userId, pageable).map(mapper::toResponse);
   }
 
   /** Returns all evaluations (admin view, all users). */
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
@@ -73,6 +82,7 @@ public class MemberEvaluationService {
       @NotNull String userId,
       @NotNull UUID categoryId,
       @NotNull MemberEvaluationUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
             .findById(categoryId)
@@ -103,6 +113,7 @@ public class MemberEvaluationService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =
         repository
             .findById(id)

@@ -98,9 +98,109 @@
                 <button type="submit" class="btn mt-1" th:text="#{admin.settings.save}">Speichern</button>
             </form>
         </div>
+
+        <!--
+            Per-squadron promotion-feature toggle. Each row PATCHes the backend on click via
+            /api/proxy/squadrons/{id}/promotion-enabled — no full form submit so the admin can
+            flip several squadrons without a page reload. Flipping the flag does NOT delete any
+            promotion data; the menu just becomes hidden for the squadron's non-admin members
+            until the flag goes back to ON.
+        -->
+        <div class="data-section mt-2">
+            <h2 th:text="#{admin.settings.squadron.promotion}">Beförderungssystem pro Staffel</h2>
+            <p style="margin-bottom: 1rem; color: var(--color-gray-2);"
+               th:text="#{admin.settings.squadron.promotion.description}">Schaltet das gesamte Beförderungssystem (Themenbereiche, Bewertungen, Rangvoraussetzungen) für die Mitglieder einer Staffel an oder aus. Bestehende Daten bleiben beim Deaktivieren erhalten und werden beim Aktivieren wieder sichtbar.</p>
+
+            <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
+                 th:text="#{admin.settings.squadron.promotion.empty}">Keine Staffeln gefunden.</div>
+
+            <table th:unless="${#lists.isEmpty(squadrons)}" class="data-table" style="max-width: 600px;">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                        <th th:text="#{admin.settings.squadron.column.promotion}">Beförderung aktiv</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
+                        <td th:text="${squadron.shorthand}">IRI</td>
+                        <td th:text="${squadron.name}">IRIDIUM</td>
+                        <td>
+                            <label class="flex-gap-sm" style="cursor:pointer;">
+                                <input type="checkbox"
+                                       class="squadron-promotion-toggle"
+                                       th:attr="data-squadron-id=${squadron.id}"
+                                       th:checked="${squadron.isPromotionEnabled}">
+                                <span class="toggle-state-text" th:text="${squadron.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
+                            </label>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    /*
+     * Per-squadron promotion-feature toggle: PATCH /api/proxy/squadrons/{id}/promotion-enabled
+     * on every checkbox change. Optimistic UI — flips the label text immediately, reverts on
+     * error. CSP-safe (no inline onclick attributes) so the strict script-src-attr policy
+     * stays intact.
+     */
+    var MSG_ENABLED  = /*[[#{admin.settings.squadron.promotion.enabled}]]*/ 'aktiv';
+    var MSG_DISABLED = /*[[#{admin.settings.squadron.promotion.disabled}]]*/ 'inaktiv';
+    var MSG_ERROR    = /*[[#{admin.settings.squadron.promotion.error}]]*/ 'Speichern fehlgeschlagen';
+    var MSG_SAVED    = /*[[#{admin.settings.squadron.promotion.saved}]]*/ 'Gespeichert';
+
+    function csrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function csrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+    function patchPromotionEnabled(squadronId, enabled) {
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader()] = csrfToken();
+        return fetch('/api/proxy/squadrons/' + encodeURIComponent(squadronId) + '/promotion-enabled', {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ enabled: enabled })
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.squadron-promotion-toggle').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                var squadronId = checkbox.getAttribute('data-squadron-id');
+                var enabled = checkbox.checked;
+                var labelSpan = checkbox.parentElement ? checkbox.parentElement.querySelector('.toggle-state-text') : null;
+                if (labelSpan) {
+                    labelSpan.textContent = enabled ? MSG_ENABLED : MSG_DISABLED;
+                }
+                patchPromotionEnabled(squadronId, enabled).then(function (response) {
+                    if (!response.ok) {
+                        // Revert UI on error.
+                        checkbox.checked = !enabled;
+                        if (labelSpan) {
+                            labelSpan.textContent = !enabled ? MSG_ENABLED : MSG_DISABLED;
+                        }
+                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_ERROR);
+                    } else if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(MSG_SAVED);
+                    }
+                }).catch(function () {
+                    checkbox.checked = !enabled;
+                    if (labelSpan) {
+                        labelSpan.textContent = !enabled ? MSG_ENABLED : MSG_DISABLED;
+                    }
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_ERROR);
+                });
+            });
+        });
+    });
+    /*]]>*/
+</script>
 </body>
 </html>

@@ -53,6 +53,9 @@ public class RankRequirementService {
    * @return a page of rank requirements
    */
   public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
@@ -66,6 +69,9 @@ public class RankRequirementService {
    * @return the rank requirements applicable to that transition
    */
   public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     return repository.findAllByFromRankAndToRankOrderByIdAsc(fromRank, toRank).stream()
         .map(mapper::toResponse)
         .toList();
@@ -79,6 +85,7 @@ public class RankRequirementService {
    * @throws EntityNotFoundException if no rank requirement exists for that id
    */
   public RankRequirementResponse get(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -93,6 +100,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = mapper.toEntity(request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
@@ -128,6 +136,7 @@ public class RankRequirementService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
     assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
@@ -155,6 +164,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     RankRequirement entity = load(id);
     assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
     repository.delete(entity);

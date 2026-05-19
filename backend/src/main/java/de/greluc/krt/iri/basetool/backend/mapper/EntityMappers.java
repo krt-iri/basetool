@@ -71,7 +71,13 @@ public final class EntityMappers {
   /** Maps a {@link Squadron} entity to its outbound DTO. */
   public static SquadronDto toDto(Squadron s) {
     return new SquadronDto(
-        s.getId(), s.getName(), s.getShorthand(), s.getDescription(), s.isActive(), s.getVersion());
+        s.getId(),
+        s.getName(),
+        s.getShorthand(),
+        s.getDescription(),
+        s.isActive(),
+        s.isPromotionEnabled(),
+        s.getVersion());
   }
 
   /**

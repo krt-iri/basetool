@@ -9,7 +9,12 @@ import org.mapstruct.Mapping;
 /** MapStruct mapper between Squadron entities and DTOs. */
 @Mapper(componentModel = "spring")
 public interface SquadronMapper {
-  /** Maps a {@link Squadron} entity to its outbound DTO. */
+  /**
+   * Maps a {@link Squadron} entity to its outbound DTO. {@code isPromotionEnabled} is taken from
+   * the entity's {@code isPromotionEnabled} accessor and surfaces on the wire as a Boolean so the
+   * admin-settings page can render the per-squadron toggle without a second lookup.
+   */
+  @Mapping(target = "isPromotionEnabled", source = "promotionEnabled")
   SquadronDto toDto(Squadron entity);
 
   /**
@@ -22,9 +27,14 @@ public interface SquadronMapper {
 
   /**
    * Builds a new {@link Squadron} entity from the inbound DTO. Timestamps are owned by the
-   * persistence provider and ignored.
+   * persistence provider and ignored. {@code promotionEnabled} is intentionally NOT mapped from the
+   * DTO either: the flag is only mutable through the dedicated {@code PATCH
+   * /api/v1/squadrons/{id}/promotion-enabled} endpoint (see {@code
+   * SquadronService.setPromotionEnabled}) so an accidental description edit cannot flip the
+   * per-squadron toggle.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "promotionEnabled", ignore = true)
   Squadron toEntity(SquadronDto dto);
 }

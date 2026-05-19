@@ -39,7 +39,7 @@
                 </details>
                 <a th:href="@{/hangar}" th:text="#{nav.hangar}">Hangar</a>
                 <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory}">Persönliches Inventar</a>
-                <details class="sidebar-group">
+                <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/promotion/overview}" th:text="#{nav.promotion.overview}">Bef\u00f6rderungssystem</a>

@@ -15,6 +15,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,7 +32,22 @@ class PromotionCategoryServiceTest {
 
   @Mock private PromotionCategoryMapper mapper;
 
+  @Mock private SquadronScopeService squadronScopeService;
+
   @InjectMocks private PromotionCategoryService service;
+
+  /**
+   * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
+   * "happy path" don't get short-circuited to empty by the new gate. {@code lenient()} keeps
+   * Mockito from failing tests that never trigger the gate (e.g. the validation paths that throw
+   * before the gate check).
+   */
+  @BeforeEach
+  void enablePromotionFeatureFlag() {
+    lenient()
+        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .thenReturn(true);
+  }
 
   @Test
   void listAllByTopic_shouldReturnMappedCategories() {

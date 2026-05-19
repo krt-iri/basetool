@@ -15,10 +15,12 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /** Frontend controller for the promotion system pages. */
@@ -32,6 +34,26 @@ public class PromotionPageController {
   private final BackendApiClient backendApiClient;
 
   /**
+   * Throws {@link AccessDeniedException} when the per-squadron promotion-feature flag is off for
+   * the current caller, so every {@code @GetMapping} below short-circuits with HTTP 403 instead of
+   * rendering the page. The advisor-supplied flag (admin override + active-squadron lookup) is
+   * passed in as a {@link ModelAttribute} parameter so the controller does not duplicate the
+   * resolution logic that {@code SquadronContextAdvice.promotionFeatureEnabled} already runs once
+   * per request.
+   *
+   * @param enabled value of the {@code promotionFeatureEnabled} model attribute; {@code null} is
+   *     treated as enabled (mirrors the advisor's permissive default).
+   * @throws AccessDeniedException when {@code Boolean.FALSE.equals(enabled)} resolves true.
+   */
+  private static void requirePromotionFeature(Boolean enabled) {
+    if (Boolean.FALSE.equals(enabled)) {
+      throw new AccessDeniedException(
+          "Promotion feature is disabled for the caller's squadron; ask an administrator to"
+              + " re-enable it.");
+    }
+  }
+
+  /**
    * Schritt 5: Übersicht Beförderungssystem – öffentlich für alle eingeloggten Nutzer.
    *
    * <p>Reicht zusätzlich den aktuellen Rang des eingeloggten Nutzers (falls vorhanden) an das
@@ -42,7 +64,9 @@ public class PromotionPageController {
    * funktioniert weiterhin als reine Übersicht.
    */
   @GetMapping("/overview")
-  public String overview(Model model) {
+  public String overview(
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+    requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
     Map<String, List<PromotionLevelContentDto>> categoryContentMap = new LinkedHashMap<>();
@@ -90,7 +114,9 @@ public class PromotionPageController {
    * gegenüberstellen muss.
    */
   @GetMapping("/my-evaluations")
-  public String myEvaluations(Model model) {
+  public String myEvaluations(
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+    requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
     List<MemberEvaluationDto> myEvaluations = fetchMyEvaluations();
 
@@ -171,7 +197,9 @@ public class PromotionPageController {
    */
   @GetMapping("/manage")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
-  public String manage(Model model) {
+  public String manage(
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+    requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
     // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
     // per-topic map so the template can iterate row cells against the flat list and header
@@ -236,7 +264,9 @@ public class PromotionPageController {
   /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
   @GetMapping("/admin/topics")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
-  public String adminTopics(Model model) {
+  public String adminTopics(
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+    requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
     Map<String, List<PromotionLevelContentDto>> categoryContentMap = new LinkedHashMap<>();
@@ -265,7 +295,9 @@ public class PromotionPageController {
    */
   @GetMapping("/admin/rank-requirements")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
-  public String adminRankRequirements(Model model) {
+  public String adminRankRequirements(
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+    requirePromotionFeature(promotionFeatureEnabled);
     List<RankRequirementDto> requirements = fetchAllRankRequirements();
 
     Map<String, List<RankRequirementDto>> groupedRequirements = new LinkedHashMap<>();

@@ -128,7 +128,7 @@ class PromotionPageControllerTest {
         .thenReturn(null);
     Model model = new ConcurrentModel();
 
-    String view = controller.overview(model);
+    String view = controller.overview(true, model);
 
     assertEquals("promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());
@@ -160,7 +160,7 @@ class PromotionPageControllerTest {
         .thenReturn(member(UUID.randomUUID(), "officer", 19));
     Model model = new ConcurrentModel();
 
-    controller.overview(model);
+    controller.overview(true, model);
 
     Map<String, List<RankRequirementDto>> grouped =
         (Map<String, List<RankRequirementDto>>) model.getAttribute("groupedRankRequirements");
@@ -182,7 +182,7 @@ class PromotionPageControllerTest {
         .thenReturn(member(UUID.randomUUID(), "alice", 12));
     Model model = new ConcurrentModel();
 
-    controller.overview(model);
+    controller.overview(true, model);
 
     assertEquals(12, model.getAttribute("currentUserRank"));
   }
@@ -198,7 +198,7 @@ class PromotionPageControllerTest {
         .thenThrow(new RuntimeException("backend down"));
     Model model = new ConcurrentModel();
 
-    controller.overview(model);
+    controller.overview(true, model);
 
     assertNull(model.getAttribute("currentUserRank"));
   }
@@ -235,7 +235,7 @@ class PromotionPageControllerTest {
         .thenReturn(member(UUID.randomUUID(), "self", 20));
     Model model = new ConcurrentModel();
 
-    String view = controller.myEvaluations(model);
+    String view = controller.myEvaluations(true, model);
 
     assertEquals("promotion-my-evaluations", view);
     Map<String, MemberEvaluationDto> byCategory =
@@ -271,7 +271,7 @@ class PromotionPageControllerTest {
         .thenReturn(null);
     Model model = new ConcurrentModel();
 
-    controller.myEvaluations(model);
+    controller.myEvaluations(true, model);
 
     Map<String, String> required =
         (Map<String, String>) model.getAttribute("requiredLevelByCategory");
@@ -304,7 +304,7 @@ class PromotionPageControllerTest {
         .thenReturn(null);
     Model model = new ConcurrentModel();
 
-    controller.myEvaluations(model);
+    controller.myEvaluations(true, model);
 
     Map<String, String> required =
         (Map<String, String>) model.getAttribute("requiredLevelByCategory");
@@ -342,7 +342,7 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
-    String view = controller.manage(model);
+    String view = controller.manage(true, model);
 
     assertEquals("promotion-manage", view);
     List<PromotionCategoryDto> all = (List<PromotionCategoryDto>) model.getAttribute("categories");
@@ -367,7 +367,7 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
-    controller.manage(model);
+    controller.manage(true, model);
 
     Map<String, MemberEvaluationDto> map =
         (Map<String, MemberEvaluationDto>) model.getAttribute("evaluationMap");
@@ -400,7 +400,7 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
-    controller.manage(model);
+    controller.manage(true, model);
 
     Map<String, Instant> last = (Map<String, Instant>) model.getAttribute("lastEvaluatedByUser");
     assertEquals(t3, last.get("u1"), "max(updatedAt) across the user's evaluations");
@@ -449,7 +449,7 @@ class PromotionPageControllerTest {
         .thenReturn(List.of(elig2));
     Model model = new ConcurrentModel();
 
-    controller.manage(model);
+    controller.manage(true, model);
 
     Map<String, List<PromotionEligibilityDto>> byUser =
         (Map<String, List<PromotionEligibilityDto>>) model.getAttribute("eligibilityByUser");
@@ -475,7 +475,7 @@ class PromotionPageControllerTest {
         .thenReturn(null);
     Model model = new ConcurrentModel();
 
-    controller.manage(model);
+    controller.manage(true, model);
 
     assertTrue(((Map<?, ?>) model.getAttribute("eligibilityByUser")).isEmpty());
     assertTrue(((List<?>) model.getAttribute("members")).isEmpty());
@@ -509,7 +509,7 @@ class PromotionPageControllerTest {
         .thenReturn(List.of(lc));
     Model model = new ConcurrentModel();
 
-    String view = controller.adminTopics(model);
+    String view = controller.adminTopics(true, model);
 
     assertEquals("promotion-admin-topics", view);
     Map<String, List<PromotionCategoryDto>> topicCats =
@@ -548,7 +548,7 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(c), 0, 1000, 1, 1, List.of()));
     Model model = new ConcurrentModel();
 
-    String view = controller.adminRankRequirements(model);
+    String view = controller.adminRankRequirements(true, model);
 
     assertEquals("promotion-admin-rank-requirements", view);
     Map<String, List<RankRequirementDto>> grouped =
@@ -573,7 +573,7 @@ class PromotionPageControllerTest {
         .thenThrow(new RuntimeException("backend explosion"));
     Model model = new ConcurrentModel();
 
-    String view = controller.overview(model);
+    String view = controller.overview(true, model);
 
     assertEquals("promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());

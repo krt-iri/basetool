@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.MemberEvaluation;
@@ -18,6 +19,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RankRequirementRepository;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,6 +36,20 @@ class PromotionEligibilityServiceTest {
 
   @Mock private RankRequirementRepository rankRequirementRepository;
   @Mock private MemberEvaluationRepository memberEvaluationRepository;
+
+  @Mock private SquadronScopeService squadronScopeService;
+
+  /**
+   * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
+   * "happy path" do not get short-circuited to empty by the new gate. {@code lenient()} keeps
+   * Mockito from failing tests that never trigger the gate.
+   */
+  @BeforeEach
+  void enablePromotionFeatureFlag() {
+    lenient()
+        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .thenReturn(true);
+  }
 
   @InjectMocks private PromotionEligibilityService service;
 

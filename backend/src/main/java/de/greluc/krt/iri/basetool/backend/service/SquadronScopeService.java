@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -281,6 +282,47 @@ public class SquadronScopeService {
         .findById(shipId)
         .map(s -> s.getOwningSquadron() == null || canEditSquadron(s.getOwningSquadron().getId()))
         .orElse(false);
+  }
+
+  /**
+   * Reports whether the per-squadron promotion-system feature flag is on for the caller's scope.
+   *
+   * <p>Resolution rules:
+   *
+   * <ul>
+   *   <li>Admin — always {@code true}; admins must retain access regardless of the flag so they can
+   *       re-enable a squadron that locked itself out and pick up exactly where it left off.
+   *   <li>Caller has an effective squadron — returns the flag stored on that squadron's row.
+   *   <li>Caller has no effective squadron (unauthenticated / member without squadron) — {@code
+   *       true}, since the squadron-scope filter already returns empty lists for them and there is
+   *       no concrete squadron whose flag would apply.
+   * </ul>
+   *
+   * @return {@code true} when the promotion menu may be exposed for the caller, {@code false} when
+   *     a non-admin caller's home squadron has the feature disabled.
+   */
+  public boolean isPromotionFeatureEnabledForCurrentScope() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    return currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
+  }
+
+  /**
+   * Throws {@link AccessDeniedException} when the per-squadron promotion-system feature flag is off
+   * for the caller's scope. Admins bypass the check (see {@link
+   * #isPromotionFeatureEnabledForCurrentScope()} for the resolution rules). Used at the top of
+   * every promotion write-service method to short-circuit the request with HTTP 403 before any
+   * mutation runs.
+   *
+   * @throws AccessDeniedException if a non-admin caller's home squadron has the flag disabled.
+   */
+  public void assertPromotionFeatureEnabled() {
+    if (!isPromotionFeatureEnabledForCurrentScope()) {
+      throw new AccessDeniedException(
+          "Promotion feature is disabled for the caller's squadron; ask an administrator to"
+              + " re-enable it.");
+    }
   }
 
   @NotNull

@@ -94,7 +94,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
     when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
         .thenReturn(
             new PageResponse<>(
-                List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, 0L)),
+                List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, 0L)),
                 0,
                 1000,
                 1,

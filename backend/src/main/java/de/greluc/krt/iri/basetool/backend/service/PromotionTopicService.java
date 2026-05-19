@@ -58,6 +58,9 @@ public class PromotionTopicService {
    * @return a page of promotion topics
    */
   public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return Page.empty(pageable);
+    }
     UUID scope = squadronScopeService.currentSquadronId().orElse(null);
     return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
@@ -70,6 +73,9 @@ public class PromotionTopicService {
    * @return visible topics in display order
    */
   public List<PromotionTopicResponse> listAll() {
+    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+      return List.of();
+    }
     UUID scope = squadronScopeService.currentSquadronId().orElse(null);
     return repository.findAllScoped(scope).stream().map(mapper::toResponse).toList();
   }
@@ -87,6 +93,7 @@ public class PromotionTopicService {
   public PromotionTopicResponse get(@NotNull UUID id) {
     PromotionTopic entity = load(id);
     assertCallerMayAccess(entity);
+    squadronScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(entity);
   }
 
@@ -103,6 +110,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     Squadron squadron =
         squadronScopeService
             .currentSquadron()
@@ -143,6 +151,7 @@ public class PromotionTopicService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     if (!entity.getVersion().equals(request.version())) {
@@ -165,6 +174,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
+    squadronScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     repository.delete(entity);

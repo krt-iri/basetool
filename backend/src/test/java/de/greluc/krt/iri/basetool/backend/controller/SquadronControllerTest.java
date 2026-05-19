@@ -39,7 +39,7 @@ class SquadronControllerTest {
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
     // Given
     Squadron entity = new Squadron();
-    SquadronDto dto = new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, 1L);
+    SquadronDto dto = new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, true, 1L);
     Page<Squadron> servicePage = new PageImpl<>(List.of(entity));
     when(service.getAllSquadrons(any(Pageable.class), eq(false))).thenReturn(servicePage);
     when(mapper.toDto(entity)).thenReturn(dto);
@@ -80,10 +80,11 @@ class SquadronControllerTest {
 
   @Test
   void create_roundTripsDtoToEntityViaMapperAndBack() {
-    SquadronDto request = new SquadronDto(null, "Bravo", "BRV", "Test", true, null);
+    SquadronDto request = new SquadronDto(null, "Bravo", "BRV", "Test", true, true, null);
     Squadron entity = new Squadron();
     Squadron persisted = new Squadron();
-    SquadronDto response = new SquadronDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, 1L);
+    SquadronDto response =
+        new SquadronDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, true, 1L);
 
     when(mapper.toEntity(request)).thenReturn(entity);
     when(service.createSquadron(entity)).thenReturn(persisted);
@@ -100,9 +101,9 @@ class SquadronControllerTest {
     // Given — note: SquadronController.updateSquadron forwards the DTO
     // (not a mapped entity) to the service. Documents the actual contract.
     UUID id = UUID.randomUUID();
-    SquadronDto request = new SquadronDto(id, "Renamed", "REN", "Test", true, 4L);
+    SquadronDto request = new SquadronDto(id, "Renamed", "REN", "Test", true, true, 4L);
     Squadron persisted = new Squadron();
-    SquadronDto response = new SquadronDto(id, "Renamed", "REN", "Test", true, 5L);
+    SquadronDto response = new SquadronDto(id, "Renamed", "REN", "Test", true, true, 5L);
 
     when(service.updateSquadron(id, request)).thenReturn(persisted);
     when(mapper.toDto(persisted)).thenReturn(response);

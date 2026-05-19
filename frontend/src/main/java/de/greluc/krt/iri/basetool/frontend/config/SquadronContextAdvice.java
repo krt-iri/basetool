@@ -196,6 +196,35 @@ public class SquadronContextAdvice {
   }
 
   /**
+   * Computes whether the promotion subsystem is exposed to the current caller. Admins always see
+   * the menu (regardless of the per-squadron flag) so they can re-enable a squadron that locked
+   * itself out; for everyone else the flag stored on {@link SquadronDto#isPromotionEnabled()} of
+   * their active squadron decides. {@code null} active squadron (anonymous caller, member without
+   * squadron) defaults to {@code true} — the squadron-scope filter in the backend already returns
+   * empty lists for them so a hidden menu would be redundant and inconsistent with the rest of the
+   * sidebar.
+   *
+   * <p>The sidebar's {@code Beförderung} section reads this attribute via {@code
+   * th:if="${promotionFeatureEnabled}"}, and every {@code PromotionPageController} {@code
+   * GetMapping} blocks the request with HTTP 403 when it resolves to {@code false}.
+   *
+   * @param activeSquadron previously-resolved squadron mini-record, or {@code null}.
+   * @return {@code true} when the promotion menu should be exposed; {@code false} when it must be
+   *     hidden / blocked.
+   */
+  @ModelAttribute("promotionFeatureEnabled")
+  public boolean promotionFeatureEnabled(
+      @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    if (activeSquadron == null || activeSquadron.isPromotionEnabled() == null) {
+      return true;
+    }
+    return activeSquadron.isPromotionEnabled();
+  }
+
+  /**
    * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after
    * the squadron change lands the user on the same page they were on. We resolve it via a model
    * attribute rather than the Thymeleaf {@code #httpServletRequest} utility because the latter is
