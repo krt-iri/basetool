@@ -1,5 +1,5 @@
 name: Feature Request
-description: Ein neues Feature oder eine Erweiterung vorschlagen.
+description: Propose a new feature or enhancement.
 title: "[Feature] "
 labels:
   - enhancement
@@ -10,8 +10,8 @@ body:
     attributes:
       label: Problem / Use Case
       description: >-
-        Welches Problem löst das Feature? Wer profitiert davon?
-        Welche Rolle (ADMIN / OFFICER / LOGISTICIAN / MISSION_MANAGER /
+        Which problem does this feature solve? Who benefits from it?
+        Which role (ADMIN / OFFICER / LOGISTICIAN / MISSION_MANAGER /
         SQUADRON_MEMBER / GUEST)?
     validations:
       required: true
@@ -19,72 +19,72 @@ body:
   - type: textarea
     id: proposal
     attributes:
-      label: Vorgeschlagene Lösung
+      label: Proposed Solution
       description: >-
-        Wie könnte das Feature aussehen? UI-Skizze, API-Shape, Workflow —
-        was immer hilft, das Endbild zu schärfen.
+        What could the feature look like? UI sketch, API shape, workflow —
+        whatever helps sharpen the end picture.
     validations:
       required: true
 
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternativen / Workarounds
+      label: Alternatives / Workarounds
       description: >-
-        Was wäre die Lösung ohne dieses Feature? Welche Alternativen
-        wurden verworfen und warum?
+        What would the solution be without this feature? Which alternatives
+        were rejected, and why?
 
   - type: dropdown
     id: area
     attributes:
-      label: Betroffener Bereich
+      label: Affected Area
       multiple: true
       options:
         - Backend (REST API / Service / Repository)
         - Frontend (Thymeleaf / Controller / JS)
-        - Datenbank / Flyway-Migration
-        - Security / OIDC / Keycloak / Rollen
-        - UEX-Integration
+        - Database / Flyway migration
+        - Security / OIDC / Keycloak / Roles
+        - UEX integration
         - Hangar / Inventory / Refinery
         - Mission Planning / Operations
-        - Inventar / Bestand
-        - i18n / UI-Texte / Styleguide
+        - Inventory / Stock
+        - i18n / UI strings / Styleguide
         - Build / Gradle / CI
         - Docker / Compose / Stack
-        - Sonstiges
+        - Other
     validations:
       required: true
 
   - type: checkboxes
     id: scope
     attributes:
-      label: Implementierungsumfang (zur Erinnerung)
-      description: Bitte abhaken, was bei der Umsetzung mitgedacht werden muss.
+      label: Implementation Scope (reminder)
+      description: Please tick what needs to be considered during implementation.
       options:
-        - label: Erfordert eine Flyway-Migration (V<n>__<desc>.sql)
-        - label: Erfordert neue/geänderte Rollen-Logik (`@PreAuthorize`, `app_user`-Flags)
-        - label: Erfordert Multi-User-Datenisolation (Filter nach JWT-`sub`)
-        - label: Hat eine UI-Komponente (Responsive-Check Smartphone/Tablet/Desktop/Ultra-wide nötig)
-        - label: Führt neue user-sichtbare Strings ein (i18n-Keys in de + en + Fallback)
-        - label: Erfordert einen Eintrag in `CHANGELOG.md` unter `[Unreleased]`
-        - label: Erfordert OpenAPI-Updates (`openapi.json` + SpringDoc-Annotationen)
-        - label: Erfordert Resilience4j-Konfiguration für neue Backend-Calls
+        - label: Requires a Flyway migration (V<n>__<desc>.sql)
+        - label: Requires new/changed role logic (`@PreAuthorize`, `app_user` flags)
+        - label: Requires multi-user data isolation (filter by JWT `sub`)
+        - label: Has a UI component (responsive check on Smartphone/Tablet/Desktop/Ultra-wide required)
+        - label: Introduces new user-visible strings (i18n keys in de + en + fallback)
+        - label: Requires an entry in `CHANGELOG.md` under `[Unreleased]`
+        - label: Requires OpenAPI updates (`openapi.json` + SpringDoc annotations)
+        - label: Requires Resilience4j configuration for new backend calls
 
   - type: textarea
     id: acceptance
     attributes:
-      label: Akzeptanzkriterien
-      description: Woran erkennen wir, dass das Feature "fertig" ist?
+      label: Acceptance Criteria
+      description: How do we know the feature is "done"?
       value: |
         - [ ]
-        - [ ] Tests vorhanden (Unit + ggf. MVC-/Integrations-Test)
-        - [ ] `./gradlew check` läuft grün
-        - [ ] CHANGELOG-Eintrag vorhanden
+        - [ ] Tests in place (unit + MVC/integration test if applicable)
+        - [ ] `./gradlew check` passes green
+        - [ ] CHANGELOG entry added
 
   - type: checkboxes
     id: confirm
     attributes:
       label: Self-Check
       options:
-        - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
+        - label: I have searched open and closed issues for duplicates.
           required: true

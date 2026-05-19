@@ -1,5 +1,5 @@
 name: Task / Refactor / Chore
-description: Eine technische Aufgabe ohne direkte User-Sichtbarkeit (Refactor, Tech-Debt, Build, Dependency, Doku).
+description: A technical task without direct user visibility (refactor, tech debt, build, dependency, docs).
 title: "[Task] "
 labels:
   - task
@@ -8,11 +8,10 @@ body:
   - type: textarea
     id: context
     attributes:
-      label: Kontext / Motivation
+      label: Context / Motivation
       description: >-
-        Warum ist diese Aufgabe sinnvoll? Welcher Schmerz, welches Risiko
-        oder welcher Nutzen ist damit verbunden? Falls vorhanden: Link auf
-        den auslösenden Bug / Issue / PR.
+        Why is this task worthwhile? Which pain, risk, or benefit is
+        attached to it? If available: link to the triggering bug / issue / PR.
     validations:
       required: true
 
@@ -21,41 +20,41 @@ body:
     attributes:
       label: Scope
       description: >-
-        Was genau soll passieren? Wo? Welche Module, Pakete oder Dateien
-        sind betroffen? Was ist explizit NICHT Teil dieser Aufgabe?
+        What exactly should happen? Where? Which modules, packages, or files
+        are affected? What is explicitly NOT part of this task?
     validations:
       required: true
 
   - type: dropdown
     id: kind
     attributes:
-      label: Art der Aufgabe
+      label: Type of Task
       options:
         - Refactor
-        - Tech-Debt
-        - Dependency-Upgrade (versions.properties / libs.versions.toml)
+        - Tech debt
+        - Dependency upgrade (versions.properties / libs.versions.toml)
         - Build / CI / GitHub Actions
-        - Doku (CLAUDE.md / README / CHANGELOG / Javadoc)
-        - Test-Coverage / Test-Infrastruktur
+        - Docs (CLAUDE.md / README / CHANGELOG / Javadoc)
+        - Test coverage / test infrastructure
         - Performance
-        - Sonstiges
+        - Other
     validations:
       required: true
 
   - type: textarea
     id: acceptance
     attributes:
-      label: Akzeptanzkriterien
-      description: Was muss zutreffen, damit die Aufgabe als abgeschlossen gilt?
+      label: Acceptance Criteria
+      description: What must hold true for the task to count as done?
       value: |
         - [ ]
-        - [ ] `./gradlew check` läuft grün (Checkstyle, SpotBugs, Tests)
-        - [ ] Keine neuen Lint-Warnungen im geänderten Code
+        - [ ] `./gradlew check` passes green (Checkstyle, SpotBugs, tests)
+        - [ ] No new lint warnings in the changed code
 
   - type: checkboxes
     id: confirm
     attributes:
       label: Self-Check
       options:
-        - label: Ich habe in offenen und geschlossenen Issues nach Duplikaten gesucht.
+        - label: I have searched open and closed issues for duplicates.
           required: true
