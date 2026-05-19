@@ -51,6 +51,8 @@ don't use "tests pass" as a stand-in.
 - [ ] `CHANGELOG.md` has been updated under `## [Unreleased]` (correct category: Added / Changed / Fixed / Removed / Security).
 - [ ] Related issues are linked (`closes #...`, `refs #...`).
 - [ ] No real secrets, tokens, passwords, keystores, or personal data in the diff.
+- [ ] I have signed the [Contributor License Agreement](../CLA.md) (one-time; see [`docs/cla-signatures.md`](../docs/cla-signatures.md) or the CLA-Assistant flow).
+- [ ] **Every** commit in this PR carries a `Signed-off-by:` trailer (DCO via `git commit -s`; see [CONTRIBUTING.md](../CONTRIBUTING.md#developer-certificate-of-origin-dco-sign-off)).
 
 ### Code Quality
 
