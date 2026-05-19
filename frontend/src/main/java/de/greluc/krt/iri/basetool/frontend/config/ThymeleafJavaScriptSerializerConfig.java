@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.io.SerializedString;
@@ -94,6 +95,13 @@ public class ThymeleafJavaScriptSerializerConfig {
       m.registerModule(new JavaTimeModule());
       m.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
       m.getFactory().setCharacterEscapes(new ThymeleafCompatibleEscapes());
+      // Jackson's writeValue(Writer, ...) closes the writer by default when AUTO_CLOSE_TARGET
+      // is on. Thymeleaf shares ONE writer across the entire template render, so closing it
+      // after an inline expression silently truncates everything that follows in the same
+      // <script> block (including the event-handler registration at the bottom of the
+      // promotion-admin-rank-requirements template). Disabling the feature keeps the writer
+      // open so Thymeleaf can continue emitting the rest of the page after the JSON island.
+      m.getFactory().disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
       this.mapper = m;
       // Reuse Thymeleaf's stock Jackson-backed serializer for the primitive path so that
       // pure-String
