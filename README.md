@@ -246,7 +246,7 @@ operations boards), but everything else respects the strict squadron
 filter.
 
 What is **deferred** to a follow-up release: the tightening migrations
-`V86`–`V88` (`SET NOT NULL` on the new columns, then the
+`V87`–`V89` (`SET NOT NULL` on the new columns, then the
 two-phase drop of the legacy `job_order.squadron` VARCHAR) per the
 two-phase rule. They intentionally do not ship in the same release as
 `V80`–`V85`, so a rollback to single-tenant remains possible during
