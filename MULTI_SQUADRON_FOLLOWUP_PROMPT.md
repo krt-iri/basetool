@@ -18,8 +18,10 @@ full matrix, JobOrderHandover cross-squadron positive + negative,
 JobOrder creatingSquadron immutability). What remains in scope of
 this release: backend filter parameters for the "Nur eigene Staffel"
 toggle on `missions.html` and `orders-index.html` + the manual
-dev-stack smoke boot. The V86–V88 migration chain is intentionally
-deferred to the next release per the two-phase drop rule.
+dev-stack smoke boot. The `V88`/`V89`/`V90` Phase-7 migration
+chain (originally `V87`/`V88`/`V89`; renumbered after `V88`'s
+solo-deploy via PR #132) is intentionally deferred to follow-up
+releases per the two-phase drop rule.
 
 Most recent commits (newest first):
 
@@ -55,7 +57,7 @@ eff9a75 G  feat(multi-tenant): squadron-aware auth helpers and switcher endpoint
 
 ### What is already in place
 
-- **Data model:** Flyway V80–V83 (IRIDIUM seed at canonical UUID `00000000-0000-0000-0000-000000000001`; `app_user.squadron_id`; `owning_squadron_id` on `mission`/`operation`/`ship`/`inventory_item`/`refinery_order`; `job_order.creating_squadron_id` + `requesting_squadron_id`). All new columns nullable in this release; `V86`–`V88` for NOT NULL tightening + legacy `job_order.squadron` VARCHAR drop are deferred to a follow-up release per the two-phase rule.
+- **Data model:** Flyway V80–V83 (IRIDIUM seed at canonical UUID `00000000-0000-0000-0000-000000000001`; `app_user.squadron_id`; `owning_squadron_id` on `mission`/`operation`/`ship`/`inventory_item`/`refinery_order`; `job_order.creating_squadron_id` + `requesting_squadron_id`). All new columns nullable in this release; `V88` (legacy `job_order.squadron` stop-write) shipped solo via PR #132, `V89` (NOT NULL tightening) is the in-flight Phase 7 Part 2, and `V90` (legacy column DROP) is deferred a release further per the two-phase rule. The chain was originally numbered `V87`/`V88`/`V89` and renumbered after the V88 solo-deploy.
 - **Authorization layer:** [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) with `currentSquadronId()` / `currentSquadron()` / `canSee*` / `canEdit*` for every staffel-scoped aggregate. [`AuthHelperService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/AuthHelperService.java) gains `currentUserId()` + `isAdmin()`. [`MeController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MeController.java) exposes `/api/v1/me/active-squadron` (GET/PUT/DELETE, PUT/DELETE admin-only). [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/MeFrontendController.java) proxies the POST from browser.
 - **Service / repository filtering:** Mission (`searchMissions` with the `owning = :ctx OR is_internal = false` clause), Inventory direct (`findGlobalByFilters` + `getAggregatedInventory` with `owningSquadronId`), Refinery (`findAllScoped` / `findByStatusInScoped`), Operation (`findAllScoped`), Hangar (`findAllScoped` + `countShipsByType`). All create paths stamp the squadron from the entity owner (Ship / InventoryItem / RefineryOrder) or from `SquadronScopeService.currentSquadron()` (Operation, sub-Mission). Job Order stamps `creatingSquadron` (immutable) + `requestingSquadron` (editable) and keeps the legacy `squadron VARCHAR` mirrored.
 - **`@PreAuthorize` on detail views:** `MissionController.GET /{id}` → `canSeeMission(#id)`. `InventoryItemController` PUT `/{id}`, PATCH `/{id}/delivered`, PUT `/{id}/note` → `canEditInventoryItem(#id)`. `RefineryOrderController` GET/PUT/DELETE `/{id}` → `canSee/canEditRefineryOrder(#id)`. `OperationController` GET `/{id}` → `canSeeOperation(#id)`; PUT combines `hasRole('MISSION_MANAGER')` with `canEditOperation(#id)`. Job-Order endpoints stay rollenbasiert (cross-staffel workspace).
@@ -79,12 +81,12 @@ Checkstyle and SpotBugs are clean on both modules.
 | :--- | :--- | :--- |
 | **Frontend UI** (Phase 5) | ⚠️ | **Mostly done in `1e35484` + `b247405`.** Live: persistent squadron-context chip top-right for every authenticated user; admin-only sidebar switcher dropdown wired through `MeFrontendController` (auto-submits on change, `<noscript>` fallback); owning-squadron column on `missions.html` / `hangar.html` / `refinery-orders-index.html` / `inventory-admin.html` (nested table) gated on `isAllSquadronsMode`; "all-squadrons aggregation" notice on `inventory-index.html` + `hangar-squadron.html` for the per-material / per-ship-type aggregations that can't carry a per-row column; dual squadron badges (Auftraggeber + Erstellt durch) on `orders-detail.html` + `orders-index.html` with the second badge muted when the two squadrons match, brand-yellow `squadron-badge-foreign` when they differ; the JobOrder edit modal shows the immutable `creatingSquadron` as a read-only chip next to the editable `requestingSquadron` dropdown; the AJAX per-material inventory table in `orders-detail.html` renders each item's owning squadron and applies the `inventory-row-foreign-jobOrder` border marker when the item's squadron differs from the order's requesting squadron; `SquadronContextAdvice` injects `activeSquadronId` / `activeSquadron` / `availableSquadrons` / `isAllSquadronsMode` / `currentRequestUri` model attributes on every page; CSS in `styles.css` covers the chip, switcher (44 px touch target), badge variants and the foreign-row marker. **Still open:** (a) "Nur eigene Staffel" filter toggle on `missions.html` — needs a one-line `ownSquadronOnly` param on `MissionRepository.searchMissions` that overrides the default `is_internal = false` escape clause; (b) "Nur eigene Staffel" filter toggle on `orders-index.html` — needs a `squadronFilter=own\|all` param on the orders list endpoint that matches `creating OR requesting = userSquadron`; (c) responsive verification on smartphone / tablet / desktop / ultra-wide breakpoints (needs a browser session); (d) optional `app.title` generic-with-suffix — the context chip already serves this purpose, revisit if user feedback asks for it. |
 | **Frontend DTO mirror records** (Phase 3 follow-up) | ✅ | Done in `0bc7b4c`. `SquadronReferenceDto` (id + name + shorthand) exists on both sides; `MissionListDto`, `JobOrderDto`, `InventoryItemDto`, `RefineryOrderDto`, `OperationDto`, `ShipDto` expose the owning/creating/requesting squadron via this mini-record; MapStruct wires it through `SquadronMapper.toReferenceDto` plus the `uses` chain on the six affected mappers. `openapi.json` regenerated. |
-| **JobOrderHandover cross-squadron guard** (Phase 3 follow-up) | ✅ | The InventoryItem-belongs-to-order guard lives in `JobOrderHandoverService.createHandover` and is exercised by `JobOrderHandoverServiceTest.createHandover_shouldThrowException_whenItemDoesNotBelongToOrder` + `…whenJobOrderIsNullOnInventoryItem`. The audit-trail columns (`executing_user_id`, `executing_squadron_id`) **shipped as V84** in `4c509f9` — the audit migration takes the V84 slot so it lands before Phase 7's V86-V88 cleanup chain (Flyway `out-of-order=false`). `JobOrderHandoverService` is intentionally NOT in the `ArchitectureTest` staffel-scoped whitelist; the comment at lines 542-554 documents that Job Orders are a cross-staffel workspace by design. |
+| **JobOrderHandover cross-squadron guard** (Phase 3 follow-up) | ✅ | The InventoryItem-belongs-to-order guard lives in `JobOrderHandoverService.createHandover` and is exercised by `JobOrderHandoverServiceTest.createHandover_shouldThrowException_whenItemDoesNotBelongToOrder` + `…whenJobOrderIsNullOnInventoryItem`. The audit-trail columns (`executing_user_id`, `executing_squadron_id`) **shipped as V84** in `4c509f9` — the audit migration takes the V84 slot so it lands before Phase 7's `V88`/`V89`/`V90` cleanup chain (Flyway `out-of-order=false`). `JobOrderHandoverService` is intentionally NOT in the `ArchitectureTest` staffel-scoped whitelist; the comment at lines 542-554 documents that Job Orders are a cross-staffel workspace by design. |
 | **Test-fixture cleanup (15 failures)** | ✅ | Done in `4b190cc`. `./gradlew :backend:test :frontend:test` is fully green again. |
 | **Cross-squadron positive test matrix** (Phase 6) | ✅ | `SquadronScopeServiceTest` (`6842f71`, 437 lines, 27 tests) covers currentSquadronId per role, canSee/canEdit for every aggregate, the Mission `is_internal=false` cross-staffel escape, and the admin/member distinction. `JobOrderHandoverServiceTest.createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron` (`c00581c`) pins the cross-staffel-workspace handover contract. `JobOrderServiceTest.updateJobOrder_ShouldNotModifyCreatingSquadron_WhenRequestingSquadronChanges` (`c00581c`) pins the dual-squadron immutability. The remaining repository-level SQL tests (MissionRepository `is_internal` cross-staffel positive case at the JPA layer, JobOrder cross-staffel read+edit through the controller stack) would need either `@SpringBootTest` + the existing Postgres test profile or a `@DataJpaTest` slice; they are flagged as "nice to have" but not blocking the release, since the Mockito tests pin the service-layer contracts and the service is the only legitimate caller. |
 | **`ROLES_AND_PERMISSIONS.md` full matrix rewrite** | ✅ | Done in `fc7c918`. Notice updated to reflect the post-Phase-4 audit completion; the inert `USER_MANAGE` authority on OFFICER is called out; a new sixth bullet describes the multi-squadron visibility model. The endpoint matrix was verified against every `@PreAuthorize` annotation in the backend controllers and lines up with the implementation. |
 | **`README.md` multi-tenant section** | ✅ | Done in `fc7c918`. New §3.4 "Multi-squadron rollout" between Deployment and Development & Testing. |
-| **Phase 7 migrations `V87`–`V89`** | ❌ | Intentionally deferred. Only land them after at least one production deploy of V80–V86 (two-phase drop rule in `db/migration/README.md`). `V87` tightens NOT NULL on `app_user.squadron_id`, `owning_squadron_id` on the 5 aggregates + `promotion_topic`, and `creating_squadron_id` + `requesting_squadron_id` on `job_order`. `V88` removes the legacy `squadron` field from the JPA `JobOrder` entity and relaxes the NOT NULL on the column. `V89` drops the column. Do NOT do this yet — flag it as a separate PR after the next prod release. The handover audit columns (`executing_user_id`, `executing_squadron_id`) shipped as V84, the promotion-topic squadron column as V85 and the per-squadron promotion toggle as V86 in this release, so they are NOT part of the Phase 7 train. |
+| **Phase 7 migrations `V88`/`V89`/`V90`** | ⚠️ | Originally planned as the `V87`/`V88`/`V89` chain; renumbered to `V88`/`V89`/`V90` after the solo-deploy of Part 1 (`V88`, PR #132). Part 1 `V88` ships the stop-write of the legacy `job_order.squadron` VARCHAR (removes the entity field + relaxes the NOT NULL on the column) — **already in Prod** as of `a00e5c8`. Part 2 `V89` tightens NOT NULL on `owning_squadron_id` (5 aggregates + `promotion_topic`) and `creating_squadron_id` + `requesting_squadron_id` (`job_order`) — in flight on `claude/phase-7-part-2`. Part 3 `V90` drops the legacy `squadron` column entirely — deferred to the release **after** V89, per the two-phase drop rule. The handover audit columns (`executing_user_id`, `executing_squadron_id`) shipped as V84, the promotion-topic squadron column as V85 and the per-squadron promotion toggle as V86 in this release, so they are NOT part of the Phase 7 train. |
 
 ### Constraints the new session must obey (do not rediscover the hard way)
 
@@ -144,14 +146,16 @@ tests are all closed. What remains:
    JobOrder cross-staffel read + edit positive cases. Use the existing
    Postgres test profile, not H2; `@SpringBootTest` + `@Transactional`
    gives the cleanest fixture isolation.
-4. **PR open with the full branch.** Do NOT include the `V86`–`V88`
-   migrations yet.
+4. **PR open with the full branch.** Do NOT include the
+   `V89`/`V90` Phase-7 migrations yet (they ship in their own PRs;
+   `V88` has already shipped solo via PR #132).
 
-The follow-on V86–V88 migration train should bundle the NOT-NULL
-tightening, the legacy `job_order.squadron` two-phase drop, and the
-JobOrderHandover executing-user / executing-squadron audit columns
-into the same release iteration so the schema change happens once
-end-to-end.
+The follow-on Phase-7 migration train (`V88` already in Prod, `V89`
+NOT-NULL tightening in flight, `V90` legacy `job_order.squadron`
+DROP COLUMN to follow) was originally `V87`/`V88`/`V89` but was
+renumbered after V88's solo-deploy. The JobOrderHandover
+executing-user / executing-squadron audit columns shipped earlier
+as V84 and are not part of this train.
 
 ### Files you'll touch most often
 
@@ -175,7 +179,7 @@ end-to-end.
 - [x] `ROLES_AND_PERMISSIONS.md` matrix matches what the controllers actually enforce.
 - [x] `README.md` has the multi-tenant section.
 - [x] All commits on `MULTI_SQUADRON` are signed (`git log --pretty=format:'%h %G?' main..HEAD` shows `G` everywhere).
-- [x] `V86`–`V88` are still NOT in the branch (intentional — they ship in the next release iteration).
+- [x] `V89`/`V90` Phase-7 migrations are still NOT in this branch (intentional — they ship in dedicated follow-up PRs; `V88` has already shipped solo via PR #132).
 
 ---
 
@@ -198,8 +202,9 @@ persistent context badge, owning-squadron columns on the list pages,
 dual badges on Job Order, foreign-squadron markers on inventory rows,
 and the generic `app.title` with active-squadron suffix. The remaining
 follow-up details (cross-squadron repository / integration tests, the
-`V86-V88` tightening + legacy-VARCHAR-drop chain + the
-`JobOrderHandover` audit-trail columns bundled with it) are scoped in
+`V88`/`V89`/`V90` Phase-7 tightening + legacy-VARCHAR-drop chain,
+renumbered from the original `V87`/`V88`/`V89` after V88's
+solo-deploy) are scoped in
 `MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the worktree root. **Read that
 file first**, then attack the frontend UI in the order it documents.
 
@@ -209,10 +214,11 @@ Hard constraints (do not rediscover):
 - Backend DTO field → Frontend mirror record in the SAME commit.
 - `.properties` Umlauts as `\uXXXX`, Markdown Umlauts as UTF-8.
 - Spotless + Checkstyle + SpotBugs must stay green at every commit.
-- Migrations V80–V83 are deployed-shape and immutable; the V86–V88
-  tightening + legacy-VARCHAR-drop chain (plus the `JobOrderHandover`
-  audit columns scoped to ride along) is INTENTIONALLY deferred to a
-  follow-up release per the two-phase rule in
+- Migrations V80–V83 are deployed-shape and immutable; the
+  `V88`/`V89`/`V90` Phase-7 tightening + legacy-VARCHAR-drop chain
+  (originally `V87`/`V88`/`V89`, renumbered after V88's solo-deploy
+  via PR #132) is INTENTIONALLY deferred to follow-up releases per
+  the two-phase rule in
   `backend/src/main/resources/db/migration/README.md`.
 - Frontend templates can dereference the new squadron DTO fields
   directly (e.g. `${item.owningSquadron?.shorthand}`,

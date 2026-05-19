@@ -211,7 +211,7 @@ public class HangarImportService {
           Ship ship = new Ship();
           ship.setOwner(user);
           // Stamp owning squadron from the importer's home squadron — same contract as
-          // HangarService.createShip uses for the manual create path. Phase 7's V87 makes
+          // HangarService.createShip uses for the manual create path. Phase 7's V89 makes
           // `ship.owning_squadron_id` NOT NULL, so the import path must populate it
           // explicitly; the previous nullable column hid this missing-stamp bug for the
           // entire Phase 6 release window.

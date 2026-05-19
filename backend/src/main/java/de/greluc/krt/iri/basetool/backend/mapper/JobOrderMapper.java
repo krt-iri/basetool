@@ -26,7 +26,7 @@ public interface JobOrderMapper {
    * Maps a {@link JobOrder} entity to its outbound DTO. The DTO's legacy {@code squadron} string is
    * fed from {@code requestingSquadron.shorthand} so wire-shape clients that haven't migrated to
    * the structured {@code requestingSquadron} reference still see a non-null value after V88
-   * dropped the entity-side legacy field. V89 (next-but-one release) removes the DTO component
+   * dropped the entity-side legacy field. V90 (next-but-one release) removes the DTO component
    * entirely.
    */
   @Mapping(target = "squadron", source = "requestingSquadron.shorthand")

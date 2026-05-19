@@ -142,7 +142,7 @@ class MissionManagerRoleTest {
 
   @Test
   void missionManagerShouldBeAbleToUpdateMission() throws Exception {
-    // Post-V87 every Mission carries a non-null owning_squadron_id, so the canManageMission
+    // Post-V89 every Mission carries a non-null owning_squadron_id, so the canManageMission
     // gate now ALWAYS evaluates the squadron-scope check on top of the role check. The
     // ROLE_MISSION_MANAGER authority alone is no longer enough — the JWT subject must
     // resolve to a User whose squadron matches the mission's. managerMember is in IRIDIUM
@@ -219,7 +219,7 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditTrueForMissionManager() throws Exception {
-    // Same V87-driven contract change as missionManagerShouldBeAbleToUpdateMission: the
+    // Same V89-driven contract change as missionManagerShouldBeAbleToUpdateMission: the
     // squadron-scope gate runs on every canEditMission evaluation now that the column is
     // NOT NULL, so the JWT subject must resolve to a User in the mission's squadron.
     mockMvc

@@ -1,5 +1,5 @@
 -- =====================================================================
--- V87 - Phase 7 part 2: tighten squadron-scope columns to NOT NULL
+-- V89 - Phase 7 part 2: tighten squadron-scope columns to NOT NULL
 -- =====================================================================
 -- Phase 7 of MULTI_SQUADRON_PLAN.md section 10: once a production deploy
 -- of Phase 6 (V80-V86) has confirmed that every code path stamps the
@@ -16,20 +16,26 @@
 -- catches any straggler that an early Phase-3 deploy might have left
 -- behind before the entity stamp landed.
 --
--- Ordering: this migration is numbered V87 — strictly between V86
--- (the per-squadron promotion-toggle from Phase 6) and V88 (the legacy
--- `job_order.squadron` VARCHAR stop-write from Phase 7 part 1, already
--- on main as of commit a00e5c8). Flyway's `out-of-order=false` default
--- expects migrations to apply in strict ascending order, so this file
--- MUST be in the source tree on the same release branch as V88 — both
--- migrations apply together on the next deploy.
+-- Ordering note (slot re-numbered from V87 -> V89):
+-- This migration was originally authored as V87, slated to ship together
+-- with V88 (`job_order.squadron` VARCHAR stop-write from Phase 7 part 1)
+-- on the same release. V88 was merged and deployed to production first
+-- via PR #132 (commit a00e5c8), leaving `flyway_schema_history` at
+-- latest_applied = 88. Flyway's `out-of-order=false` default rejects
+-- any newly-discovered migration with a version <= latest_applied, so
+-- introducing V87 after the V88 deploy would fail validation on the
+-- next startup. To recover, this file was renumbered V89 so it slots
+-- strictly above the already-applied V88. The follow-up DROP COLUMN
+-- for the legacy `job_order.squadron` VARCHAR (originally planned as
+-- V89) shifts to V90 in a future release iteration per the two-phase
+-- destructive-ops rule.
 --
 -- Out of scope (intentionally NOT tightened):
 --   * `app_user.squadron_id` — admins and guests must stay NULL there;
 --     `SquadronScopeService.currentSquadron()` treats NULL squadron on
 --     a JWT-sub-resolved user as "no concrete scope, span everything".
 --   * `job_order.squadron` (legacy VARCHAR) — V88 already dropped that
---     column's NOT NULL constraint; V89 will drop the column entirely
+--     column's NOT NULL constraint; V90 will drop the column entirely
 --     in a future release iteration per the two-phase rule.
 
 -- 5 strict-staffel aggregates (mission, operation, ship, inventory_item,
