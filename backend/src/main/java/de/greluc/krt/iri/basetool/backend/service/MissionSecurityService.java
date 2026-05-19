@@ -187,9 +187,9 @@ public class MissionSecurityService {
 
   /**
    * Authorizes adding/removing co-managers on a mission. Same elevated-authority surface as {@link
-   * #canManageMission} plus the mission owner / current co-managers. Verbose {@code [DEBUG_LOG]}
-   * lines exist because this is the most common "why was I denied" report — the log tells exactly
-   * which authority check passed or failed for a given user.
+   * #canManageMission} plus the mission owner / current co-managers. Verbose debug-level trace
+   * lines exist because this is the most common "why was I denied" report — enable {@code DEBUG} on
+   * this class to see exactly which authority check passed or failed for a given user.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -197,20 +197,15 @@ public class MissionSecurityService {
    */
   public boolean canManageManagers(UUID missionId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
-      log.warn(
-          "[DEBUG_LOG] Authentication failed or missing for canManageManagers on mission {}",
-          missionId);
+      log.debug("Authentication failed or missing for canManageManagers on mission {}", missionId);
       return false;
     }
 
     Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
-    log.info(
-        "[DEBUG_LOG] User {} authorities: {}, Reachable: {}",
-        authentication.getName(),
-        authorities,
-        reachable);
+    log.debug(
+        "User {} authorities: {}, Reachable: {}", authentication.getName(), authorities, reachable);
 
     boolean hasAuthority =
         reachable.stream()
@@ -223,8 +218,8 @@ public class MissionSecurityService {
                         || a.getAuthority().equals("ROLE_ADMIN"));
 
     if (hasAuthority) {
-      log.info(
-          "[DEBUG_LOG] Access granted for user {} via authority for mission {}",
+      log.debug(
+          "Access granted for user {} via authority for mission {}",
           authentication.getName(),
           missionId);
       return true;
@@ -235,8 +230,8 @@ public class MissionSecurityService {
         .map(
             mission -> {
               boolean result = isOwnerOrManager(mission, authentication);
-              log.info(
-                  "[DEBUG_LOG] Access check for user {} on mission {} (owner/manager): {}",
+              log.debug(
+                  "Access check for user {} on mission {} (owner/manager): {}",
                   authentication.getName(),
                   missionId,
                   result);
@@ -244,7 +239,7 @@ public class MissionSecurityService {
             })
         .orElseGet(
             () -> {
-              log.warn("[DEBUG_LOG] Mission {} not found for canManageManagers check", missionId);
+              log.debug("Mission {} not found for canManageManagers check", missionId);
               return false;
             });
   }

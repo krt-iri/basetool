@@ -13,6 +13,9 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,6 +46,7 @@ public class GlobalExceptionHandler {
   private static final Map<String, String> CODE_TO_MESSAGE_KEY = buildCodeMapping();
   private static final String DEFAULT_MESSAGE_KEY = "error.unexpected";
   private static final String DEFAULT_TITLE_KEY = "error.generic.title";
+  private static final String FORBIDDEN_UNAUTHENTICATED_KEY = "error.forbidden.unauthenticated";
 
   private final MessageSource messageSource;
 
@@ -58,6 +62,12 @@ public class GlobalExceptionHandler {
     Locale locale = LocaleContextHolder.getLocale();
     HttpStatus status = resolveStatus(ex.getStatusCode());
     String messageKey = CODE_TO_MESSAGE_KEY.getOrDefault(ex.getProblemCode(), DEFAULT_MESSAGE_KEY);
+    boolean unauthenticated = isUnauthenticatedAccessDenial(ex.getProblemCode());
+    if (unauthenticated && isForbiddenCode(ex.getProblemCode())) {
+      // Replace the generic "you don't have permission" wording with one that tells the user
+      // they are not signed in and recommends retrying after authentication — issue #108.
+      messageKey = FORBIDDEN_UNAUTHENTICATED_KEY;
+    }
     String localizedMessage = resolve(messageKey, locale, ex.getReadableErrorMessage());
     String localizedTitle =
         resolve(titleKeyForStatus(status), locale, resolve(DEFAULT_TITLE_KEY, locale, "Error"));
@@ -84,6 +94,7 @@ public class GlobalExceptionHandler {
       body.put(
           "reloadHint",
           ex.getProblemCode().equals("OPTIMISTIC_LOCK") || ex.getProblemCode().equals("CONFLICT"));
+      body.put("unauthenticated", unauthenticated);
       return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body);
     }
 
@@ -91,6 +102,7 @@ public class GlobalExceptionHandler {
     model.addAttribute("message", localizedMessage);
     model.addAttribute("status", String.valueOf(status.value()));
     model.addAttribute("errorCode", ex.getProblemCode());
+    model.addAttribute("unauthenticated", unauthenticated);
     if (ex.getCorrelationId() != null) {
       model.addAttribute("correlationId", ex.getCorrelationId());
     }
@@ -151,6 +163,12 @@ public class GlobalExceptionHandler {
    * letting them fall through to the generic 500 handler. Without this mapping, a missing role
    * would surface to the user as an opaque "Internal Server Error" — which both hides the real
    * cause and contradicts the standard semantics for HTTP 403.
+   *
+   * <p>The wording adapts to the security context: an authenticated caller who lacks the required
+   * role sees the generic "you do not have permission" copy, while an anonymous caller (no {@link
+   * Authentication} or an {@link AnonymousAuthenticationToken}) gets the "please sign in and try
+   * again" variant plus an {@code unauthenticated=true} model attribute that flips on the sign-in
+   * CTA on the error page (issue #108).
    */
   @ExceptionHandler({
     org.springframework.security.access.AccessDeniedException.class,
@@ -161,12 +179,20 @@ public class GlobalExceptionHandler {
       @NotNull Exception ex, @NotNull HttpServletRequest request, @NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
     String title = resolve("error.403.title", locale, "Forbidden");
-    String message = resolve("error.forbidden", locale, "Access denied.");
+    // Distinguish "authenticated but lacks role" (generic forbidden) from "not signed in at all"
+    // (suggest sign-in + retry) — issue #108. An anonymous user can reach handleAccessDenied
+    // because permitAll() routes still run @PreAuthorize on controller methods, and the latter
+    // raises AuthorizationDeniedException for the anonymous principal instead of triggering
+    // SsoReAuthenticationEntryPoint.
+    boolean anonymous = isAnonymous();
+    String messageKey = anonymous ? FORBIDDEN_UNAUTHENTICATED_KEY : "error.forbidden";
+    String message = resolve(messageKey, locale, "Access denied.");
     log.warn(
-        "Access denied for {} {} [exception={}]: {}",
+        "Access denied for {} {} [exception={}, anonymous={}]: {}",
         request.getMethod(),
         request.getRequestURI(),
         ex.getClass().getSimpleName(),
+        anonymous,
         ex.getMessage());
     if (wantsJson(request)) {
       Map<String, Object> body = new LinkedHashMap<>();
@@ -174,6 +200,7 @@ public class GlobalExceptionHandler {
       body.put("status", 403);
       body.put("title", title);
       body.put("message", message);
+      body.put("unauthenticated", anonymous);
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
           .contentType(MediaType.APPLICATION_JSON)
           .body(body);
@@ -181,6 +208,7 @@ public class GlobalExceptionHandler {
     model.addAttribute("error", title);
     model.addAttribute("message", message);
     model.addAttribute("status", "403");
+    model.addAttribute("unauthenticated", anonymous);
     return "error/error";
   }
 
@@ -229,6 +257,42 @@ public class GlobalExceptionHandler {
   private static @NotNull HttpStatus resolveStatus(int statusCode) {
     HttpStatus resolved = HttpStatus.resolve(statusCode);
     return resolved != null ? resolved : HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  /**
+   * Returns {@code true} when the current Spring Security context represents an unauthenticated
+   * caller — either no {@link Authentication} at all or an {@link AnonymousAuthenticationToken}
+   * supplied by the {@code AnonymousAuthenticationFilter}. Used to decide whether a 403 message
+   * should explain "you don't have permission" (authenticated user, insufficient role) versus
+   * "please sign in and try again" (anonymous caller hitting a {@code @PreAuthorize} gate behind a
+   * {@code permitAll()} route).
+   */
+  private static boolean isAnonymous() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return auth == null || auth instanceof AnonymousAuthenticationToken;
+  }
+
+  /**
+   * Reports whether the supplied backend problem code denotes a forbidden-style outcome that should
+   * be rephrased into "please sign in" when the caller is anonymous. {@code UNAUTHENTICATED} is
+   * intentionally handled by {@link #isUnauthenticatedAccessDenial(String)} separately because its
+   * own message key ({@code error.unauthenticated}) already speaks about session expiry.
+   */
+  private static boolean isForbiddenCode(@NotNull String problemCode) {
+    return "ACCESS_DENIED".equals(problemCode) || "FORBIDDEN_ROLE".equals(problemCode);
+  }
+
+  /**
+   * Tells the caller-facing layer whether to render a "sign in" CTA next to the error message.
+   * {@code true} for explicit {@code UNAUTHENTICATED} backend problems (session expired) and for
+   * {@code ACCESS_DENIED}/{@code FORBIDDEN_ROLE} when the current security context is anonymous —
+   * both scenarios resolve with the same user action: re-authenticate and retry.
+   */
+  private static boolean isUnauthenticatedAccessDenial(@NotNull String problemCode) {
+    if ("UNAUTHENTICATED".equals(problemCode)) {
+      return true;
+    }
+    return isForbiddenCode(problemCode) && isAnonymous();
   }
 
   private static @NotNull String titleKeyForStatus(@NotNull HttpStatus status) {
