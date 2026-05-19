@@ -54,13 +54,19 @@ public class SquadronContextAdvice {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Resolves {@code activeSquadronId} for the current request directly from the frontend's
-   * Redis-backed Spring Session. The state is owned by the frontend (see {@link
-   * MeFrontendController}) because backend REST calls do not relay session cookies, so a backend-
-   * side {@code HttpSession} would not survive across calls. {@code null} when the call is
-   * anonymous, when the admin has not chosen a specific squadron ("all squadrons" mode), or when
-   * the user is not an admin (members do not own this preference and their effective squadron is
-   * resolved by the backend from {@code app_user.squadron_id}).
+   * Resolves {@code activeSquadronId} for the current request. Two different paths because the
+   * state lives in different places for admins and members:
+   *
+   * <ul>
+   *   <li>Admin: read the switcher selection from the frontend's Redis-backed Spring Session (set
+   *       by {@link MeFrontendController}). {@code null} means "all squadrons" mode.
+   *   <li>Non-admin: the user's persistent home squadron from {@code app_user.squadron_id} on the
+   *       backend. The {@code GET /api/v1/me/active-squadron} endpoint already resolves this for
+   *       the current principal; we reuse it instead of duplicating the lookup on the frontend.
+   * </ul>
+   *
+   * <p>Anonymous callers return {@code null}; the failure of the backend round-trip degrades
+   * silently to {@code null} so an unrelated UI never breaks because of this advice.
    *
    * @param request the current HTTP servlet request; never {@code null}.
    * @return the active squadron UUID, or {@code null}.
@@ -70,13 +76,31 @@ public class SquadronContextAdvice {
     if (!authHelper.isAuthenticated()) {
       return null;
     }
-    HttpSession session = request.getSession(false);
-    if (session == null) {
+    if (authHelper.isAdmin()) {
+      HttpSession session = request.getSession(false);
+      if (session == null) {
+        return null;
+      }
+      return de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
+          session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
+    }
+    try {
+      ActiveSquadronResponse resp =
+          backendApiClient.get("/api/v1/me/active-squadron", ActiveSquadronResponse.class);
+      return resp != null ? resp.squadronId() : null;
+    } catch (Exception ex) {
+      log.debug("Failed to resolve home squadron for non-admin caller", ex);
       return null;
     }
-    return de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
-        session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
   }
+
+  /**
+   * Wire-shape mirror of the backend's {@code MeController.ActiveSquadronResponse} record. Kept
+   * local to avoid a frontend dependency on the backend module just for one JSON envelope.
+   *
+   * @param squadronId resolved squadron UUID, or {@code null} when none applies.
+   */
+  public record ActiveSquadronResponse(UUID squadronId) {}
 
   /**
    * Resolves the full {@link SquadronDto} that matches {@link #activeSquadronId()} so the template

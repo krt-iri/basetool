@@ -1,9 +1,12 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.dto.MemberEvaluationResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.MemberEvaluationService;
+import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,8 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
  * REST endpoints for {@code MemberEvaluation}.
  *
  * <p>Personal view ({@code /my}) is filtered by JWT sub (data isolation). Admin view ({@code /all}
- * and upsert) requires the ADMIN role (Phase-4 lockdown — Officer lost promotion-system write
- * access alongside the rest of the admin area).
+ * and upsert) requires ADMIN or OFFICER. Officer access is squadron-scoped — an Officer of squadron
+ * X may only manage evaluations whose category belongs to a topic owned by squadron X (gate
+ * enforced by {@code MemberEvaluationService}).
  */
 @RestController
 @RequestMapping("/api/v1/promotion/evaluations")
@@ -49,6 +53,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class MemberEvaluationController {
 
   private final MemberEvaluationService service;
+  private final UserService userService;
+  private final UserMapper userMapper;
 
   /**
    * Returns every {@link MemberEvaluationResponse} owned by the calling member, filtered by the JWT
@@ -108,7 +114,7 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} covering all evaluations
    */
   @GetMapping("/all")
-  @Operation(summary = "List all member evaluations (ADMIN only).")
+  @Operation(summary = "List all member evaluations (ADMIN/OFFICER, squadron-scoped for OFFICER).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "All evaluations."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
@@ -128,6 +134,51 @@ public class MemberEvaluationController {
   }
 
   /**
+   * Returns the paged list of squadron members that the caller may evaluate. Squadron-scoped for
+   * Officer (own squadron only) and for Admin with the sidebar switcher focused on a squadron;
+   * Admin in "all squadrons" mode sees every squadron's members. Admins themselves never appear —
+   * they are squadron-less by design and must not show up in any Officer's Bewertungsverwaltung.
+   *
+   * @param page zero-based page index, or {@code null} for the default
+   * @param size page size, or {@code null} for the default
+   * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
+   *     default
+   * @return a {@link PageResponse} of evaluatable members
+   */
+  @GetMapping("/members")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @org.springframework.transaction.annotation.Transactional(readOnly = true)
+  @Operation(
+      summary =
+          "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins"
+              + " excluded).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Evaluatable members."),
+    @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
+  })
+  public PageResponse<UserDto> listEvaluatableMembers(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page,
+            size,
+            sort,
+            java.util.Set.of("id", "username", "displayName", "userRank"),
+            "username");
+    var result = userService.findEvaluatableMembers(pageable);
+    List<UserDto> content = result.getContent().stream().map(userMapper::toDto).toList();
+    return new PageResponse<>(
+        content,
+        result.getNumber(),
+        result.getSize(),
+        result.getTotalElements(),
+        result.getTotalPages(),
+        PaginationUtil.toSortStrings(result.getSort()));
+  }
+
+  /**
    * Creates or updates the evaluation record for the given user and promotion category. The request
    * body carries the new score and notes; the optimistic-locking {@code version} echoed back by the
    * client guards against concurrent edits and surfaces as HTTP 409 on conflict.
@@ -139,7 +190,10 @@ public class MemberEvaluationController {
    * @return the persisted evaluation in its response form
    */
   @PutMapping("/user/{userId}/category/{categoryId}")
-  @Operation(summary = "Upsert evaluation for a user/category. Requires ADMIN role.")
+  @Operation(
+      summary =
+          "Upsert evaluation for a user/category. ADMIN or OFFICER of the category's owning"
+              + " squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Evaluation upserted."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -156,14 +210,16 @@ public class MemberEvaluationController {
 
   /**
    * Permanently removes the evaluation identified by {@code id}, dropping the row used to track a
-   * member's standing in one promotion category. Restricted to ADMIN callers.
+   * member's standing in one promotion category. ADMIN or OFFICER of the category's owning
+   * squadron.
    *
    * @param id identifier of the {@link de.greluc.krt.iri.basetool.backend.model.MemberEvaluation}
    *     to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a member evaluation. Requires ADMIN role.")
+  @Operation(
+      summary = "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")

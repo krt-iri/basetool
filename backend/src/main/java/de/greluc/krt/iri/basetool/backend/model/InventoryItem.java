@@ -83,7 +83,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * represents). Set at creation time from the caller's active squadron and immutable afterwards.
    * The direct Lager-View filters by this column; an item linked to a job order via {@link
    * #jobOrder} additionally surfaces in that order's UI for ALL squadrons (cross-squadron
-   * workspace, see MULTI_SQUADRON_PLAN.md). Kept JPA-nullable for Phase 1 until Flyway V85 tightens
+   * workspace, see MULTI_SQUADRON_PLAN.md). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
    * the column to NOT NULL.
    */
   @ManyToOne(fetch = FetchType.LAZY)

@@ -2882,7 +2882,7 @@
     "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}" : {
       "put" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "Upsert evaluation for a user/category. Requires ADMIN role.",
+        "summary" : "Upsert evaluation for a user/category. ADMIN or OFFICER of the category's owning squadron.",
         "operationId" : "upsert",
         "parameters" : [ {
           "name" : "userId",
@@ -20688,10 +20688,133 @@
         } ]
       }
     },
+    "/api/v1/promotion/evaluations/members" : {
+      "get" : {
+        "tags" : [ "Member Evaluations" ],
+        "summary" : "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins excluded).",
+        "operationId" : "listEvaluatableMembers",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Evaluatable members.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseUserDto"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/promotion/evaluations/all" : {
       "get" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "List all member evaluations (ADMIN only).",
+        "summary" : "List all member evaluations (ADMIN/OFFICER, squadron-scoped for OFFICER).",
         "operationId" : "listAll_1",
         "parameters" : [ {
           "name" : "page",
@@ -26308,7 +26431,7 @@
     "/api/v1/promotion/evaluations/{id}" : {
       "delete" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "Delete a member evaluation. Requires ADMIN role.",
+        "summary" : "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.",
         "operationId" : "delete_6",
         "parameters" : [ {
           "name" : "id",
@@ -27636,6 +27759,9 @@
           "sortOrder" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "createdAt" : {
             "type" : "string",

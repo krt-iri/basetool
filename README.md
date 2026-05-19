@@ -246,10 +246,10 @@ operations boards), but everything else respects the strict squadron
 filter.
 
 What is **deferred** to a follow-up release: the tightening migrations
-`V85`–`V87` (`SET NOT NULL` on the new columns, then the
+`V86`–`V88` (`SET NOT NULL` on the new columns, then the
 two-phase drop of the legacy `job_order.squadron` VARCHAR) per the
 two-phase rule. They intentionally do not ship in the same release as
-`V80`–`V84`, so a rollback to single-tenant remains possible during
+`V80`–`V85`, so a rollback to single-tenant remains possible during
 the grace window. The full frontend UI for the squadron switcher /
 context badge / squadron-column rendering is tracked as the next slice
 of work; see `MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the repo root for

@@ -428,7 +428,9 @@ class PromotionPageControllerTest {
     when(backendApiClient.get(
             contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"),
+            any(ParameterizedTypeReference.class)))
         .thenReturn(
             new PageResponse<>(
                 List.of(member(id1, "a", 20), member(id2, "b", 19), nullIdMember),

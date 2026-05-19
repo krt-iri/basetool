@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,9 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Domain service for {@link MemberEvaluation}.
  *
  * <p>Data isolation: read operations for personal views are filtered by {@code userId} (JWT sub).
- * Write operations (assign/update level) are restricted to the ADMIN role. The promotion system
- * counts as system-wide configuration under the Phase-4 admin lockdown (MULTI_SQUADRON_PLAN.md
- * section 2: "Promotion-System-Pflege" sits in the admin bucket Officer no longer reaches).
+ * Write operations (assign/update level) are restricted to ADMIN and OFFICER callers, with an
+ * additional squadron-scope guard: an Officer of squadron X may only manage evaluations whose
+ * category belongs to a topic owned by squadron X. Admins span every squadron unless they have
+ * focused the sidebar switcher.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +44,7 @@ public class MemberEvaluationService {
   private final MemberEvaluationRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
+  private final SquadronScopeService squadronScopeService;
 
   /** Returns all evaluations for the given user (JWT-sub filtered – data isolation). */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
@@ -55,16 +58,17 @@ public class MemberEvaluationService {
   }
 
   /** Returns all evaluations (admin view, all users). */
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
   /**
-   * Upserts (create or update) an evaluation for a user/category combination. Restricted to ADMIN.
+   * Upserts (create or update) an evaluation for a user/category combination. ADMIN or OFFICER of
+   * the category's owning squadron.
    */
   @Transactional
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public MemberEvaluationResponse upsert(
       @NotNull String userId,
       @NotNull UUID categoryId,
@@ -74,6 +78,7 @@ public class MemberEvaluationService {
             .findById(categoryId)
             .orElseThrow(
                 () -> new EntityNotFoundException("PromotionCategory not found: " + categoryId));
+    assertCallerMayEditCategory(category);
 
     MemberEvaluation entity =
         repository
@@ -96,13 +101,26 @@ public class MemberEvaluationService {
 
   /** Deletes an evaluation entry (removes the assigned level). */
   @Transactional
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
     MemberEvaluation entity =
         repository
             .findById(id)
             .orElseThrow(() -> new EntityNotFoundException("MemberEvaluation not found: " + id));
+    assertCallerMayEditCategory(entity.getCategory());
     repository.delete(entity);
     log.info("Deleted MemberEvaluation id={}", id);
+  }
+
+  private void assertCallerMayEditCategory(PromotionCategory category) {
+    if (category == null
+        || category.getTopic() == null
+        || category.getTopic().getOwningSquadron() == null) {
+      return;
+    }
+    if (!squadronScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing evaluations of this scope");
+    }
   }
 }

@@ -76,6 +76,31 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       org.springframework.data.domain.Sort sort);
 
   /**
+   * Paged squadron-scoped listing of users eligible to be evaluated in the promotion system.
+   * Excludes admins entirely — they are squadron-less by design (admins always have {@code
+   * app_user.squadron_id = NULL} per V81 backfill) and must not appear in any Officer's
+   * Bewertungsverwaltung even when an admin has focused a squadron via the switcher. The additional
+   * explicit role-based exclusion guards against a manually mis-assigned admin row that still
+   * carries a squadron FK.
+   *
+   * <p>When {@code scopeSquadronId} is {@code null} (admin "all squadrons" mode) the result spans
+   * every squadron's members. A non-null id restricts to that squadron. Users without a squadron
+   * are excluded — they are not part of any squadron's evaluation list.
+   *
+   * @param scopeSquadronId squadron filter; {@code null} = all squadrons.
+   * @param pageable Spring Data paging and sorting parameters.
+   * @return paged squadron members that an Officer / Admin may evaluate.
+   */
+  @EntityGraph(attributePaths = {"roles", "squadron"})
+  @Query(
+      "SELECT u FROM User u WHERE u.squadron IS NOT NULL AND (:scopeSquadronId IS NULL OR"
+          + " u.squadron.id = :scopeSquadronId) AND NOT EXISTS (SELECT 1 FROM u.roles r WHERE"
+          + " UPPER(r.name) = 'ADMIN')")
+  Page<User> findEvaluatableMembers(
+      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      Pageable pageable);
+
+  /**
    * Squadron-scoped substring search. Mirrors {@link
    * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
    * but adds the {@code u.squadron.id = :scopeSquadronId OR :scopeSquadronId IS NULL OR u.squadron

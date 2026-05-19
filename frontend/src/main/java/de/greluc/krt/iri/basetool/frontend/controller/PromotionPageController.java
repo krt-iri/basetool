@@ -170,7 +170,7 @@ public class PromotionPageController {
    * allCategories}, which is what the row body relies on.
    */
   @GetMapping("/manage")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String manage(Model model) {
     List<PromotionTopicDto> topics = fetchTopics();
     // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
@@ -235,7 +235,7 @@ public class PromotionPageController {
 
   /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
   @GetMapping("/admin/topics")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String adminTopics(Model model) {
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
@@ -264,7 +264,7 @@ public class PromotionPageController {
    * @return the Thymeleaf view name for the rank-requirements admin page
    */
   @GetMapping("/admin/rank-requirements")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String adminRankRequirements(Model model) {
     List<RankRequirementDto> requirements = fetchAllRankRequirements();
 
@@ -410,11 +410,19 @@ public class PromotionPageController {
 
   private List<de.greluc.krt.iri.basetool.frontend.model.dto.UserDto> fetchMembers() {
     try {
+      // Squadron-scoped, admin-free member list. The backend's
+      // /api/v1/promotion/evaluations/members endpoint applies the same scope as
+      // SquadronScopeService.currentSquadronId() (Officer = own squadron, Admin = focused
+      // squadron or all squadrons) and excludes any user that carries the Admin role —
+      // admins are squadron-less by design and must not appear in any Officer's
+      // Bewertungsverwaltung even when an admin set a squadron context via the switcher.
       PageResponse<de.greluc.krt.iri.basetool.frontend.model.dto.UserDto> result =
-          backendApiClient.get("/api/v1/users?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.get(
+              "/api/v1/promotion/evaluations/members?size=1000",
+              new ParameterizedTypeReference<>() {});
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
-      log.error("Failed to fetch members", e);
+      log.error("Failed to fetch evaluatable members", e);
       return new ArrayList<>();
     }
   }

@@ -44,9 +44,9 @@
                     <div class="sidebar-sublinks">
                         <a th:href="@{/promotion/overview}" th:text="#{nav.promotion.overview}">Bef\u00f6rderungssystem</a>
                         <a th:href="@{/promotion/my-evaluations}" th:text="#{nav.promotion.my_evaluations}">Meine Bewertungen</a>
-                        <a th:href="@{/promotion/manage}" sec:authorize="hasRole('ADMIN')" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
-                        <a th:href="@{/promotion/admin/topics}" sec:authorize="hasRole('ADMIN')" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
-                        <a th:href="@{/promotion/admin/rank-requirements}" sec:authorize="hasRole('ADMIN')" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
+                        <a th:href="@{/promotion/manage}" sec:authorize="hasAnyRole('ADMIN','OFFICER')" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
+                        <a th:href="@{/promotion/admin/topics}" sec:authorize="hasAnyRole('ADMIN','OFFICER')" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
+                        <a th:href="@{/promotion/admin/rank-requirements}" sec:authorize="hasAnyRole('ADMIN','OFFICER')" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
                     </div>
                 </details>
                 <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>

@@ -3,9 +3,12 @@ package de.greluc.krt.iri.basetool.backend.model;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -48,6 +51,19 @@ public class PromotionTopic extends AbstractEntity<UUID> {
 
   @Column(name = "sort_order", nullable = false)
   private int sortOrder;
+
+  /**
+   * Squadron that owns this promotion topic. Set at creation time from the caller's active squadron
+   * context and immutable afterwards. Cascades the squadron scope to every child ({@link
+   * PromotionCategory}, {@code PromotionLevelContent}, {@code RankRequirement}, {@code
+   * MemberEvaluation}) which derive their squadron via this reference rather than carrying their
+   * own (Plan §3.2 "no denormalisation"). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
+   * the column to NOT NULL.
+   */
+  @ToString.Exclude
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "owning_squadron_id")
+  private Squadron owningSquadron;
 
   // Excluded from {@code @ToString} because {@code List<PromotionCategory>} is a LAZY association
   // and the children's own {@code toString()} would either trigger a LazyInitializationException

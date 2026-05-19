@@ -52,7 +52,7 @@ public class Operation extends AbstractEntity<UUID> {
   /**
    * Squadron that owns this operation. Set at creation time from the caller's active squadron and
    * immutable afterwards. Gates read/write access at the service layer; admins can see all
-   * squadrons. Kept JPA-nullable for Phase 1 until Flyway V85 tightens the column to NOT NULL.
+   * squadrons. Kept JPA-nullable for Phase 1 until Flyway V86 tightens the column to NOT NULL.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id")

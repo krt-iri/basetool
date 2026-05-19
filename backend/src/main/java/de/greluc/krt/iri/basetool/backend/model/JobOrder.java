@@ -46,9 +46,9 @@ public class JobOrder extends AbstractEntity<UUID> {
   /**
    * Legacy free-text squadron column, semantically superseded by {@link #requestingSquadron} and
    * {@link #creatingSquadron}. Still written by the service layer in this release as a safety net
-   * during the two-phase migration; Flyway V86 removes the JPA field and V87 drops the DB column.
+   * during the two-phase migration; Flyway V87 removes the JPA field and V88 drops the DB column.
    * New read paths must use {@link #requestingSquadron} instead - this field stays mirrored only to
-   * keep the legacy {@code NOT NULL} column populated until V86 lifts the constraint.
+   * keep the legacy {@code NOT NULL} column populated until V87 lifts the constraint.
    */
   @Column(nullable = false)
   private String squadron;

@@ -146,7 +146,7 @@ public class Mission extends AbstractEntity<UUID> {
    * Squadron that owns this mission. Set at creation time from the caller's active squadron and
    * immutable afterwards. Gates read/write access together with {@link #isInternal}: non-internal
    * missions are visible across squadrons, internal ones are restricted to the owning squadron and
-   * admins. Kept JPA-nullable for Phase 1 until Flyway V85 tightens the column to NOT NULL.
+   * admins. Kept JPA-nullable for Phase 1 until Flyway V86 tightens the column to NOT NULL.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id")

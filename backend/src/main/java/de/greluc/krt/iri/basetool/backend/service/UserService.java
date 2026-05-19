@@ -477,6 +477,24 @@ public class UserService {
   }
 
   /**
+   * Returns paged squadron members eligible to be evaluated in the promotion system, scoped to the
+   * caller's squadron context and excluding admins. An Officer of squadron X sees only members of
+   * squadron X; an Admin in "all squadrons" mode sees every squadron's members; an Admin with the
+   * sidebar switcher focused on a squadron sees that squadron's members. Admins themselves are
+   * never returned — they are squadron-less by design and must not appear in any Officer's
+   * Bewertungsverwaltung. Delegates the filter to {@link
+   * UserRepository#findEvaluatableMembers(UUID, Pageable)}.
+   *
+   * @param pageable page request
+   * @return paged evaluatable members (squadron-scoped, admin-free)
+   */
+  @NotNull
+  public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
+    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    return userRepository.findEvaluatableMembers(scope, pageable);
+  }
+
+  /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
    * Squadron-scoped via {@link SquadronScopeService#currentSquadronId()} — non-admins only see
    * their own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
@@ -590,7 +608,7 @@ public class UserService {
    *
    * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
    * scope ({@link SquadronScopeService} reads it to decide which staffel-scoped aggregates a
-   * non-admin sees). Until V85 tightens the column to NOT NULL, {@code null} is a valid value that
+   * non-admin sees). Until V86 tightens the column to NOT NULL, {@code null} is a valid value that
    * means "admin / unassigned" and falls back to the cross-squadron view.
    *
    * @param userId user primary key; must exist

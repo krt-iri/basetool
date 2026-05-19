@@ -40,7 +40,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created topic representation
    */
   @PostMapping("/topics")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> createTopic(@RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.post("/api/v1/promotion/topics", body, Map.class);
   }
@@ -53,7 +53,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated topic
    */
   @PutMapping("/topics/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> updateTopic(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.put("/api/v1/promotion/topics/" + id, body, Map.class);
@@ -66,7 +66,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/topics/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public ResponseEntity<Void> deleteTopic(@PathVariable @NotNull UUID id) {
     backendApiClient.delete("/api/v1/promotion/topics/" + id, Void.class);
     return ResponseEntity.noContent().build();
@@ -81,7 +81,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created category representation
    */
   @PostMapping("/categories")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> createCategory(@RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.post("/api/v1/promotion/categories", body, Map.class);
   }
@@ -94,7 +94,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated category
    */
   @PutMapping("/categories/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> updateCategory(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.put("/api/v1/promotion/categories/" + id, body, Map.class);
@@ -107,7 +107,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/categories/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public ResponseEntity<Void> deleteCategory(@PathVariable @NotNull UUID id) {
     backendApiClient.delete("/api/v1/promotion/categories/" + id, Void.class);
     return ResponseEntity.noContent().build();
@@ -122,7 +122,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created requirement representation
    */
   @PostMapping("/rank-requirements")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> createRankRequirement(@RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.post("/api/v1/promotion/rank-requirements", body, Map.class);
   }
@@ -135,7 +135,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated requirement
    */
   @PutMapping("/rank-requirements/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> updateRankRequirement(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.put("/api/v1/promotion/rank-requirements/" + id, body, Map.class);
@@ -148,7 +148,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/rank-requirements/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public ResponseEntity<Void> deleteRankRequirement(@PathVariable @NotNull UUID id) {
     backendApiClient.delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
     return ResponseEntity.noContent().build();
@@ -163,7 +163,7 @@ public class PromotionProxyController {
    * @return the backend's response body, typically the created entry representation
    */
   @PostMapping("/level-contents")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> createLevelContent(@RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.post("/api/v1/promotion/level-contents", body, Map.class);
   }
@@ -176,7 +176,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the updated entry
    */
   @PutMapping("/level-contents/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> updateLevelContent(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     return backendApiClient.put("/api/v1/promotion/level-contents/" + id, body, Map.class);
@@ -189,7 +189,7 @@ public class PromotionProxyController {
    * @return {@code 204 No Content} on success
    */
   @DeleteMapping("/level-contents/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public ResponseEntity<Void> deleteLevelContent(@PathVariable @NotNull UUID id) {
     backendApiClient.delete("/api/v1/promotion/level-contents/" + id, Void.class);
     return ResponseEntity.noContent().build();
@@ -208,7 +208,7 @@ public class PromotionProxyController {
    * @return the backend's response body for the upserted evaluation
    */
   @PutMapping("/evaluations/user/{userId}/category/{categoryId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Map<?, ?> updateEvaluation(
       @PathVariable @NotNull String userId,
       @PathVariable @NotNull UUID categoryId,
