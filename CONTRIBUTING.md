@@ -1,183 +1,624 @@
-# Contributing to Iridium HQ - Backend
+# Contributing to IRIDIUM Basetool
 
-First off, thanks for taking the time to contribute.
+Thanks for taking the time to help improve IRIDIUM Basetool — the
+squadron-management web app for the *DAS KARTELL* / IRIDIUM organization.
+This document is the entry point for everything around *how* to contribute:
+asking questions, reporting bugs, proposing features, sending pull
+requests, and the style / quality rules every change is held to.
 
-The following is a set of guidelines for contributing to Iridium HQ - Backend, which is hosted with GitLab.  
-These are mostly guidelines, not rules.  
-Use your best judgment and feel free to propose changes to this document in a pull request.
+If you only have a couple of minutes, the very short version is:
+
+1. **Security issues never go into public Issues** — use the confidential
+   channel in [`.github/SECURITY.md`](.github/SECURITY.md).
+2. **General questions go into
+   [GitHub Discussions](https://github.com/krt-iri/basetool/discussions)**,
+   not the issue tracker.
+3. **Bugs and features go through the
+   [issue templates](https://github.com/krt-iri/basetool/issues/new/choose)**.
+4. **Pull requests branch from `main`, target `main`**, follow
+   [Conventional Commits](#commit-messages), and must pass
+   `./gradlew check` + `./gradlew spotlessApply` locally before they are
+   pushed.
+5. **Every user-visible change updates
+   [`CHANGELOG.md`](CHANGELOG.md)** under `## [Unreleased]`.
+
+The rest of this document goes into detail.
+
+---
 
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [I don't want to read this whole thing. I've a question.](#i-dont-want-to-read-this-whole-thing-ive-a-question)
-- [How Can I Contribute?](#how-can-i-contribute)
-    - [Reporting Bugs](#reporting-bugs)
-        - [Before Submitting A Bug Report](#before-submitting-a-bug-report)
-        - [How Do I Submit A (Good) Bug Report?](#how-do-i-submit-a-good-bug-report)
-    - [Suggesting Enhancements](#suggesting-enhancements)
-        - [Before Submitting An Enhancement Suggestion](#before-submitting-an-enhancement-suggestion)
-        - [How Do I Submit A (Good) Enhancement Suggestion?](#how-do-i-submit-a-good-enhancement-suggestion)
-- [Your First Code Contribution](#your-first-code-contribution)
-- [Pull Requests](#pull-requests)
-- [Style Guides](#style-guides)
-    - [Git Commit Messages Style Guide](#git-commit-messages-style-guide)
-    - [Java Style Guide](#java-style-guide)
-    - [JavaDoc Style Guide](#javadoc-style-guide)
+- [Project documentation map](#project-documentation-map)
+- [Asking questions](#asking-questions)
+- [Reporting a security vulnerability](#reporting-a-security-vulnerability)
+- [Reporting bugs](#reporting-bugs)
+- [Suggesting features](#suggesting-features)
+- [Your first code contribution](#your-first-code-contribution)
+- [Local development setup](#local-development-setup)
+- [Pull requests](#pull-requests)
+- [Commit messages](#commit-messages)
+- [Branch names](#branch-names)
+- [Style guides](#style-guides)
+  - [Java](#java)
+  - [Javadoc](#javadoc)
+  - [Internationalization (i18n)](#internationalization-i18n)
+  - [Frontend / UI](#frontend--ui)
+  - [Markdown and documentation](#markdown-and-documentation)
+  - [Git and GitHub language](#git-and-github-language)
+- [Architectural invariants to know before you change code](#architectural-invariants-to-know-before-you-change-code)
+- [Before-you-push checklist](#before-you-push-checklist)
+- [License and sign-off](#license-and-sign-off)
 
 ---
 
 ## Code of Conduct
 
-This project and everyone who participates in it are governed by the [Code of Conduct](CODE_OF_CONDUCT.md).  
-By participating, you're expected to uphold this code.  
-Report unacceptable behavior to [lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
+This project and everyone who participates in it are governed by the
+[Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md). By
+participating, you agree to uphold it. Report unacceptable behaviour
+confidentially to
+[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
 
 ---
 
-## I don't want to read this whole thing. I've a question.
+## Project documentation map
 
-First, you can read the documentation or search the wiki for the information you need.
+Most of the substance lives in dedicated documents. Read the one that
+matches what you are about to change *before* you open a PR:
 
-If you need help by the developers, create an issue with your question and add the label **support** to it.  
-**Perform a cursory search** to see if your question has already been asked.  
-If it has, add a comment to the existing issue instead of opening a new one.
+| Topic | Where |
+| :--- | :--- |
+| Project overview, prerequisites, local dev/test stack, deployment runbook | [`README.md`](README.md) |
+| Release notes and every user-visible change | [`CHANGELOG.md`](CHANGELOG.md) |
+| Security vulnerability reporting, supported versions, scope, safe harbor | [`.github/SECURITY.md`](.github/SECURITY.md) |
+| Architectural invariants, build/test commands, AI-assistant guardrails | [`CLAUDE.md`](CLAUDE.md) |
+| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`) | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) |
+| Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist) | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) |
+| "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette) | [`Styleguide.md`](Styleguide.md) |
+| Pull-request expectations (template + checklist that ships with every PR) | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) |
+| Production deployment runbook (host bootstrap, releases, rollback, PAT rotation) | [`docs/deployment.md`](docs/deployment.md) |
+| License | [`LICENSE.md`](LICENSE.md) — GPL-3.0 |
 
----
-
-**Note:** If you find a **Closed** issue that seems like it's the same topic that you're looking for, open a new issue and include a link to the original issue in the body of your new one.
-
----
-
-## How Can I Contribute?
-
-### Reporting Bugs
-
-This section guides you through submitting a bug report for Iridium HQ - Backend.  
-Following these guidelines helps maintainers and the community to understand your report, reproduce the behavior, and find related reports.
-
-Before creating bug reports, check [this list](#before-submitting-a-bug-report) as you might find out that you don't need to create one.  
-When you're creating a bug report, [include as many details as possible](#how-do-i-submit-a-good-bug-report).  
-Fill out the required template. The information it asks for helps us to resolve issues faster.
-
-#### Before Submitting A Bug Report
-
-- **Check the FAQ** for a list of common questions and problems.
-- **Perform a cursory search** to see if the problem has already been reported.  
-  If it has, **and the issue is still open**, add a comment to the existing issue instead of opening a new one.
+CLAUDE.md and the SECURITY.md are the two documents that most often
+surprise first-time contributors — please read them before touching the
+backend security model, the multi-squadron data paths, or anything that
+could conceivably leak data across users.
 
 ---
 
-**Note:** If you find a **Closed** issue that seems like it's the same thing that you're experiencing, open a new issue and include a link to the original issue in the body of your new one.
+## Asking questions
+
+> [!IMPORTANT]
+> The issue tracker is **not** a Q&A forum. General questions land in
+> [GitHub Discussions](https://github.com/krt-iri/basetool/discussions);
+> the [issue-template config](.github/ISSUE_TEMPLATE/config.yml) routes
+> "blank" issues there on purpose.
+
+Before asking, please:
+
+- Search the [README](README.md), this document, [CLAUDE.md](CLAUDE.md),
+  and the [CHANGELOG](CHANGELOG.md). Most "why does the build do X?" /
+  "how do I run the test stack?" / "what is `owning_squadron_id`?"
+  questions are answered there.
+- Search open **and closed** Discussions / Issues for an existing answer.
+
+If none of that helps, open a Discussion with:
+
+- A clear, specific title.
+- What you tried and what you observed.
+- Versions (commit SHA / release tag) and environment
+  (local Gradle, local Compose, local test stack, …).
 
 ---
 
-#### How Do I Submit A (Good) Bug Report?
+## Reporting a security vulnerability
 
-Bugs are tracked as Issues. Provide the following information by filling in the template.
+**Do not open a public Issue, Discussion, or Pull Request for anything
+you believe is security-sensitive.** Public disclosure before a fix is
+available puts every operator running this project at risk.
 
-Explain the problem and include additional details to help maintainers reproduce the problem:
-
-- **Use a clear and descriptive title** for the issue to identify the problem.
-- **Describe the exact steps which reproduce the problem** in as many details as possible.  
-  For example, start by explaining how you started the software. When listing steps, **don't only say what you did, but explain how you did it**.
-- **Provide specific examples to demonstrate the steps.**  
-  Include links to files, other projects, or copy/pasteable snippets. If you're providing snippets in the issue, use [Markdown code blocks](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
-- **Describe the behavior you observed after following the steps** and point out what exactly is the problem with that behavior.
-- **Explain which behavior you expected to see instead and why.**
-- **Include screenshots and animated GIFs** that show you following the described steps and clearly demonstrate the problem.
-- **If you're reporting that Iridium HQ - Backend crashed**, include a crash report with a stack trace.  
-  Include the crash report in the issue in [code block](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax), a file attachment, or a [GitHub Gist](https://gist.github.com/) and provide the link to that snippet.
-- **If the problem wasn't triggered by a specific action**, describe what you were doing before the problem happened.
-
-Provide more context by answering these questions:
-
-- **Did the problem start happening recently,** (e.g., after updating to a new version of Iridium HQ - Backend) or was this always a problem?
-- If the problem started happening recently, **can you reproduce the problem in an older version of Iridium HQ - Backend?**  
-  What's the most recent version in which the problem doesn't happen?
-- **Can you reliably reproduce the issue?**  
-  If not, provide details about how often the problem happens and under which conditions it normally happens.
-- If the problem is related to working with files (e.g., opening and editing files), **does the problem happen for all files and projects or only some?**
-
-Include details about your configuration and environment:
-
-- **Which version of Iridium HQ - Backend are you using?**
-- **What's the name and version of the OS you're using?**
-- **What's your Java version and type** (JRE or JDK)? (Only when you use the JAR directly.)
-- **What's your Java distribution** (e.g., Oracle, OpenJDK, AdoptOpenJDK, Amazon Coretto)? (Only when you use the JAR directly.)
-- **Are you running Iridium HQ - Backend in a virtual machine or a container?**  
-  If so, which VM/Container software are you using and which operating systems and versions are used for the host and the guest?
+Report vulnerabilities confidentially through
+**[GitHub Private Vulnerability Reporting](https://github.com/krt-iri/basetool/security/advisories/new)**.
+The full policy — supported versions, scope (cross-tenant data access,
+auth bypass, optimistic-lock bypass, SSRF, sensitive data in logs,
+supply-chain), coordinated-disclosure window, safe-harbor commitment,
+how to verify a released container image via Cosign / SLSA / SBOM — is
+in [`.github/SECURITY.md`](.github/SECURITY.md).
 
 ---
 
-### Suggesting Enhancements
+## Reporting bugs
 
-This section guides you through submitting an enhancement suggestion for Iridium HQ - Backend, including new features and improvements.  
-Follow [this list](#before-submitting-an-enhancement-suggestion) before creating a suggestion.  
-Fill in the template with a description and the steps you'd take if the feature existed.
+Bugs are tracked as
+[GitHub Issues](https://github.com/krt-iri/basetool/issues) via the
+[Bug Report template](.github/ISSUE_TEMPLATE/bug_report.yml). The
+template asks for everything maintainers normally need: summary, area,
+version / commit SHA, environment, reproduction steps, expected vs.
+actual behaviour, the **`X-Correlation-Id`** of the failing request, the
+affected role, and (for UI bugs) the browser and device class.
 
-#### Before Submitting An Enhancement Suggestion
+Two non-obvious rules worth highlighting:
 
-- **Perform a cursory search** to see if the enhancement has already been suggested.  
-  Add a comment to the existing issue instead of opening a new one.
+- **Never include tokens, passwords, email addresses, real names, or JWTs**
+  in a bug report. The Self-Check on the template makes you confirm this
+  explicitly — please do not check the box if there is sensitive data in
+  the issue body.
+- **If you found a closed issue that looks like the same problem, open a
+  new one** and link the original from the body. Reopening someone
+  else's closed issue makes triage harder.
 
----
-
-**Note:** If you find a **Closed** issue that is similar to your suggestion, and you have new arguments, open a new issue and include a link to the original one.
-
----
-
-#### How Do I Submit A (Good) Enhancement Suggestion?
-
-Enhancement suggestions are tracked as Issues. Create an issue and provide:
-
-- **A clear and descriptive title**
-- **Step-by-step description** of the proposed feature.
-- **Specific examples** (e.g., code snippets in [Markdown code blocks](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)).
-- **Expected behavior** and how it differs from the current behavior.
-- **Screenshots and animated GIFs** where applicable.
-- **An explanation of why the enhancement would be useful**.
-- **Version details for Iridium HQ - Backend, your browser, and your OS.**
+A good bug report includes the correlation ID; with it, maintainers can
+go straight to the matching log lines (`correlationId` MDC field in
+`logs/{backend,frontend}.json`) instead of guessing which request you
+mean.
 
 ---
 
-## Your First Code Contribution
+## Suggesting features
 
-Look for `beginner` or `help-wanted` issues to get started:
+Feature requests use the
+[Feature Request template](.github/ISSUE_TEMPLATE/feature_request.yml).
+The template intentionally asks for:
 
-- **Beginner issues**: Simple fixes requiring only a few lines of code.
-- **Help wanted issues**: More involved tasks than beginner issues.
+- The **problem / use case** (who benefits, in which role).
+- A **proposed solution** — UI sketch, API shape, or workflow.
+- **Alternatives** you considered and rejected.
+- A scope checklist that flags non-obvious follow-on work (Flyway
+  migration, role logic, multi-user / multi-squadron isolation,
+  responsive UI work, i18n keys in DE + EN + fallback, CHANGELOG entry,
+  OpenAPI updates, Resilience4j configuration for new backend calls).
+
+If your proposal needs a Flyway migration or touches the role model or
+the squadron-scope rules, please link to the relevant sections of
+[CLAUDE.md](CLAUDE.md) so the discussion can move quickly.
+
+Refactors, dependency upgrades, build / CI work, and docs-only changes
+use the
+[Task template](.github/ISSUE_TEMPLATE/task.yml) instead.
 
 ---
 
-## Pull Requests
+## Your first code contribution
 
-- Open a pull request (PR) against the **develop** branch.
-- Prefix the MR name with one of these types: "FEATURE", "BUG", "CHORE", "META", e.g., `[FEATURE – Database]`.
-- Fill in the template.
-- Avoid issue numbers in titles.
-- Provide screenshots or animated GIFs, where possible.
-- Document new code based on [Style Guides](#style-guides).
-- End all files with a newline.
-- Avoid platform-dependent code.
+Looking for an entry point? Filter the issue tracker by these labels:
+
+- [`good first issue`](https://github.com/krt-iri/basetool/labels/good%20first%20issue) — small, well-scoped fixes that don't require deep architectural knowledge.
+- [`help wanted`](https://github.com/krt-iri/basetool/labels/help%20wanted) — open tasks where additional contributors are explicitly welcome.
+
+If you cannot find anything that suits you, opening a Discussion that
+describes what you would like to work on is a perfectly fine starting
+point.
 
 ---
 
-## Style Guides
+## Local development setup
 
-### Git Commit Messages Style Guide
+The README is the canonical place. The relevant sections:
 
-- Use the present tense ("Add feature" not "Added feature").
-- Use the imperative mood ("Move cursor to…" not "Moves cursor to…").
-- Limit the first line to 72 characters or fewer.
-- Reference issues and MRs (`relates to #XYZ`, `relates to !XYZ`).
-- Add `[skip ci]` to skip CI pipelines if unnecessary.
+- [§4.1 Prerequisites](README.md#41-prerequisites) — Java 25 + Docker + Compose.
+- [§4.2 Local development setup](README.md#42-local-development-setup-running-the-apps-from-gradle) — recommended for active development (apps on the host JVM, dependencies in containers).
+- [§4.3 Full dev stack with Compose](README.md#43-running-the-full-dev-stack-with-docker-compose) — when you need the whole thing in containers.
+- [§4.4 Local test stack](README.md#44-running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [CLAUDE.md → Testing](CLAUDE.md) for the rationale.
+- [§4.5 Running tests](README.md#45-running-tests) — Gradle wrapper only, never the IDE test runner.
+- [§4.6 Linting, static analysis, SBOM](README.md#46-linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
 
-### Java Style Guide
+Hard project rule: **always use the Gradle wrapper** (`./gradlew`).
+Never the IDE test runner; never `mvn`; never a system-installed Gradle.
+This is what CI runs, this is what every contributor's machine runs,
+and "works in the IDE" is not a passing state.
 
-- Follow [Google's Java Style Guide](https://google.github.io/styleguide/javaguide.html).  
-  IntelliJ IDEA XML settings file is available in the settings directory.
+---
 
-### JavaDoc Style Guide
+## Pull requests
 
-- Always update the `@author` tag but retain earlier authors.
-- Use the `@since` tag.
+### Workflow
+
+1. Fork (or branch directly if you have push access).
+2. Branch off `main` — there is no long-lived `develop` branch.
+3. Make focused commits using the [commit-message style](#commit-messages).
+4. Run the [before-you-push checklist](#before-you-push-checklist) locally.
+5. Open the PR **against `main`**.
+6. Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) — the template auto-populates the PR body and includes a multi-section checklist (General, Code Quality, Tests, API & Database, Security & Data Isolation, UI / Frontend, Configuration & Dependencies). Tick what applies; sections marked *(if affected)* can stay untouched if your change does not touch that area.
+7. Mark the PR as **Draft** and prefix the title with `WIP` while it is in progress.
+
+### CI
+
+The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue`
+on every PR and push to `main`. That includes Checkstyle, SpotBugs, the
+full JUnit suite, the JaCoCo coverage report, and the CycloneDX SBOMs.
+Reports are uploaded as workflow artefacts so reviewers can download
+them when investigating a failure. **CI must be green before a PR
+merges** — there is no "rerun until it passes" allowance.
+
+In addition, [CodeQL](.github/workflows/codeql.yml) and an OWASP
+[dependency check](.github/workflows/dependency-check.yml) run on a
+schedule; if your change introduces a new security finding, expect to
+address it before merge.
+
+### Review and merge
+
+- PRs are reviewed by maintainers; non-trivial changes typically need at least one approving review.
+- Reviewer comments are not blockers by default — please respond to them, even if your response is "I disagree, here is why".
+- Maintainers normally merge via **squash merge** so the final commit on `main` matches the PR title. Write the PR title accordingly: it is what ends up in `git log`.
+- Do not force-push to a PR branch once review has started unless a reviewer asks you to; prefer additional commits and let the squash collapse them at merge time.
+
+---
+
+## Commit messages
+
+The repository follows **[Conventional Commits](https://www.conventionalcommits.org/)**.
+The PR title becomes the squash-merge commit subject, so the same rules
+apply there.
+
+### Format
+
+```
+<type>(<scope>): <short summary>
+
+<optional body>
+
+<optional footer(s)>
+```
+
+- **`<type>`** — one of `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `style`, `build`, `ci`, `perf`. Add a `!` (e.g. `feat!`) for breaking changes, or use a `BREAKING CHANGE:` footer.
+- **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `promotion`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
+- **`<short summary>`** — imperative mood (*"add foo"*, not *"added foo"* or *"adds foo"*), lower-case start, no trailing period, ≤ 72 characters including the prefix.
+- **Body** — explain the *why*. Reference Issues / PRs (`closes #123`, `refs #456`). Keep lines ≤ 100 characters.
+- **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, etc.
+
+### Examples (taken from real history)
+
+```
+feat(multi-tenant): make Basetool multi-squadron capable
+fix(db/V80): drop+recreate mission_participant FK around IRIDIUM UUID swap
+chore(multi-tenant): Phase 7 part 1 - stop writing legacy job_order.squadron VARCHAR
+fix(frontend/orders): use public WebClient for guest material fetch
+refactor(logging): replace [DEBUG_LOG] markers with debug-level logging
+docs(github): translate issue and PR templates to English
+chore(deps): refreshVersions proposals
+```
+
+> [!NOTE]
+> The Conventional Commits format **replaces** the older
+> `[FEATURE – X]` / `[BUG – X]` prefix scheme that earlier versions of
+> this guide described. Do not use the bracket-prefixed style any more.
+
+---
+
+## Branch names
+
+There is no strict naming policy, but a useful convention is:
+
+```
+<type>/<short-kebab-case-description>
+```
+
+Examples: `feat/squadron-switcher-ui`, `fix/orders-guest-webclient`,
+`chore/refresh-versions-may`. Avoid embedding issue numbers in branch
+names — they go into commit messages and PR descriptions instead.
+
+The `main` branch is the only long-lived branch. There is no `develop`,
+no `release/*`, no `staging/*`. Releases are cut by tagging `main` with
+`vX.Y.Z`; see [`docs/deployment.md`](docs/deployment.md) for the full
+release loop.
+
+---
+
+## Style guides
+
+### Java
+
+- **Google Java Style** is the baseline, enforced by Checkstyle
+  (`config/checkstyle/google_checks.xml`). IntelliJ IDEA settings live in
+  the `settings/` directory.
+- **Spotless** auto-formats Java sources — `./gradlew spotlessApply` is
+  mandatory before every push. Spotless is wired into `check` with
+  `isEnforceCheck = true`, so unformatted code fails CI.
+- **Checkstyle** runs with `maxWarnings = 0`. **Every** new or changed
+  warning in the changed code must be fixed; do not silence findings
+  with `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle
+  suppressions unless the rule is genuinely wrong for that specific
+  call site — and then leave a one-line comment explaining why.
+- **SpotBugs** runs as part of `check`. Same rule: no new findings on
+  top of pre-existing ones.
+- **Constructor injection only**, ideally via Lombok
+  `@RequiredArgsConstructor`. No field `@Autowired`.
+- **Records** for DTOs and immutable config wrappers; no equivalent
+  POJOs.
+- **Lombok** — lean on it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`,
+  `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`,
+  `@Data`) to avoid boilerplate.
+- **Loggers** exclusively via `@Slf4j` — never `LoggerFactory.getLogger(...)`.
+- **Modern Java** — switch expressions, pattern matching, sealed classes
+  where exhaustiveness genuinely helps.
+- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`) on
+  anything that communicates a real contract.
+
+### Javadoc
+
+Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
+`MissingJavadocMethod`, `SummaryJavadoc`, `InvalidJavadocPosition`,
+`JavadocParagraph`, `AtclauseOrder`). The rules:
+
+- **Every** new / changed class, interface, enum, record, and
+  public/protected method needs Javadoc — including trivial
+  getters/setters (document at the field level for Lombok-generated
+  members).
+- Javadoc must describe the *actual* behaviour, parameters, return
+  values, side effects, thrown exceptions, and non-obvious invariants
+  of the specific code it annotates.
+- **Generic boilerplate is forbidden.** Phrases like *"Gets the value"*,
+  *"Returns the result"*, *"Does something"*, *"Helper method"*, or just
+  restating the method name in prose are not acceptable. If you cannot
+  write a concrete, code-specific sentence, read the implementation
+  again until you can.
+- Always update the `@author` tag for substantial changes but retain
+  earlier authors.
+- Use the `@since` tag with the release version when adding new public
+  API.
+
+### Internationalization (i18n)
+
+- **Every** user-visible string comes from
+  `frontend/src/main/resources/messages.properties` (and
+  `messages_de.properties` / `messages_en.properties`). No exceptions —
+  labels, buttons, tooltips, error messages, flash messages, alerts,
+  placeholders, titles. No hardcoded text in HTML, JS, or Java.
+- **German umlauts in `.properties` files MUST be encoded as `\uXXXX`**
+  — e.g. `ä` for `ä`. This is a hard rule, enforced by review.
+- **German umlauts in Markdown files MUST be literal UTF-8 characters.**
+  Never use `\uXXXX` outside `.properties`.
+- New keys land in `messages.properties` (fallback) plus both
+  `messages_de.properties` and `messages_en.properties`.
+
+### Frontend / UI
+
+The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
+[`Styleguide.md`](Styleguide.md) and the *Frontend / UI rules* section
+of [`CLAUDE.md`](CLAUDE.md). Highlights:
+
+- **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
+  or black.
+- **Backgrounds** `#000000` / `#141414` (dark-mode aesthetic).
+- **Headlines** `Ethnocentric`, **uppercase only**, with letter-spacing
+  tweaks for the font's irregular kerning.
+- **Body** `Lato` (Light 300 standard, Bold 700 emphasis).
+- **Department colours** are semantic — Combat red `#A3000A`,
+  Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit
+  green `#239E33`, Search & Rescue yellow `#FFD23F`, Marine Corps
+  purple `#7A5E96`. Use them only in their semantic context.
+- **Never** use `confirm()`, `alert()`, or any native browser dialog.
+  Build a KRT-styled modal or toast instead.
+- **Responsive design is mandatory across four device classes**:
+  Smartphone (≤ 768 px), Tablet (768–1024 px), Desktop (1024–1600 px),
+  Ultra-wide (1600 px+). Minimum touch target 44 px; long-form text
+  capped at `max-width: 80ch`.
+- **DOM `data-version` propagation** — when an entity is updated via
+  AJAX, the new `version` must propagate to **every** related element in
+  the same context (edit buttons, modals inside the same `<tr>` /
+  container). A missed `data-version` becomes a 409 on the user's next
+  click. When in doubt, `window.location.reload()` on success.
+
+### Markdown and documentation
+
+- Wrap lines around 80 characters in long-form prose; tables and code
+  blocks are exempt.
+- Use Markdown headings hierarchically (no jumping from `##` to `####`).
+- Code samples in fenced blocks with a language hint (` ```java`,
+  ` ```bash`, ` ```yaml`).
+- Cross-link to other docs in the repo with relative paths so links
+  work both on GitHub and in a local checkout.
+- The
+  [`docs/`](docs/) directory is for long-form documentation
+  (deployment runbook, design notes); ad-hoc scratch files do not
+  belong there.
+
+### Git and GitHub language
+
+**Always write Git and GitHub content in English** — commit messages,
+branch names, tag names and messages, PR titles and bodies, PR review
+comments, issue titles and bodies, issue comments, Discussions posts,
+release notes. This applies regardless of the language a contributor or
+reporter writes in: translate substance into English before committing
+or posting. The only exception is verbatim quoting of existing
+non-English content (e.g. quoting a user-reported error message in an
+issue) — the surrounding prose you author stays English.
+
+Reason: the codebase has international contributors and the source-of-
+truth audit trail (git log, PR history, advisories) must be readable by
+all of them.
+
+---
+
+## Architectural invariants to know before you change code
+
+The codebase has a small number of invariants that exist because real
+bugs hit production when they were violated. They are enforced by
+ArchUnit, Checkstyle, the CI build, and — where automation cannot reach
+— by review. Read the matching CLAUDE.md / README.md sections **before**
+you touch these areas.
+
+### Security model
+
+- Both modules use Spring Security with Keycloak OIDC. Backend = resource
+  server (validates JWT); frontend = OAuth2 client.
+- **Authorization is centralised in `@PreAuthorize` annotations on
+  services and controllers.** Keep checks out of business logic.
+- `SecurityContextHolder` is forbidden outside the auth-helper service
+  (ArchUnit-enforced). Every `@RestController` carries at least one
+  `@PreAuthorize`. Controllers do not return JPA entities. The frontend
+  module does not depend on Spring Data JPA.
+- Full role / permission matrix:
+  [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
+
+### Multi-user data isolation
+
+- Every read / write must filter by JWT `sub` unless the caller has an
+  elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service
+  layer, not the controller.
+- For unauthenticated guests, the controller must explicitly clear
+  sensitive fields (email, real name, internal orders / items) via a
+  `cleanupForGuest`-style helper. Returning a full DTO to a guest is an
+  information-disclosure bug.
+
+### Multi-squadron tenancy
+
+- Five aggregate roots are **strictly squadron-scoped**: `Ship`,
+  `InventoryItem` (direct Lager-View), `RefineryOrder`, `Operation`,
+  and `Mission` (with a public-escape carve-out for non-internal
+  missions).
+- `JobOrder` is intentionally **cross-squadron** and carries both a
+  `creating_squadron_id` (immutable) and a `requesting_squadron_id`
+  (editable on whose behalf the order runs).
+- Scope is enforced in the service layer via
+  [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java);
+  controllers gate detail / write endpoints with
+  `@PreAuthorize("@squadronScopeService.canEdit…")`.
+- ArchUnit rule `staffelScopedServicesMustWireSquadronOrAuthHelper`
+  breaks the build if a staffel-scoped service stops injecting
+  `AuthHelperService` / `SquadronScopeService`. Update the whitelist in
+  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+  when you add a new staffel-scoped aggregate.
+- Full operational rules: [`CLAUDE.md`](CLAUDE.md) → *Multi-squadron tenancy*.
+
+### Concurrency: optimistic locking and the `*WithinTransaction` pattern
+
+The codebase has been bitten by optimistic-locking traps multiple times.
+The rules in [CLAUDE.md → Concurrency](CLAUDE.md) exist because of real
+bugs that shipped. The short version:
+
+- **Optimistic locking via `@Version`** — every write DTO carries
+  `version`; concurrent modifications surface as
+  `ObjectOptimisticLockingFailureException` → HTTP 409. Do not strip
+  `version` from DTOs.
+- **`@Modifying` bulk updates with `clearAutomatically = true` detach
+  the entire persistence context.** Never run such a bulk update inside
+  a loop that mutates more than one item of the same aggregate.
+- **`*WithinTransaction` pattern** — when a `@Transactional` service
+  method modifies an entity and then calls another service that operates
+  on the **same** entity, expose a dedicated
+  `completeSomethingWithinTransaction(Entity entity)` method annotated
+  `@Transactional(propagation = MANDATORY)` that operates on the
+  already-managed entity and relies on dirty-checking. Canonical
+  example:
+  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/JobOrderService.java).
+- **Pessimistic locking** for bulk reorders / priority shifts:
+  `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL).
+
+### API conventions
+
+- Versioned URI paths `/api/v1/...`; breaking changes → `/api/v2/...`
+  plus `@ApiDeprecation(sunset=..., replacement=...)` on the retired
+  endpoint.
+- **DTOs only at boundaries.** Never expose JPA entities. DTOs are
+  records with Jakarta validation annotations on write fields.
+- `@Valid` on every `@RequestBody` for POST / PUT / PATCH.
+- Errors are RFC 7807 Problem Details (`application/problem+json`) via
+  `GlobalExceptionHandler` — do not throw into the void.
+- List endpoints take `Pageable` and return `PageResponse`. **Whitelist
+  allowed sort fields** in the service — never pass user input directly
+  to `Sort`.
+- All timestamps in UTC (`Instant` / `OffsetDateTime`); timezone
+  conversion happens in the display layer only.
+- Keep [`backend/src/main/resources/api/openapi.json`](backend/src/main/resources/api/openapi.json)
+  in sync with controller changes; every endpoint carries SpringDoc
+  annotations (`@Operation`, `@ApiResponses`).
+
+### Database
+
+- Schema is owned by Flyway. Every change is a new
+  `V<n>__<description>.sql` under
+  [`backend/src/main/resources/db/migration`](backend/src/main/resources/db/migration).
+- **Hibernate `ddl-auto` stays at `validate` everywhere — never
+  `update` or `create`.** Validate is one-directional (entity → DB);
+  orphan DB columns are intentional during two-phase drops.
+- Destructive operations follow the two-phase rule (stop-write release
+  → drop release) documented in
+  [`db/migration/README.md`](backend/src/main/resources/db/migration/README.md).
+- Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data
+  projections.
+
+### Frontend resilience and config
+
+- WebClient is centrally configured (base URL, headers, connect / read /
+  write timeouts).
+- **Resilience4j** wraps every backend call (Timeout, Retry,
+  CircuitBreaker, Bulkhead). State transitions are logged via
+  `ResilienceEventLogger` so degraded-backend symptoms
+  (`SERVICE_UNAVAILABLE`, `BACKEND_TIMEOUT`) always have a matching log
+  line.
+- Type-safe configuration via `@ConfigurationProperties` + `@Validated`
+  on every Keycloak / backend / limits properties class. Misconfiguration
+  is caught at startup.
+
+### Logging
+
+- Both modules emit one access-log line per request and enrich every log
+  line with MDC fields `correlationId`, `userId`, and `squadronId`.
+- The `prod` profile additionally writes structured JSON
+  (`LogstashEncoder`) to `logs/{backend,frontend}.json` with errors
+  rolled into `*-error.log` for fast triage.
+- **Never log names, emails, JWTs, or tokens.**
+
+### Tests
+
+- Tests live in the same package structure under `src/test/java/`
+  mirroring `src/main/java/`.
+- Naming: `*Test` suffix (`UserServiceTest`).
+- Structure: Given / When / Then (or Arrange / Act / Assert).
+- Mock external / complex dependencies with Mockito (`@Mock`,
+  `@InjectMocks`).
+- **Every new feature ships with tests.** No exceptions.
+- **Never use production / real credentials in tests or local test
+  stacks.** This is a hard rule covering Mockito unit tests, MockMvc,
+  `@SpringBootTest`, TestContainers, and any locally-spun-up stack used
+  to verify a change. The recovery for a leaked secret is more
+  expensive than always using the `.env.test` / throwaway `keystore.p12` /
+  stripped `realm-export.json` route described in
+  [README §4.4](README.md#44-running-the-local-test-stack) and
+  [CLAUDE.md → Testing](CLAUDE.md).
+
+---
+
+## Before-you-push checklist
+
+A condensed version of the PR template. Run through this before opening
+the PR — every box should be reasonably tickable.
+
+- [ ] `./gradlew spotlessApply` was the last formatting change.
+- [ ] `./gradlew check` passes locally (Checkstyle, SpotBugs, tests).
+- [ ] No new Checkstyle / SpotBugs findings in the **changed code**.
+- [ ] Every new / changed public API has Javadoc — concrete, code-specific, no boilerplate.
+- [ ] New / changed code has tests (`*Test`, Given/When/Then); concurrency-sensitive changes test the optimistic-lock path.
+- [ ] No production credentials in test artefacts, stack spin-ups, or screenshots.
+- [ ] `CHANGELOG.md` updated under `## [Unreleased]` in the correct category (`Added` / `Changed` / `Fixed` / `Removed` / `Security`).
+- [ ] No tokens, passwords, real names, emails, or JWTs in the diff or in logs.
+- [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
+- [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
+- [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
+- [ ] For dependency upgrades: edited `versions.properties` / `gradle/libs.versions.toml`, not `build.gradle.kts` directly.
+
+If you find yourself wanting to skip a checklist item "for now", that is
+the moment to add a follow-up issue and link it from the PR description
+instead of silently shipping the gap.
+
+---
+
+## License and sign-off
+
+IRIDIUM Basetool is released under the
+[GNU General Public License v3.0](LICENSE.md). By contributing, you
+agree that your contribution is licensed under the same terms.
+
+There is no formal Contributor License Agreement (CLA) or DCO sign-off
+required. Standard good faith applies: only contribute code you wrote,
+or for which you have the right to grant a GPL-3.0 license. If you
+incorporate third-party code, make sure the upstream license is
+compatible with GPL-3.0 and call it out in the PR description.
+
+---
+
+Thanks again for being here. The IRIDIUM Basetool exists because a
+bunch of people kept showing up to make squadron logistics a little
+less painful — your contribution is part of that.
