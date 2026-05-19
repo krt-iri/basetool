@@ -1,0 +1,24 @@
+-- =====================================================================
+-- V88 - Phase 7 part 2: stop writing the legacy job_order.squadron VARCHAR
+-- =====================================================================
+-- Phase 7 of MULTI_SQUADRON_PLAN.md section 10: first half of the
+-- two-phase column drop (db/migration/README.md: drop NOT NULL + stop
+-- writing in release N, DROP COLUMN in release N+1). The JPA field is
+-- removed in this same commit so Hibernate no longer references the
+-- column; the column itself stays on disk until V89 drops it in the
+-- next-but-one release iteration.
+--
+-- Why first drop NOT NULL: any code path that still INSERTs into the
+-- table without supplying `squadron` (e.g. an out-of-process script,
+-- an old replica during a rolling deploy, or a manual SQL session)
+-- must not fail. After V88 the column is "write-optional, read-ignored
+-- by the application"; after V89 it is gone entirely.
+--
+-- Why no index drop: the column was never indexed in production —
+-- pg_indexes confirms only the PK index exists on job_order in the
+-- current dev/test stack, and a grep across the migration directory
+-- shows no CREATE INDEX statement referencing the squadron column.
+-- Keeping the explicit ALTER TABLE here even though the index drop is
+-- a no-op so the migration script is parallel to the plan's wording.
+
+ALTER TABLE job_order ALTER COLUMN squadron DROP NOT NULL;

@@ -78,7 +78,9 @@ class JobOrderServiceAssigneeAndListTest {
               return new JobOrderDto(
                   o.getId(),
                   o.getDisplayId(),
-                  o.getSquadron(),
+                  o.getRequestingSquadron() != null
+                      ? o.getRequestingSquadron().getShorthand()
+                      : null,
                   null,
                   null,
                   o.getHandle(),
