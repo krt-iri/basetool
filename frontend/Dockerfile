@@ -1,6 +1,16 @@
 FROM eclipse-temurin:25-jdk-alpine AS build
 WORKDIR /app
 
+# Application version string forwarded to Gradle's `bootBuildInfo` via
+# `-PappVersion=...`. `.dockerignore` excludes `.git` from the build context
+# (intentional — keeps the build context small and is consistent with secrets
+# policy), so `git describe` inside the container has nothing to work with.
+# Instead the CI workflow computes the value on the runner (where `.git` is
+# fully checked out with `fetch-depth: 0`) and passes it through as a
+# `--build-arg`. Unset (= local `docker build` without the arg) falls back to
+# the Gradle project version inside `frontend/build.gradle.kts`.
+ARG APP_VERSION=
+
 # Gradle-Wrapper und Konfigurationsdateien für Dependency-Caching kopieren
 COPY gradlew .
 COPY gradle/ gradle/
@@ -29,7 +39,11 @@ RUN ./gradlew :frontend:dependencies --no-daemon || true
 # runs `./gradlew check` separately on a controlled environment where format
 # enforcement is the right call.
 COPY frontend/src/ frontend/src/
+# `${APP_VERSION:+...}` only expands when the build-arg was set and non-empty,
+# so a `docker build` without `--build-arg APP_VERSION=...` still works and the
+# Gradle fallback in `frontend/build.gradle.kts` kicks in.
 RUN ./gradlew :frontend:build \
+    ${APP_VERSION:+-PappVersion=$APP_VERSION} \
     -x test \
     -x checkstyleMain \
     -x spotbugsMain \
