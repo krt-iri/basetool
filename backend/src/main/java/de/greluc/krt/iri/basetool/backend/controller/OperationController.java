@@ -6,6 +6,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.OperationFinanceService;
@@ -108,6 +109,31 @@ public class OperationController {
         dtoPage.getTotalElements(),
         dtoPage.getTotalPages(),
         PaginationUtil.toSortStrings(dtoPage.getSort()));
+  }
+
+  /**
+   * Slim id + name projection of every operation visible to the caller, sorted by name. Drives the
+   * mission-detail page's operation-picker dropdown — replaces the previous {@code
+   * /api/v1/operations?page=0&size=1000} call that pulled the full {@code OperationDto} payload for
+   * every option on every mission page render.
+   *
+   * @return slim reference DTOs for the operation picker
+   */
+  @GetMapping("/lookup")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Lookup operations",
+      description =
+          "Returns a slim id + name reference list of every operation in the caller's squadron"
+              + " scope, sorted by name. Designed for dropdowns and typeaheads where the full"
+              + " OperationDto payload is overkill.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Reference list returned."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
+  })
+  @Transactional(readOnly = true)
+  public List<OperationReferenceDto> lookupOperations() {
+    return operationService.findAllReference();
   }
 
   /**
