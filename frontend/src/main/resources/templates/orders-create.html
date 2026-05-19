@@ -183,8 +183,12 @@
             
             if (match) {
                 const materialName = match[1].trim().toLowerCase();
-                let amount = match[2].replace(',', '.'); // Komma zu Punkt für JS parseFloat
-                
+                // Komma zu Punkt + numerische Normalisierung, damit Werte wie
+                // "2.0000" (Laranite/Titanium) oder "0.0200" (Aluminum) ohne
+                // überflüssige Nachkomma-Nullen im number-Input landen.
+                const amount = parseFloat(match[2].replace(',', '.'));
+                if (isNaN(amount)) continue;
+
                 // Finde materialId im Template
                 let materialId = null;
                 for (let i = 0; i < materialOptions.length; i++) {
