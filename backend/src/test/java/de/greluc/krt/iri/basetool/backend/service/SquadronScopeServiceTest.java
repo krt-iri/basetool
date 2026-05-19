@@ -3,7 +3,11 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
@@ -19,6 +23,8 @@ import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -380,6 +386,77 @@ class SquadronScopeServiceTest {
 
       assertTrue(service.canSeeRefineryOrder(orderId));
       assertTrue(service.canEditRefineryOrder(orderId));
+    }
+  }
+
+  /**
+   * Verifies the request-scoped memoisation on {@link SquadronScopeService#currentSquadronId()} and
+   * {@link SquadronScopeService#currentSquadron()}. Without this, every controller call chain on a
+   * non-admin request would re-hit {@code userRepository.findById} and {@code
+   * squadronRepository.findById} once per scope query - cheap on a single call, but multiplied
+   * across the authz checks and list filters that fire inside one HTTP request the cost compounds.
+   */
+  @Nested
+  class RequestScopedCacheTests {
+
+    private Map<String, Object> requestAttributes;
+
+    @BeforeEach
+    void backRequestAttributesWithMap() {
+      requestAttributes = new HashMap<>();
+      lenient()
+          .when(request.getAttribute(anyString()))
+          .thenAnswer(inv -> requestAttributes.get(inv.getArgument(0, String.class)));
+      lenient()
+          .doAnswer(
+              inv -> {
+                requestAttributes.put(inv.getArgument(0), inv.getArgument(1));
+                return null;
+              })
+          .when(request)
+          .setAttribute(anyString(), any());
+    }
+
+    @Test
+    void currentSquadronId_nonAdmin_calledTwice_hitsUserRepoOnce() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+
+      Optional<UUID> first = service.currentSquadronId();
+      Optional<UUID> second = service.currentSquadronId();
+
+      assertEquals(Optional.of(SQUADRON_A_ID), first);
+      assertEquals(first, second);
+      verify(userRepository, times(1)).findById(MEMBER_USER_ID);
+    }
+
+    @Test
+    void currentSquadron_calledTwice_hitsSquadronRepoOnce() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      when(squadronRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
+
+      Optional<Squadron> first = service.currentSquadron();
+      Optional<Squadron> second = service.currentSquadron();
+
+      assertEquals(Optional.of(squadronA), first);
+      assertEquals(first, second);
+      verify(squadronRepository, times(1)).findById(SQUADRON_A_ID);
+    }
+
+    @Test
+    void currentSquadronId_andCanSeeSquadron_shareUserRepoLookup() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+
+      service.currentSquadronId();
+      assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
+      assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
+
+      verify(userRepository, times(1)).findById(MEMBER_USER_ID);
     }
   }
 

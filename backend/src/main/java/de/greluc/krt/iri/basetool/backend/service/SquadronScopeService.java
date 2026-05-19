@@ -56,6 +56,22 @@ public class SquadronScopeService {
    */
   public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
 
+  /**
+   * Request-attribute key under which the result of {@link #readPersistentSquadronFromUser()} is
+   * cached for the duration of the current HTTP request. Stored as {@code Optional<UUID>} (never
+   * {@code null}) so the cache can distinguish "resolved to empty" from "not yet resolved".
+   */
+  private static final String CACHE_KEY_PERSISTENT_USER_SQUADRON_ID =
+      SquadronScopeService.class.getName() + ".persistentUserSquadronId";
+
+  /**
+   * Request-attribute key under which the result of {@link #currentSquadron()} is cached for the
+   * duration of the current HTTP request. Same distinction-via-Optional contract as {@link
+   * #CACHE_KEY_PERSISTENT_USER_SQUADRON_ID}.
+   */
+  private static final String CACHE_KEY_CURRENT_SQUADRON =
+      SquadronScopeService.class.getName() + ".currentSquadron";
+
   private final AuthHelperService authHelper;
   private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
@@ -73,19 +89,17 @@ public class SquadronScopeService {
    * Empty result means "no filter" for admins ("all squadrons") and "no access" for non-admins
    * (typically unauthenticated/anonymous).
    *
-   * <p>The call hits the DB for non-admin requests (one {@code userRepository.findById} per call).
-   * Callers in hot paths should resolve it once per request rather than per filtered row.
+   * <p>The non-admin branch's {@code userRepository.findById} round-trip is memoised on the
+   * HttpServletRequest via {@link #readPersistentSquadronFromUser()}, so repeated calls within the
+   * same request collapse to a single DB hit. The admin branch reads the request header (in-memory)
+   * and is not cached separately - it is already constant-time.
    */
   @NotNull
   public Optional<UUID> currentSquadronId() {
     if (authHelper.isAdmin()) {
       return readActiveSquadronFromHeader();
     }
-    return authHelper
-        .currentUserId()
-        .flatMap(userRepository::findById)
-        .map(User::getSquadron)
-        .map(Squadron::getId);
+    return readPersistentSquadronFromUser();
   }
 
   /**
@@ -97,11 +111,21 @@ public class SquadronScopeService {
    * Mission}, ...) prefer to derive the squadron from the owner so a future user-squadron move does
    * not silently retag history.
    *
+   * <p>Result is memoised per HttpServletRequest so repeated calls in one request (e.g. {@code
+   * isPromotionFeatureEnabledForCurrentScope} after a separate {@code currentSquadron} hit on a
+   * write path) collapse to a single {@code squadronRepository.findById} round-trip.
+   *
    * @return the {@link Squadron} for the current effective context, or empty when none applies.
    */
   @NotNull
   public Optional<Squadron> currentSquadron() {
-    return currentSquadronId().flatMap(squadronRepository::findById);
+    Optional<Optional<Squadron>> cached = readCachedOptional(CACHE_KEY_CURRENT_SQUADRON);
+    if (cached.isPresent()) {
+      return cached.get();
+    }
+    Optional<Squadron> resolved = currentSquadronId().flatMap(squadronRepository::findById);
+    request.setAttribute(CACHE_KEY_CURRENT_SQUADRON, resolved);
+    return resolved;
   }
 
   /**
@@ -343,10 +367,40 @@ public class SquadronScopeService {
 
   @NotNull
   private Optional<UUID> readPersistentSquadronFromUser() {
-    return authHelper
-        .currentUserId()
-        .flatMap(userRepository::findById)
-        .map(User::getSquadron)
-        .map(Squadron::getId);
+    Optional<Optional<UUID>> cached = readCachedOptional(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID);
+    if (cached.isPresent()) {
+      return cached.get();
+    }
+    Optional<UUID> resolved =
+        authHelper
+            .currentUserId()
+            .flatMap(userRepository::findById)
+            .map(User::getSquadron)
+            .map(Squadron::getId);
+    request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);
+    return resolved;
+  }
+
+  /**
+   * Reads a previously-cached {@link Optional} from the current HttpServletRequest under {@code
+   * key}. The outer {@link Optional} of the return value signals presence in the cache: an outer
+   * {@link Optional#empty()} means "key not yet written, do the real work", while a present outer
+   * Optional wraps the cached value (which may itself be {@link Optional#empty()} for the
+   * "resolved-to-empty" case). Keeps the unchecked cast confined to a single helper instead of
+   * being repeated at every call site.
+   *
+   * @param key request-attribute key under which the cached Optional was previously stored
+   * @param <T> element type of the cached Optional
+   * @return outer-present iff the key has been written this request; the inner Optional is the
+   *     cached value as written
+   */
+  @NotNull
+  @SuppressWarnings("unchecked")
+  private <T> Optional<Optional<T>> readCachedOptional(@NotNull String key) {
+    Object raw = request.getAttribute(key);
+    if (raw instanceof Optional<?> opt) {
+      return Optional.of((Optional<T>) opt);
+    }
+    return Optional.empty();
   }
 }
