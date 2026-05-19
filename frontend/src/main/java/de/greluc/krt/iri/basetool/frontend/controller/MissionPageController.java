@@ -9,6 +9,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto;
@@ -80,12 +81,12 @@ public class MissionPageController {
       return;
     }
     try {
-      PageResponse<OperationDto> operationsPage =
+      List<OperationReferenceDto> operations =
           backendApiClient.get(
-              "/api/v1/operations?page=0&size=1000",
-              new ParameterizedTypeReference<PageResponse<OperationDto>>() {},
+              "/api/v1/operations/lookup",
+              new ParameterizedTypeReference<List<OperationReferenceDto>>() {},
               false);
-      model.addAttribute("operationsList", operationsPage.content());
+      model.addAttribute("operationsList", operations);
     } catch (Exception e) {
       log.warn("Could not load operations", e);
       model.addAttribute("operationsList", List.of());

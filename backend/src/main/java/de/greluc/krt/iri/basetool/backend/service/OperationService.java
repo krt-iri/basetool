@@ -118,6 +118,21 @@ public class OperationService {
   }
 
   /**
+   * Returns the slim id + name projection of every operation in the caller's squadron scope, sorted
+   * by name. Used by the mission-detail page's operation-picker dropdown so the page render does
+   * not need to pull the full {@code OperationDto} payload for every option.
+   *
+   * @return slim {@link de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto} list,
+   *     filtered by the caller's squadron scope
+   */
+  @NotNull
+  public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto>
+      findAllReference() {
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return operationRepository.findAllReferenceScoped(owningSquadronId);
+  }
+
+  /**
    * Returns the operation.
    *
    * @param id operation primary key
