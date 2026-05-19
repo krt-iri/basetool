@@ -23,7 +23,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>The legacy {@code squadron} free-text field is preserved on the wire for backwards
  * compatibility — clients that have not migrated to the UUID-typed fields can still post a
  * shorthand string and the service layer resolves it against {@code squadron.shorthand}. The field
- * will be removed when migration V86 drops the legacy column.
+ * will be removed when migration V87 drops the legacy column.
  */
 public record CreateJobOrderDto(
     @Nullable String squadron,

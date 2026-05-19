@@ -8,9 +8,9 @@
 -- replacement happens in three migrations across two releases per the
 -- two-phase drop rule in db/migration/README.md:
 --   V83 (this file)  - add the two FK columns + backfill, keep VARCHAR.
---   V85 (next release) - entity drops the VARCHAR field, migration
+--   V86 (next release) - entity drops the VARCHAR field, migration
 --                        relaxes NOT NULL on the column.
---   V86 (release after) - DROP COLUMN squadron.
+--   V87 (release after) - DROP COLUMN squadron.
 --
 -- Backfill:
 --   creating_squadron_id  - trivially IRIDIUM (single-tenant past).

@@ -1,8 +1,12 @@
 -- =====================================================================
--- V87 - JobOrderHandover audit columns (executing user + squadron)
+-- V84 - JobOrderHandover audit columns (executing user + squadron)
 -- =====================================================================
--- Numbered V87 to leave V84-V86 reserved for the Phase 7 tightening /
--- legacy-VARCHAR drop chain in MULTI_SQUADRON_PLAN.md section 10.
+-- Slots V85-V87 are reserved for the Phase 7 tightening / legacy-VARCHAR
+-- drop chain in MULTI_SQUADRON_PLAN.md section 10. This audit migration
+-- ships with Phase 6 (this release), so it lands BEFORE Phase 7 both
+-- chronologically and in version order — Flyway applies migrations in
+-- strict ascending order with `out-of-order=false` (the project default),
+-- so a Phase-6 migration must have a lower version than Phase 7's chain.
 -- Why: MULTI_SQUADRON_PLAN.md section 4.4 mandates that a handover
 -- protocols the executing user inclusive of their squadron as an audit
 -- information. The cross-staffel workspace lets a Logistician from

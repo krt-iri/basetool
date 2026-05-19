@@ -9,7 +9,7 @@
 -- MULTI_SQUADRON_PLAN.md, sections 1 and 3.2).
 --
 -- Phase 1 of the two-phase rollout: column added as nullable + backfill
--- to IRIDIUM. NOT NULL tightening lands in V84, one release later, once
+-- to IRIDIUM. NOT NULL tightening lands in V85, one release later, once
 -- prod confirms the new code path persists the column on every write.
 
 ALTER TABLE mission        ADD COLUMN owning_squadron_id UUID;

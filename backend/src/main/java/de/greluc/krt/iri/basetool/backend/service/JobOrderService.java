@@ -695,7 +695,7 @@ public class JobOrderService {
    *   <li>Caller's active squadron context ({@link SquadronScopeService#currentSquadron()}).
    *   <li>Admin in "all squadrons" mode without override → {@link BadRequestException} (400). The
    *       Plan is explicit on this: a focused stamp is required so the column is populated
-   *       correctly for the V84 NOT NULL tightening; silently falling back to IRIDIUM would mask a
+   *       correctly for the V85 NOT NULL tightening; silently falling back to IRIDIUM would mask a
    *       real misconfiguration.
    * </ol>
    *

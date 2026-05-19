@@ -590,7 +590,7 @@ public class UserService {
    *
    * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
    * scope ({@link SquadronScopeService} reads it to decide which staffel-scoped aggregates a
-   * non-admin sees). Until V84 tightens the column to NOT NULL, {@code null} is a valid value that
+   * non-admin sees). Until V85 tightens the column to NOT NULL, {@code null} is a valid value that
    * means "admin / unassigned" and falls back to the cross-squadron view.
    *
    * @param userId user primary key; must exist

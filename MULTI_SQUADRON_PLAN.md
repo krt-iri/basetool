@@ -78,9 +78,10 @@ Naechste freie Versionen ab `V80`. Phase 1 fuegt Spalten als nullable hinzu und 
 | `V81__add_squadron_id_to_user.sql` | `app_user.squadron_id UUID` (FK → `squadron`, nullable) + Backfill aller User auf IRIDIUM. **Nicht** NOT NULL – Admins/Guest duerfen ohne Squadron sein. |
 | `V82__add_owning_squadron_to_aggregates.sql` | `owning_squadron_id UUID` (FK → `squadron`, nullable) fuer `mission`, `operation`, `ship`, `inventory_item`, `refinery_order` + Backfill auf IRIDIUM. **Noch ohne NOT NULL.** |
 | `V83__add_job_order_squadron_columns.sql` | `job_order.creating_squadron_id UUID` (FK → `squadron`) + `job_order.requesting_squadron_id UUID` (FK → `squadron`). Backfill:<br>– `creating_squadron_id = IRIDIUM` fuer alle bestehenden Rows (Single-Tenant-Vergangenheit)<br>– `requesting_squadron_id` aus der bestehenden `squadron VARCHAR`-Spalte via LEFT JOIN auf `squadron.name`/`squadron.shorthand`; nicht-aufloesbare Strings fallen auf IRIDIUM zurueck.<br>FK-Constraints anlegen. Bestehende `squadron VARCHAR`-Spalte bleibt zunaechst stehen. **Noch ohne NOT NULL.** |
-| `V84__tighten_squadron_id_not_null.sql` | `SET NOT NULL` fuer `owning_squadron_id` (5 Aggregat-Tabellen) und fuer `creating_squadron_id` + `requesting_squadron_id` (`job_order`). **Erst nach** mind. einem prod-Deploy von `V80`–`V83` (eigene Release-Iteration). |
-| `V85__stop_writing_job_order_squadron_string.sql` | Entity entfernt das `squadron`-VARCHAR-Feld; Migration loescht `NOT NULL`-Constraint und etwaige Indizes auf der Spalte. Phase-1-Schritt fuer Legacy-Cleanup. |
-| `V86__drop_job_order_squadron_string.sql` | `ALTER TABLE job_order DROP COLUMN squadron`. **Erst** in der **uebernaechsten** Release-Iteration nach `V85` (zweiphasige Drop-Regel aus `db/migration/README.md`). |
+| `V84__add_job_order_handover_audit_columns.sql` | `job_order_handover.executing_user_id UUID` (FK → `app_user`, `ON DELETE SET NULL`) + `executing_squadron_id UUID` (FK → `squadron`). Plan §4.4 / §7: Audit-Stempel fuer den ausfuehrenden User + dessen Staffel auf Cross-Staffel-Handovers. Ship't in **Phase 6**, NICHT Phase 7 — die Nummer steht **vor** der Phase-7-Kette `V85`–`V87`, damit Flyway's strikte aufsteigende Reihenfolge respektiert wird (`out-of-order=false` ist Projekt-Default). |
+| `V85__tighten_squadron_id_not_null.sql` | `SET NOT NULL` fuer `owning_squadron_id` (5 Aggregat-Tabellen) und fuer `creating_squadron_id` + `requesting_squadron_id` (`job_order`). **Erst nach** mind. einem prod-Deploy von `V80`–`V84` (eigene Release-Iteration). |
+| `V86__stop_writing_job_order_squadron_string.sql` | Entity entfernt das `squadron`-VARCHAR-Feld; Migration loescht `NOT NULL`-Constraint und etwaige Indizes auf der Spalte. Phase-1-Schritt fuer Legacy-Cleanup. |
+| `V87__drop_job_order_squadron_string.sql` | `ALTER TABLE job_order DROP COLUMN squadron`. **Erst** in der **uebernaechsten** Release-Iteration nach `V86` (zweiphasige Drop-Regel aus `db/migration/README.md`). |
 
 Backfill-SQL ist idempotent (`WHERE owning_squadron_id IS NULL`), keine seiteneffekte ueber Tabellen-Grenzen hinweg, Header-Kommentar erklaert das Warum.
 
@@ -215,7 +216,7 @@ Alle neuen UI-Bestandteile (Switcher, Badge, Spalten) muessen ueber alle vier Ge
   * `requesting_squadron_id` wird aus der bestehenden `squadron VARCHAR`-Spalte abgeleitet: SQL-Backfill mit LEFT JOIN auf `squadron.name` **und** `squadron.shorthand` (case-insensitive); nicht-aufloesbare Strings fallen auf IRIDIUM zurueck und werden im Migrations-Log gezaehlt.
   * Pre-Migration-Diagnose: `SELECT DISTINCT squadron FROM job_order` im PR-Kommentar protokollieren, damit klar ist, welche Strings auf IRIDIUM gemappt werden bzw. ob neue Squadron-Stammdaten **vor** der Migration eingelegt werden muessen.
   * Post-Migration-Sanity: `SELECT COUNT(*) FROM job_order WHERE requesting_squadron_id = IRIDIUM_UUID AND squadron <> 'IRIDIUM'` muss `0` ergeben (oder die abweichenden Faelle sind dokumentierte Fallbacks).
-  * Bestehende `squadron VARCHAR`-Spalte bleibt fuer mind. einen Release-Zyklus stehen (`V85`/`V86` entsorgen sie).
+  * Bestehende `squadron VARCHAR`-Spalte bleibt fuer mind. einen Release-Zyklus stehen (`V86`/`V87` entsorgen sie).
 
 ## 7. Sicherheit / Datenschutz
 
@@ -244,7 +245,7 @@ Alle neuen UI-Bestandteile (Switcher, Badge, Spalten) muessen ueber alle vier Ge
 * Job-Order-Endpunkte (`/api/v1/job-orders/**`) tragen **zwei** Felder (`creatingSquadronId`, `requestingSquadronId`); fuer Backward-Compatibility wird ein fehlendes `requestingSquadronId` mit dem `creatingSquadronId`-Wert (= `currentSquadronId()`) initialisiert, sodass Bestands-Clients ohne Schemaerweiterung weiter funktionieren.
 * Schreib-Endpunkte **staffel-scoped Aggregate** (Mission – `is_internal`-respektierend, Inventory-Direktpfad, Refinery, Hangar, Operation) werden via `@PreAuthorize` auf `SquadronScopeService.canEdit*` umgestellt. Effekt fuer User in IRIDIUM: keiner. Effekt fuer kuenftige User anderer Staffeln: korrekte Filterung.
 * Schreib-Endpunkte **Job-Order-Aggregat** (`/api/v1/job-orders/**` inkl. Handover, Material-Management) **behalten** die bestehenden Rollen-Checks ohne Squadron-Komponente (Logistician+ darf editieren, Admin darf loeschen). Squadron-Information im Request ist optional und wird – sofern vorhanden – nur fuer den Owner-Stempel beim Erstellen genutzt.
-* Kein Endpunkt wird in Phase 1 entfernt; veraltete Pfade (z. B. Officer-Routen im Admin-Bereich) werden mit `@ApiDeprecation` markiert und nach `V85`/Phase 2 entsorgt.
+* Kein Endpunkt wird in Phase 1 entfernt; veraltete Pfade (z. B. Officer-Routen im Admin-Bereich) werden mit `@ApiDeprecation` markiert und nach `V86`/Phase 2 entsorgt.
 * OpenAPI-Spec (`openapi.json`) wird mitgepflegt.
 
 ## 10. Phasenplan / Schnittfolge
@@ -296,10 +297,10 @@ Pro Phase: ein Commit-Schwerpunkt, mit Tests, Linting (Checkstyle + SpotBugs war
 * Manueller dev-Stack-Boot (mit `.env.test`-Pendant – produktive `.env` weiterhin tabu, siehe [[feedback_env_test_isolation]]).
 
 ### Phase 7 – Release 1 deployen, **dann** Folge-Release fuer Cleanup
-* **Erst nach prod-Deploy** von Phase 1–6 die Folge-Migrationen einreihen:
-  * `V84` – tightening: `SET NOT NULL` fuer `owning_squadron_id` (5 Aggregat-Tabellen) sowie `creating_squadron_id` + `requesting_squadron_id` (`job_order`).
-  * `V85` – `job_order.squadron`-VARCHAR aus Entity entfernen, DB-Spalte stop-write (NOT NULL droppen, Indizes loeschen).
-  * `V86` – `DROP COLUMN job_order.squadron` (erst in der **uebernaechsten** Release-Iteration nach `V85`, gem. Zweiphasen-Regel aus `db/migration/README.md`).
+* **Erst nach prod-Deploy** von Phase 1–6 (inkl. `V84` Handover-Audit) die Folge-Migrationen einreihen:
+  * `V85` – tightening: `SET NOT NULL` fuer `owning_squadron_id` (5 Aggregat-Tabellen) sowie `creating_squadron_id` + `requesting_squadron_id` (`job_order`).
+  * `V86` – `job_order.squadron`-VARCHAR aus Entity entfernen, DB-Spalte stop-write (NOT NULL droppen, Indizes loeschen).
+  * `V87` – `DROP COLUMN job_order.squadron` (erst in der **uebernaechsten** Release-Iteration nach `V86`, gem. Zweiphasen-Regel aus `db/migration/README.md`).
 
 ## 11. Tests
 
