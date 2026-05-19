@@ -26,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,6 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
     description =
         "Operation aggregate: groups multiple missions under one umbrella and exposes "
             + "aggregated finance and payout views.")
+@Transactional
 public class OperationController {
 
   // Whitelisted sort fields. Anything else from the request will cause
@@ -90,6 +92,7 @@ public class OperationController {
     @ApiResponse(responseCode = "400", description = "Unsupported sort field."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
   })
+  @Transactional(readOnly = true)
   public PageResponse<OperationDto> getAllOperations(
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "10") Integer size,
@@ -121,6 +124,7 @@ public class OperationController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "404", description = "Operation not found.")
   })
+  @Transactional(readOnly = true)
   public OperationDto getOperationById(@PathVariable UUID id) {
     return operationMapper.toDto(operationService.getOperationById(id));
   }
@@ -144,6 +148,7 @@ public class OperationController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "404", description = "Operation not found.")
   })
+  @Transactional(readOnly = true)
   public OperationFinanceDto getOperationFinances(@PathVariable UUID id) {
     return operationFinanceService.getOperationFinances(id);
   }
@@ -180,6 +185,7 @@ public class OperationController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "404", description = "Operation not found.")
   })
+  @Transactional(readOnly = true)
   public List<OperationPayoutDto> getOperationPayouts(@PathVariable UUID id) {
     return operationService.getOperationPayouts(id);
   }
