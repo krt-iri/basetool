@@ -78,8 +78,15 @@ public class TerminalService {
   }
 
   /**
-   * Releases the admin pin on {@code hasLoadingDock}. The value column stays at its last value
-   * until the next UEX sweep overwrites it from the upstream feed.
+   * Releases the admin pin on {@code hasLoadingDock} and immediately reverts the value column to
+   * the last UEX-reported state ({@link Terminal#getUexHasLoadingDock()}), so consumers like the
+   * materials-overview filter and the UEX-source chip stop seeing the stale admin-pinned value
+   * before the next UEX sweep runs.
+   *
+   * <p>If the terminal has never been synced yet, {@code uexHasLoadingDock} is {@code null} and the
+   * value column is cleared to {@code null} too — that maps to "unknown" in every consumer and is
+   * the correct semantics for "I do not have a UEX value yet, fall back to whatever the next sweep
+   * tells me".
    *
    * @param id terminal primary key
    * @return the persisted terminal
@@ -88,6 +95,7 @@ public class TerminalService {
   public Terminal clearLoadingDockOverride(UUID id) {
     Terminal terminal = getTerminal(id);
     terminal.setHasLoadingDockOverridden(false);
+    terminal.setHasLoadingDock(terminal.getUexHasLoadingDock());
     return terminalRepository.save(terminal);
   }
 
@@ -108,8 +116,15 @@ public class TerminalService {
   }
 
   /**
-   * Releases the admin pin on {@code isAutoLoad}. The value column stays at its last value until
-   * the next UEX sweep overwrites it from the upstream feed.
+   * Releases the admin pin on {@code isAutoLoad} and immediately reverts the value column to the
+   * last UEX-reported state ({@link Terminal#getUexIsAutoLoad()}), so consumers like the
+   * materials-overview filter and the UEX-source chip stop seeing the stale admin-pinned value
+   * before the next UEX sweep runs.
+   *
+   * <p>If the terminal has never been synced yet, {@code uexIsAutoLoad} is {@code null} and the
+   * value column is cleared to {@code null} too — that maps to "unknown" in every consumer and is
+   * the correct semantics for "I do not have a UEX value yet, fall back to whatever the next sweep
+   * tells me".
    *
    * @param id terminal primary key
    * @return the persisted terminal
@@ -118,6 +133,7 @@ public class TerminalService {
   public Terminal clearAutoLoadOverride(UUID id) {
     Terminal terminal = getTerminal(id);
     terminal.setIsAutoLoadOverridden(false);
+    terminal.setIsAutoLoad(terminal.getUexIsAutoLoad());
     return terminalRepository.save(terminal);
   }
 }
