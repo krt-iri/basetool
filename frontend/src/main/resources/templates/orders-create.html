@@ -101,7 +101,7 @@
                     <label for="squadron" th:text="#{orders.create.squadron}">Staffel</label>
                     <select id="squadron" th:field="*{squadron}" required>
                         <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                        <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
+                        <option th:each="s : ${squadrons}" th:value="${s.shorthand}" th:text="${s.name}"></option>
                     </select>
                 </div>
                 
