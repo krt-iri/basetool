@@ -407,13 +407,21 @@ public class JobOrderService {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
     }
 
-    // creatingSquadron is immutable post-create (MULTI_SQUADRON_PLAN.md section 8); ignore any
-    // value the client may have sent in updateDto.creatingSquadronId(). The legacy fallback
-    // path remains in case a pre-V83 row has no creator stamp yet.
+    // creatingSquadron is immutable post-create (MULTI_SQUADRON_PLAN.md section 8 + section 11
+    // expectation that a creatingSquadronId change rejects with 400/409). Reject explicitly so
+    // misbehaving clients learn about the contract instead of silently dropping the field. The
+    // legacy fallback resolution remains for pre-V83 rows that have no creator stamp yet — in
+    // that case the column is filled in for the first time, which counts as initial stamping
+    // rather than a mutation of an existing value.
+    Squadron existingCreator = jobOrder.getCreatingSquadron();
+    if (existingCreator != null
+        && updateDto.creatingSquadronId() != null
+        && !existingCreator.getId().equals(updateDto.creatingSquadronId())) {
+      throw new BadRequestException(
+          "creatingSquadronId is immutable post-create; pass null or the unchanged id.");
+    }
     Squadron creatingFallback =
-        jobOrder.getCreatingSquadron() != null
-            ? jobOrder.getCreatingSquadron()
-            : resolveCreatingSquadronForCreate(null);
+        existingCreator != null ? existingCreator : resolveCreatingSquadronForCreate(null);
     Squadron newRequesting =
         resolveRequestingSquadron(
             updateDto.requestingSquadronId(), updateDto.squadron(), creatingFallback);

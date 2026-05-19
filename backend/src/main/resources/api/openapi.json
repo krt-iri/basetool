@@ -2882,7 +2882,7 @@
     "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}" : {
       "put" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "Upsert evaluation for a user/category. Requires ADMIN or OFFICER role.",
+        "summary" : "Upsert evaluation for a user/category. Requires ADMIN role.",
         "operationId" : "upsert",
         "parameters" : [ {
           "name" : "userId",
@@ -20934,7 +20934,7 @@
     "/api/v1/promotion/evaluations/all" : {
       "get" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "List all member evaluations (ADMIN/OFFICER only).",
+        "summary" : "List all member evaluations (ADMIN only).",
         "operationId" : "listAll_1",
         "parameters" : [ {
           "name" : "page",
@@ -26456,7 +26456,7 @@
     "/api/v1/promotion/evaluations/{id}" : {
       "delete" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "Delete a member evaluation. Requires ADMIN or OFFICER role.",
+        "summary" : "Delete a member evaluation. Requires ADMIN role.",
         "operationId" : "delete_6",
         "parameters" : [ {
           "name" : "id",

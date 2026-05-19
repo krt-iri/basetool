@@ -72,6 +72,8 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 | **Schiffsdaten (Ship Types, Manufacturers)** | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Basisdatenbank** (Locations, Materials, StarSystems, Terminals, etc.) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Promotion-System (Verwaltung von Kategorien/Themen/Voraussetzungen)** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Member Evaluations: Eigene Bewertungen ansehen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Member Evaluations: Pflegen (Alle / Upsert / Delete)** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Admin-Dashboard & Settings** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Aktive Staffel umschalten (Switcher)** | ❌ | ❌ | ❌ | ❌ | ✅ |
 
@@ -82,6 +84,6 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 1. **Fallback bei Keycloak-Synchronisation:** Wenn JWT-Claims (wie `realm_access.roles`) nicht vollständig in die lokale Datenbank synchronisiert werden können, fällt das System auf die reinen Rollen-Namen aus dem JWT-Token zurück (`ROLE_ADMIN`, `ROLE_OFFICER`, etc.), fügt diesen das Präfix `ROLE_` hinzu und übersetzt sie in Großbuchstaben.
 2. **Ränge (Ranks):** Die `UserService`-Logik gibt vor, dass `OFFICER` nur die Ränge 1–12 und `SQUADRON_MEMBER` die Ränge 13–20 erhalten dürfen.
 3. **Default Role:** Wird bei der Anmeldung keine bekannte Rolle aus Keycloak übermittelt oder dem User noch keine spezifische Rolle zugewiesen, erhält der Benutzer standardmäßig die Rolle **Guest**.
-4. **Logistiker-Flag:** Die Rolle `LOGISTICIAN` kann über das `is_logistician`-Flag in der `users`-Tabelle manuell durch Admins/Offiziere vergeben werden, unabhängig von Keycloak-Rollen.
-5. **Missions-Manager-Flag:** Die Rolle `MISSION_MANAGER` kann über das `is_mission_manager`-Flag in der `users`-Tabelle manuell durch Admins/Offiziere vergeben werden, analog zur Logistiker-Rolle.
+4. **Logistiker-Flag:** Die Rolle `LOGISTICIAN` kann über das `is_logistician`-Flag in der `users`-Tabelle manuell vergeben werden, unabhängig von Keycloak-Rollen. Seit dem Phase-4-Lockdown des Multi-Squadron-Umbaus ausschließlich durch **Admins** (Officer haben keinen Zugriff mehr auf die Flag-Endpunkte; siehe `@PreAuthorize("hasRole('ADMIN')")` auf `UserController#patchLogistician`).
+5. **Missions-Manager-Flag:** Die Rolle `MISSION_MANAGER` kann über das `is_mission_manager`-Flag in der `users`-Tabelle manuell durch **Admins** vergeben werden, analog zur Logistiker-Rolle. Officer haben seit Phase 4 keinen Zugriff mehr (`UserController#patchMissionManager` ist `hasRole('ADMIN')`).
 6. **Multi-Squadron-Sichtbarkeit:** Lesepfade werden ueber [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) gefiltert. Nicht-Admins sehen ausschliesslich Daten ihrer eigenen Staffel; oeffentliche Missionen (`is_internal = false`) sind zusaetzlich cross-staffel sichtbar. Admins koennen ueber den Sidebar-Switcher (`PUT /api/v1/me/active-squadron`) den aktiven Kontext umschalten oder die "Alle Staffeln"-Sicht anwaehlen. Job-Orders sind per Design ein cross-staffel-Arbeitsbereich und werden in beiden Spalten (`creating_squadron_id` und `requesting_squadron_id`) gekennzeichnet, damit Auftraggeber und Ausfuehrender getrennt nachvollziehbar bleiben.

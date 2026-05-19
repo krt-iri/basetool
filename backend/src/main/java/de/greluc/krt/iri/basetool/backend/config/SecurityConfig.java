@@ -244,12 +244,20 @@ public class SecurityConfig {
                     .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
                     .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    // Post Phase-4-Lockdown (MULTI_SQUADRON_PLAN.md section 2): flag-vergabe
+                    // (Logistician/Mission-Manager) und attribute-patches sind admin-only. Die
+                    // method-level @PreAuthorize auf UserController#patchLogistician /
+                    // #patchMissionManager / #updateAttributes verlangt bereits hasRole('ADMIN');
+                    // der Path-Matcher hier war ein Relikt der Pre-Phase-4-Konfiguration und wird
+                    // jetzt mit der Method-Level-Annotation in Deckung gebracht, damit
+                    // SecurityConfig nicht mehr suggeriert OFFICER duerfe diese Endpunkte
+                    // erreichen.
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/logistician")
-                    .hasAnyRole("ADMIN", "OFFICER")
+                    .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/mission-manager")
-                    .hasAnyRole("ADMIN", "OFFICER")
+                    .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
-                    .hasAnyRole("ADMIN", "OFFICER")
+                    .hasRole("ADMIN")
                     .requestMatchers("/api/v1/users/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")

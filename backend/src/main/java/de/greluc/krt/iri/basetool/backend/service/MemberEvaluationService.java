@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Domain service for {@link MemberEvaluation}.
  *
  * <p>Data isolation: read operations for personal views are filtered by {@code userId} (JWT sub).
- * Write operations (assign/update level) are restricted to ADMIN and OFFICER roles.
+ * Write operations (assign/update level) are restricted to the ADMIN role. The promotion system
+ * counts as system-wide configuration under the Phase-4 admin lockdown (MULTI_SQUADRON_PLAN.md
+ * section 2: "Promotion-System-Pflege" sits in the admin bucket Officer no longer reaches).
  */
 @Service
 @RequiredArgsConstructor
@@ -53,17 +55,16 @@ public class MemberEvaluationService {
   }
 
   /** Returns all evaluations (admin view, all users). */
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     return repository.findAll(pageable).map(mapper::toResponse);
   }
 
   /**
-   * Upserts (create or update) an evaluation for a user/category combination. Restricted to ADMIN
-   * and OFFICER.
+   * Upserts (create or update) an evaluation for a user/category combination. Restricted to ADMIN.
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public MemberEvaluationResponse upsert(
       @NotNull String userId,
       @NotNull UUID categoryId,
@@ -95,7 +96,7 @@ public class MemberEvaluationService {
 
   /** Deletes an evaluation entry (removes the assigned level). */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasRole('ADMIN')")
   public void delete(@NotNull UUID id) {
     MemberEvaluation entity =
         repository

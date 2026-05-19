@@ -464,6 +464,61 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges() {
+    // Plan §8 + §11: passing a different creatingSquadronId on update must reject with 400
+    // rather than silently dropping the field. Pins the strict-reject contract that the prior
+    // "silently ignore" implementation violated.
+    Squadron creatingOriginal = new Squadron();
+    creatingOriginal.setId(UUID.randomUUID());
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    UUID attemptedOverride = UUID.randomUUID();
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, attemptedOverride, null, "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> jobOrderService.updateJobOrder(orderId, updateDto));
+    assertTrue(
+        ex.getMessage().contains("creatingSquadronId"),
+        "Error message should reference creatingSquadronId: " + ex.getMessage());
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void updateJobOrder_ShouldAccept_WhenCreatingSquadronIdMatchesExisting() {
+    // Companion to updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges: passing the SAME
+    // creatingSquadronId (i.e. echoing the unchanged value back from a read DTO) is a no-op
+    // and must NOT trip the immutability guard.
+    Squadron creatingOriginal = new Squadron();
+    UUID creatingId = UUID.randomUUID();
+    creatingOriginal.setId(creatingId);
+    creatingOriginal.setShorthand("ALF");
+    jobOrder.setCreatingSquadron(creatingOriginal);
+
+    Squadron requestingOriginal = new Squadron();
+    requestingOriginal.setId(UUID.randomUUID());
+    requestingOriginal.setShorthand("ALF");
+    jobOrder.setRequestingSquadron(requestingOriginal);
+
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto("ALF", creatingId, null, "Tester", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    assertDoesNotThrow(() -> jobOrderService.updateJobOrder(orderId, updateDto));
+    assertSame(creatingOriginal, jobOrder.getCreatingSquadron());
+  }
+
+  @Test
   void updateJobOrder_ShouldUpdateFieldsAndUnlinkRemovedMaterials() {
     // Given
     UUID newMaterialId = UUID.randomUUID();

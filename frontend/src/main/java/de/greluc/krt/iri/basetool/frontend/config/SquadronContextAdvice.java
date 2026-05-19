@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.config;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Locale;
@@ -12,8 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -50,6 +49,7 @@ public class SquadronContextAdvice {
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
+  private final FrontendAuthHelperService authHelper;
 
   /**
    * The {@code GET /api/v1/me/active-squadron} response body. Mirrors the backend's {@code
@@ -69,7 +69,7 @@ public class SquadronContextAdvice {
    */
   @ModelAttribute("activeSquadronId")
   public UUID activeSquadronId() {
-    if (!isAuthenticated()) {
+    if (!authHelper.isAuthenticated()) {
       return null;
     }
     try {
@@ -116,7 +116,7 @@ public class SquadronContextAdvice {
    */
   @ModelAttribute("availableSquadrons")
   public List<SquadronDto> availableSquadrons() {
-    if (!isAuthenticated()) {
+    if (!authHelper.isAuthenticated()) {
       return List.of();
     }
     try {
@@ -141,7 +141,7 @@ public class SquadronContextAdvice {
    */
   @ModelAttribute("isAllSquadronsMode")
   public boolean isAllSquadronsMode(@ModelAttribute("activeSquadronId") UUID activeSquadronId) {
-    return isAdmin() && activeSquadronId == null;
+    return authHelper.isAdmin() && activeSquadronId == null;
   }
 
   /**
@@ -195,18 +195,5 @@ public class SquadronContextAdvice {
       return "/";
     }
     return query != null && !query.isBlank() ? uri + "?" + query : uri;
-  }
-
-  private boolean isAuthenticated() {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    return auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal());
-  }
-
-  private boolean isAdmin() {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null) {
-      return false;
-    }
-    return auth.getAuthorities().stream().map(Object::toString).anyMatch("ROLE_ADMIN"::equals);
   }
 }

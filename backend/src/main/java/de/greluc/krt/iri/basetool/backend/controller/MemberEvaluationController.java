@@ -35,8 +35,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST endpoints for {@code MemberEvaluation}.
  *
- * <p>Personal view ({@code /my}) is filtered by JWT sub (data isolation). Admin/Officer view
- * ({@code /all} and upsert) requires ADMIN or OFFICER role.
+ * <p>Personal view ({@code /my}) is filtered by JWT sub (data isolation). Admin view ({@code /all}
+ * and upsert) requires the ADMIN role (Phase-4 lockdown — Officer lost promotion-system write
+ * access alongside the rest of the admin area).
  */
 @RestController
 @RequestMapping("/api/v1/promotion/evaluations")
@@ -98,8 +99,7 @@ public class MemberEvaluationController {
 
   /**
    * Returns a paginated slice of every {@link MemberEvaluationResponse} in the system for promotion
-   * reviewers. Authorization is enforced in the service layer and limited to ADMIN or OFFICER
-   * callers.
+   * reviewers. Authorization is enforced in the service layer and limited to ADMIN callers.
    *
    * @param page zero-based page index, or {@code null} for the default
    * @param size page size, or {@code null} for the default
@@ -108,7 +108,7 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} covering all evaluations
    */
   @GetMapping("/all")
-  @Operation(summary = "List all member evaluations (ADMIN/OFFICER only).")
+  @Operation(summary = "List all member evaluations (ADMIN only).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "All evaluations."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
@@ -139,7 +139,7 @@ public class MemberEvaluationController {
    * @return the persisted evaluation in its response form
    */
   @PutMapping("/user/{userId}/category/{categoryId}")
-  @Operation(summary = "Upsert evaluation for a user/category. Requires ADMIN or OFFICER role.")
+  @Operation(summary = "Upsert evaluation for a user/category. Requires ADMIN role.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Evaluation upserted."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -156,14 +156,14 @@ public class MemberEvaluationController {
 
   /**
    * Permanently removes the evaluation identified by {@code id}, dropping the row used to track a
-   * member's standing in one promotion category. Restricted to ADMIN or OFFICER callers.
+   * member's standing in one promotion category. Restricted to ADMIN callers.
    *
    * @param id identifier of the {@link de.greluc.krt.iri.basetool.backend.model.MemberEvaluation}
    *     to delete
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete a member evaluation. Requires ADMIN or OFFICER role.")
+  @Operation(summary = "Delete a member evaluation. Requires ADMIN role.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Deleted."),
     @ApiResponse(responseCode = "404", description = "Not found.")
