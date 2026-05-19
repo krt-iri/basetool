@@ -55,6 +55,6 @@ public class Operation extends AbstractEntity<UUID> {
    * squadrons. Kept JPA-nullable for Phase 1 until Flyway V86 tightens the column to NOT NULL.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id")
+  @JoinColumn(name = "owning_squadron_id", nullable = false)
   private Squadron owningSquadron;
 }

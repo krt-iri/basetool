@@ -11,6 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
@@ -18,6 +19,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +40,10 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Transactional
 class HangarIntegrationTest {
+
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
 
   @Autowired private WebApplicationContext context;
 
@@ -64,21 +70,25 @@ class HangarIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("user1");
+    user1.setSquadron(iridium);
     userRepository.save(user1);
 
     user2 = new User();
     user2.setId(UUID.randomUUID());
     user2.setUsername("user2");
+    user2.setSquadron(iridium);
     userRepository.save(user2);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
     adminUser.setUsername("admin");
+    adminUser.setSquadron(iridium);
     userRepository.save(adminUser);
 
     fighter = new ShipType();
@@ -146,6 +156,7 @@ class HangarIntegrationTest {
   void testUserCannotManageOtherHangar() throws Exception {
     // User1 creates ship
     Ship ship = new Ship();
+    ship.setOwningSquadron(iridium);
     ship.setName("User1 Ship");
     ship.setShipType(fighter);
     ship.setOwner(user1);
@@ -252,6 +263,7 @@ class HangarIntegrationTest {
   void testAdminResetAllFittedStatus() throws Exception {
     // Setup two fitted ships
     Ship ship1 = new Ship();
+    ship1.setOwningSquadron(iridium);
     ship1.setName("Fitted Ship 1");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -260,6 +272,8 @@ class HangarIntegrationTest {
     shipRepository.save(ship1);
 
     Ship ship2 = new Ship();
+
+    ship2.setOwningSquadron(iridium);
     ship2.setName("Fitted Ship 2");
     ship2.setShipType(fighter);
     ship2.setOwner(user2);
@@ -301,6 +315,7 @@ class HangarIntegrationTest {
   @Test
   void testSquadronOverview() throws Exception {
     Ship ship1 = new Ship();
+    ship1.setOwningSquadron(iridium);
     ship1.setName("Fitted Ship 1");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -309,6 +324,8 @@ class HangarIntegrationTest {
     shipRepository.save(ship1);
 
     Ship ship2 = new Ship();
+
+    ship2.setOwningSquadron(iridium);
     ship2.setName("Unfitted Ship 2");
     ship2.setShipType(fighter);
     ship2.setOwner(user2);
@@ -337,6 +354,7 @@ class HangarIntegrationTest {
   @Test
   void testSquadronOverviewAsAdmin() throws Exception {
     Ship ship1 = new Ship();
+    ship1.setOwningSquadron(iridium);
     ship1.setName("Admin Fitted Ship");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -368,6 +386,7 @@ class HangarIntegrationTest {
   void testDeleteShipInMission() throws Exception {
     // Given a ship owned by user1
     Ship ship = new Ship();
+    ship.setOwningSquadron(iridium);
     ship.setName("Mission Ship");
     ship.setShipType(fighter);
     ship.setOwner(user1);
@@ -376,6 +395,7 @@ class HangarIntegrationTest {
 
     // And a mission where this ship is assigned
     Mission mission = new Mission();
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -411,12 +431,15 @@ class HangarIntegrationTest {
   void testDeleteAllShips_ReturnsNoContent() throws Exception {
     // Given: user1 has two ships
     Ship ship1 = new Ship();
+    ship1.setOwningSquadron(iridium);
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
     ship1.setInsurance("LTI");
     shipRepository.save(ship1);
 
     Ship ship2 = new Ship();
+
+    ship2.setOwningSquadron(iridium);
     ship2.setShipType(fighter);
     ship2.setOwner(user1);
     ship2.setInsurance("0");
@@ -457,12 +480,15 @@ class HangarIntegrationTest {
   void testDeleteAllShips_WithLinkedMissionUnit_UnlinksBeforeDelete() throws Exception {
     // Given: user1 has a ship assigned to a mission unit
     Ship ship = new Ship();
+    ship.setOwningSquadron(iridium);
     ship.setShipType(fighter);
     ship.setOwner(user1);
     ship.setInsurance("LTI");
     ship = shipRepository.save(ship);
 
     Mission mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission for Delete All");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -490,6 +516,7 @@ class HangarIntegrationTest {
 
     // And: user2's ships are unaffected (multi-user isolation)
     Ship user2Ship = new Ship();
+    user2Ship.setOwningSquadron(iridium);
     user2Ship.setShipType(fighter);
     user2Ship.setOwner(user2);
     user2Ship.setInsurance("LTI");

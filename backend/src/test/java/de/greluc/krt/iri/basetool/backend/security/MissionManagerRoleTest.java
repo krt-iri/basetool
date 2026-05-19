@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.Collections;
@@ -37,6 +39,10 @@ class MissionManagerRoleTest {
 
   private MockMvc mockMvc;
 
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
+
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
@@ -57,25 +63,31 @@ class MissionManagerRoleTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     owner = new User();
     owner.setId(UUID.randomUUID());
     owner.setUsername("owner");
+    owner.setSquadron(iridium);
     userRepository.save(owner);
 
     otherMember = new User();
     otherMember.setId(UUID.randomUUID());
     otherMember.setUsername("other");
+    otherMember.setSquadron(iridium);
     userRepository.save(otherMember);
 
     managerMember = new User();
     managerMember.setId(UUID.randomUUID());
     managerMember.setUsername("manager");
     managerMember.setMissionManager(true);
+    managerMember.setSquadron(iridium);
     userRepository.save(managerMember);
 
     mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission");
     mission.setOwner(owner);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));
@@ -234,6 +246,7 @@ class MissionManagerRoleTest {
     user.setId(userId);
     user.setUsername("manager_user");
     user.setMissionManager(true);
+    user.setSquadron(iridium);
     userRepository.save(user);
     userRepository.flush();
 

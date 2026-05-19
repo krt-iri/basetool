@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreItemDto;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -33,6 +35,10 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Transactional
 class RefineryOrderTest {
+
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
 
   @Autowired private WebApplicationContext context;
 
@@ -71,6 +77,7 @@ class RefineryOrderTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
@@ -78,11 +85,13 @@ class RefineryOrderTest {
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("refineryUser");
+    user1.setSquadron(iridium);
     userRepository.save(user1);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
     adminUser.setUsername("refineryAdmin");
+    adminUser.setSquadron(iridium);
     userRepository.save(adminUser);
 
     StarSystem system = new StarSystem();
@@ -100,6 +109,8 @@ class RefineryOrderTest {
     locationRepository.save(station);
 
     mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Mining Op");
     missionRepository.save(mission);
 
@@ -125,6 +136,7 @@ class RefineryOrderTest {
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -234,6 +246,7 @@ class RefineryOrderTest {
   void testAdminManageUserRefineryOrder() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx); // Set a method
@@ -294,6 +307,7 @@ class RefineryOrderTest {
   void testAccessControl() throws Exception {
     // User1 creates order
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     RefineryGood good = new RefineryGood();
@@ -309,6 +323,7 @@ class RefineryOrderTest {
     User user2 = new User();
     user2.setId(UUID.randomUUID());
     user2.setUsername("user2");
+    user2.setSquadron(iridium);
     userRepository.save(user2);
 
     // User2 tries to update User1's order
@@ -356,6 +371,8 @@ class RefineryOrderTest {
     refinedMaterial = materialRepository.save(refinedMaterial);
 
     RefineryOrder order = new RefineryOrder();
+
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
 
@@ -390,6 +407,7 @@ class RefineryOrderTest {
   @Test
   void testCreateRefineryOrder_WithNullMission_ShouldSucceed() throws Exception {
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -439,6 +457,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -484,6 +503,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithNoteAndAmountOverride() throws Exception {
     // Given: ein Raffinerieauftrag mit einem Output-Material
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -554,6 +574,7 @@ class RefineryOrderTest {
   @Test
   void testStoreRefineryOrder_RejectsNegativeAmount() throws Exception {
     RefineryOrder order = new RefineryOrder();
+    order.setOwningSquadron(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);

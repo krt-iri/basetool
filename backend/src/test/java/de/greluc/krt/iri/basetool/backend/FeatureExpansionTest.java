@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +33,10 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 @Transactional
 class FeatureExpansionTest {
+
+  @Autowired private SquadronRepository squadronRepository;
+
+  private Squadron iridium;
 
   @Autowired private WebApplicationContext context;
 
@@ -65,21 +71,25 @@ class FeatureExpansionTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officerExp");
+    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
 
     normalUser = new User();
     normalUser.setId(UUID.randomUUID());
     normalUser.setUsername("normalExp");
+    normalUser.setSquadron(iridium);
     userRepository.save(normalUser);
 
     otherUser = new User();
     otherUser.setId(UUID.randomUUID());
     otherUser.setUsername("otherExp");
+    otherUser.setSquadron(iridium);
     userRepository.save(otherUser);
 
     Manufacturer aegis = new Manufacturer();
@@ -190,6 +200,7 @@ class FeatureExpansionTest {
   @Test
   void testSubMission() throws Exception {
     Mission parent = new Mission();
+    parent.setOwningSquadron(iridium);
     parent.setName("Parent Mission");
     parent = missionRepository.save(parent);
 
@@ -236,6 +247,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance() throws Exception {
     Mission mission = new Mission();
+    mission.setOwningSquadron(iridium);
     mission.setName("Finance Mission");
     mission = missionRepository.save(mission);
 
@@ -287,6 +299,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance_OtherUser_Forbidden() throws Exception {
     Mission mission = new Mission();
+    mission.setOwningSquadron(iridium);
     mission.setName("Finance Mission 2");
     mission = missionRepository.save(mission);
 

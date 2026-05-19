@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.backend.model.*;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.repository.*;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,8 @@ class MissionUnitCrewTest {
   @Autowired private JobTypeRepository jobTypeRepository;
   @Autowired private SquadronRepository squadronRepository;
 
+  private Squadron iridium;
+
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
@@ -50,11 +54,13 @@ class MissionUnitCrewTest {
 
   @BeforeEach
   void setUp() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer_crew");
+    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
 
     ShipType shipType = new ShipType();
@@ -63,6 +69,8 @@ class MissionUnitCrewTest {
     shipTypeRepository.save(shipType);
 
     ship = new Ship();
+
+    ship.setOwningSquadron(iridium);
     ship.setName("Test Ship Crew");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
@@ -70,6 +78,8 @@ class MissionUnitCrewTest {
     shipRepository.save(ship);
 
     mission = new Mission();
+
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission Crew");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

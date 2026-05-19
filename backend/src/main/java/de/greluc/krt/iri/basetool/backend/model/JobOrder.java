@@ -50,7 +50,7 @@ public class JobOrder extends AbstractEntity<UUID> {
    * field (see MULTI_SQUADRON_PLAN.md, section 1).
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "creating_squadron_id")
+  @JoinColumn(name = "creating_squadron_id", nullable = false)
   private Squadron creatingSquadron;
 
   /**
@@ -60,7 +60,7 @@ public class JobOrder extends AbstractEntity<UUID> {
    * not access-controlling.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "requesting_squadron_id")
+  @JoinColumn(name = "requesting_squadron_id", nullable = false)
   private Squadron requestingSquadron;
 
   @Column private String handle;

@@ -29,12 +29,16 @@ class MissionParticipantSquadronTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
+  private Squadron iridium;
+
   private Mission mission;
   private Squadron testSquadron;
 
   @BeforeEach
   void setup() {
+    iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mission = new Mission();
+    mission.setOwningSquadron(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
