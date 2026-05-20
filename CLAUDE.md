@@ -71,7 +71,7 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 - For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
 
 ### Multi-squadron tenancy (CRITICAL)
-The system supports multiple squadrons in parallel; the IRIDIUM squadron sits at the canonical UUID `00000000-0000-0000-0000-000000000001` and every staffel-scoped aggregate carries an `owning_squadron_id` FK. Read the design in [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md) before changing access paths.
+The system supports multiple squadrons in parallel; the IRIDIUM squadron sits at the canonical UUID `00000000-0000-0000-0000-000000000001` and every staffel-scoped aggregate carries an `owning_squadron_id` FK.
 
 - **Squadron scope is enforced in the service layer**, not the controller. Use [`SquadronScopeService.currentSquadronId()`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) for list-endpoint filters and `SquadronScopeService.canSee*`/`canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active squadron selection get `Optional.empty()` (= "all squadrons"); admins with a selection get the same restrictive view as a member.
 - **Aggregate scope kinds:**
