@@ -105,10 +105,17 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   @NotNull
   private String resolveCorrelationId(@NotNull HttpServletRequest request) {
     String inbound = request.getHeader(loggingProperties.getCorrelationIdHeader());
-    if (inbound != null && !inbound.isBlank() && isSafe(inbound)) {
-      return inbound.length() > MAX_ID_LENGTH ? inbound.substring(0, MAX_ID_LENGTH) : inbound;
+    if (inbound == null || inbound.isBlank()) {
+      return UUID.randomUUID().toString();
     }
-    return UUID.randomUUID().toString();
+    // Truncate BEFORE validating: `isSafe` walks the string character by character, so a 64 KB
+    // header that fails validation anyway would cost 64 K char scans. Capping to MAX_ID_LENGTH
+    // first bounds that cost to ~128 chars regardless of input size, while keeping the same
+    // accept/reject decision — a value that contains an unsafe char in the prefix would have
+    // failed either way, and a value whose prefix is safe was already what we'd have returned.
+    String truncated =
+        inbound.length() > MAX_ID_LENGTH ? inbound.substring(0, MAX_ID_LENGTH) : inbound;
+    return isSafe(truncated) ? truncated : UUID.randomUUID().toString();
   }
 
   /**
