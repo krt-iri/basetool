@@ -22,6 +22,7 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.security.KeyStore;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
@@ -75,13 +76,30 @@ public class WebClientConfig {
    *       publicly-trusted cert): falls back to the default JVM trust store. No MITM exposure
    *       because the cert chain must validate against a well-known CA.
    * </ul>
+   *
+   * <h3>Hostname verification</h3>
+   *
+   * <p>On the two "pinned trust" paths (dev/test InsecureTrustManagerFactory and prod {@code
+   * backend-trust} bundle) endpoint identification is explicitly disabled via {@link
+   * SSLParameters#setEndpointIdentificationAlgorithm}. The trust set is already pinned to exactly
+   * the cert we ship (or accept-any in dev), so the hostname check only ever defends against the
+   * pinned cert being presented under a different hostname — which an attacker can only do by
+   * stealing the private key from {@code keystore.p12}, in which case the entire trust boundary has
+   * already collapsed. Disabling the check lets the prod stack work even when the operator's cert
+   * was generated without {@code dns:backend} / {@code dns:frontend} in its SAN list (the Docker
+   * network aliases used by service-to-service traffic), without weakening security further than
+   * M-13 deliberately allowed. The fallback (default JVM trust store) keeps hostname verification
+   * enabled — that path validates against a well-known CA pool where the hostname check is the only
+   * thing tying the cert to the target host.
    */
   private ReactorClientHttpConnector connector() {
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
       java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
+      boolean pinnedTrust = false;
       if (profiles.contains("dev") || profiles.contains("test")) {
         builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
+        pinnedTrust = true;
       } else {
         try {
           SslBundle bundle = sslBundles.getBundle("backend-trust");
@@ -90,15 +108,19 @@ public class WebClientConfig {
               TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
           tmf.init(truststore);
           builder = builder.trustManager(tmf);
+          pinnedTrust = true;
         } catch (NoSuchSslBundleException ignored) {
           // No `backend-trust` SSL bundle defined for the active profile —
           // fall back to the JVM default trust store. This path supports
           // deployments where the backend is fronted by a publicly-trusted
           // cert (Let's Encrypt, internal corporate CA already in cacerts,
           // etc.) and no per-deployment truststore configuration is needed.
+          // pinnedTrust stays false so hostname verification remains enabled
+          // on this fallback path.
         }
       }
       SslContext sslContext = builder.build();
+      boolean disableHostnameVerification = pinnedTrust;
 
       // Pool sized at 100 connections: a single mission-detail render now fans out to four
       // parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can exhaust a
@@ -116,7 +138,18 @@ public class WebClientConfig {
 
       HttpClient httpClient =
           HttpClient.create(provider)
-              .secure(t -> t.sslContext(sslContext))
+              .secure(
+                  t -> {
+                    var spec = t.sslContext(sslContext);
+                    if (disableHostnameVerification) {
+                      spec.handlerConfigurator(
+                          sslHandler -> {
+                            SSLParameters params = sslHandler.engine().getSSLParameters();
+                            params.setEndpointIdentificationAlgorithm("");
+                            sslHandler.engine().setSSLParameters(params);
+                          });
+                    }
+                  })
               .option(
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
                   Math.toIntExact(httpProperties.getConnectTimeout().toMillis()))
