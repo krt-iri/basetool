@@ -89,7 +89,9 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    Squadron creatingSquadron = resolveCreatingSquadronForCreate(createDto.creatingSquadronId());
+    Squadron creatingSquadron =
+        resolveCreatingSquadronForCreate(
+            createDto.creatingSquadronId(), createDto.requestingSquadronId());
     Squadron requestingSquadron =
         resolveRequestingSquadron(createDto.requestingSquadronId(), creatingSquadron);
 
@@ -418,7 +420,9 @@ public class JobOrderService {
           "creatingSquadronId is immutable post-create; pass null or the unchanged id.");
     }
     Squadron creatingFallback =
-        existingCreator != null ? existingCreator : resolveCreatingSquadronForCreate(null);
+        existingCreator != null
+            ? existingCreator
+            : resolveCreatingSquadronForCreate(null, updateDto.requestingSquadronId());
     Squadron newRequesting =
         resolveRequestingSquadron(updateDto.requestingSquadronId(), creatingFallback);
     jobOrder.setRequestingSquadron(newRequesting);
@@ -687,10 +691,12 @@ public class JobOrderService {
    *   <li>Explicit {@code creatingSquadronIdOverride} from the create DTO — only honored when the
    *       caller is an admin (admin override path).
    *   <li>Caller's active squadron context ({@link SquadronScopeService#currentSquadron()}).
-   *   <li>Anonymous caller without context — falls back to the canonical IRIDIUM squadron so the
-   *       public job-order request form (CLAUDE.md: anonymous job-order creation is intended)
-   *       always resolves to a known audit-trail owner. Verified by {@code
-   *       JobOrderServiceCreateAnonymousTest}.
+   *   <li>Anonymous caller without context — falls back to the squadron the public form picked as
+   *       requesting squadron ({@code anonymousRequestingFallback}). The audit trail then credits
+   *       the squadron the request was filed on behalf of rather than always crediting the
+   *       canonical IRIDIUM squadron. When the form also leaves {@code requestingSquadronId} blank,
+   *       the IRIDIUM seed row is used as a last resort so the V86 NOT NULL constraint is still
+   *       respected.
    *   <li>Admin in "all squadrons" mode without override → {@link BadRequestException} (400). The
    *       Plan is explicit on this: a focused stamp is required so the column is populated
    *       correctly for the V86 NOT NULL tightening, and an admin with no selection has more than
@@ -699,13 +705,17 @@ public class JobOrderService {
    *
    * @param creatingSquadronIdOverride optional explicit value from the create DTO; rejected for
    *     non-admins.
+   * @param anonymousRequestingFallback {@code requestingSquadronId} from the same DTO; only
+   *     consulted for unauthenticated callers so the creating squadron equals the squadron the
+   *     anonymous form selected as the requesting one.
    * @return the resolved squadron; never {@code null}.
    * @throws BadRequestException when the caller is an admin in all-squadrons mode and did not
    *     supply an explicit {@code creatingSquadronId}, or when a non-admin tried to override.
    */
   @org.jetbrains.annotations.NotNull
   private Squadron resolveCreatingSquadronForCreate(
-      @org.jetbrains.annotations.Nullable UUID creatingSquadronIdOverride) {
+      @org.jetbrains.annotations.Nullable UUID creatingSquadronIdOverride,
+      @org.jetbrains.annotations.Nullable UUID anonymousRequestingFallback) {
     if (creatingSquadronIdOverride != null) {
       if (!authHelperService.isAdmin()) {
         throw new BadRequestException(
@@ -726,16 +736,20 @@ public class JobOrderService {
     }
     // Anonymous caller (public request form). The SecurityConfig permits POST /api/v1/orders
     // for unauthenticated callers because the squadron uses the form for external sympathisers /
-    // visitors who want to request a job. Stamp the canonical IRIDIUM squadron so the row has a
-    // valid owner for the V86 NOT NULL constraint.
+    // visitors who want to request a job. Stamp the creating squadron with the squadron the form
+    // picked as requesting — the request belongs to that squadron and the audit trail should
+    // reflect it. Fall back to the canonical IRIDIUM seed row when the form did not pick a
+    // requesting squadron either, so the V86 NOT NULL constraint still holds.
     if (!authHelperService.isAuthenticated()) {
+      UUID anonymousStampId =
+          anonymousRequestingFallback != null ? anonymousRequestingFallback : Squadron.IRIDIUM_ID;
       return squadronRepository
-          .findById(Squadron.IRIDIUM_ID)
+          .findById(anonymousStampId)
           .orElseThrow(
               () ->
                   new BadRequestException(
-                      "IRIDIUM squadron seed row is missing; cannot resolve creating squadron for"
-                          + " anonymous job-order creation."));
+                      "Squadron does not resolve for anonymous job-order creation: "
+                          + anonymousStampId));
     }
     // Authenticated caller without a resolvable squadron context — only happens for an admin in
     // "all squadrons" mode. Plan-compliant 400: a focused stamp is required so the audit trail
