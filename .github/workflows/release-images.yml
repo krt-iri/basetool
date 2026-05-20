@@ -94,15 +94,17 @@ jobs:
         id: app-version
         run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
 
-      # QEMU is only strictly required if we cross-build for arm64. We currently
-      # only build linux/amd64 (the production host architecture), so this is a
-      # very cheap no-op — keeping it in makes a future multi-arch flip a
-      # one-line `platforms:` change in the build step instead of a workflow
-      # restructure.
+      # QEMU registers binfmt handlers for foreign architectures so the linux/amd64
+      # GitHub runner can also execute linux/arm64 build steps under emulation.
+      # The Java parts of the build (Gradle compilation, Spring Boot repackage)
+      # are CPU-bound under qemu-aarch64 — expect the arm64 stage to take ~3-4x
+      # longer than amd64. The matrix-step `timeout-minutes: 60` is the safety
+      # net; if a slower arm64 build trips it, narrow the scope back to amd64
+      # here rather than tightening the timeout.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
         with:
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
@@ -153,7 +155,11 @@ jobs:
           context: .
           file: ${{ matrix.module }}/Dockerfile
           push: true
-          platforms: linux/amd64
+          # Multi-arch publish. linux/amd64 covers the current production host
+          # and linux/arm64 covers Ampere / Apple-silicon / arm-based cloud
+          # targets so an operator can pull a working image without specifying
+          # `--platform`. The arm64 stage is emulated via qemu (set up above).
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Forwarded to both module Dockerfiles. The frontend consumes it via
