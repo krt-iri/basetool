@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: temurin
           java-version: '25'
@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload JUnit test reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-reports
           path: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload JaCoCo coverage reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jacoco-reports
           path: '**/build/reports/jacoco/**'
@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload Checkstyle reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: checkstyle-reports
           path: '**/build/reports/checkstyle/**'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload SpotBugs reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: spotbugs-reports
           path: '**/build/reports/spotbugs/**'
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload CycloneDX SBOMs
         if: success()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sboms
           path: |
