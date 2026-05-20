@@ -1,6 +1,6 @@
-# Contributing to IRIDIUM Basetool
+# Contributing to Profit Basetool
 
-Thanks for taking the time to help improve IRIDIUM Basetool — the
+Thanks for taking the time to help improve Profit Basetool — the
 squadron-management web app for the *DAS KARTELL* / IRIDIUM organization.
 This document is the entry point for everything around *how* to contribute:
 asking questions, reporting bugs, proposing features, sending pull
@@ -254,7 +254,7 @@ address it before merge.
 ## Contributor License Agreement (CLA)
 
 Before Your first contribution is merged, You must sign the
-[IRIDIUM Basetool Individual Contributor License Agreement](CLA.md).
+[Profit Basetool Individual Contributor License Agreement](CLA.md).
 
 The CLA grants the Project Maintainers a perpetual, worldwide,
 royalty-free license to distribute Your contributions under GPL-3.0
@@ -773,7 +773,7 @@ instead of silently shipping the gap.
 
 ## License
 
-IRIDIUM Basetool is released under the
+Profit Basetool is released under the
 [GNU General Public License v3.0](LICENSE.md). By contributing, you
 agree that your contribution is distributed under GPL-3.0.
 
@@ -793,6 +793,6 @@ context-sensitive ways. When in doubt, ask in the PR or via
 
 ---
 
-Thanks again for being here. The IRIDIUM Basetool exists because a
+Thanks again for being here. The Profit Basetool exists because a
 bunch of people kept showing up to make squadron logistics a little
 less painful — your contribution is part of that.

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="refresh" content="30">
   <meta name="robots" content="noindex, nofollow">
-  <title>System Maintenance &mdash; IRIDIUM Basetool</title>
+  <title>System Maintenance &mdash; Profit Basetool</title>
   <style>
     /* The KRT corporate fonts (Ethnocentric, Lato) live inside the Spring
        frontend's static assets. This page is served by nginx while that
@@ -123,6 +123,12 @@
       font-size: 0.95rem;
       max-width: 64ch;
     }
+    .brand-logo {
+      display: block;
+      margin: 0 auto 1.25rem;
+      max-height: 80px;
+      width: auto;
+    }
     .meta {
       margin-top: 1.75rem;
       padding-top: 1rem;
@@ -143,12 +149,14 @@
       main.panel { padding: 3rem 2.5rem; }
       h2 { font-size: 1.2rem; }
       p  { font-size: 1rem; }
+      .brand-logo { max-height: 100px; }
     }
     /* Desktop (>= 1024px). */
     @media (min-width: 1024px) {
       main.panel { max-width: 760px; padding: 3.5rem 3rem; }
       h2 { font-size: 1.25rem; }
       p  { font-size: 1.05rem; }
+      .brand-logo { max-height: 120px; }
     }
     /* Ultra-wide (>= 1600px). */
     @media (min-width: 1600px) {
@@ -162,20 +170,22 @@
       <span class="status-badge"><span class="pulse" aria-hidden="true"></span>Maintenance</span>
     </div>
 
+    <img src="krt_logo.svg" alt="KRT Logo" class="brand-logo">
+
     <section class="lang-block" lang="de">
       <h2>Wartungsarbeiten</h2>
-      <p>Das IRIDIUM Basetool wird gerade aktualisiert. Bitte habt etwas Geduld &mdash; diese Seite lädt sich automatisch neu, sobald das System wieder erreichbar ist.</p>
+      <p>Das Profit Basetool wird gerade aktualisiert. Bitte habt etwas Geduld &mdash; diese Seite lädt sich automatisch neu, sobald das System wieder erreichbar ist.</p>
       <p>Normalerweise dauert das nur wenige Augenblicke.</p>
     </section>
 
     <section class="lang-block" lang="en">
       <h2>Maintenance in Progress</h2>
-      <p>The IRIDIUM Basetool is currently being updated. Please stand by &mdash; this page reloads automatically as soon as the system is back online.</p>
+      <p>The Profit Basetool is currently being updated. Please stand by &mdash; this page reloads automatically as soon as the system is back online.</p>
       <p>This typically only takes a few moments.</p>
     </section>
 
     <div class="meta">
-      <span class="pulse" aria-hidden="true"></span>IRIDIUM // DAS KARTELL &mdash; auto-refresh every 30&nbsp;s
+      <span class="pulse" aria-hidden="true"></span>PROFIT // DAS KARTELL &mdash; auto-refresh every 30&nbsp;s
     </div>
   </main>
 </body>

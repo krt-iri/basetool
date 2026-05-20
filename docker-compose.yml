@@ -115,7 +115,7 @@ x-keycloak: &keycloak-template
         memory: 1536M
         cpus: '2.0'
   environment:
-    KC_HOSTNAME: keycloak.iri-base.org
+    KC_HOSTNAME: keycloak.profit-base.online
     KC_HOSTNAME_STRICT: "true"
     KC_HEALTH_ENABLED: "true"
     KC_HTTP_ENABLED: "true"
@@ -174,7 +174,7 @@ x-backend: &backend-template
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
+    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
     # The keystore lives on the host filesystem (bind-mounted below) and is
     # explicitly NOT packaged into the GHCR image. Both backend and frontend
@@ -249,7 +249,7 @@ x-frontend: &frontend-template
   environment:
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
-    KEYCLOAK_ISSUER_URI: https://keycloak.iri-base.org/realms/iri
+    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
     BACKEND_URL: https://backend:11261
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12

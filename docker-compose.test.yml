@@ -1,6 +1,6 @@
 # Override for spinning up the dev stack with test-only credentials from
 # .env.test. The base docker-compose.yml hardcodes the production-facing
-# KEYCLOAK_ISSUER_URI (https://keycloak.iri-base.org/realms/iri) into both
+# KEYCLOAK_ISSUER_URI (https://keycloak.profit-base.online/realms/iri) into both
 # x-backend and x-frontend templates; this file points everything at the
 # locally-imported `iri` realm on the host-mapped Keycloak port 18080
 # instead, using host.docker.internal so that the same URL works both

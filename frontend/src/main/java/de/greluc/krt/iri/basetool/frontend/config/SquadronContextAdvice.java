@@ -168,7 +168,7 @@ public class SquadronContextAdvice {
    * Composes the dynamic application title for the {@code <title>} tag and the sidebar logo: a
    * plain "Basetool" when no squadron context applies, "Basetool – &lt;shorthand&gt;" when a
    * concrete squadron is active, and "Basetool – Alle Staffeln" when an admin is in the
-   * cross-staffel view. Replaces the previous hardcoded "IRIDIUM Basetool" title
+   * cross-staffel view. Replaces the previous hardcoded "Profit Basetool" title
    * (MULTI_SQUADRON_PLAN.md section 5.4: app.title generic or dynamic).
    *
    * <p>Resolution uses the request locale via {@link LocaleContextHolder} so the squadron suffix is

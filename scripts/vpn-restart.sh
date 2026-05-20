@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# IRIDIUM Basetool – VPN Restart Script
+# Profit Basetool – VPN Restart Script
 # Startet die WireGuard-Schnittstelle wg0 neu (down + up).
 # Cron-Beispiel (täglich um 04:00 Uhr):
 #   0 4 * * * /var/iri/code/scripts/vpn-restart.sh >> /var/log/iri-vpn-restart.log 2>&1

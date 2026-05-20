@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{inventory.input.title} + ' - IRIDIUM Basetool'">Lagereintrag einbuchen - IRIDIUM Basetool</title>
+    <title th:text="#{inventory.input.title} + ' - Profit Basetool'">Lagereintrag einbuchen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <style th:attr="nonce=${cspNonce}">
         .form-container {
@@ -38,8 +38,8 @@
             <span></span>
         </button>
         <a th:href="@{/}" class="brand">
-            <img th:src="@{/logos/iridium.svg}" alt="Logo" width="50" height="50">
-            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
+            <img th:src="@{/logos/krt_logo.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
         </a>
     </nav>
 </header>

@@ -1,4 +1,4 @@
-# IRIDIUM Basetool — Deployment Runbook
+# Profit Basetool — Deployment Runbook
 
 ## Overview
 
@@ -379,9 +379,9 @@ sudo -u deploy /usr/bin/docker compose \
     -f /var/iri/code/docker-compose.yml --profile prod \
     stop frontend
 
-curl -i https://iri-base.org/                  # expect HTTP/1.1 503 + HTML
+curl -i https://profit-base.online/                  # expect HTTP/1.1 503 + HTML
 curl -i -H 'Accept: application/json' \
-        https://iri-base.org/api/v1/missions   # expect HTTP/1.1 503 + JSON
+        https://profit-base.online/api/v1/missions   # expect HTTP/1.1 503 + JSON
 
 sudo -u deploy /usr/bin/docker compose \
     -f /var/iri/code/docker-compose.yml --profile prod \
@@ -389,7 +389,7 @@ sudo -u deploy /usr/bin/docker compose \
 ```
 
 The page is intentionally not scoped per virtual host — any proxy host behind
-NPM (including `keycloak.iri-base.org`) will fall back to the same screen if
+NPM (including `keycloak.profit-base.online`) will fall back to the same screen if
 its upstream ever serves a `5xx`. The wording is kept generic ("System
 maintenance") so it reads correctly for both.
 

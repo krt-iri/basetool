@@ -1,5 +1,5 @@
 # =============================================================================
-# IRIDIUM Basetool – logrotate-Konfiguration für das VPN-Restart-Log
+# Profit Basetool – logrotate-Konfiguration für das VPN-Restart-Log
 #
 # Installation auf dem Server:
 #   sudo cp /var/iri/code/scripts/vpn-restart.logrotate /etc/logrotate.d/iri-vpn-restart

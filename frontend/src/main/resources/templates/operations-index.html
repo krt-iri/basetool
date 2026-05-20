@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - IRIDIUM Basetool</title>
+    <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <style th:attr="nonce=${cspNonce}">
             html, body { overflow-x: hidden; }
@@ -42,8 +42,8 @@
             <span></span>
         </button>
         <a th:href="@{/}" class="brand">
-            <img th:src="@{/logos/iridium.svg}" alt="Logo" width="50" height="50">
-            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
+            <img th:src="@{/logos/krt_logo.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
         </a>
     </nav>
 </header>
@@ -59,65 +59,41 @@
 
     <div class="hud-box mt-2">
 
-        <form id="operations-filter-form" method="get" th:action="@{/operations}" class="search-form no-track">
-            <div class="search-form-flex-1">
-                <label for="operation-search" th:text="#{operation.search}">Search</label>
-                <input type="text" id="operation-search" name="search" th:value="${search}" th:placeholder="#{operation.search.placeholder}">
-            </div>
-
-            <div class="search-form-checkbox-col" sec:authorize="isAuthenticated()">
-                <div class="search-form-checkbox-spacer"></div>
-                <label class="search-form-checkbox-label">
-                    <input type="checkbox" name="showPast" th:checked="${showPast}">
-                    <span th:text="#{operation.filter.show_past}">Show Past</span>
-                </label>
-            </div>
-
-            <div class="search-form-actions">
-                <button type="button" id="operations-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zur&uuml;cksetzen</button>
-                <button sec:authorize="hasRole('MISSION_MANAGER')" type="button" class="btn" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
-            </div>
-        </form>
-
-        <div id="operations-loading-indicator" style="display:none; text-align:center; padding: 1rem;">
-            <span class="krt-loading-indicator"></span>
+        <div sec:authorize="hasRole('MISSION_MANAGER')" style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+            <button type="button" class="btn" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
         </div>
 
-        <div id="operations-results">
-            <th:block th:fragment="operationsResults">
-                <div class="table-responsive">
-                    <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
-                        <thead>
-                            <tr>
-                                <th th:text="#{operation.name}">Name</th>
-                                <th th:text="#{operation.status}">Status</th>
-                                <th class="op-desc" th:text="#{operation.description}">Description</th>
-                                <th class="op-action" th:text="#{general.action}">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="op : ${operations}">
-                                <td th:text="${op.name}">Name</td>
-                                <td th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</td>
-                                <td class="op-desc" th:text="${op.description}">Description</td>
-                                <td class="op-action">
-                                    <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                                    <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
-                                            th:data-id="${op.id}"
-                                            data-trigger="operations-open-delete">Delete</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div th:if="${operationsPage != null}">
-                    <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
-                </div>
-
-                <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
-            </th:block>
+        <div class="table-responsive">
+            <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{operation.name}">Name</th>
+                        <th th:text="#{operation.status}">Status</th>
+                        <th class="op-desc" th:text="#{operation.description}">Description</th>
+                        <th class="op-action" th:text="#{general.action}">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="op : ${operations}">
+                        <td th:text="${op.name}">Name</td>
+                        <td th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</td>
+                        <td class="op-desc" th:text="${op.description}">Description</td>
+                        <td class="op-action">
+                            <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
+                            <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
+                                    th:data-id="${op.id}"
+                                    data-trigger="operations-open-delete">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+
+        <div th:if="${operationsPage != null}">
+            <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
+        </div>
+
+        <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
     </div>
 
     <!-- Create Modal -->
@@ -164,7 +140,6 @@
         </div>
     </div>
 </main>
-<script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:attr="nonce=${cspNonce}">
     function openDeleteModal(id) {
         var deleteForm = document.getElementById('delete-operation-form');

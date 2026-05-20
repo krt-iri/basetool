@@ -1,6 +1,6 @@
 # Security Policy
 
-Thank you for taking the time to look at the security of IRIDIUM Basetool.
+Thank you for taking the time to look at the security of Profit Basetool.
 This document explains how to report a vulnerability, which versions receive
 fixes, and what you can expect from us in return.
 
@@ -53,7 +53,7 @@ advisory and the [`CHANGELOG.md`](../CHANGELOG.md) unless you ask us not to.
 
 ## Supported Versions
 
-IRIDIUM Basetool is currently in the `0.x` release line and under active
+Profit Basetool is currently in the `0.x` release line and under active
 development. Only the latest minor release receives security fixes; older
 `0.x` minors do not get backports.
 

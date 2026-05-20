@@ -54,7 +54,7 @@ public class SecurityConfig {
    * server-side from the Spring-Boot frontend (Thymeleaf SSR), so no direct browser-to-backend
    * cross-origin traffic is expected, and any such call is rejected with HTTP 403. Override in
    * environment-specific YAML when a real browser client on a different origin is introduced (e.g.
-   * a future mobile web app on https://mobile.iri-base.org).
+   * a future mobile web app on https://mobile.profit-base.online).
    */
   @Value("${app.cors.allowed-origin-patterns:}")
   private List<String> allowedOriginPatterns;

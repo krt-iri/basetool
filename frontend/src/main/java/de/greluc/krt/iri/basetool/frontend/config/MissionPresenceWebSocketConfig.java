@@ -24,7 +24,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
  * {@link SecurityConfig} already requires authentication: the browser would still ship the victim's
  * session cookie on the upgrade request, and the handshake would succeed as the victim for an
  * attacker page on a third-party origin. Default falls back to the production hostname ({@code
- * https://iri-base.org}) plus localhost variants for dev (audit finding H-7).
+ * https://profit-base.online}) plus localhost variants for dev (audit finding H-7).
  *
  * <p>The handler uses its own {@link ObjectMapper} rather than the Spring-auto-configured bean:
  * Spring Boot 4 has moved its primary mapper to Jackson 3 ({@code tools.jackson.core}), but this
@@ -48,7 +48,7 @@ public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
   public MissionPresenceWebSocketConfig(
       MissionPresenceService presenceService,
       @Value(
-              "${app.websocket.allowed-origin-patterns:https://iri-base.org,https://localhost:18081,http://localhost:18081}")
+              "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
     this.presenceService = presenceService;
     this.allowedOriginPatterns = allowedOriginPatterns;
