@@ -9,11 +9,13 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -47,12 +49,58 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class HangarPageController {
 
   private final BackendApiClient backendApiClient;
+  private final ParallelPageLoader parallelPageLoader;
+
+  /**
+   * Multi-key comparator that orders ships by manufacturer, ship type, insurance tier (LTI &lt;
+   * numeric &lt; unset), insurance amount desc, location, fitted-status and finally name. Kept as a
+   * shared instance because the comparator is stateless and the controller sorts the ship list on
+   * every render.
+   */
+  private static final Comparator<ShipDto> SHIP_SORT =
+      Comparator.comparing(
+              (ShipDto s) ->
+                  s.shipType() != null && s.shipType().manufacturer() != null
+                      ? s.shipType().manufacturer().name()
+                      : "",
+              String.CASE_INSENSITIVE_ORDER)
+          .thenComparing(
+              s -> s.shipType() != null ? s.shipType().name() : "", String.CASE_INSENSITIVE_ORDER)
+          .thenComparing(
+              (ShipDto s) -> {
+                String ins = s.insurance();
+                if (ins == null || ins.equals("0")) {
+                  return 3;
+                }
+                if (ins.equals("LTI")) {
+                  return 1;
+                }
+                return 2;
+              })
+          .thenComparing(
+              (ShipDto s) -> {
+                String ins = s.insurance();
+                if (ins == null || ins.equals("LTI") || ins.equals("0")) {
+                  return 0;
+                }
+                try {
+                  return Integer.parseInt(ins);
+                } catch (NumberFormatException e) {
+                  return 0;
+                }
+              },
+              Comparator.reverseOrder())
+          .thenComparing(
+              s -> s.location() != null ? s.location().name() : "", String.CASE_INSENSITIVE_ORDER)
+          .thenComparing(s -> (s.fitted() != null && s.fitted()) ? 0 : 1)
+          .thenComparing(s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER);
 
   /**
    * Renders the personal hangar page. Fetches my ships and the three cached reference catalogs
-   * (ship types, locations, manufacturers); each catalog call independently degrades to an empty
-   * list on backend failure so a single dead reference catalog never blanks the whole page. The
-   * ship list is sorted client-side with the multi-key comparator described in the class Javadoc.
+   * (ship types, locations, manufacturers) in parallel via {@link ParallelPageLoader}; each catalog
+   * call independently degrades to an empty list on backend failure so a single dead reference
+   * catalog never blanks the whole page. The ship list is sorted client-side with the multi-key
+   * comparator described in the class Javadoc.
    *
    * @param model Thymeleaf model populated with the ship form, ship list and reference catalogs
    * @return the {@code hangar} view name
@@ -63,97 +111,96 @@ public class HangarPageController {
       model.addAttribute("shipForm", new ShipForm());
     }
 
-    List<ShipDto> myShips = new ArrayList<>();
-    try {
-      PageResponse<ShipDto> p =
-          backendApiClient.get(
-              "/api/v1/hangar/my-ships?size=1000", new ParameterizedTypeReference<>() {});
-      if (p != null && p.content() != null) {
-        myShips = new ArrayList<>(p.content());
-        myShips.sort(
-            Comparator.comparing(
-                    (ShipDto s) ->
-                        s.shipType() != null && s.shipType().manufacturer() != null
-                            ? s.shipType().manufacturer().name()
-                            : "",
-                    String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(
-                    s -> s.shipType() != null ? s.shipType().name() : "",
-                    String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(
-                    (ShipDto s) -> {
-                      String ins = s.insurance();
-                      if (ins == null || ins.equals("0")) {
-                        return 3;
-                      }
-                      if (ins.equals("LTI")) {
-                        return 1;
-                      }
-                      return 2;
-                    })
-                .thenComparing(
-                    (ShipDto s) -> {
-                      String ins = s.insurance();
-                      if (ins == null || ins.equals("LTI") || ins.equals("0")) {
-                        return 0;
-                      }
-                      try {
-                        return Integer.parseInt(ins);
-                      } catch (NumberFormatException e) {
-                        return 0;
-                      }
-                    },
-                    Comparator.reverseOrder())
-                .thenComparing(
-                    s -> s.location() != null ? s.location().name() : "",
-                    String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(s -> (s.fitted() != null && s.fitted()) ? 0 : 1)
-                .thenComparing(
-                    s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER));
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch my ships", e);
-      log.error("Error loading ships", e);
-      model.addAttribute("error", "error.hangar.ships.load");
-    }
+    CompletableFuture<List<ShipDto>> shipsFuture =
+        parallelPageLoader
+            .<List<ShipDto>>loadAsync(
+                () -> {
+                  PageResponse<ShipDto> p =
+                      backendApiClient.get(
+                          "/api/v1/hangar/my-ships?size=1000",
+                          new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
+                  return p != null && p.content() != null
+                      ? new ArrayList<>(p.content())
+                      : new ArrayList<>();
+                })
+            .exceptionally(
+                e -> {
+                  log.error("Failed to fetch my ships", e);
+                  model.addAttribute("error", "error.hangar.ships.load");
+                  return new ArrayList<>();
+                });
 
-    List<ShipTypeDto> shipTypes = new ArrayList<>();
-    try {
-      PageResponse<ShipTypeDto> p =
-          backendApiClient.getCached(
-              "/api/v1/ship-types?size=1000", new ParameterizedTypeReference<>() {});
-      if (p != null && p.content() != null) {
-        shipTypes = new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch ship types", e);
-    }
+    CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
+        parallelPageLoader
+            .<List<ShipTypeDto>>loadAsync(
+                () -> {
+                  PageResponse<ShipTypeDto> p =
+                      backendApiClient.getCached(
+                          "/api/v1/ship-types?size=1000",
+                          new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {});
+                  return p != null && p.content() != null
+                      ? new ArrayList<>(p.content())
+                      : new ArrayList<>();
+                })
+            .exceptionally(
+                e -> {
+                  log.error("Failed to fetch ship types", e);
+                  return new ArrayList<>();
+                });
+
+    CompletableFuture<List<LocationDto>> locationsFuture =
+        parallelPageLoader
+            .<List<LocationDto>>loadAsync(
+                () -> {
+                  PageResponse<LocationDto> p =
+                      backendApiClient.getCached(
+                          "/api/v1/locations?size=1000",
+                          new ParameterizedTypeReference<PageResponse<LocationDto>>() {});
+                  return p != null && p.content() != null
+                      ? new ArrayList<>(p.content())
+                      : new ArrayList<>();
+                })
+            .exceptionally(
+                e -> {
+                  log.error("Failed to fetch locations", e);
+                  return new ArrayList<>();
+                });
+
+    CompletableFuture<List<ManufacturerDto>> manufacturersFuture =
+        parallelPageLoader
+            .<List<ManufacturerDto>>loadAsync(
+                () -> {
+                  PageResponse<ManufacturerDto> p =
+                      backendApiClient.getCached(
+                          "/api/v1/manufacturers?size=1000",
+                          new ParameterizedTypeReference<PageResponse<ManufacturerDto>>() {});
+                  return p != null && p.content() != null
+                      ? new ArrayList<>(p.content())
+                      : new ArrayList<>();
+                })
+            .exceptionally(
+                e -> {
+                  log.error("Failed to fetch manufacturers", e);
+                  return new ArrayList<>();
+                });
+
+    // join() blocks until every parallel fetch finishes; each call ran on its own virtual thread
+    // with the full request-scoped context (SecurityContext / RequestAttributes / squadron /
+    // correlation id) restored, so OAuth2 bearer relay and squadron-header propagation behave
+    // identically to the previous sequential implementation.
+    CompletableFuture.allOf(shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture)
+        .join();
+
+    List<ShipDto> myShips = shipsFuture.join();
+    myShips.sort(SHIP_SORT);
+
+    List<ShipTypeDto> shipTypes = shipTypesFuture.join();
     shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
 
-    List<LocationDto> locations = new ArrayList<>();
-    try {
-      PageResponse<LocationDto> pageLocations =
-          backendApiClient.getCached(
-              "/api/v1/locations?size=1000", new ParameterizedTypeReference<>() {});
-      if (pageLocations != null && pageLocations.content() != null) {
-        locations = new ArrayList<>(pageLocations.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch locations", e);
-    }
+    List<LocationDto> locations = locationsFuture.join();
     locations.sort(Comparator.comparing(LocationDto::name, String.CASE_INSENSITIVE_ORDER));
 
-    List<ManufacturerDto> manufacturers = new ArrayList<>();
-    try {
-      PageResponse<ManufacturerDto> pageManufacturers =
-          backendApiClient.getCached(
-              "/api/v1/manufacturers?size=1000", new ParameterizedTypeReference<>() {});
-      if (pageManufacturers != null && pageManufacturers.content() != null) {
-        manufacturers = new ArrayList<>(pageManufacturers.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch manufacturers", e);
-    }
+    List<ManufacturerDto> manufacturers = manufacturersFuture.join();
     manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
 
     model.addAttribute("myShips", myShips);

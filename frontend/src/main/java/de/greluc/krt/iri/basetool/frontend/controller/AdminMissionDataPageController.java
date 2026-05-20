@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.frontend.model.form.JobTypeForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.SquadronForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.iri.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,6 +16,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,11 +55,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminMissionDataPageController {
 
   private final BackendApiClient backendApiClient;
+  private final ParallelPageLoader parallelPageLoader;
 
   /**
    * Renders all three reference catalogs side by side. Seeds empty forms when the model does not
-   * already carry one (a previous validation failure rerender). Each catalog is fetched
-   * independently so a single backend failure only blanks that catalog, not the entire page.
+   * already carry one (a previous validation failure rerender). The three catalogs are fetched in
+   * parallel via {@link ParallelPageLoader}; if any individual fetch throws, the corresponding
+   * catalog renders empty and a single shared error message ({@code error.admin.mission.data.load})
+   * is surfaced — same user-visible behaviour as the previous sequential implementation.
    *
    * @param includeInactiveJobTypes show soft-deleted job types
    * @param includeInactiveSquadrons show soft-deleted squadrons
@@ -82,76 +88,131 @@ public class AdminMissionDataPageController {
     model.addAttribute("includeInactiveJobTypes", includeInactiveJobTypes);
     model.addAttribute("includeInactiveSquadrons", includeInactiveSquadrons);
     model.addAttribute("includeInactiveFrequencyTypes", includeInactiveFrequencyTypes);
-    try {
-      PageResponse<Map<String, Object>> jobTypesPage =
-          backendApiClient.get(
-              "/api/v1/job-types?size=1000&sort=name,asc&includeInactive="
-                  + includeInactiveJobTypes,
-              new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
 
-      List<JobTypeDto> jobTypes = null;
-      if (jobTypesPage != null && jobTypesPage.content() != null) {
-        jobTypes =
-            jobTypesPage.content().stream()
-                .map(
-                    m ->
-                        new JobTypeDto(
-                            parseUuid(m.get("id")),
-                            parseString(m.get("name")),
-                            parseString(m.get("description")),
-                            parseString(m.get("archetype")),
-                            parseUuid(m.get("parentId")),
-                            parseBoolean(m.get("active")),
-                            parseBoolean(m.get("isLeadershipRole")),
-                            parseLong(m.get("version"))))
-                .collect(Collectors.toCollection(ArrayList::new));
-        jobTypes.sort(
-            Comparator.comparing(
-                j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
-      }
-      model.addAttribute("jobTypes", jobTypes);
+    AtomicBoolean anyFailure = new AtomicBoolean(false);
 
-      PageResponse<Map<String, Object>> squadronsPage =
-          backendApiClient.get(
-              "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive="
-                  + includeInactiveSquadrons,
-              new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    CompletableFuture<List<JobTypeDto>> jobTypesFuture =
+        parallelPageLoader
+            .loadAsync(() -> fetchJobTypes(includeInactiveJobTypes))
+            .exceptionally(
+                e -> {
+                  log.error("Error loading job types", e);
+                  anyFailure.set(true);
+                  return null;
+                });
 
-      List<SquadronDto> squadrons = null;
-      if (squadronsPage != null && squadronsPage.content() != null) {
-        squadrons =
-            squadronsPage.content().stream()
-                .map(
-                    m ->
-                        new SquadronDto(
-                            parseUuid(m.get("id")),
-                            parseString(m.get("name")),
-                            parseString(m.get("shorthand")),
-                            parseString(m.get("description")),
-                            parseBoolean(m.get("active")),
-                            parseBoolean(m.get("isPromotionEnabled")),
-                            parseLong(m.get("version"))))
-                .collect(Collectors.toCollection(ArrayList::new));
-        squadrons.sort(
-            Comparator.comparing(
-                s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
-      }
-      model.addAttribute("squadrons", squadrons);
+    CompletableFuture<List<SquadronDto>> squadronsFuture =
+        parallelPageLoader
+            .loadAsync(() -> fetchSquadrons(includeInactiveSquadrons))
+            .exceptionally(
+                e -> {
+                  log.error("Error loading squadrons", e);
+                  anyFailure.set(true);
+                  return null;
+                });
 
-      PageResponse<Map<String, Object>> freqsPage =
-          backendApiClient.get(
-              "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
-                  + (includeInactiveFrequencyTypes ? "" : "&active=true"),
-              new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
-      if (freqsPage != null) {
-        model.addAttribute("frequencyTypes", freqsPage.content());
-      }
+    CompletableFuture<List<Map<String, Object>>> freqsFuture =
+        parallelPageLoader
+            .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
+            .exceptionally(
+                e -> {
+                  log.error("Error loading frequency types", e);
+                  anyFailure.set(true);
+                  return null;
+                });
 
-    } catch (Exception e) {
-      log.error("Error loading mission data", e);
+    CompletableFuture.allOf(jobTypesFuture, squadronsFuture, freqsFuture).join();
+
+    model.addAttribute("jobTypes", jobTypesFuture.join());
+    model.addAttribute("squadrons", squadronsFuture.join());
+    List<Map<String, Object>> freqs = freqsFuture.join();
+    if (freqs != null) {
+      model.addAttribute("frequencyTypes", freqs);
+    }
+    if (anyFailure.get()) {
       model.addAttribute("error", "error.admin.mission.data.load");
     }
     return "admin/mission-data";
+  }
+
+  /**
+   * Fetches the job-type catalog from the backend, transforms the raw {@code Map} payload into a
+   * list of {@link JobTypeDto} records and sorts the result case-insensitively by name. Returns
+   * {@code null} when the backend responds with no content; callers treat that as "no catalog
+   * available", same as the previous sequential implementation.
+   */
+  private List<JobTypeDto> fetchJobTypes(boolean includeInactive) {
+    PageResponse<Map<String, Object>> page =
+        backendApiClient.get(
+            "/api/v1/job-types?size=1000&sort=name,asc&includeInactive=" + includeInactive,
+            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    if (page == null || page.content() == null) {
+      return null;
+    }
+    List<JobTypeDto> jobTypes =
+        page.content().stream()
+            .map(
+                m ->
+                    new JobTypeDto(
+                        parseUuid(m.get("id")),
+                        parseString(m.get("name")),
+                        parseString(m.get("description")),
+                        parseString(m.get("archetype")),
+                        parseUuid(m.get("parentId")),
+                        parseBoolean(m.get("active")),
+                        parseBoolean(m.get("isLeadershipRole")),
+                        parseLong(m.get("version"))))
+            .collect(Collectors.toCollection(ArrayList::new));
+    jobTypes.sort(
+        Comparator.comparing(j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
+    return jobTypes;
+  }
+
+  /**
+   * Fetches the squadron catalog from the backend, transforms the raw {@code Map} payload into a
+   * list of {@link SquadronDto} records and sorts the result case-insensitively by name. Returns
+   * {@code null} when the backend responds with no content; callers treat that as "no catalog
+   * available", same as the previous sequential implementation.
+   */
+  private List<SquadronDto> fetchSquadrons(boolean includeInactive) {
+    PageResponse<Map<String, Object>> page =
+        backendApiClient.get(
+            "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=" + includeInactive,
+            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    if (page == null || page.content() == null) {
+      return null;
+    }
+    List<SquadronDto> squadrons =
+        page.content().stream()
+            .map(
+                m ->
+                    new SquadronDto(
+                        parseUuid(m.get("id")),
+                        parseString(m.get("name")),
+                        parseString(m.get("shorthand")),
+                        parseString(m.get("description")),
+                        parseBoolean(m.get("active")),
+                        parseBoolean(m.get("isPromotionEnabled")),
+                        parseLong(m.get("version"))))
+            .collect(Collectors.toCollection(ArrayList::new));
+    squadrons.sort(
+        Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
+    return squadrons;
+  }
+
+  /**
+   * Fetches the frequency-type catalog from the backend and returns the raw {@code Map} content
+   * (this list is rendered with Thymeleaf utility helpers and does not need a typed DTO). Returns
+   * {@code null} when the backend responds with no content; callers treat that as "no catalog
+   * available", same as the previous sequential implementation.
+   */
+  private List<Map<String, Object>> fetchFrequencyTypes(boolean includeInactive) {
+    PageResponse<Map<String, Object>> page =
+        backendApiClient.get(
+            "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
+                + (includeInactive ? "" : "&active=true"),
+            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    return page != null ? page.content() : null;
   }
 
   /**
