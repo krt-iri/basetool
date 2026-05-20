@@ -472,7 +472,9 @@
         </div>
 
         <!-- Column 3: Payout -->
-        <div class="mission-column" id="col-payout" data-panel-key="payout" th:attr="data-operation-id=${operation.id}">
+        <div class="mission-column" id="col-payout" data-panel-key="payout"
+             th:attr="data-operation-id=${operation.id},
+                      data-can-unset-paid-out=${canUnsetPaidOut}">
             <button type="button" class="col-header" aria-expanded="true" aria-controls="col-payout-content"
                     data-panel-toggle="col-payout"
                     th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{operation.payout}, title=#{mission.panel.toggle.aria}">
@@ -524,7 +526,9 @@
                                                    class="payout-paid-checkbox"
                                                    th:attr="data-participant-id=${payout.participantId},
                                                             data-operation-id=${operation.id}"
-                                                   th:checked="${payout.paidOut}">
+                                                   th:checked="${payout.paidOut}"
+                                                   th:disabled="${payout.paidOut and not canUnsetPaidOut}"
+                                                   th:title="${payout.paidOut and not canUnsetPaidOut} ? #{operation.payout.paid.unset.locked} : ''">
                                             <span class="payout-paid-status"
                                                   th:if="${payout.paidOut and payout.paidOutByName != null}"
                                                   th:text="${payout.paidOutByName}"
@@ -736,6 +740,7 @@
     /*<![CDATA[*/
     const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';
     const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung, den Auszahlungsstatus zu aendern.';
+    const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
     /*]]>*/
 
     function payoutPaidUrl() {
@@ -744,12 +749,30 @@
         return operationId ? ('/operations/' + operationId + '/payouts/paid-out') : null;
     }
 
+    function canUnsetPaidOut() {
+        const col = document.getElementById('col-payout');
+        // Default to false: a missing attribute means we cannot prove the user
+        // is an officer/admin, so lock the unchecking path conservatively. The
+        // backend remains the source of truth and would 403 anyway.
+        return col != null && col.getAttribute('data-can-unset-paid-out') === 'true';
+    }
+
     function refreshPayoutPaidStatusCell(row, dto) {
         if (!row) return;
         // Only mutate the audit subtitle for the canEdit branch (the one with the checkbox).
         const checkbox = row.querySelector('.payout-paid-checkbox');
         if (!checkbox) return;
         checkbox.checked = !!dto.paidOut;
+        // Mirror the server-side rule: once paid and the current user cannot
+        // unset, lock the checkbox so a plain mission manager does not run
+        // into a 403 on the next click.
+        if (checkbox.checked && !canUnsetPaidOut()) {
+            checkbox.disabled = true;
+            checkbox.title = MSG_PAYOUT_PAID_UNSET_LOCKED;
+        } else {
+            checkbox.disabled = false;
+            checkbox.title = '';
+        }
         let statusSpan = row.querySelector('.payout-paid-status');
         if (dto.paidOut && dto.paidOutByName) {
             if (!statusSpan) {
@@ -814,7 +837,13 @@
             if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
         })
         .finally(() => {
-            checkbox.disabled = false;
+            // Re-enable for the next interaction — UNLESS we just confirmed
+            // paidOut=true as a non-officer, in which case refreshPayoutPaidStatusCell
+            // has already locked the box and the user is no longer allowed
+            // to flip it back. Don't undo that lock here.
+            if (!(checkbox.checked && !canUnsetPaidOut())) {
+                checkbox.disabled = false;
+            }
         });
     }
 
