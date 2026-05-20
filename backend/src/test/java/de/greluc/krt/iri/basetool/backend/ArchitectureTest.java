@@ -66,6 +66,24 @@ class ArchitectureTest {
   private static final String PATCH_MAPPING =
       "org.springframework.web.bind.annotation.PatchMapping";
 
+  private static final String REQUEST_BODY = "org.springframework.web.bind.annotation.RequestBody";
+
+  /**
+   * DTOs that are response-only — they may be returned from {@code @GetMapping} methods or used as
+   * {@code @PostMapping} return types, but MUST NOT be accepted as a {@code @RequestBody} on any
+   * state-changing endpoint. They carry server-managed fields ({@code id}, {@code version}, {@code
+   * owningSquadron}, {@code parent}, role-derived flags) which, if let through a write binding,
+   * become a mass-assignment vector (audit finding C-3: the original {@code POST /api/v1/missions}
+   * accepted the full {@code MissionDto} and let any authenticated caller overwrite a foreign
+   * squadron's mission via {@code EntityManager.merge}).
+   *
+   * <p>Add to this list when a new response DTO ships with server-managed fields. The corresponding
+   * write endpoints must then accept a dedicated {@code …Request} record from {@code dto/request/}
+   * carrying only caller-controllable fields.
+   */
+  private static final Set<String> RESPONSE_ONLY_DTOS =
+      Set.of("de.greluc.krt.iri.basetool.backend.model.dto.MissionDto");
+
   /**
    * Java-generic wrappers that controllers legitimately return (paging envelopes, optional results,
    * response wrappers). The Entity-Generic rule below scans the actual type arguments of these
@@ -740,5 +758,336 @@ class ArchitectureTest {
               }
             })
         .check(CLASSES);
+  }
+
+  /**
+   * Audit finding C-1 guard (2026-05-20 security audit): mission endpoints gated only by
+   * {@code @PreAuthorize("@squadronScopeService.canSeeMission(#id)")} (without an additional {@code
+   * isAuthenticated()} / {@code hasRole(...)} / {@code hasAuthority(...)} clause) are reachable by
+   * anonymous callers for non-internal missions — {@link
+   * de.greluc.krt.iri.basetool.backend.config.SecurityConfig} declares the matching paths as {@code
+   * permitAll}. Any such endpoint that returns a {@link
+   * de.greluc.krt.iri.basetool.backend.model.dto.MissionDto}, a {@link
+   * de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto} or a generic collection of
+   * either MUST invoke one of the guest-redaction helpers ({@code cleanupMissionForGuest} / {@code
+   * cleanupParticipantForGuest}) somewhere in its body; otherwise full participant PII (email, real
+   * name, roles, permissions) is shipped to guests.
+   *
+   * <p>The rule fired on the original C-1 regression in {@code
+   * MissionController.addParticipantPublic} and {@code MissionController.addParticipantSlim}, both
+   * of which had the {@code canSeeMission} gate but skipped the redaction pass that {@code
+   * getMissionById} / {@code getNextMission} already applied. Without this guard a future endpoint
+   * added with the same gate would silently re-introduce the same leak.
+   *
+   * <p>The check is structural: it asserts the helper is referenced in the bytecode, NOT that the
+   * call is conditional on {@code jwt == null}. The conditional branching is verified by the
+   * per-endpoint unit tests. The intent of the ArchUnit rule is to catch the "I forgot the
+   * redaction entirely" regression, which is the actual C-1 root cause.
+   */
+  @Test
+  void anonymousReadableMissionEndpointsMustRedactGuestPii() {
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .resideInAPackage("..backend.controller..")
+        .and()
+        .arePublic()
+        .and(hasGuestVisibleCanSeeMissionPreAuthorize())
+        .and(returnsMissionDtoOrMissionParticipantDtoOrCollection())
+        .should(callOneOfTheGuestRedactionHelpers())
+        .because(
+            "Mission endpoints reachable by anonymous callers must apply cleanupMissionForGuest "
+                + "or cleanupParticipantForGuest before returning — audit finding C-1: "
+                + "addParticipantPublic / addParticipantSlim previously leaked full participant "
+                + "emails and real names to anonymous callers because the redaction pass that "
+                + "getMissionById / getNextMission already used was skipped on the write paths.")
+        .check(CLASSES);
+  }
+
+  /**
+   * Mission DTOs whose participant nesting carries PII (email, first/last name, roles). Used by
+   * {@link #anonymousReadableMissionEndpointsMustRedactGuestPii} to recognise return shapes that
+   * must go through guest-redaction before reaching an anonymous caller. {@code
+   * MissionFinanceEntryDto} is included because it embeds {@link
+   * de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto} directly — the audit found
+   * this transitive leak (C-2) in {@code MissionFinanceEntryController.createFinanceEntry}.
+   */
+  private static final Set<String> MISSION_PII_CARRYING_DTOS =
+      Set.of(
+          "de.greluc.krt.iri.basetool.backend.model.dto.MissionDto",
+          "de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto",
+          "de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto");
+
+  /**
+   * Naming convention for helper methods that strip participant PII for anonymous callers: {@code
+   * cleanup<EntityName>ForGuest}. Examples in the codebase: {@code
+   * MissionController#cleanupMissionForGuest}, {@code …#cleanupParticipantForGuest}, {@code
+   * MissionFinanceEntryController#cleanupFinanceEntryForGuest}. The ArchUnit rule recognises any
+   * call to a method matching this pattern as a valid redaction call — so adding a new
+   * guest-reachable controller with its own entity-specific redactor (named accordingly) does not
+   * require updating this test.
+   *
+   * @param name candidate method name
+   * @return {@code true} iff {@code name} matches the {@code cleanup…ForGuest} convention
+   */
+  private static boolean isGuestRedactionHelperName(String name) {
+    return name.startsWith("cleanup") && name.endsWith("ForGuest");
+  }
+
+  private static DescribedPredicate<JavaMethod> hasGuestVisibleCanSeeMissionPreAuthorize() {
+    return new DescribedPredicate<JavaMethod>(
+        "annotated with @PreAuthorize that gates on canSeeMission without an"
+            + " isAuthenticated/hasRole/hasAuthority clause") {
+      @Override
+      public boolean test(JavaMethod method) {
+        if (!method.isAnnotatedWith(PRE_AUTHORIZE)) {
+          return false;
+        }
+        JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
+        String value =
+            ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
+        if (!value.contains("canSeeMission")) {
+          return false;
+        }
+        // Any of the following would force the caller to be authenticated, making jwt non-null
+        // at runtime and the guest-redaction pass moot.
+        return !value.contains("isAuthenticated()")
+            && !value.contains("hasRole(")
+            && !value.contains("hasAnyRole(")
+            && !value.contains("hasAuthority(")
+            && !value.contains("hasAnyAuthority(");
+      }
+    };
+  }
+
+  private static DescribedPredicate<JavaMethod>
+      returnsMissionDtoOrMissionParticipantDtoOrCollection() {
+    return new DescribedPredicate<JavaMethod>(
+        "returns MissionDto / MissionParticipantDto, or a known generic wrapper of either") {
+      @Override
+      public boolean test(JavaMethod method) {
+        JavaClass rawReturnType = method.getRawReturnType();
+        if (MISSION_PII_CARRYING_DTOS.contains(rawReturnType.getFullName())) {
+          return true;
+        }
+        JavaType returnType = method.getReturnType();
+        if (!(returnType instanceof JavaParameterizedType parameterized)) {
+          return false;
+        }
+        if (!ENTITY_GENERIC_WRAPPERS.contains(parameterized.toErasure().getFullName())) {
+          return false;
+        }
+        for (JavaType arg : parameterized.getActualTypeArguments()) {
+          if (MISSION_PII_CARRYING_DTOS.contains(arg.toErasure().getFullName())) {
+            return true;
+          }
+        }
+        return false;
+      }
+    };
+  }
+
+  /**
+   * Audit finding C-3 guard (2026-05-20 security audit): write endpoints on REST controllers must
+   * not accept a response-only DTO as {@code @RequestBody}. Response DTOs carry server-managed
+   * fields ({@code id}, {@code version}, {@code owningSquadron}, …) which, if let through a JSON
+   * binding into a fresh entity, become a mass-assignment vector — the original {@code POST
+   * /api/v1/missions} accepted a full {@code MissionDto} and let any authenticated caller overwrite
+   * a foreign squadron's mission row via {@code EntityManager.merge}. The fix migrated those
+   * endpoints to dedicated {@code CreateMissionRequest} / {@code UpdateMissionRequest} records that
+   * physically lack the dangerous fields.
+   *
+   * <p>This rule keeps the migration one-way: any future {@code @PostMapping} / {@code @PutMapping}
+   * / {@code @PatchMapping} that tries to take a listed response-only DTO as its request body fails
+   * the build. The {@code RESPONSE_ONLY_DTOS} allowlist at the top of this test file is the
+   * explicit registry — extend it when a new response DTO ships with server-managed fields (every
+   * staffel-scoped aggregate's main DTO is a candidate).
+   */
+  @Test
+  void responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints() {
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .resideInAPackage("..backend.controller..")
+        .and()
+        .arePublic()
+        .and(isAnnotatedWithAnyOf(POST_MAPPING, PUT_MAPPING, PATCH_MAPPING))
+        .should(notAcceptResponseOnlyDtoAsRequestBody())
+        .because(
+            "Write endpoints must accept a dedicated request DTO (e.g. CreateMissionRequest, "
+                + "UpdateMissionRequest) that structurally excludes server-managed fields — "
+                + "binding the full response DTO opens a mass-assignment vector. See audit "
+                + "finding C-3 in CHANGELOG / MissionMapper#toEntity removal.")
+        .check(CLASSES);
+  }
+
+  private static ArchCondition<JavaMethod> notAcceptResponseOnlyDtoAsRequestBody() {
+    return new ArchCondition<JavaMethod>(
+        "not declare a @RequestBody parameter of a response-only DTO type") {
+      @Override
+      public void check(JavaMethod method, ConditionEvents events) {
+        method.getParameters().stream()
+            .filter(p -> p.isAnnotatedWith(REQUEST_BODY))
+            .filter(p -> RESPONSE_ONLY_DTOS.contains(p.getRawType().getFullName()))
+            .forEach(
+                p ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            method,
+                            method.getFullName()
+                                + " — @RequestBody parameter of type "
+                                + p.getRawType().getSimpleName()
+                                + " is a response-only DTO; binding it on a write endpoint enables"
+                                + " mass-assignment of server-managed fields (id, version,"
+                                + " owningSquadron, …). Switch to a dedicated *Request record"
+                                + " from backend/.../dto/request/. See audit finding C-3.")));
+      }
+    };
+  }
+
+  private static ArchCondition<JavaMethod> callOneOfTheGuestRedactionHelpers() {
+    return new ArchCondition<JavaMethod>(
+        "call a cleanup…ForGuest redaction helper from its own body") {
+      @Override
+      public void check(JavaMethod method, ConditionEvents events) {
+        boolean callsHelper =
+            method.getMethodCallsFromSelf().stream()
+                .map(call -> call.getTarget().getName())
+                .anyMatch(ArchitectureTest::isGuestRedactionHelperName);
+        if (callsHelper) {
+          return;
+        }
+        // Method references (e.g. `stream.map(this::cleanupParticipantForGuest)`) are compiled
+        // into a synthetic invokedynamic call site whose target is reachable via the bootstrap.
+        // ArchUnit exposes that as a separate access kind — fall back to the broader call set so
+        // the rule does not false-positive on the slim endpoint's stream pattern.
+        boolean referencesHelper =
+            method.getAccessesFromSelf().stream()
+                .map(access -> access.getTarget().getName())
+                .anyMatch(ArchitectureTest::isGuestRedactionHelperName);
+        if (referencesHelper) {
+          return;
+        }
+        events.add(
+            SimpleConditionEvent.violated(
+                method,
+                method.getFullName()
+                    + " — anonymous callers reach this endpoint (PreAuthorize gates on"
+                    + " canSeeMission without forcing authentication) and the return type carries"
+                    + " participant PII, but the method body does not invoke any cleanup…ForGuest"
+                    + " redaction helper. Full participant emails / real names / roles will leak to"
+                    + " guests — see audit findings C-1 / C-2."));
+      }
+    };
+  }
+
+  /**
+   * Audit finding C-4 guard (2026-05-20 security audit): the unconditional server-side stamping of
+   * {@code owningSquadron} / {@code owner} / {@code parent} in {@link
+   * de.greluc.krt.iri.basetool.backend.service.MissionService#createMission} and {@link
+   * de.greluc.krt.iri.basetool.backend.service.MissionService#addSubMission} relies on the
+   * corresponding columns NEVER being present on the request DTOs. The C-3 refactor enforces this
+   * structurally by giving the records only safe components, but a future maintainer could ship a
+   * "small convenience" patch like adding {@code UUID owningSquadronId} to {@code
+   * CreateMissionRequest} and re-wiring the service to honour it — that single step re-opens the
+   * squadron-stamp-forgery vector (an authenticated SQUADRON_MEMBER of squadron A creates a mission
+   * stamped as squadron B's, optionally with {@code isInternal=true} so it is hidden from A's
+   * roster).
+   *
+   * <p>This rule locks down the shape: {@code CreateMissionRequest} and {@code
+   * UpdateMissionRequest} must not declare any record component whose name matches a server-
+   * managed concern. Adding a new column to {@link
+   * de.greluc.krt.iri.basetool.backend.model.dto.MissionDto} response side is fine; adding {@code
+   * owningSquadronId} / {@code parentId} / {@code ownerId} / {@code id} / etc. to the write-side
+   * records is what this guard prevents.
+   */
+  @Test
+  void missionWriteRequestDtosMustNotCarryServerManagedFields() {
+    classes()
+        .that()
+        .haveFullyQualifiedName(
+            "de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest")
+        .or()
+        .haveFullyQualifiedName(
+            "de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionRequest")
+        .should(notDeclareServerManagedRecordComponents())
+        .because(
+            "MissionService.createMission / addSubMission stamp owner / owningSquadron / parent"
+                + " from the authenticated principal and the path-resolved parent — never from the"
+                + " request body. The request records must not grow components for those concerns"
+                + " or the squadron-stamp-forgery vector returns. See audit finding C-4.")
+        .check(CLASSES);
+  }
+
+  /**
+   * Record component names that are forbidden on Mission write DTOs (audit finding C-4): server-
+   * managed concerns that the service stamps unconditionally and which a client-supplied value
+   * would silently override. {@code version} is allowed on {@code UpdateMissionRequest} because it
+   * is the optimistic-lock token — the check below carves it out for the update DTO only.
+   */
+  private static final Set<String> FORBIDDEN_MISSION_REQUEST_COMPONENTS =
+      Set.of(
+          // Identity / global version — set by the persistence layer.
+          "id",
+          "version",
+          "coreVersion",
+          "scheduleVersion",
+          "flagsVersion",
+          // Owner — stamped from the authenticated principal in createMission.
+          "owner",
+          "ownerId",
+          // Managers — managed via dedicated /missions/{id}/managers endpoints.
+          "managers",
+          // Owning squadron — derived from owner.squadron / scope (createMission) or parent
+          // (addSubMission); never the body.
+          "owningSquadron",
+          "owningSquadronId",
+          "squadronId",
+          "squadron",
+          // Parent — for sub-missions, taken from the path variable; never the body.
+          "parent",
+          "parentId",
+          // Sub-aggregate collections have their own write endpoints.
+          "participants",
+          "assignedUnits",
+          "frequencies",
+          "subMissions",
+          "inventoryEntries",
+          "refineryOrders",
+          // Computed-on-response projections.
+          "canEdit",
+          "canManageManagers",
+          "checkedInParticipants",
+          "registeredParticipants");
+
+  private static ArchCondition<JavaClass> notDeclareServerManagedRecordComponents() {
+    return new ArchCondition<JavaClass>(
+        "not declare any server-managed record component (owningSquadron, owner, parent, …)") {
+      @Override
+      public void check(JavaClass clazz, ConditionEvents events) {
+        boolean isUpdateDto = clazz.getSimpleName().equals("UpdateMissionRequest");
+        clazz.getFields().stream()
+            .filter(
+                f ->
+                    !f.getModifiers()
+                        .contains(com.tngtech.archunit.core.domain.JavaModifier.STATIC))
+            .map(f -> f.getName())
+            .filter(FORBIDDEN_MISSION_REQUEST_COMPONENTS::contains)
+            // `version` is the optimistic-lock token on UpdateMissionRequest — legitimate there.
+            .filter(name -> !(isUpdateDto && "version".equals(name)))
+            .forEach(
+                name ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            clazz,
+                            clazz.getFullName()
+                                + " declares record component `"
+                                + name
+                                + "` — that field is server-managed (audit finding C-4). Stamp it"
+                                + " inside MissionService, not from the request body. If this is"
+                                + " legitimately client-supplied, justify in a code comment and"
+                                + " carve it out of FORBIDDEN_MISSION_REQUEST_COMPONENTS.")));
+      }
+    };
   }
 }

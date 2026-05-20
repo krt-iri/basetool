@@ -24,7 +24,12 @@ public class PiiMaskingLogstashEncoder extends LogstashEncoder {
     }
     String json = new String(raw, StandardCharsets.UTF_8);
     String masked = PiiMasker.mask(json);
-    if (masked == json) {
+    // Audit finding L-7: the previous {@code masked == json} reference check relied on the
+    // fragile invariant that {@link PiiMasker#mask(String)} returns the same String instance when
+    // there is no PII to scrub. Compare by value so a future refactor that returns a new
+    // instance for the no-match case does not silently force a re-encode-roundtrip per log
+    // event (or — worse — introduce a behaviour gap).
+    if (masked.equals(json)) {
       return raw;
     }
     return masked.getBytes(StandardCharsets.UTF_8);

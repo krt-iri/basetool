@@ -22,6 +22,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
@@ -100,6 +101,7 @@ public class MissionController {
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
   private final MissionSecurityService missionSecurityService;
+  private final AuthHelperService authHelperService;
 
   /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
@@ -395,25 +397,31 @@ public class MissionController {
 
   /**
    * Creates a new mission. The caller becomes the owner via {@link MissionService#createMission}.
+   * The {@link de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest} record
+   * structurally excludes {@code id} / {@code version} / {@code owningSquadron} / {@code parent} /
+   * {@code owner} / collections (audit finding C-3) — those are stamped server-side.
    *
-   * @param mission create payload
+   * @param request create payload
    * @return the persisted DTO
    */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Create a new mission")
   public MissionDto createMission(
-      @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
-    return missionMapper.toDto(missionService.createMission(missionMapper.toEntity(mission)));
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest request) {
+    return missionMapper.toDto(missionService.createMission(request));
   }
 
   /**
    * Attaches a new sub-mission to a parent. Sub-missions are independent missions that aggregate up
-   * to the parent for finance/payout roll-ups.
+   * to the parent for finance/payout roll-ups. Uses the same {@link
+   * de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest} as the top-level
+   * create — {@code parent} and {@code owningSquadron} are stamped from the path-resolved parent
+   * (audit finding C-3).
    *
    * @param id parent mission id
-   * @param subMission create payload for the sub-mission
+   * @param request create payload for the sub-mission
    * @return the persisted parent DTO with the new sub-mission attached
    */
   @PostMapping("/{id}/sub-missions")
@@ -421,10 +429,9 @@ public class MissionController {
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto subMission) {
-    return missionMapper.toDto(
-        missionService.addSubMission(id, missionMapper.toEntity(subMission)));
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest request) {
+    return missionMapper.toDto(missionService.addSubMission(id, request));
   }
 
   /**
@@ -434,7 +441,9 @@ public class MissionController {
    * multi-user-friendly edits.
    *
    * @param id mission id
-   * @param mission update payload (carries the expected version)
+   * @param request update payload (carries the expected version); structurally excludes server-
+   *     managed fields ({@code id}, {@code owningSquadron}, {@code parent}, {@code owner}, …) to
+   *     close the audit-finding-C-3 mass-assignment vector
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -448,9 +457,9 @@ public class MissionController {
               + "anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.")
   public MissionDto updateMission(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.iri.basetool.backend.model.dto.MissionDto mission) {
-    return missionMapper.toDto(missionService.updateMission(id, missionMapper.toEntity(mission)));
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionRequest request) {
+    return missionMapper.toDto(missionService.updateMission(id, request));
   }
 
   /**
@@ -1049,14 +1058,24 @@ public class MissionController {
       }
     }
 
-    return missionMapper.toDto(
-        missionService.addParticipant(
-            id,
-            finalUserId,
-            finalGuestName,
-            request.desiredJobTypeId(),
-            request.comment(),
-            request.squadronId()));
+    MissionDto dto =
+        missionMapper.toDto(
+            missionService.addParticipant(
+                id,
+                finalUserId,
+                finalGuestName,
+                request.desiredJobTypeId(),
+                request.comment(),
+                request.squadronId()));
+    // C-1: anonymous callers must never receive participant emails / real names. Mirror the
+    // redaction applied by {@link #getMissionById} so the add-participant response shape is
+    // identical to the read-participant response shape. The ArchUnit rule
+    // {@code anonymousReadableMissionEndpointsMustRedactPii} statically enforces this for any
+    // future endpoint added with the same {@code @squadronScopeService.canSeeMission(#id)} gate.
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -1670,7 +1689,18 @@ public class MissionController {
             request.desiredJobTypeId(),
             request.comment(),
             request.squadronId());
-    return mission.getParticipants().stream().map(missionMapper::toDto).toList();
+    java.util.stream.Stream<MissionParticipantDto> participants =
+        mission.getParticipants().stream().map(missionMapper::toDto);
+    // C-1 (anonymous) + H-5 (authenticated non-Officer): every caller below Officer+ gets the
+    // peer-redacted user shape. The mission roster UI works fine with the slim fields (callsign,
+    // displayName, rank); only Officer / Admin (moderation) and {@code /users/me} (the caller's
+    // own row) need full PII. The ArchUnit rule
+    // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
+    // future endpoint added with the same {@code @squadronScopeService.canSeeMission(#id)} gate.
+    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
+      participants = participants.map(this::cleanupParticipantForGuest);
+    }
+    return participants.toList();
   }
 
   /**

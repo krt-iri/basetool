@@ -213,16 +213,17 @@ subprojects {
 }
 
 // OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over
-// all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate stays
-// wide open (`failBuildOnCVSS = 11`) for the first iteration so the team
-// triages findings before the gate turns strict. The plugin's first invocation
-// downloads the NVD feed (~500 MB cached under
+// all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate now fails
+// the build on findings with CVSS 7.0 or higher (audit finding L-8: previously
+// the gate was wide open at CVSS 11 — triage-only). 7.0 covers the OWASP "HIGH"
+// severity band; CRITICAL (>= 9.0) is included by definition. The plugin's
+// first invocation downloads the NVD feed (~500 MB cached under
 // `~/.gradle/dependency-check-data`) and takes 5-15 minutes; subsequent runs
 // are seconds. Set `-PnvdApiKey=<key>` (CI: `NVD_API_KEY` repo secret) to
 // bypass the public NVD rate limit — register a free key at
 // https://nvd.nist.gov/developers/request-an-api-key.
 dependencyCheck {
-  failBuildOnCVSS = 11.0f
+  failBuildOnCVSS = 7.0f
   formats = listOf("HTML", "SARIF")
   outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
   // Treat the on-disk NVD copy as valid for a full ISO-week. The

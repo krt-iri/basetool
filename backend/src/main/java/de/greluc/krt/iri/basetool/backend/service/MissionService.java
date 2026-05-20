@@ -16,6 +16,8 @@ import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.iri.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionCrewRepository;
@@ -42,6 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +71,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MissionService {
 
+  /** Hard cap on participants per mission — see {@link #addParticipant} for the rationale. */
+  public static final int MAX_PARTICIPANTS_PER_MISSION = 500;
+
   private final MissionRepository missionRepository;
   private final UserRepository userRepository;
   private final ShipRepository shipRepository;
@@ -83,6 +89,7 @@ public class MissionService {
   private final OperationRepository operationRepository;
   private final UserService userService;
   private final SquadronScopeService squadronScopeService;
+  private final AuthHelperService authHelperService;
 
   /**
    * Returns paged mission list.
@@ -123,9 +130,16 @@ public class MissionService {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
+    // M-1: defence-in-depth. Anonymous callers may never see internal missions, even if a future
+    // controller forgets to pass {@code isInternal=false}. Force the filter here so the data
+    // layer is the authoritative gate — a regression in the controller cannot widen the leak.
+    Boolean effectiveIsInternal = isInternal;
+    if (!authHelperService.isAuthenticated()) {
+      effectiveIsInternal = Boolean.FALSE;
+    }
     UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return missionRepository.searchMissions(
-        query, start, end, status, isInternal, operationId, scopeSquadronId, pageable);
+        query, start, end, status, effectiveIsInternal, operationId, scopeSquadronId, pageable);
   }
 
   /**
@@ -161,42 +175,66 @@ public class MissionService {
   }
 
   /**
-   * Persists a new mission. Resolves shallow references (operation, location, frequencies) and
-   * creates the {@code mission_ownership} row that tracks owner-change versioning separately from
-   * the main mission version.
+   * Persists a new mission from the request DTO. Every server-managed column ({@code id}, {@code
+   * version}, the section counters, {@code owner}, {@code owningSquadron}, {@code parent}, the
+   * sub-aggregate collections) is set inside this method — the request record carries only
+   * caller-controllable fields, which makes the mass-assignment vector exploited in audit finding
+   * C-3 structurally impossible.
    *
-   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
-   *     is unknown
+   * @param request create payload (already validated by Bean Validation at the controller boundary)
+   * @return the persisted mission entity
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when {@code operationId}
+   *     does not resolve
    */
   @Transactional
-  public Mission createMission(@NotNull Mission mission) {
-    if (mission.getIsInternal() == null) {
-      mission.setIsInternal(false);
+  public Mission createMission(@NotNull CreateMissionRequest request) {
+    Mission mission = new Mission();
+    applyCreatePayload(mission, request);
+
+    // Fail-fast on the time-window validation BEFORE the userService / squadronScopeService
+    // round-trips so a malformed payload does not waste a DB / security-context lookup.
+    validateMissionTimes(mission);
+
+    userService.getCurrentUser().ifPresent(mission::setOwner);
+
+    if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
+      mission.setOwningSquadron(mission.getOwner().getSquadron());
+    } else {
+      squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
     }
 
-    if (mission.getOperation() != null && mission.getOperation().getId() != null) {
+    return missionRepository.save(mission);
+  }
+
+  /**
+   * Copies the caller-controllable fields of {@link CreateMissionRequest} onto a fresh {@link
+   * Mission} entity. Shared by {@link #createMission(CreateMissionRequest)} and {@link
+   * #addSubMission(UUID, CreateMissionRequest)}; the latter additionally wires up {@code parent}
+   * and inherits the owning squadron. Operation lookup runs here so both create paths fail the same
+   * way for an unknown operation id.
+   *
+   * @param mission target entity (caller owns its identity and version)
+   * @param request validated create payload
+   */
+  private void applyCreatePayload(Mission mission, CreateMissionRequest request) {
+    mission.setName(request.name());
+    mission.setDescription(request.description());
+    mission.setCalendarLink(request.calendarLink());
+    mission.setStatus(request.status());
+    mission.setMeetingTime(request.meetingTime());
+    mission.setPlannedStartTime(request.plannedStartTime());
+    mission.setPlannedEndTime(request.plannedEndTime());
+    mission.setIsInternal(request.isInternal() != null ? request.isInternal() : Boolean.FALSE);
+
+    if (request.operationId() != null) {
       Operation op =
           operationRepository
-              .findById(mission.getOperation().getId())
+              .findById(request.operationId())
               .orElseThrow(() -> new NotFoundException("Operation not found"));
       mission.setOperation(op);
     } else {
       mission.setOperation(null);
     }
-
-    validateMissionTimes(mission);
-
-    userService.getCurrentUser().ifPresent(mission::setOwner);
-
-    if (mission.getOwningSquadron() == null) {
-      if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
-        mission.setOwningSquadron(mission.getOwner().getSquadron());
-      } else {
-        squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
-      }
-    }
-
-    return missionRepository.save(mission);
   }
 
   /**
@@ -218,14 +256,13 @@ public class MissionService {
    *     version is stale
    */
   @Transactional
-  public Mission updateMission(@NotNull UUID missionId, @NotNull Mission missionDetails) {
+  public Mission updateMission(@NotNull UUID missionId, @NotNull UpdateMissionRequest request) {
     Mission mission =
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
 
-    if (missionDetails.getVersion() != null
-        && !mission.getVersion().equals(missionDetails.getVersion())) {
+    if (!mission.getVersion().equals(request.version())) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
     }
@@ -234,39 +271,35 @@ public class MissionService {
     // entity — the auto-stamp branch reads the current (pre-mutation) status, so capturing it
     // here keeps the decision honest and avoids a far-away usage of the snapshot variable that
     // Checkstyle's VariableDeclarationUsageDistance would otherwise flag.
-    Instant explicitActualStart = missionDetails.getActualStartTime();
+    Instant explicitActualStart = request.actualStartTime();
     boolean autoStampActualStart =
-        "ACTIVE".equals(missionDetails.getStatus())
+        "ACTIVE".equals(request.status())
             && !"ACTIVE".equals(mission.getStatus())
             && explicitActualStart == null;
     Instant effectiveActualStart = autoStampActualStart ? Instant.now() : explicitActualStart;
 
-    mission.setName(missionDetails.getName());
-    mission.setDescription(missionDetails.getDescription());
-    mission.setCalendarLink(missionDetails.getCalendarLink());
-    mission.setStatus(missionDetails.getStatus());
-    mission.setMeetingTime(missionDetails.getMeetingTime());
-    mission.setPlannedStartTime(missionDetails.getPlannedStartTime());
-    mission.setPlannedEndTime(missionDetails.getPlannedEndTime());
+    mission.setName(request.name());
+    mission.setDescription(request.description());
+    mission.setCalendarLink(request.calendarLink());
+    mission.setStatus(request.status());
+    mission.setMeetingTime(request.meetingTime());
+    mission.setPlannedStartTime(request.plannedStartTime());
+    mission.setPlannedEndTime(request.plannedEndTime());
     mission.setActualStartTime(effectiveActualStart);
 
-    if (missionDetails.getOperation() != null && missionDetails.getOperation().getId() != null) {
+    if (request.operationId() != null) {
       Operation op =
           operationRepository
-              .findById(missionDetails.getOperation().getId())
+              .findById(request.operationId())
               .orElseThrow(() -> new NotFoundException("Operation not found"));
       mission.setOperation(op);
     } else {
       mission.setOperation(null);
     }
 
-    if (missionDetails.getIsInternal() != null) {
-      mission.setIsInternal(missionDetails.getIsInternal());
-    } else {
-      mission.setIsInternal(false);
-    }
+    mission.setIsInternal(request.isInternal() != null ? request.isInternal() : Boolean.FALSE);
 
-    Instant newEndTime = missionDetails.getActualEndTime();
+    Instant newEndTime = request.actualEndTime();
     mission.setActualEndTime(newEndTime);
 
     if (newEndTime != null) {
@@ -573,6 +606,20 @@ public class MissionService {
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
 
+    // Audit finding M-4: hard cap of {@value #MAX_PARTICIPANTS_PER_MISSION} per mission. Closes
+    // the DoS vector where an anonymous caller scripts thousands of guest sign-ups until the
+    // mission_participant table holds millions of rows for a single mission and {@code
+    // mission.getParticipants()} (eager-fetched via the findById EntityGraph) starts scanning
+    // hundreds of MB per request. 500 covers every realistic IRIDIUM-scale operation by a large
+    // margin; override via a Squadron-level property is a follow-up if ever needed.
+    if (mission.getParticipants() != null
+        && mission.getParticipants().size() >= MAX_PARTICIPANTS_PER_MISSION) {
+      throw new de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException(
+          "Mission participant cap reached ("
+              + MAX_PARTICIPANTS_PER_MISSION
+              + "). Remove inactive participants before adding more.");
+    }
+
     UUID effectiveUserId = userId;
     String effectiveGuestName = guestName;
 
@@ -637,8 +684,9 @@ public class MissionService {
       }
     } else {
       participant.setGuestName(effectiveGuestName);
-      if (squadronId != null) {
-        Squadron squadron = squadronRepository.findById(squadronId).orElse(null);
+      UUID safeSquadronId = resolveGuestSubmittedSquadron(squadronId);
+      if (safeSquadronId != null) {
+        Squadron squadron = squadronRepository.findById(safeSquadronId).orElse(null);
         participant.setSquadron(squadron);
       }
     }
@@ -806,10 +854,11 @@ public class MissionService {
       if (guestName != null) {
         participant.setGuestName(guestName);
       }
-      if (squadronId != null) {
+      UUID safeSquadronId = resolveGuestSubmittedSquadron(squadronId);
+      if (safeSquadronId != null) {
         Squadron sq =
             squadronRepository
-                .findById(squadronId)
+                .findById(safeSquadronId)
                 .orElseThrow(() -> new NotFoundException("Squadron not found"));
         participant.setSquadron(sq);
       } else {
@@ -1201,31 +1250,29 @@ public class MissionService {
 
   /**
    * Creates a sub-mission under a parent mission. Sub-missions are independent missions that roll
-   * up to their parent in the operation overview.
+   * up to their parent in the operation overview. {@code parent} and {@code owningSquadron} are
+   * stamped server-side from the path-resolved parent — the request body has no say in either,
+   * which is the mass-assignment fix from audit finding C-3.
+   *
+   * @param parentMissionId path-resolved parent id (authoritative)
+   * @param request create payload (validated at the controller boundary)
+   * @return the persisted sub-mission entity
+   * @throws NotFoundException when {@code parentMissionId} or {@code operationId} does not resolve
    */
   @Transactional
-  public Mission addSubMission(@NotNull UUID parentMissionId, @NotNull Mission subMission) {
+  public Mission addSubMission(
+      @NotNull UUID parentMissionId, @NotNull CreateMissionRequest request) {
     Mission parent =
         missionRepository
             .findById(parentMissionId)
             .orElseThrow(() -> new NotFoundException("Parent mission not found"));
 
-    if (subMission.getOperation() != null && subMission.getOperation().getId() != null) {
-      Operation op =
-          operationRepository
-              .findById(subMission.getOperation().getId())
-              .orElseThrow(() -> new NotFoundException("Operation not found"));
-      subMission.setOperation(op);
-    } else {
-      subMission.setOperation(null);
-    }
-
+    Mission subMission = new Mission();
+    applyCreatePayload(subMission, request);
     subMission.setParent(parent);
+    subMission.setOwningSquadron(parent.getOwningSquadron());
 
-    if (subMission.getOwningSquadron() == null) {
-      subMission.setOwningSquadron(parent.getOwningSquadron());
-    }
-
+    validateMissionTimes(subMission);
     return missionRepository.save(subMission);
   }
 
@@ -1394,5 +1441,43 @@ public class MissionService {
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     mission.getManagers().removeIf(u -> u.getId().equals(userId));
     return mission;
+  }
+
+  /**
+   * Resolves a caller-submitted {@code squadronId} for a GUEST participant entry to the value the
+   * service is allowed to persist. Implements audit finding H-3:
+   *
+   * <ul>
+   *   <li>anonymous caller + non-null {@code squadronId} → silently coerced to {@code null}.
+   *       Throwing 403 here would expose the existence of the auth gate to a probe; the
+   *       audit-recommended behaviour is to drop the claim and let the request succeed without the
+   *       forged affiliation.
+   *   <li>authenticated caller + non-null {@code squadronId} + {@code canEditSquadron} returns
+   *       {@code true} → the submitted value is honoured (an officer of squadron A may legitimately
+   *       label a guest as "guest of squadron A").
+   *   <li>authenticated caller + non-null {@code squadronId} + {@code canEditSquadron} returns
+   *       {@code false} → 403 {@link AccessDeniedException}, since the caller is attempting
+   *       cross-squadron forgery.
+   *   <li>{@code null} input → returns {@code null} (no change).
+   * </ul>
+   *
+   * @param submittedSquadronId the caller-supplied squadron id from the request DTO
+   * @return the squadron id the service may persist on the guest participant, or {@code null}
+   */
+  private UUID resolveGuestSubmittedSquadron(UUID submittedSquadronId) {
+    if (submittedSquadronId == null) {
+      return null;
+    }
+    if (!authHelperService.isAuthenticated()) {
+      log.debug(
+          "Anonymous guest tried to claim squadronId {}; silently dropping the claim (H-3)",
+          submittedSquadronId);
+      return null;
+    }
+    if (!authHelperService.canEditSquadron(submittedSquadronId)) {
+      throw new AccessDeniedException(
+          "Cross-squadron guest labeling requires admin or squadron-officer rights.");
+    }
+    return submittedSquadronId;
   }
 }

@@ -39,10 +39,17 @@ public class UserProxyController {
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchUsers(@RequestParam String query) {
+    // L-1: UriComponentsBuilder so the user-supplied query is properly query-param-encoded
+    // and cannot inject extra parameters via crafted `&`-separators.
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
+            .queryParam("query", query)
+            .queryParam("size", 1000)
+            .queryParam("sort", "username,asc")
+            .toUriString();
     PageResponse<Map<String, Object>> response =
         backendApiClient.get(
-            "/api/v1/users/search?query=" + query + "&size=1000&sort=username,asc",
-            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+            uri, new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
     return response != null && response.content() != null ? response.content() : List.of();
   }
 }

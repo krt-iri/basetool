@@ -99,9 +99,13 @@ public class BotProtectionFilter extends OncePerRequestFilter {
           "/api-docs",
           // Debug / trace endpoints
           "/debug",
-          "/trace",
-          // robots.txt (not served by this app)
-          "/robots.txt");
+          "/trace");
+
+  // Audit finding M-17: previously {@code /robots.txt} was in the block list and answered with
+  // 404. That is a "this is a custom app" signal to crawlers and means legitimate search engines
+  // cannot announce a no-index preference. {@code /robots.txt} is now served as a literal static
+  // file from {@code static/robots.txt} with {@code User-agent: * / Disallow: /} so crawlers do
+  // not index the (auth-only) member area.
 
   /**
    * File extensions that the application never serves. Requests for files with these extensions

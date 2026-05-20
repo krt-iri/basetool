@@ -43,7 +43,10 @@ public class SquadronController {
   private final SquadronMapper squadronMapper;
 
   /**
-   * Paged list with {@code includeInactive} for the admin view.
+   * Paged list with {@code includeInactive} for the admin view. The {@code includeInactive=true}
+   * flavour is admin-only — soft-deleted squadron descriptions can carry internal context, and the
+   * public {@code /api/v1/squadrons} matcher is {@code permitAll} so a guest could otherwise
+   * enumerate every archived squadron (audit finding M-6).
    *
    * @return paged squadron DTOs
    */
@@ -52,7 +55,15 @@ public class SquadronController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+      @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
+      org.springframework.security.core.Authentication authentication) {
+    if (includeInactive
+        && (authentication == null
+            || authentication.getAuthorities().stream()
+                .noneMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "includeInactive=true requires ROLE_ADMIN");
+    }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
     List<SquadronDto> content = p.getContent().stream().map(squadronMapper::toDto).toList();

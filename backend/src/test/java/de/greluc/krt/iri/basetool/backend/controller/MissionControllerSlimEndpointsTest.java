@@ -612,4 +612,181 @@ class MissionControllerSlimEndpointsTest {
                 .content("{\"guestName\":\"alex\"}"))
         .andExpect(status().isConflict());
   }
+
+  // ===================================================================
+  // Audit finding C-1: anonymous callers of addParticipantPublic and
+  // addParticipantSlim must never receive participant emails / real
+  // names — the response shape must match getMissionById's redacted
+  // shape. Authenticated callers (officer, member) keep the full PII so
+  // existing UI flows are unchanged.
+  // ===================================================================
+
+  /**
+   * Builds a mission whose participant set already contains an OTHER registered user (Bob,
+   * email/firstName/lastName populated) plus the newly-added guest entry. Reflects the response
+   * shape both endpoints assemble: the entire participant list is returned, so the response carries
+   * everyone's PII unless redaction kicks in.
+   */
+  private Mission missionWithOtherUserAndGuest(UUID otherUserId, UUID guestParticipantId) {
+    Mission mission = new Mission();
+    Set<MissionParticipant> set = new LinkedHashSet<>();
+
+    MissionParticipant bobEntry = new MissionParticipant();
+    bobEntry.setId(UUID.randomUUID());
+    User bob = new User();
+    bob.setId(otherUserId);
+    bob.setUsername("bob.callsign");
+    bob.setFirstName("Bob");
+    bob.setLastName("Builder");
+    bob.setEmail("bob@example.invalid");
+    bobEntry.setUser(bob);
+    set.add(bobEntry);
+
+    MissionParticipant guestEntry = new MissionParticipant();
+    guestEntry.setId(guestParticipantId);
+    guestEntry.setGuestName("Anon-Guest");
+    set.add(guestEntry);
+
+    mission.setParticipants(set);
+    return mission;
+  }
+
+  @Test
+  void addParticipantSlim_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
+    UUID guestParticipantId = UUID.randomUUID();
+
+    when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
+
+    String body =
+        mockMvc
+            .perform(
+                post("/api/v1/missions/{id}/participants/slim", missionId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"guestName\":\"Anon-Guest\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Username + displayName-equivalent ("public callsign tuple") stay visible — guests need a
+    // way to identify the other participants on the public mission page.
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("bob.callsign"), "username must remain visible to guests");
+    // PII redaction: email, real first / last name must NOT appear in the response.
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "anonymous response must not leak participant email — audit finding C-1");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("\"firstName\":\"Bob\""),
+        "anonymous response must not leak participant first name — audit finding C-1");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("\"lastName\":\"Builder\""),
+        "anonymous response must not leak participant last name — audit finding C-1");
+  }
+
+  @Test
+  void addParticipantSlim_authenticatedOfficer_keepsParticipantPii() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
+    UUID guestParticipantId = UUID.randomUUID();
+
+    when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+    when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
+
+    String body =
+        mockMvc
+            .perform(
+                post("/api/v1/missions/{id}/participants/slim", missionId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"guestName\":\"Anon-Guest\"}")
+                    .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Authenticated officer DOES see the full PII — required for the existing mission-roster UI.
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("bob@example.invalid"), "authenticated officer must see participant email");
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("\"firstName\":\"Bob\""),
+        "authenticated officer must see participant first name");
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("\"lastName\":\"Builder\""),
+        "authenticated officer must see participant last name");
+  }
+
+  @Test
+  void addParticipantPublic_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
+    UUID guestParticipantId = UUID.randomUUID();
+
+    when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
+
+    String body =
+        mockMvc
+            .perform(
+                post("/api/v1/missions/{id}/participants/add", missionId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"guestName\":\"Anon-Guest\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("bob.callsign"), "username must remain visible to guests");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "anonymous response must not leak participant email — audit finding C-1");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("\"firstName\":\"Bob\""),
+        "anonymous response must not leak participant first name — audit finding C-1");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("\"lastName\":\"Builder\""),
+        "anonymous response must not leak participant last name — audit finding C-1");
+  }
+
+  @Test
+  void addParticipantPublic_authenticatedOfficer_keepsParticipantPii() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
+    UUID otherUserId = UUID.randomUUID();
+    UUID guestParticipantId = UUID.randomUUID();
+
+    when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+    when(missionService.addParticipant(any(), any(), any(), any(), any(), any()))
+        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
+
+    String body =
+        mockMvc
+            .perform(
+                post("/api/v1/missions/{id}/participants/add", missionId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"guestName\":\"Anon-Guest\"}")
+                    .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("bob@example.invalid"), "authenticated officer must see participant email");
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("\"firstName\":\"Bob\""),
+        "authenticated officer must see participant first name");
+    org.junit.jupiter.api.Assertions.assertTrue(
+        body.contains("\"lastName\":\"Builder\""),
+        "authenticated officer must see participant last name");
+  }
 }

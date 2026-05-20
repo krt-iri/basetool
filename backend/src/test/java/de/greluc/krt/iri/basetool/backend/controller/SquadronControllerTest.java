@@ -45,7 +45,7 @@ class SquadronControllerTest {
     when(mapper.toDto(entity)).thenReturn(dto);
 
     // When
-    PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false);
+    PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false, null);
 
     // Then
     assertEquals(1, resp.totalElements());
@@ -58,7 +58,16 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllSquadrons(null, null, null, true);
+    // M-6: includeInactive=true now requires ROLE_ADMIN. Provide an admin Authentication so the
+    // delegation-contract test still exercises the pass-through to the service.
+    org.springframework.security.core.Authentication adminAuth =
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+            "admin",
+            null,
+            java.util.List.of(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                    "ROLE_ADMIN")));
+    controller.getAllSquadrons(null, null, null, true, adminAuth);
 
     // The boolean flag controls whether inactive squadrons appear in the result;
     // mis-routing it would silently hide deleted-but-still-required entries.
@@ -70,7 +79,7 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllSquadrons(3, 75, "name,desc", false);
+    controller.getAllSquadrons(3, 75, "name,desc", false, null);
 
     ArgumentCaptor<Pageable> pgCap = ArgumentCaptor.forClass(Pageable.class);
     verify(service).getAllSquadrons(pgCap.capture(), eq(false));

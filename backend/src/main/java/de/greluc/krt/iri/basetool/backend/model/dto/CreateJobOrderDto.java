@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +32,6 @@ import org.jetbrains.annotations.Nullable;
 public record CreateJobOrderDto(
     @Nullable UUID creatingSquadronId,
     @Nullable UUID requestingSquadronId,
-    String handle,
-    @NotEmpty @Valid List<CreateJobOrderMaterialDto> materials,
+    @Size(max = 200) String handle,
+    @NotEmpty @Size(max = 50) @Valid List<CreateJobOrderMaterialDto> materials,
     Long version) {}

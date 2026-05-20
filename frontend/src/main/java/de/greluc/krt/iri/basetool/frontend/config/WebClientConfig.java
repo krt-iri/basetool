@@ -48,11 +48,24 @@ public class WebClientConfig {
   private final AppHttpProperties httpProperties;
   private final WebClientLoggingFilter webClientLoggingFilter;
   private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
+  private final org.springframework.core.env.Environment environment;
 
+  /**
+   * Builds the Netty SSL context for the backend WebClient. {@link InsecureTrustManagerFactory} (=
+   * accept any certificate) is only attached when the active Spring profile is {@code dev} or
+   * {@code test} — the bundled bootstrap {@code keystore.p12} cert is self-signed and the test
+   * docker stack uses an ephemeral cert. In every other profile (including {@code prod}) the
+   * default JVM trust store is used, so a man-in-the-middle on the network between frontend and
+   * backend cannot intercept the bearer-token-relay traffic (audit finding M-13).
+   */
   private ReactorClientHttpConnector connector() {
     try {
-      SslContext sslContext =
-          SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+      SslContextBuilder builder = SslContextBuilder.forClient();
+      java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
+      if (profiles.contains("dev") || profiles.contains("test")) {
+        builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
+      }
+      SslContext sslContext = builder.build();
 
       reactor.netty.resources.ConnectionProvider provider =
           reactor.netty.resources.ConnectionProvider.builder("frontend-pool")

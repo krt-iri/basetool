@@ -43,3 +43,15 @@ app:
   logging:
     # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true
+  rate-limit:
+    # Audit finding H-8: the production deployment runs behind nginx-proxy-manager which
+    # presents the immediate peer as a docker-network IP. Without trusting that range, every
+    # request looks like it originates from NPM and the per-IP bucket collapses into a single
+    # global budget. The default Docker bridge network (172.17.0.0/16) plus the user-defined
+    # bridge ranges (172.18.0.0/16 and 172.19.0.0/16 are the typical compose-allocated
+    # ranges) cover the typical compose topology — override via APP_RATE_LIMIT_TRUSTED_PROXIES
+    # if the NPM container sits on a different subnet.
+    trusted-proxies:
+      - 172.17.0.0/16
+      - 172.18.0.0/16
+      - 172.19.0.0/16

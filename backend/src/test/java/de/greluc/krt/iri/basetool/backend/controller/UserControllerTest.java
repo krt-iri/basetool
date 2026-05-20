@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.service.UserService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,11 +42,22 @@ class UserControllerTest {
 
   @Mock private UserService userService;
   @Mock private UserMapper userMapper;
+  @Mock private de.greluc.krt.iri.basetool.backend.service.AuthHelperService authHelperService;
   @Mock private Jwt jwt;
 
   @InjectMocks private UserController controller;
 
   private static final UUID CALLER_ID = UUID.randomUUID();
+
+  @BeforeEach
+  void setUp() {
+    // Audit finding H-4: UserController now redacts peer PII for non-Officer callers via
+    // {@code authHelperService.isLogisticianOrAbove()}. The existing delegation/contract tests
+    // below were written before that gate and assume "controller hands the DTO through as-is".
+    // Default the gate to {@code true} (officer view) here so those tests keep asserting the
+    // delegation invariants; the dedicated H-4 tests override the stub with {@code false}.
+    org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+  }
 
   // ── GET / (list) ────────────────────────────────────────────────────────
 
@@ -118,6 +130,70 @@ class UserControllerTest {
     UserDto result = controller.getUserById(id);
 
     assertSame(dto, result);
+  }
+
+  // ── Audit finding H-4: peer redaction for non-Officer callers ───────────
+
+  @Test
+  void getUserById_nonOfficerCaller_redactsPii() {
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    UUID id = UUID.randomUUID();
+    User entity = new User();
+    UserDto fullDto = fullPiiUserDto(id);
+    when(userService.findById(id)).thenReturn(entity);
+    when(userMapper.toDto(entity)).thenReturn(fullDto);
+
+    UserDto result = controller.getUserById(id);
+
+    assertNotSame(fullDto, result);
+    assertEquals(id, result.id());
+    assertEquals("bob.callsign", result.username());
+    assertEquals("Bob Display", result.displayName());
+    assertNull(result.email(), "peer view must not expose email");
+    assertNull(result.firstName(), "peer view must not expose firstName");
+    assertNull(result.lastName(), "peer view must not expose lastName");
+    assertNull(result.roles(), "peer view must not expose roles");
+    assertNull(result.permissions(), "peer view must not expose permissions");
+  }
+
+  @Test
+  void searchUsers_nonOfficerCaller_redactsEveryRowPii() {
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    UUID id = UUID.randomUUID();
+    User entity = new User();
+    UserDto fullDto = fullPiiUserDto(id);
+    when(userService.searchByUsername(any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(entity)));
+    when(userMapper.toDto(entity)).thenReturn(fullDto);
+
+    PageResponse<UserDto> resp = controller.searchUsers("bob", 0, 50, null);
+
+    UserDto redacted = resp.content().getFirst();
+    assertNull(redacted.email());
+    assertNull(redacted.firstName());
+    assertNull(redacted.lastName());
+  }
+
+  private static UserDto fullPiiUserDto(UUID id) {
+    return new UserDto(
+        id,
+        "bob.callsign",
+        "Bob Display",
+        "Bob",
+        "Bob",
+        "Builder",
+        "bob@example.invalid",
+        5,
+        "some desc",
+        java.util.Set.of("ROLE_SQUADRON_MEMBER"),
+        java.util.Set.of(),
+        null,
+        false,
+        false,
+        true,
+        null,
+        1L,
+        null);
   }
 
   // ── GET /me ─────────────────────────────────────────────────────────────

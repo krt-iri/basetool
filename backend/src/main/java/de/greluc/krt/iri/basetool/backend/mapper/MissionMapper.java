@@ -98,24 +98,13 @@ public abstract class MissionMapper {
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   public abstract MissionListDto toListDto(Mission mission);
 
-  /**
-   * Builds a new {@link Mission} entity from the DTO. All aggregate-owned collections and
-   * service-managed references ({@code participants}, {@code assignedUnits}, {@code
-   * inventoryEntries}, ...) are stripped here and rewired by the service after the entity is
-   * persisted.
-   */
-  @Mapping(target = "subMissions", ignore = true)
-  @Mapping(target = "participants", ignore = true)
-  @Mapping(target = "assignedUnits", ignore = true)
-  @Mapping(target = "inventoryEntries", ignore = true)
-  @Mapping(target = "refineryOrders", ignore = true)
-  @Mapping(target = "frequencies", ignore = true)
-  @Mapping(target = "owner", ignore = true)
-  @Mapping(target = "managers", ignore = true)
-  @Mapping(target = "coreVersion", ignore = true)
-  @Mapping(target = "scheduleVersion", ignore = true)
-  @Mapping(target = "flagsVersion", ignore = true)
-  public abstract Mission toEntity(MissionDto dto);
+  // toEntity(MissionDto) has been removed (audit finding C-3, 2026-05-20): the previous mapper
+  // copied id / version / owningSquadron / parent / isInternal straight from the response DTO
+  // into a fresh Mission entity, which made `missionRepository.save(entity)` invoke
+  // EntityManager.merge() and overwrite an attacker-supplied existing row. Write paths now go
+  // through dedicated CreateMissionRequest / UpdateMissionRequest records that physically lack
+  // those fields. The ArchUnit rule {@code missionDtoMustNotBeAcceptedAsRequestBody} keeps this
+  // direction one-way.
 
   /**
    * Returns the mission description only to authenticated callers; guests get {@code null} so the
