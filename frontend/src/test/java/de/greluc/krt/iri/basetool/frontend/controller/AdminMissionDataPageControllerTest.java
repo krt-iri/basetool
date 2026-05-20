@@ -10,6 +10,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.ParallelPageLoader;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
@@ -24,7 +25,7 @@ class AdminMissionDataPageControllerTest {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
-        new AdminMissionDataPageController(backendApiClient);
+        new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
     Model model = new ConcurrentModel();
 
     // Data for JobTypes (A, C, B) -> Expected (A, B, C)
