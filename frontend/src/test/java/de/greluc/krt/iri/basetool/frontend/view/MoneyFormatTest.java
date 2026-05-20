@@ -66,27 +66,27 @@ class MoneyFormatTest {
 
   @Test
   void roundNumber_handlesDouble() {
-    assertEquals(new BigDecimal("1500000"), moneyFormat.round(Double.valueOf(1_499_999.51)));
-    assertEquals(new BigDecimal("2"), moneyFormat.round(Double.valueOf(1.5)));
-    assertEquals(new BigDecimal("0"), moneyFormat.round(Double.valueOf(0.49)));
+    assertEquals(new BigDecimal("1500000"), moneyFormat.roundNumber(Double.valueOf(1_499_999.51)));
+    assertEquals(new BigDecimal("2"), moneyFormat.roundNumber(Double.valueOf(1.5)));
+    assertEquals(new BigDecimal("0"), moneyFormat.roundNumber(Double.valueOf(0.49)));
   }
 
   @Test
   void roundNumber_handlesLong() {
-    assertEquals(new BigDecimal("123"), moneyFormat.round(Long.valueOf(123L)));
+    assertEquals(new BigDecimal("123"), moneyFormat.roundNumber(Long.valueOf(123L)));
   }
 
   @Test
   void roundNumber_bigDecimalIsDelegatedWithoutWideningThroughDouble() {
     BigDecimal precise = new BigDecimal("100000000000000000000.5");
 
-    BigDecimal rounded = moneyFormat.round((Number) precise);
+    BigDecimal rounded = moneyFormat.roundNumber(precise);
 
     assertEquals(new BigDecimal("100000000000000000001"), rounded);
   }
 
   @Test
   void roundNumber_nullReturnsNull() {
-    assertNull(moneyFormat.round((Number) null));
+    assertNull(moneyFormat.roundNumber(null));
   }
 }

@@ -46,17 +46,20 @@ public class MoneyFormat {
   }
 
   /**
-   * Overload for {@link Number} arguments (refinery-order expenses arrive as {@link Double} on the
-   * frontend DTOs). The value is converted via its canonical {@link Number#toString()}
-   * representation to avoid the {@code new BigDecimal(double)} precision artefact (e.g. 0.1
-   * becoming 0.1000000000000000055511...), then delegated to {@link #round(BigDecimal)}.
+   * Variant of {@link #round(BigDecimal)} for {@link Number} arguments (refinery-order expenses
+   * arrive as {@link Double} on the frontend DTOs). Deliberately named distinctly from {@link
+   * #round(BigDecimal)} so the Thymeleaf SpEL dispatch is unambiguous at template-author read time
+   * — the two methods are not overloads. The value is converted via its canonical {@link
+   * Number#toString()} representation to avoid the {@code new BigDecimal(double)} precision
+   * artefact (e.g. 0.1 becoming 0.1000000000000000055511...), then delegated to {@link
+   * #round(BigDecimal)}.
    *
    * @param value the amount to round; {@code null} is passed through so the calling template
    *     renders it the same way it would have without the bean
    * @return the value rounded to a whole number, or {@code null} if {@code value} was {@code null}
    */
   @Nullable
-  public BigDecimal round(@Nullable Number value) {
+  public BigDecimal roundNumber(@Nullable Number value) {
     if (value == null) {
       return null;
     }

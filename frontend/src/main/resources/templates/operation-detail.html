@@ -594,7 +594,7 @@
                                                 </td>
                                                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                                 <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color:var(--color-primary);text-decoration:none;">Raffinerieauftrag</a></td>
-                                                <td th:text="${#numbers.formatInteger(@moneyFormat.round(order.expenses), 1, 'POINT')} + ' aUEC'" class="text-danger">0 aUEC</td>
+                                                <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'" class="text-danger">0 aUEC</td>
                                             </tr>
                                         </tbody>
                                     </table>

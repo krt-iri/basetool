@@ -816,7 +816,7 @@
                                     <td>
                                         <span th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
                                     </td>
-                                    <td th:text="${#numbers.formatInteger(@moneyFormat.round(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                    <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td>
                                         <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-mining); text-decoration: underline;">Raffinerieauftrag</a>
                                     </td>
