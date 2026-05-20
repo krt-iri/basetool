@@ -11,6 +11,25 @@ name: Release Images
 #                               the loop decides what reaches the server.
 #   - workflow_dispatch      -> manual rebuild from the Actions UI.
 #
+# Topology — distributed multi-arch build:
+#   1. `build` matrix (4 jobs, fully parallel): one job per (module, platform).
+#      Each runs natively on the matching architecture's runner — linux/amd64
+#      on the regular `ubuntu-latest` fleet, linux/arm64 on GitHub's free
+#      public-repo `ubuntu-24.04-arm` fleet — and pushes the resulting image
+#      to GHCR **by digest** only (no tag). The previous all-in-one matrix
+#      went through qemu-aarch64 emulation for the arm64 stage and was
+#      ~3-6x slower than amd64 because every javac / Gradle / AppCDS JVM
+#      invocation ran translated. With native runners both architectures
+#      finish in roughly the same wall time.
+#   2. `merge` matrix (2 jobs, one per module): downloads the per-arch digest
+#      artifacts, assembles a multi-arch OCI image index via
+#      `docker buildx imagetools create`, applies all of metadata-action's
+#      tags to the index, then cosign-signs the manifest digest. The
+#      attestation manifests (SLSA provenance, SPDX SBOM) attached to each
+#      per-arch image flow through `imagetools create` automatically, so
+#      the merged index keeps the same audit trail the previous single-job
+#      build had — no separate `cosign attest` step needed.
+#
 # What this workflow guarantees about the resulting images:
 #   1. Built from a clean GitHub checkout — `.dockerignore` blocks production
 #      secrets (keystore.p12, .env, realm-export.json, ...) from ever entering
@@ -18,15 +37,22 @@ name: Release Images
 #      production TLS keystore.
 #   2. Signed with cosign keyless (Sigstore Rekor / Fulcio via OIDC), so the
 #      server can verify the image was produced by THIS workflow on THIS repo
-#      before pulling. No long-lived signing key to rotate.
+#      before pulling. No long-lived signing key to rotate. The signature is
+#      pinned to the manifest digest, so all tags pointing at the digest
+#      (including a later `:stable` promotion) are covered by one signature.
 #   3. Carries SLSA build provenance + an SPDX SBOM as OCI attestations
-#      (`provenance: mode=max`, `sbom: true`) so a downstream auditor can prove
-#      which commit + builder produced the image and which packages it bundles.
+#      (`provenance: mode=max`, `sbom: true`) so a downstream auditor can
+#      prove which commit + builder produced the image and which packages
+#      it bundles.
 #   4. Scanned with Trivy. Findings are uploaded as SARIF to the repository's
 #      Security tab for visibility; the scan does NOT block the push itself
 #      (a CVE-bearing image is preferable to no image when a hotfix is
 #      urgent), but the `promote.yml` workflow re-checks before flipping
-#      the :stable tag — that is the production gate.
+#      the :stable tag — that is the production gate. Both architectures
+#      are scanned natively on their own runner (one Trivy run per
+#      (module, platform) pair, four SARIF uploads total, distinct
+#      categories per arch so they show up as independent alert streams
+#      in the Security tab).
 
 on:
   push:
@@ -44,7 +70,7 @@ concurrency:
 permissions:
   contents: read
   packages: write          # push to ghcr.io
-  id-token: write          # cosign keyless OIDC (Sigstore Fulcio)
+  id-token: write          # cosign keyless OIDC (Sigstore Fulcio) + provenance attestation
   attestations: write      # SLSA provenance + SBOM attestation
   security-events: write   # Trivy SARIF upload
 
@@ -54,16 +80,37 @@ env:
 
 jobs:
   build:
-    name: Build & Push (${{ matrix.module }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    name: Build (${{ matrix.module }} / ${{ matrix.platform }})
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
         module: [backend, frontend]
+        platform: [linux/amd64, linux/arm64]
+        # `include` augments the cartesian product without expanding it: each
+        # of the 4 (module, platform) combinations gets the matching `runs-on`
+        # label added, so we end up with 2 amd64 jobs on `ubuntu-latest` and
+        # 2 arm64 jobs on `ubuntu-24.04-arm`, all four in parallel. Note that
+        # `ubuntu-24.04-arm` is free for public repositories; if the project
+        # ever goes private, switch to `ubuntu-22.04-arm` (cheaper minute
+        # billing) or fall back to qemu emulation with `ubuntu-latest`.
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: ubuntu-24.04-arm
 
     steps:
+      # `linux/amd64` -> `linux-amd64` for use in artifact / cache-scope names
+      # where the slash would break shell globs, artifact-name validation
+      # (no `/` allowed) and SARIF category strings.
+      - name: Resolve platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -94,18 +141,8 @@ jobs:
         id: app-version
         run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
 
-      # QEMU registers binfmt handlers for foreign architectures so the linux/amd64
-      # GitHub runner can also execute linux/arm64 build steps under emulation.
-      # The Java parts of the build (Gradle compilation, Spring Boot repackage)
-      # are CPU-bound under qemu-aarch64 — expect the arm64 stage to take ~3-4x
-      # longer than amd64. The matrix-step `timeout-minutes: 60` is the safety
-      # net; if a slower arm64 build trips it, narrow the scope back to amd64
-      # here rather than tightening the timeout.
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
-        with:
-          platforms: linux/amd64,linux/arm64
-
+      # No QEMU here — the matrix already runs each platform on its own
+      # native runner. setup-qemu-action would only add overhead.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
@@ -117,6 +154,150 @@ jobs:
           # GITHUB_TOKEN gets `packages: write` from the workflow permissions
           # block above, scoped to this repo's package namespace. No PAT
           # required, no secret rotation needed.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Per-arch builds only need the OCI labels here; tags are applied to
+      # the final merged manifest by `imagetools create` in the merge job.
+      # metadata-action is still useful in this job because it emits the
+      # `org.opencontainers.image.{title,description,vendor,source,...}`
+      # labels that build-push-action attaches to the per-arch image
+      # manifest — those labels then ride along into the merged index.
+      - name: Generate image labels
+        id: meta
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          labels: |
+            org.opencontainers.image.title=basetool-${{ matrix.module }}
+            org.opencontainers.image.description=IRIDIUM Basetool ${{ matrix.module }} (Spring Boot)
+            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build & push per-arch image by digest
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ${{ matrix.module }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Forwarded to both module Dockerfiles. The frontend consumes it via
+          # `-PappVersion=...` to override `bootBuildInfo`'s default version;
+          # the backend just declares the ARG to silence BuildKit's "unused
+          # build arg" warning (it has no UI to render a version chip on).
+          build-args: |
+            APP_VERSION=${{ steps.app-version.outputs.version }}
+          # Push the per-arch image as a digest-only reference (no tag). The
+          # merge job below assembles all per-arch digests into a single
+          # multi-arch OCI image index and applies all final tags there.
+          # `name-canonical=true` makes the registry store the image under
+          # its full canonical name so the imagetools merge can resolve it
+          # consistently across both per-arch jobs.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }},push-by-digest=true,name-canonical=true,push=true
+          # GitHub Actions cache backend. `mode=max` caches all build stages
+          # including the multi-stage `build` layer (Gradle dependency
+          # download), which is the slowest part of the build. Scoped per
+          # (module, platform) so the four parallel build jobs do not
+          # invalidate each other — amd64 and arm64 layers have different
+          # base images and library binaries and must not share cache keys.
+          cache-from: type=gha,scope=${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+          # `mode=max` provenance records every build step's command and
+          # parameters in the SLSA attestation; the default `mode=min` only
+          # records the final manifest. Max is verbose but auditable. The
+          # attestation manifest is attached to the per-arch image; the
+          # merge job's `imagetools create` carries it through into the
+          # final multi-arch index without further plumbing.
+          provenance: mode=max
+          # Attach an SPDX SBOM of every package shipped in the image as an
+          # OCI attestation. This is image-scope; the CycloneDX BOM produced
+          # by `./gradlew cyclonedxBom` in the main CI workflow is
+          # Java-only, the buildx SBOM also covers the Alpine + JRE layers.
+          sbom: true
+
+      # The merge job needs each per-arch digest to assemble the manifest.
+      # GitHub Actions job outputs do not survive matrix expansion (each
+      # matrix cell would overwrite the previous one), so we materialise
+      # the digests as zero-byte artifact files named after their digest
+      # value. The merge job downloads them per module and globs them.
+      - name: Export digest
+        run: |
+          mkdir -p "/tmp/digests/${{ matrix.module }}"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${{ matrix.module }}/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          # Distinct per-arch artifact name so the four parallel build jobs
+          # do not collide. The merge job downloads the pair for its module
+          # via `pattern: digest-<module>-*`.
+          name: digest-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/${{ matrix.module }}/*
+          if-no-files-found: error
+          retention-days: 1
+
+      # Trivy scans the per-arch image by its exact digest — the per-arch
+      # job runs on the matching native runner (arm64 image is scanned by
+      # an arm64 runner), so no QEMU emulation is needed inside Trivy
+      # either. `exit-code: 0` is deliberate: we do NOT block the push on
+      # findings (a CVE-bearing image is preferable to a missing image
+      # when a hotfix is urgent). The findings show up in the Security tab
+      # and the `promote.yml` workflow re-runs this check as a gate before
+      # flipping :stable.
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
+          # Distinct category per (module, platform) so GitHub's Security
+          # tab treats the four scans as independent alert streams instead
+          # of overwriting each other.
+          category: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+
+  merge:
+    name: Merge & sign (${{ matrix.module }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, frontend]
+
+    steps:
+      - name: Download per-arch digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests/${{ matrix.module }}
+          # Pull both `digest-<module>-linux-amd64` and `digest-<module>-linux-arm64`
+          # artifacts for this module; `merge-multiple: true` flattens them
+          # into the same directory so the manifest-create loop below can
+          # glob them with a single `*`.
+          pattern: digest-${{ matrix.module }}-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate image metadata (tags + OCI labels)
@@ -140,81 +321,47 @@ jobs:
             # a casual `docker pull ...:latest` always yields the most recent
             # release rather than an arbitrary main commit.
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
-          labels: |
-            org.opencontainers.image.title=basetool-${{ matrix.module }}
-            org.opencontainers.image.description=IRIDIUM Basetool ${{ matrix.module }} (Spring Boot)
-            org.opencontainers.image.vendor=KRT IRIDIUM
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
-            org.opencontainers.image.licenses=Apache-2.0
 
-      - name: Build & push image
-        id: build
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: ${{ matrix.module }}/Dockerfile
-          push: true
-          # Multi-arch publish. linux/amd64 covers the current production host
-          # and linux/arm64 covers Ampere / Apple-silicon / arm-based cloud
-          # targets so an operator can pull a working image without specifying
-          # `--platform`. The arm64 stage is emulated via qemu (set up above).
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Forwarded to both module Dockerfiles. The frontend consumes it via
-          # `-PappVersion=...` to override `bootBuildInfo`'s default version;
-          # the backend just declares the ARG to silence BuildKit's "unused
-          # build arg" warning (it has no UI to render a version chip on).
-          build-args: |
-            APP_VERSION=${{ steps.app-version.outputs.version }}
-          # GitHub Actions cache backend. `mode=max` caches all build stages
-          # including the multi-stage `build` layer (Gradle dependency
-          # download), which is the slowest part of the build. Scoped per
-          # module so backend and frontend do not invalidate each other.
-          cache-from: type=gha,scope=${{ matrix.module }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.module }}
-          # `mode=max` provenance records every build step's command and
-          # parameters in the SLSA attestation; the default `mode=min` only
-          # records the final manifest. Max is verbose but auditable.
-          provenance: mode=max
-          # Attach an SPDX SBOM of every package shipped in the image as an
-          # OCI attestation. This is image-scope; the CycloneDX BOM produced
-          # by `./gradlew cyclonedxBom` in the main CI workflow is
-          # Java-only, the buildx SBOM also covers the Alpine + JRE layers.
-          sbom: true
+      # `imagetools create` assembles an OCI image index from N source
+      # references and applies one or more tags to it. We feed it every
+      # per-arch digest collected from the build matrix; the source refs
+      # are themselves OCI indexes (image manifest + provenance manifest
+      # + SBOM manifest), so the final merged index inherits the
+      # attestation chain intact — no separate `cosign attest` step
+      # needed for provenance / SBOM. metadata-action exports its `tags`
+      # output as JSON via the `DOCKER_METADATA_OUTPUT_JSON` env var; the
+      # jq expression below transforms each tag string into a `-t <tag>`
+      # CLI argument.
+      - name: Create multi-arch manifest
+        working-directory: /tmp/digests/${{ matrix.module }}
+        run: |
+          set -eu
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:%s ' *)
+
+      # Resolve the manifest digest of the newly-tagged index. Cosign signs
+      # by digest (not tag) so that a later `:stable` promotion sees the
+      # same signature without needing a re-sign.
+      - name: Inspect merged manifest
+        id: inspect
+        run: |
+          set -eu
+          digest=$(docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}:${{ steps.meta.outputs.version }}" \
+            --format '{{json .Manifest}}' | jq -r '.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
+      # Signs the *manifest digest*, not the tag. Multiple tags pointing
+      # at the same digest are all covered by one signature, so a later
+      # `:stable` promotion does not need a re-sign. The keyless flow
+      # uses the workflow's GitHub-OIDC token to mint a short-lived
+      # Sigstore Fulcio cert and writes the signature to the Rekor
+      # transparency log.
       - name: Sign image (keyless / OIDC)
-        # Signs the *digest*, not the tag. Multiple tags pointing at the same
-        # digest are all covered by one signature, so a later `:stable`
-        # promotion does not need a re-sign. The keyless flow uses the
-        # workflow's GitHub-OIDC token to mint a short-lived Sigstore Fulcio
-        # cert and writes the signature to the Rekor transparency log.
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.inspect.outputs.digest }}
         run: cosign sign --yes "$IMAGE"
-
-      - name: Run Trivy vulnerability scan
-        # Reports HIGH+CRITICAL CVEs with available fixes. `exit-code: 0` is
-        # deliberate: we do NOT block the push on findings (a CVE-bearing
-        # image is preferable to a missing image when a hotfix is urgent).
-        # The findings show up in the Security tab and the `promote.yml`
-        # workflow re-runs this check as a gate before flipping :stable.
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
-          format: sarif
-          output: trivy-${{ matrix.module }}.sarif
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '0'
-
-      - name: Upload Trivy SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-${{ matrix.module }}.sarif
-          category: trivy-${{ matrix.module }}
