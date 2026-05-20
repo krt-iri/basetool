@@ -233,22 +233,37 @@ public class OperationController {
    * @return the refreshed payout row for the participant, so the caller can patch a single row of
    *     its table without re-fetching the whole breakdown
    */
+  // Asymmetric authorization: any mission manager (or higher via the role
+  // hierarchy) can SET paidOut=true, but only OFFICER / ADMIN can clear it
+  // back to false — once a mission manager confirms a payout, only a
+  // squadron officer or admin may rescind that confirmation. The SpEL
+  // expression encodes both halves in one gate.
   @PutMapping("/{id}/payouts/paid-out")
-  @PreAuthorize("hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id)")
+  @PreAuthorize(
+      "hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id) "
+          + "and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
       description =
           "Records that a mission manager has marked the participant as paid out (or unset "
-              + "it). Last-writer-wins: no client-supplied version is required because the "
-              + "field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are "
-              + "always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last "
-              + "audit fields as a historical record. The participantKey matches the opaque "
-              + "key returned by `/payouts` (real user UUID stringified or `guest_<name>`).")
+              + "it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and "
+              + "officers satisfy it via the role hierarchy). Setting `paidOut=false` is "
+              + "reserved for ADMIN and OFFICER — a plain mission manager cannot undo a "
+              + "paid-out confirmation. Last-writer-wins: no client-supplied version is "
+              + "required because the field is a boolean. The audit fields (`paidOutAt`, "
+              + "`paidOutByUser`) are always refreshed when `paidOut=true`; setting "
+              + "`paidOut=false` keeps the last audit fields as a historical record. The "
+              + "participantKey matches the opaque key returned by `/payouts` (real user UUID "
+              + "stringified or `guest_<name>`).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paid-out flag updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
-    @ApiResponse(responseCode = "403", description = "Caller lacks the MISSION_MANAGER role."),
+    @ApiResponse(
+        responseCode = "403",
+        description =
+            "Caller lacks the MISSION_MANAGER role, or attempted to clear paidOut without"
+                + " ADMIN/OFFICER."),
     @ApiResponse(
         responseCode = "404",
         description = "Operation not found, or participantKey is not part of the operation.")

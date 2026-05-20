@@ -4331,7 +4331,7 @@
       "put" : {
         "tags" : [ "Operations" ],
         "summary" : "Toggle the per-participant paid-out flag for an operation",
-        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`).",
+        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`).",
         "operationId" : "setPayoutStatus",
         "parameters" : [ {
           "name" : "id",

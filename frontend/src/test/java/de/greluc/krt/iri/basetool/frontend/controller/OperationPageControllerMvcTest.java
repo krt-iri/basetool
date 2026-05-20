@@ -8,14 +8,18 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
@@ -27,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -275,5 +280,134 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("alert-warning"))));
+  }
+
+  // ── /operations/{id}/payouts/paid-out — asymmetric authorization ────────
+  // Plain mission managers can SET paidOut=true, but only ADMIN/OFFICER may
+  // clear it back to false. The SpEL guard returns 403 for a plain mission
+  // manager attempting paidOut=false.
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void updatePayoutStatus_missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/payouts/paid-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":false}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void updatePayoutStatus_officer_canClear_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+
+    when(backendApiClient.put(
+            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            any(),
+            eq(OperationPayoutDto.class),
+            anyBoolean()))
+        .thenReturn(
+            new OperationPayoutDto(
+                participantId.toString(),
+                "Alice",
+                100.0,
+                PayoutPreference.PAYOUT,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                false,
+                null,
+                null));
+
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/payouts/paid-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":false}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void updatePayoutStatus_missionManager_canSet_paidOutTrue() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+
+    when(backendApiClient.put(
+            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            any(),
+            eq(OperationPayoutDto.class),
+            anyBoolean()))
+        .thenReturn(
+            new OperationPayoutDto(
+                participantId.toString(),
+                "Alice",
+                100.0,
+                PayoutPreference.PAYOUT,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                true,
+                null,
+                null));
+
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/payouts/paid-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":true}"))
+        .andExpect(status().isOk());
+  }
+
+  // ── /operations/{id} — canUnsetPaidOut model attribute ─────────────────
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void operationDetail_missionManager_rendersCanUnsetPaidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+
+    mockMvc
+        .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        // Plain mission managers don't get the unset capability — the panel
+        // exposes data-can-unset-paid-out=false so the JS lockout activates
+        // after a successful paidOut=true transition.
+        .andExpect(content().string(containsString("data-can-unset-paid-out=\"false\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_officer_rendersCanUnsetPaidOutTrue() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+
+    mockMvc
+        .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-can-unset-paid-out=\"true\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void operationDetail_admin_rendersCanUnsetPaidOutTrue() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+
+    mockMvc
+        .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-can-unset-paid-out=\"true\"")));
   }
 }
