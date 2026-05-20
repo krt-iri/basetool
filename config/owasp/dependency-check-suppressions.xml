@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check suppression file.
+
+  Wired into the `org.owasp.dependencycheck` plugin in the root build.gradle.kts
+  via `dependencyCheck { suppressionFile = ... }`. Every entry below MUST carry
+  a `notes` block that explains *why* the finding is suppressed so the next
+  weekly Monday scan does not require re-deriving the justification from
+  scratch.
+
+  Categories accepted:
+    1. CPE confusion - the NVD entry refers to a different product that shares
+       a token (e.g. "line", "spring boot tools") with the dependency we ship.
+    2. Build-time-only path - the affected JAR is on the buildscript /
+       checkstyle / pitest / asciidoctor plugin classpath, never reaches the
+       runtime classpath of the deployed Spring Boot fat JAR.
+    3. Nested JAR inside a build-time tool - same as #2 but the SHA-1 match
+       happens because OWASP unpacks `jruby-complete` (etc.) and inspects the
+       embedded JARs.
+
+  Real production CVEs are NEVER suppressed; they are fixed by upgrading the
+  dependency to a patched version (see build.gradle.kts dependency overrides).
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!--
+    pitest-command-line carries the artifact id "pitest" but the OWASP CPE
+    matcher attributes CVE-2015-0897 (a MITM bug in the "LINE" Android/iOS
+    messenger app) to it because the messenger's vendor/product CPE happens
+    to be "cpe:2.3:a:line:line". The library has no relation to LINE Corp;
+    it is a JVM mutation testing tool. CVSS for this CVE is 5.9 (under our
+    7.0 fail-build gate) but the SARIF report would still surface the
+    finding noisily to GitHub Security every week.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion. CVE-2015-0897 targets the "LINE" Android/iOS messenger app (cpe:2.3:a:line:line) and has nothing to do with the pitest mutation testing library.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.pitest/pitest-command-line@.*$</packageUrl>
+    <cve>CVE-2015-0897</cve>
+  </suppress>
+
+  <!--
+    spring-boot-devtools (Spring Boot 4.x) is wrongly matched against the
+    `cpe:2.3:a:vmware:spring_boot_tools` / `cpe:2.3:a:vmware:spring_tools`
+    CPEs. CVE-2022-31691 is a deserialization gadget in **Spring Tools 4
+    for Eclipse** plus the VSCode "Spring Boot Tools", "Concourse CI Pipeline
+    Editor", "Bosh Editor" and "Cloudfoundry Manifest YML Support" extensions
+    - none of which we ship. The Spring Boot runtime devtools module is a
+    distinct artifact and is gated to the `development` profile only.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion. CVE-2022-31691 affects Spring Tools 4 for Eclipse and a set of VSCode plugins; it does not apply to the Spring Boot runtime devtools dependency.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-devtools@.*$</packageUrl>
+    <cve>CVE-2022-31691</cve>
+  </suppress>
+
+  <!--
+    plexus-utils 3.3.0 is pulled in transitively by Checkstyle 13.4.2 via
+    `org.apache.maven.doxia:doxia-core`/`doxia-module-xdoc` (Checkstyle's
+    Javadoc/site-rendering helper), which is exclusively on the
+    `checkstyleMain` configuration. It is never on the runtime classpath of
+    the deployed application. CVE-2025-67030 is a `Expand.extractFile` zip
+    slip - we do not call that method anywhere, and Checkstyle itself only
+    invokes it during local report rendering, not when scanning sources.
+  -->
+  <suppress>
+    <notes>Build-time-only: plexus-utils 3.3.0 is a transitive dependency of Checkstyle (doxia-core). The Expand.extractFile zip slip is unreachable through Checkstyle's source-scanning path and the JAR never ships in the deployed Spring Boot fat JAR.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.codehaus\.plexus/plexus-utils@3\.3\.0$</packageUrl>
+    <cve>CVE-2025-67030</cve>
+  </suppress>
+
+  <!--
+    SnakeYAML 1.31 is detected as an embedded JAR inside jruby-complete
+    9.3.8.0 (path `META-INF/jruby.home/lib/ruby/stdlib/org/yaml/snakeyaml/`).
+    jruby-complete is the Ruby runtime that the asciidoctor Gradle plugin
+    spins up to render the backend's REST-docs snippets - it is exclusively
+    on the `asciidoctor` configuration and never reaches the deployed JAR.
+    Our application-side YAML parser is SnakeYAML 2.5 (managed by the Spring
+    Boot 4 BOM); 2.x has a safe default `Constructor` and is not affected by
+    CVE-2022-1471.
+  -->
+  <suppress>
+    <notes>Build-time-only: SnakeYAML 1.31 is bundled inside jruby-complete, used by the asciidoctor Gradle plugin for REST docs rendering. It is not on the runtime classpath and our app-level SnakeYAML version is 2.5 (managed by Spring Boot BOM).</notes>
+    <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@1\.31$</packageUrl>
+    <cve>CVE-2022-1471</cve>
+  </suppress>
+
+</suppressions>
