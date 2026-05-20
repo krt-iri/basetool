@@ -293,7 +293,7 @@ jobs:
 
     steps:
       - name: Download per-arch digests
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/digests/${{ matrix.module }}
           # Pull both `digest-<module>-linux-amd64` and `digest-<module>-linux-arm64`
