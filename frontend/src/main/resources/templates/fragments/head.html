@@ -16,14 +16,23 @@
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
     <!--
-      `defer` on the four head scripts: they execute in document order AFTER the HTML has been
-      parsed, so they no longer block first contentful paint. Each script ships side-effect-free
-      initialisation; load order is still deterministic under `defer` (unlike `async`).
+      `defer` on the utility scripts whose globals are only consumed from inside event-handler
+      callbacks (escape-html, safe-url, datetime-splitter): they execute in document order AFTER
+      the HTML has been parsed, so they no longer block first contentful paint.
+
+      `event-delegation.js` and `common-handlers.js` deliberately load WITHOUT `defer` because
+      page templates call `window.krtEvents.on(...)` from synchronous inline `<script>` blocks at
+      the bottom of the body — those inline scripts run during HTML parsing, BEFORE any deferred
+      script has executed, so a deferred event-delegation.js would leave `window.krtEvents`
+      undefined at the call site and silently drop every per-page handler registration (observed
+      symptom: the index-page Information section did not expand on click). The two files are
+      tiny IIFEs that only register globals / `document.addEventListener` listeners, so they are
+      safe to evaluate before the DOM tree is built.
     -->
     <script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/event-delegation.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/common-handlers.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/event-delegation.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/common-handlers.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
     
     <title th:replace="${titleContent}"></title>
