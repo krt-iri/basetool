@@ -144,7 +144,14 @@ public class OperationController {
    */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
-  @Operation(summary = "Get operation by ID")
+  @Operation(
+      summary = "Get operation by ID",
+      description =
+          "Returns the operation DTO. The `payoutPreliminary` field is authoritative on this"
+              + " endpoint: it is `true` when at least one mission of the operation still lacks an"
+              + " `actualStartTime` or `actualEndTime` — the operation-detail page reads this to"
+              + " render a 'payout figures are preliminary' warning above the payout table. List"
+              + " and create/update responses leave the field `null`.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation found."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
@@ -152,7 +159,8 @@ public class OperationController {
   })
   @Transactional(readOnly = true)
   public OperationDto getOperationById(@PathVariable UUID id) {
-    return operationMapper.toDto(operationService.getOperationById(id));
+    OperationDto dto = operationMapper.toDto(operationService.getOperationById(id));
+    return dto.withPayoutPreliminary(operationService.hasUnfinishedMissions(id));
   }
 
   /**

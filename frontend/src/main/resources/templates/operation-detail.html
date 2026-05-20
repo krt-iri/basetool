@@ -481,6 +481,13 @@
             </button>
             <div class="col-content" id="col-payout-content">
                 <div class="hud-box">
+                    <div th:if="${operation != null and operation.payoutPreliminary != null and operation.payoutPreliminary}"
+                         class="alert alert-warning"
+                         role="status"
+                         th:attr="aria-label=#{operation.payout.preliminary.title}">
+                        <strong th:text="#{operation.payout.preliminary.title}">Vorlaeufige Werte</strong>
+                        <span th:text="' ' + #{operation.payout.preliminary.message}">Die Anteile sind noch nicht endgueltig, solange nicht alle Einsaetze eine tatsaechliche Start- und Endzeit haben.</span>
+                    </div>
                     <div class="table-responsive">
                         <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}" class="payout-table">
                             <thead>

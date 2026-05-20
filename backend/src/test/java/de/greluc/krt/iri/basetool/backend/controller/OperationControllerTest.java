@@ -45,7 +45,7 @@ class OperationControllerTest {
     Operation operation = new Operation();
     OperationDto operationDto =
         new OperationDto(
-            UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, null, 0L, null, null);
+            UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, null, 0L, null, null, null);
 
     when(operationMapper.toEntity(createDto)).thenReturn(operation);
     when(operationService.createOperation(operation)).thenReturn(operation);
@@ -133,7 +133,7 @@ class OperationControllerTest {
     Operation entity = new Operation();
     OperationDto dto =
         new OperationDto(
-            UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, null, 0L, null, null);
+            UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, null, 0L, null, null, null);
     // Echo the incoming Pageable back through the PageImpl so the
     // Sort survives the .map() in the controller — otherwise getSort()
     // would default to Sort.unsorted() and the assertion below loses
@@ -148,5 +148,37 @@ class OperationControllerTest {
     assertEquals(dto, resp.content().getFirst());
     assertTrue(
         resp.sort().contains("createdAt,desc"), "the echoed sort must reflect the active ordering");
+  }
+
+  @Test
+  void getOperationById_stampsPayoutPreliminaryFromService_true() {
+    UUID id = UUID.randomUUID();
+    Operation entity = new Operation();
+    OperationDto baseDto =
+        new OperationDto(id, "Op", "d", OperationStatus.PLANNED, null, 0L, null, null, null);
+    when(operationService.getOperationById(id)).thenReturn(entity);
+    when(operationMapper.toDto(entity)).thenReturn(baseDto);
+    when(operationService.hasUnfinishedMissions(id)).thenReturn(true);
+
+    OperationDto result = operationController.getOperationById(id);
+
+    assertEquals(Boolean.TRUE, result.payoutPreliminary());
+    assertEquals(id, result.id());
+    verify(operationService, times(1)).hasUnfinishedMissions(id);
+  }
+
+  @Test
+  void getOperationById_stampsPayoutPreliminaryFromService_false() {
+    UUID id = UUID.randomUUID();
+    Operation entity = new Operation();
+    OperationDto baseDto =
+        new OperationDto(id, "Op", "d", OperationStatus.PLANNED, null, 0L, null, null, null);
+    when(operationService.getOperationById(id)).thenReturn(entity);
+    when(operationMapper.toDto(entity)).thenReturn(baseDto);
+    when(operationService.hasUnfinishedMissions(id)).thenReturn(false);
+
+    OperationDto result = operationController.getOperationById(id);
+
+    assertEquals(Boolean.FALSE, result.payoutPreliminary());
   }
 }
