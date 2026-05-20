@@ -52,6 +52,8 @@ class JobOrderServiceTest {
 
   @Mock private SquadronScopeService squadronScopeService;
 
+  @Mock private AuthHelperService authHelperService;
+
   @Mock private JobOrderMapper jobOrderMapper;
 
   @Mock private de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
@@ -214,6 +216,94 @@ class JobOrderServiceTest {
     // When/Then
     assertThrows(NotFoundException.class, () -> jobOrderService.createJobOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void createJobOrder_AnonymousCaller_StampsCreatingSquadronFromRequestingSquadron() {
+    // Given — anonymous public form picks a non-IRIDIUM squadron as the requesting one.
+    // Both creating and requesting must end up pointing at that same squadron so the audit
+    // trail credits the squadron the request was filed on behalf of, instead of always
+    // stamping IRIDIUM.
+    UUID requestingSquadronId = UUID.randomUUID();
+    Squadron requestingSquadron = new Squadron();
+    requestingSquadron.setId(requestingSquadronId);
+    requestingSquadron.setShorthand("BRAVO");
+
+    when(squadronScopeService.currentSquadron()).thenReturn(Optional.empty());
+    when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(squadronRepository.findById(requestingSquadronId))
+        .thenReturn(Optional.of(requestingSquadron));
+
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
+    CreateJobOrderDto createDto =
+        new CreateJobOrderDto(null, requestingSquadronId, "anon-handle", List.of(createMat), null);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When
+    jobOrderService.createJobOrder(createDto);
+
+    // Then — both stamps point at the requesting squadron, IRIDIUM is never looked up.
+    verify(jobOrderRepository)
+        .save(
+            argThat(
+                jo ->
+                    jo.getCreatingSquadron() == requestingSquadron
+                        && jo.getRequestingSquadron() == requestingSquadron));
+    verify(squadronRepository, never()).findById(Squadron.IRIDIUM_ID);
+  }
+
+  @Test
+  void createJobOrder_AnonymousCaller_NoRequestingSquadron_FallsBackToIridium() {
+    // Given — anonymous caller without a requesting squadron in the DTO. The fallback to the
+    // IRIDIUM seed row must still kick in so the V86 NOT NULL constraint holds.
+    Squadron iridium = new Squadron();
+    iridium.setId(Squadron.IRIDIUM_ID);
+    iridium.setShorthand("IRI");
+
+    when(squadronScopeService.currentSquadron()).thenReturn(Optional.empty());
+    when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(squadronRepository.findById(Squadron.IRIDIUM_ID)).thenReturn(Optional.of(iridium));
+
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
+    CreateJobOrderDto createDto =
+        new CreateJobOrderDto(null, null, "anon-handle", List.of(createMat), null);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When
+    jobOrderService.createJobOrder(createDto);
+
+    // Then
+    verify(jobOrderRepository)
+        .save(
+            argThat(
+                jo ->
+                    jo.getCreatingSquadron() == iridium && jo.getRequestingSquadron() == iridium));
   }
 
   @Test
