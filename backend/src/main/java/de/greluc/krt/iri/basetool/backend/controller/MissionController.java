@@ -777,7 +777,6 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted via {@link #cleanupMissionForGuest} for anonymous
    *     callers, who reach this endpoint when editing a guest participant per {@code
@@ -801,7 +800,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto =
         missionMapper.toDto(
@@ -828,7 +826,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #checkInParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
@@ -849,7 +846,6 @@ public class MissionController {
   public MissionDto checkInParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
     if (jwt == null) {
@@ -863,7 +859,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #checkOutParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
@@ -884,7 +879,6 @@ public class MissionController {
   public MissionDto checkOutParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
     if (jwt == null) {
@@ -902,7 +896,6 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request payout preference payload
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #updatePayoutPreferenceSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
@@ -924,7 +917,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto =
         missionMapper.toDto(
@@ -967,7 +959,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #removeParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
@@ -988,7 +979,6 @@ public class MissionController {
   public MissionDto removeParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
     if (jwt == null) {
@@ -1554,7 +1544,7 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
-   * @param authentication current Spring Security authentication
+   * @param jwt caller's JWT (null for anonymous)
    * @return the updated participant DTO
    */
   @PutMapping("/{id}/participants/{participantId}/slim")
@@ -1566,7 +1556,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     var mission =
         missionService.updateParticipantAttributes(
@@ -1599,7 +1588,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the updated participant DTO (redacted for anonymous callers)
    */
@@ -1612,7 +1600,6 @@ public class MissionController {
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkIn(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
@@ -1627,7 +1614,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param authentication current Spring Security authentication
    * @param jwt caller's JWT (null for anonymous)
    * @return the updated participant DTO (redacted for anonymous callers)
    */
@@ -1640,7 +1626,6 @@ public class MissionController {
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkOut(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
@@ -1656,8 +1641,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request payout preference payload
-   * @param authentication current Spring Security authentication
-   * @return the updated participant DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
@@ -1669,7 +1654,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      Authentication authentication,
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
