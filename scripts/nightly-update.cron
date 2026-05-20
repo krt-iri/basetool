@@ -1,1 +1,0 @@
-30 3 * * * /var/iri/code/scripts/nightly-update.sh >> /var/log/iri-nightly-update.log 2>&1
