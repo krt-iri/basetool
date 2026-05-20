@@ -67,12 +67,17 @@ public class WebClientConfig {
       }
       SslContext sslContext = builder.build();
 
+      // Pool sized at 100 connections: a single mission-detail render now fans out to four
+      // parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can exhaust a
+      // 50-slot pool. 100 gives comfortable headroom; the `pendingAcquireTimeout` is raised in
+      // step from 5 s to 10 s so a transient backend slowdown queues rather than failing fast,
+      // which the page render cannot recover from gracefully. Idle/life timeouts unchanged.
       reactor.netty.resources.ConnectionProvider provider =
           reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
-              .maxConnections(50)
+              .maxConnections(100)
               .maxIdleTime(java.time.Duration.ofSeconds(20))
               .maxLifeTime(java.time.Duration.ofSeconds(60))
-              .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
+              .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
               .evictInBackground(java.time.Duration.ofSeconds(10))
               .build();
 
