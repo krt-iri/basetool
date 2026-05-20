@@ -247,8 +247,21 @@ jobs:
       # when a hotfix is urgent). The findings show up in the Security tab
       # and the `promote.yml` workflow re-runs this check as a gate before
       # flipping :stable.
+      #
+      # `TRIVY_PLATFORM` is required because `provenance: mode=max` + `sbom: true`
+      # cause buildkit to push an OCI index (image manifest + provenance manifest
+      # + SBOM manifest) rather than a bare image manifest, and `outputs.digest`
+      # points at that index. Trivy's default child-selection inside an OCI
+      # index is hardcoded to `linux/amd64`, which works coincidentally on the
+      # amd64 runner (the index's per-arch image happens to be linux/amd64) but
+      # fails on the arm64 runner with `no child with platform linux/amd64 in
+      # index ...`. Setting `TRIVY_PLATFORM` to the matrix platform pins the
+      # selection to the matching child explicitly so the scan stays consistent
+      # regardless of buildkit's index-vs-manifest output decision.
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
           format: sarif
