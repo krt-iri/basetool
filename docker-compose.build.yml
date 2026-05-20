@@ -10,10 +10,21 @@
 # `docker compose pull` still pulls from GHCR, and `docker compose up --build`
 # forces a rebuild.
 #
+# It also wires `develop.watch` on the *-dev services. With Compose v2.22+,
+# `docker compose --profile dev watch` rebuilds the affected image whenever a
+# Java/resource source file changes — saves the manual `up -d --build` cycle.
+# `action: rebuild` (rather than `sync`) is the right choice here because our
+# Dockerfile bakes the JAR at build time; a file-level sync into the running
+# container would not re-run Gradle.
+#
 # Usage examples:
 #   # Iterate on the dev stack with local Dockerfile changes:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml \
 #       --profile dev up -d --build
+#
+#   # Auto-rebuild on source changes (foreground; Ctrl+C exits):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#       --profile dev watch
 #
 #   # Smoke-test a production image build locally without pushing:
 #   IRI_BASETOOL_VERSION=local \
@@ -31,27 +42,55 @@
 #      `/var/iri/code/` directory (the bootstrap procedure copies only the
 #      base compose file and the scripts directory).
 
+x-backend-build: &backend-build
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+
+x-frontend-build: &frontend-build
+  build:
+    context: .
+    dockerfile: frontend/Dockerfile
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+
+# Watch specs are service-specific (they reference module source roots), so
+# they cannot live in the build anchor — define them inline on the dev
+# services below. Ignored files are limited to known-noisy paths; everything
+# else under the source tree triggers a rebuild on change.
+x-backend-watch: &backend-watch
+  develop:
+    watch:
+      - action: rebuild
+        path: ./backend/src
+      - action: rebuild
+        path: ./backend/build.gradle.kts
+      - action: rebuild
+        path: ./build.gradle.kts
+      - action: rebuild
+        path: ./versions.properties
+
+x-frontend-watch: &frontend-watch
+  develop:
+    watch:
+      - action: rebuild
+        path: ./frontend/src
+      - action: rebuild
+        path: ./frontend/build.gradle.kts
+      - action: rebuild
+        path: ./build.gradle.kts
+      - action: rebuild
+        path: ./versions.properties
+
 services:
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+    <<: *backend-build
 
   backend-dev:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+    <<: [*backend-build, *backend-watch]
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+    <<: *frontend-build
 
   frontend-dev:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+    <<: [*frontend-build, *frontend-watch]

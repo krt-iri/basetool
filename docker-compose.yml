@@ -1,5 +1,37 @@
+# Shared log-rotation policy. Without these limits the default `json-file`
+# driver grows the per-container log file unbounded — at our request volume the
+# backend alone produces ~150 MB/day of JSON access logs, so a long-running
+# host would fill `/var/lib/docker/containers/` within weeks. Anchored here and
+# referenced via `logging: *default-logging` from every service template so a
+# future change (e.g. switch to `local` driver) is a single-line edit.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 x-db-backend: &db-backend-template
-  image: postgres:18-alpine
+  # Pinned by digest in addition to the `:18-alpine` tag so a silent upstream
+  # rebuild (Postgres or Alpine base) cannot land on the prod host between the
+  # `docker compose pull` on the deploy server and a subsequent compose-driven
+  # restart. Refresh by running `docker buildx imagetools inspect postgres:18-alpine`
+  # locally and updating the digest below — never via :latest.
+  image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
+  restart: unless-stopped
+  logging: *default-logging
+  # Container-aware memory tuning. The default Postgres settings (128 kB work_mem,
+  # 128 MB shared_buffers) target a 4 GB host — at our 768 MB container limit the
+  # buffer pool stays warm and join/sort operations spill to disk far less often.
+  # `effective_cache_size` is an estimate to the planner, not an allocation, so
+  # setting it to ~2/3 of the limit is safe and helps index plans win over seq
+  # scans.
+  command: >
+    postgres
+    -c shared_buffers=192MB
+    -c effective_cache_size=512MB
+    -c work_mem=8MB
+    -c maintenance_work_mem=64MB
+    -c max_connections=100
   environment:
     POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
@@ -29,7 +61,20 @@ x-db-backend: &db-backend-template
     - /var/iri/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
-  image: postgres:18-alpine
+  # Same digest pin policy as db-backend (see comment there).
+  image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
+  restart: unless-stopped
+  logging: *default-logging
+  # Smaller tuning than db-backend (512 MB limit vs 768 MB). Keycloak's working
+  # set is realm config + user records + sessions — easily fits in 128 MB
+  # shared_buffers for our member count.
+  command: >
+    postgres
+    -c shared_buffers=128MB
+    -c effective_cache_size=384MB
+    -c work_mem=4MB
+    -c maintenance_work_mem=32MB
+    -c max_connections=100
   environment:
     POSTGRES_DB: ${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
@@ -54,8 +99,12 @@ x-db-keycloak: &db-keycloak-template
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
-  image: quay.io/keycloak/keycloak:26.6
+  # Same digest pin policy as the Postgres images. Refresh with
+  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.6`.
+  image: quay.io/keycloak/keycloak:26.6@sha256:e712055eab50036a06dda2921ee5158e4fdf8d362402ae3886cc0eb97012cffb
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
+  restart: unless-stopped
+  logging: *default-logging
   stop_grace_period: 30s
   # Quarkus-based Keycloak with local cache + JWT signing + the realm import is
   # the second-biggest RAM consumer behind the backend. 1.5 GB matches the
@@ -77,8 +126,17 @@ x-keycloak: &keycloak-template
     KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD must be set in .env}
     KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?KC_BOOTSTRAP_ADMIN_USERNAME must be set in .env}
     KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?KC_BOOTSTRAP_ADMIN_PASSWORD must be set in .env}
+  # The Keycloak Quarkus image is built on `ubi9-micro` and ships neither curl
+  # nor wget, so the readiness probe uses bash's `/dev/tcp` virtual filesystem to
+  # open a TCP connection to the management port and reads back the HTTP status
+  # line. `printf` (POSIX) replaces `echo -e` for predictable backslash handling.
   healthcheck:
-    test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+    test:
+      - CMD-SHELL
+      - >-
+        exec 3<>/dev/tcp/127.0.0.1/9000
+        && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+        && grep -q '200 OK' <&3
     interval: 10s
     timeout: 10s
     retries: 15
@@ -97,6 +155,7 @@ x-backend: &backend-template
   # docker-compose.build.yml as an override to add `build:` back in.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  logging: *default-logging
   stop_grace_period: 30s
   # Biggest workload on the host: every API call goes through this JVM, Flyway
   # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
@@ -137,9 +196,12 @@ x-backend: &backend-template
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
 
 x-redis: &redis-template
-  image: redis:8-alpine
+  # Same digest pin policy as the Postgres images. Refresh with
+  # `docker buildx imagetools inspect redis:8-alpine`.
+  image: redis:8-alpine@sha256:d146f83b1e0f02fc27c26a50cee39338c736674c5959db84363e6ae3cd9e02d2
   command: redis-server --save 1 1 --appendonly yes --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-  restart: always
+  restart: unless-stopped
+  logging: *default-logging
   stop_grace_period: 30s
   # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
   # attributes). 256 MB is generous for our active-user count and leaves room
@@ -162,6 +224,7 @@ x-frontend: &frontend-template
   # rebuilds happen via docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  logging: *default-logging
   stop_grace_period: 30s
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
   # so the working set is well below the backend's. 768 MB → ~576 MB heap with
@@ -345,7 +408,9 @@ services:
     # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
     # and break reproducibility). Consider appending @sha256:<digest> as well.
-    image: jc21/nginx-proxy-manager:2.14.0
+    image: jc21/nginx-proxy-manager:2.14.0@sha256:2aa69b382a384b676c0d4f1d6f2eac40ecd478fcf7af1cfb3f9f1d3cd0c81e12
+    restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"     # Frontend / Keycloak HTTP Traffic
       - "443:443"    # Frontend / Keycloak HTTPS Traffic
