@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{promotion.my.title} + ' - ' + ${appTitle}">Meine Bewertungen - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .eval-topic { margin-bottom: 2rem; }
         .eval-topic-header {
             font-family: 'Ethnocentric', sans-serif;

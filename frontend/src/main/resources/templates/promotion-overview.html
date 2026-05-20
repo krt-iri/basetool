@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{promotion.overview.title} + ' - ' + ${appTitle}">Beförderungssystem - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .promotion-topic { margin-bottom: 2rem; }
         .promotion-topic-header {
             font-family: 'Ethnocentric', sans-serif;

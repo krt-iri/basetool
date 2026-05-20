@@ -5,8 +5,10 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.MissionFinanceEntryService;
+import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -42,17 +45,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MissionFinanceEntryController {
 
+  /**
+   * Whitelisted sort fields for {@link #getFinanceEntries}. Anything else from the {@code sort}
+   * query parameter triggers {@link IllegalArgumentException} in {@link
+   * PaginationUtil#createPageRequest} — the global handler turns that into a 400. Without the
+   * whitelist Spring's default resolver accepts paths like {@code participant.user.email,desc},
+   * leaking ordering information about PII columns (audit finding M-1).
+   */
+  private static final Set<String> ALLOWED_SORT =
+      Set.of("createdAt", "amount", "type", "note", "id");
+
   private final MissionFinanceEntryService financeEntryService;
 
   /**
-   * Paged finance entries for a mission.
+   * Paged finance entries for a mission. Sort is whitelisted; unknown fields → 400.
    *
+   * @param missionId mission id
+   * @param page zero-based page index, defaults to {@code 0}
+   * @param size page size, defaults to {@code 20}
+   * @param sort comma-separated {@code field,direction} pair, defaults to {@code createdAt,desc};
+   *     {@code field} must be one of {@link #ALLOWED_SORT}.
    * @return paged finance-entry DTOs
    */
   @GetMapping("/missions/{missionId}/finance-entries")
   @PreAuthorize("isAuthenticated()")
   public PageResponse<MissionFinanceEntryDto> getFinanceEntries(
-      @PathVariable UUID missionId, Pageable pageable) {
+      @PathVariable UUID missionId,
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false, defaultValue = "20") int size,
+      @RequestParam(required = false, defaultValue = "createdAt,desc") String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
     return toPageResponse(financeEntryService.getEntriesByMission(missionId, pageable));
   }
 

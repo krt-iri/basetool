@@ -5,7 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-<style>
+<style th:attr="nonce=${cspNonce}">
         .data-section {
             margin-bottom: 3rem;
         }

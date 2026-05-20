@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -56,8 +57,10 @@ class MissionFinanceEntryControllerTest {
             List.of(a, b), PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")), 2);
     when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(page);
 
+    // Audit finding M-1 (2026-05-20): the controller now builds the {@link Pageable} from
+    // explicit page / size / sort params with a whitelist (mirrors UserController / JobOrder).
     PageResponse<MissionFinanceEntryDto> result =
-        controller.getFinanceEntries(missionId, PageRequest.of(0, 10));
+        controller.getFinanceEntries(missionId, 0, 10, "createdAt,asc");
 
     assertThat(result.content()).containsExactly(a, b);
     assertThat(result.totalElements()).isEqualTo(2L);
@@ -66,6 +69,18 @@ class MissionFinanceEntryControllerTest {
     // PaginationUtil contract used by every other listing endpoint or the next-page link breaks.
     assertThat(result.sort()).containsExactly("createdAt,ASC");
     verify(service).getEntriesByMission(eq(missionId), any(Pageable.class));
+  }
+
+  @Test
+  void getFinanceEntries_rejectsUnknownSortField() {
+    UUID missionId = UUID.randomUUID();
+
+    // Whitelist guard: {@code participant.user.email} is NOT in {@link
+    // MissionFinanceEntryController#ALLOWED_SORT} — a 400 here is what the global handler
+    // surfaces, so ordering information about PII columns cannot leak via sort.
+    assertThatThrownBy(
+            () -> controller.getFinanceEntries(missionId, 0, 10, "participant.user.email,desc"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

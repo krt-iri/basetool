@@ -778,7 +778,10 @@ public class MissionController {
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
    * @param authentication current Spring Security authentication
-   * @return the persisted parent DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO (redacted via {@link #cleanupMissionForGuest} for anonymous
+   *     callers, who reach this endpoint when editing a guest participant per {@code
+   *     MissionSecurityService#canAccessParticipant})
    * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -798,20 +801,26 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication) {
-    return missionMapper.toDto(
-        missionService.updateParticipantAttributes(
-            id,
-            participantId,
-            request.desiredMissionJobTypeId(),
-            request.plannedMissionJobTypeId(),
-            request.comment(),
-            request.startTime(),
-            request.endTime(),
-            request.squadronId(),
-            request.payoutPreference(),
-            request.guestName(),
-            request.version()));
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
+    MissionDto dto =
+        missionMapper.toDto(
+            missionService.updateParticipantAttributes(
+                id,
+                participantId,
+                request.desiredMissionJobTypeId(),
+                request.plannedMissionJobTypeId(),
+                request.comment(),
+                request.startTime(),
+                request.endTime(),
+                request.squadronId(),
+                request.payoutPreference(),
+                request.guestName(),
+                request.version()));
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -820,7 +829,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param authentication current Spring Security authentication
-   * @return the persisted parent DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #checkInParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -839,8 +849,13 @@ public class MissionController {
   public MissionDto checkInParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
-    return missionMapper.toDto(missionService.checkIn(id, participantId));
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
+    MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -849,7 +864,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param authentication current Spring Security authentication
-   * @return the persisted parent DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #checkOutParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -868,19 +884,27 @@ public class MissionController {
   public MissionDto checkOutParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
-    return missionMapper.toDto(missionService.checkOut(id, participantId));
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
+    MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
    * Legacy payout-preference endpoint. {@code DONATE} on any participant is sticky for the whole
-   * operation (handled in the service).
+   * operation (handled in the service). Anonymous guests reach this path for their own guest
+   * participant via {@code MissionSecurityService#canAccessParticipant} and must receive a redacted
+   * response.
    *
    * @param id mission id
    * @param participantId participant id
    * @param request payout preference payload
    * @param authentication current Spring Security authentication
-   * @return the persisted parent DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #updatePayoutPreferenceSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -900,9 +924,15 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      Authentication authentication) {
-    return missionMapper.toDto(
-        missionService.updatePayoutPreference(id, participantId, request.preference()));
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
+    MissionDto dto =
+        missionMapper.toDto(
+            missionService.updatePayoutPreference(id, participantId, request.preference()));
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -938,7 +968,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param authentication current Spring Security authentication
-   * @return the persisted parent DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the persisted parent DTO (redacted for anonymous callers)
    * @deprecated use {@link #removeParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -957,8 +988,13 @@ public class MissionController {
   public MissionDto removeParticipant(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
-    return missionMapper.toDto(missionService.removeParticipant(id, participantId));
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
+    MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
+    if (jwt == null) {
+      dto = cleanupMissionForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -1012,7 +1048,8 @@ public class MissionController {
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
+      @AuthenticationPrincipal Jwt jwt,
+      Authentication authentication) {
     UUID finalUserId = request.userId();
     String finalGuestName = request.guestName();
 
@@ -1034,11 +1071,7 @@ public class MissionController {
     if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
       List<User> matches = userService.findMatchesByExactName(finalGuestName);
       if (matches.size() > 1) {
-        log.debug(
-            "Participant name '{}' is ambiguous ({} matches) for mission {}",
-            finalGuestName,
-            matches.size(),
-            id);
+        log.debug("Participant name is ambiguous ({} matches) for mission {}", matches.size(), id);
         throw new BusinessConflictException("Participant name is ambiguous.");
       }
       if (matches.size() == 1) {
@@ -1046,15 +1079,25 @@ public class MissionController {
           finalUserId = matches.get(0).getId();
           finalGuestName = null;
           log.debug(
-              "Resolved free-text participant name '{}' to userId {} for mission {}",
-              request.guestName(),
-              finalUserId,
-              id);
+              "Resolved free-text participant name to userId {} for mission {}", finalUserId, id);
         } else {
           // Anonymous user tried to add a name that belongs to a registered member -> keep spoofing
           // protection.
           throw new BadRequestException("Guest name is already taken.");
         }
+      }
+    }
+
+    // H-1 (2026-05-20 audit): the legacy public add-participant let an authenticated non-manager
+    // submit a foreign userId and silently add another registered member as participant. Mirror
+    // the slim variant's self-vs-manager check — self-enroll always works, adding someone else
+    // requires {@code canManageMission}.
+    if (jwt != null && finalUserId != null) {
+      UUID callerId = userService.getUserIdFromJwt(jwt);
+      if ((callerId == null || !finalUserId.equals(callerId))
+          && !missionSecurityService.canManageMission(id, authentication)) {
+        throw new AccessDeniedException(
+            "Only mission managers may add other users as participants.");
       }
     }
 
@@ -1067,12 +1110,13 @@ public class MissionController {
                 request.desiredJobTypeId(),
                 request.comment(),
                 request.squadronId()));
-    // C-1: anonymous callers must never receive participant emails / real names. Mirror the
-    // redaction applied by {@link #getMissionById} so the add-participant response shape is
-    // identical to the read-participant response shape. The ArchUnit rule
-    // {@code anonymousReadableMissionEndpointsMustRedactPii} statically enforces this for any
-    // future endpoint added with the same {@code @squadronScopeService.canSeeMission(#id)} gate.
-    if (jwt == null) {
+    // C-1 + H-2: every caller below Officer+ gets the peer-redacted shape — anonymous callers
+    // would otherwise see participant emails / real names; authenticated non-Logistician callers
+    // got the same leak on the legacy public endpoint until H-2. The slim variant's redaction
+    // covers the same matrix; keep both consistent so the {@code .../add} legacy path can be
+    // removed at sunset without behavioural surprises. The ArchUnit rule
+    // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} keeps this from regressing.
+    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
       dto = cleanupMissionForGuest(dto);
     }
     return dto;
@@ -1522,7 +1566,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication) {
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
     var mission =
         missionService.updateParticipantAttributes(
             id,
@@ -1536,7 +1581,17 @@ public class MissionController {
             request.payoutPreference(),
             request.guestName(),
             request.version());
-    return missionMapper.toDto(findParticipant(mission, participantId));
+    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
+    // The {@code cleanupParticipantForGuest} call here satisfies the ArchUnit rule {@code
+    // anonymousReadableMissionEndpointsMustRedactGuestPii} (audit finding C-1): the participant
+    // {@code canAccessParticipant} lets anonymous reach this endpoint reaches only guest entries
+    // anyway ({@code participant.user == null}), so the redaction is a no-op for the data — but
+    // calling it directly is the structural guarantee that a future mapping change which surfaces
+    // a non-null {@code UserDto} on a guest participant cannot leak through.
+    if (jwt == null) {
+      dto = cleanupParticipantForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -1545,7 +1600,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param authentication current Spring Security authentication
-   * @return the updated participant DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
@@ -1556,9 +1612,14 @@ public class MissionController {
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkIn(id, participantId);
-    return missionMapper.toDto(findParticipant(mission, participantId));
+    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
+    if (jwt == null) {
+      dto = cleanupParticipantForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -1567,7 +1628,8 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param authentication current Spring Security authentication
-   * @return the updated participant DTO
+   * @param jwt caller's JWT (null for anonymous)
+   * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
   @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
@@ -1578,9 +1640,14 @@ public class MissionController {
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      Authentication authentication) {
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkOut(id, participantId);
-    return missionMapper.toDto(findParticipant(mission, participantId));
+    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
+    if (jwt == null) {
+      dto = cleanupParticipantForGuest(dto);
+    }
+    return dto;
   }
 
   /**
@@ -1602,9 +1669,14 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      Authentication authentication) {
+      Authentication authentication,
+      @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
-    return missionMapper.toDto(findParticipant(mission, participantId));
+    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
+    if (jwt == null) {
+      dto = cleanupParticipantForGuest(dto);
+    }
+    return dto;
   }
 
   /**

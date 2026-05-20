@@ -4,7 +4,7 @@
     <title th:text="#{promotion.admin.ranks.title} + ' - ' + ${appTitle}">Rangvoraussetzungen verwalten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .badge-level {
             display: inline-block;
             padding: 0.1rem 0.4rem;

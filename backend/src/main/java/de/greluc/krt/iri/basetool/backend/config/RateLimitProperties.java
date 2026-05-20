@@ -1,9 +1,12 @@
 package de.greluc.krt.iri.basetool.backend.config;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -12,9 +15,14 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Configuration properties under {@code app.rate-limit.*}.
  *
- * <p>Consumed by {@link de.greluc.krt.iri.basetool.backend.filter.RateLimitingFilter}. Capacity +
- * refill rate define the Bucket4j token bucket; {@code paths} narrows the filter to API endpoints
- * only; {@code trustedProxies} controls whether the filter honors {@code X-Forwarded-For} from a
+ * <p>Consumed by {@link de.greluc.krt.iri.basetool.backend.filter.RateLimitingFilter}. The {@code
+ * capacity} / {@code refillTokens} / {@code refillPeriod} triple defines the GLOBAL Bucket4j bucket
+ * that applies to every request matching {@code paths}; the optional {@link #getRules() rules} list
+ * overlays tighter per-pattern budgets on top (e.g. tighter limits for anonymous-spam POST
+ * endpoints — audit finding L-5, 2026-05-20). When both apply, ALL matching buckets must have a
+ * token left or the request is rejected with 429.
+ *
+ * <p>{@code trustedProxies} controls whether the filter honors {@code X-Forwarded-For} from a
  * reverse proxy. The defaults (300 tokens, refilled 300/min) are tuned for the project's typical
  * mission-planning workload — adjust per environment, not via global wildcards.
  */
@@ -40,6 +48,18 @@ public class RateLimitProperties {
   @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
 
   /**
+   * Optional list of endpoint-specific rate-limit rules layered on top of the global bucket. Each
+   * rule gets its own Bucket4j bucket per client IP, keyed by the rule's {@link Rule#getName()
+   * name}. The filter checks the tightest rule first and aborts on the first depleted bucket, so
+   * spam against an anonymous-reachable POST endpoint trips the per-rule budget before it touches
+   * the loose global budget (audit finding L-5, 2026-05-20). A rule's {@link Rule#getPaths()}
+   * should still be covered by {@link #getPaths()} — paths outside the global umbrella skip the
+   * filter entirely via {@link
+   * de.greluc.krt.iri.basetool.backend.filter.RateLimitingFilter#shouldNotFilter}.
+   */
+  @Valid private List<Rule> rules = new ArrayList<>();
+
+  /**
    * List of trusted reverse-proxy IPs, exact match against {@code request.getRemoteAddr()}. Only
    * when the immediate peer is in this list does the filter honor {@code X-Forwarded-For} to derive
    * the client IP for bucketing. An empty list disables {@code X-Forwarded-For} entirely. The
@@ -47,4 +67,44 @@ public class RateLimitProperties {
    * client spoof the header and bypass IP-based rate limiting.
    */
   private List<String> trustedProxies = new java.util.ArrayList<>();
+
+  /**
+   * Per-endpoint rate-limit overlay. Matches a request when (1) the request method is contained in
+   * {@link #getMethods()} (case-insensitive, empty = any method) AND (2) the request URI matches at
+   * least one Ant-style pattern in {@link #getPaths()}. Bucket key is {@code clientIp + "|rule:" +
+   * name}, so rules with the same {@link #getName()} share buckets across different request methods
+   * — typically not desired; pick distinct names per logical surface.
+   */
+  @Data
+  public static class Rule {
+    /**
+     * Stable identifier used as the bucket-key suffix. Two rules with the same {@code name}
+     * collapse into one bucket, which is virtually never intended — keep names unique per logical
+     * endpoint group.
+     */
+    @NotBlank private String name;
+
+    /**
+     * Ant-style URI patterns this rule applies to. Should be a subset of the global {@link
+     * RateLimitProperties#getPaths()} umbrella; paths outside that umbrella never reach the filter.
+     */
+    @NotEmpty private List<String> paths;
+
+    /**
+     * HTTP methods the rule applies to (e.g. {@code POST}, {@code PUT}). Empty / {@code null} means
+     * any method. Matching is case-insensitive.
+     */
+    private List<String> methods = new ArrayList<>();
+
+    /** Bucket capacity (max tokens). */
+    @Min(1)
+    private int capacity;
+
+    /** Tokens refilled per period. */
+    @Min(1)
+    private int refillTokens;
+
+    /** Refill period. */
+    @NotNull private Duration refillPeriod;
+  }
 }

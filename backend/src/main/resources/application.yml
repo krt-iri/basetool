@@ -103,6 +103,55 @@ app:
     capacity: 300
     refillTokens: 300
     refillPeriod: 1m
+    # Audit finding L-5 (2026-05-20): tighter per-endpoint budgets layered on top of the global
+    # 300/min/IP bucket. A spam attacker with one fixed IP trips the per-endpoint budget below
+    # before the loose global budget is even touched, so a flood of anonymous joborder POSTs
+    # cannot starve the legitimate read traffic. Capacities are sized for the realistic squadron
+    # workload — a single human files at most a handful of these per minute; the limits leave
+    # the legitimate user with comfortable headroom while flagging programmatic abuse.
+    rules:
+      - name: mission-create
+        # Anonymous can create missions via POST /api/v1/missions. The endpoint runs a Mission
+        # row insert + index update — heavy enough that 10/min/IP is the right ceiling for a
+        # legitimate public submission flow.
+        methods: [POST]
+        paths:
+          - /api/v1/missions
+        capacity: 10
+        refillTokens: 10
+        refillPeriod: 1m
+      - name: order-create
+        # Anonymous can create job orders via POST /api/v1/orders (CLAUDE.md: gewollt). Same
+        # write-heavy profile as the mission create, same cap.
+        methods: [POST]
+        paths:
+          - /api/v1/orders
+        capacity: 10
+        refillTokens: 10
+        refillPeriod: 1m
+      - name: finance-entry-create
+        # Anonymous guest participants can record their own payouts via POST /api/v1/finance-entries.
+        # Slightly higher cap than mission/order because one mission may legitimately accrue 5–10
+        # finance entries during its lifecycle, all created by the same guest IP.
+        methods: [POST]
+        paths:
+          - /api/v1/finance-entries
+        capacity: 20
+        refillTokens: 20
+        refillPeriod: 1m
+      - name: participant-mutations
+        # Covers the anonymous-reachable participant flows: add, slim add, update, check-in,
+        # check-out, payout-preference change, delete (both legacy and /slim variants). A single
+        # legitimate guest goes through join → check-in → maybe a payout flip → check-out — that's
+        # 4–6 calls per mission they participate in. 30/min/IP comfortably covers the human path
+        # while killing a script that tries to spam the participant table.
+        methods: [POST, PUT, DELETE]
+        paths:
+          - /api/v1/missions/*/participants
+          - /api/v1/missions/*/participants/**
+        capacity: 30
+        refillTokens: 30
+        refillPeriod: 1m
 
 # Actuator: expose only `health` for the Docker HEALTHCHECK / docker-compose
 # `service_healthy` gating. The response is restricted to the bare status so that

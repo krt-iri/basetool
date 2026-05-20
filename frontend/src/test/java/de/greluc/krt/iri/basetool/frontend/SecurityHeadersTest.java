@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -48,5 +49,43 @@ class SecurityHeadersTest {
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
         .andExpect(header().exists("Permissions-Policy"));
+  }
+
+  /**
+   * Audit finding L-3 (2026-05-20): the CSP {@code style-src} directive must be nonce-gated and
+   * must NOT carry {@code 'unsafe-inline'} — every {@code <style>} block in the templates now
+   * renders with {@code th:attr="nonce=${cspNonce}"}, so an injected {@code <style>} tag (stored
+   * XSS via mission name / finance note / …) cannot be evaluated by the browser. The {@code
+   * style=""} attributes on individual elements remain allowed via the explicit {@code
+   * style-src-attr 'unsafe-inline'} fallback — that is a separate CSP3 directive and is pinned here
+   * so future tightening (e.g. moving to {@code 'unsafe-hashes' 'sha256-…'}) can land on
+   * style-src-attr without touching style-src.
+   */
+  @Test
+  void cspStyleSrcIsNonceGated_andStyleSrcAttrIsExplicit() throws Exception {
+    String csp =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Security-Policy");
+
+    assertThat(csp).as("Content-Security-Policy header").isNotNull();
+    // Nonce embedded in style-src — the placeholder is replaced per request, so we only assert
+    // the prefix + the nonce-pattern.
+    assertThat(csp)
+        .as("style-src must be nonce-gated, not 'unsafe-inline'")
+        .containsPattern("style-src 'self' 'nonce-[A-Za-z0-9_-]+'");
+    assertThat(csp)
+        .as("style-src must NOT carry 'unsafe-inline' (would defeat the nonce gate)")
+        .doesNotContain("style-src 'self' 'unsafe-inline'");
+    // style-src-attr stays unsafe-inline for now — pinned explicitly so a future tightening can
+    // move from 'unsafe-inline' to an 'unsafe-hashes' allow-list incrementally.
+    assertThat(csp)
+        .as("style-src-attr fallback for 859 style='…' attributes")
+        .contains("style-src-attr 'unsafe-inline'");
+    // script-src stays nonce-gated as before — regression-pin.
+    assertThat(csp).contains("script-src 'nonce-").contains("'strict-dynamic'");
   }
 }

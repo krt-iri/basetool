@@ -836,8 +836,8 @@ class ArchitectureTest {
 
   private static DescribedPredicate<JavaMethod> hasGuestVisibleCanSeeMissionPreAuthorize() {
     return new DescribedPredicate<JavaMethod>(
-        "annotated with @PreAuthorize that gates on canSeeMission without an"
-            + " isAuthenticated/hasRole/hasAuthority clause") {
+        "annotated with @PreAuthorize that gates on canSeeMission or canAccessParticipant"
+            + " without an isAuthenticated/hasRole/hasAuthority clause") {
       @Override
       public boolean test(JavaMethod method) {
         if (!method.isAnnotatedWith(PRE_AUTHORIZE)) {
@@ -846,7 +846,12 @@ class ArchitectureTest {
         JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
         String value =
             ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-        if (!value.contains("canSeeMission")) {
+        // {@code canAccessParticipant} returns true for any guest participant ({@code
+        // p.getUser() == null}) — so an anonymous caller can reach the endpoint when the target
+        // is a guest. The legacy participant endpoints (PUT /participants/{id}, check-in / -out,
+        // payout-preference, DELETE /participants/{id}) all carry this gate and have shipped the
+        // full MissionDto without redaction before the 2026-05-20 audit fix.
+        if (!value.contains("canSeeMission") && !value.contains("canAccessParticipant")) {
           return false;
         }
         // Any of the following would force the caller to be authenticated, making jwt non-null

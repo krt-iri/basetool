@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.uex.title} + ' - ' + ${appTitle}">UEX-Daten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<style>
+<style th:attr="nonce=${cspNonce}">
         .data-section { margin-bottom: 3rem; }
         .form-group { margin-bottom: 1rem; }
         .form-group label {

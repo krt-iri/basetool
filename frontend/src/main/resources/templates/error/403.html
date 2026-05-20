@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{error.403.title} + ' - ' + ${appTitle}">Access Denied - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<style>
+<style th:attr="nonce=${cspNonce}">
         .error-container {
             text-align: center;
             border: 2px solid var(--color-dept-combat);

@@ -50,7 +50,10 @@ public class UserSyncTask {
         keycloakUserIds.add(user.id());
         count++;
       } catch (Exception e) {
-        log.error("Failed to sync user {}", user.username(), e);
+        // Audit finding M-4 (2026-05-20): Keycloak {@code username} can be email-shaped (caught by
+        // PiiMasker) or a real-name handle (not caught). Log the JWT-sub UUID instead — sufficient
+        // to correlate with the user row on the next sync run, and free of PII.
+        log.error("Failed to sync user {}", user.id(), e);
       }
     }
     userService.markMissingUsers(keycloakUserIds);

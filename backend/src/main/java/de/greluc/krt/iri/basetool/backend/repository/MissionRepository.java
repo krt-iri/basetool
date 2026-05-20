@@ -18,15 +18,28 @@ import org.springframework.stereotype.Repository;
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
   /**
-   * Returns slim {@link MissionReferenceDto}s for every mission in {@code PLANNED} or {@code
-   * ACTIVE} status, sorted by planned start. Used to populate mission-picker dropdowns without
-   * pulling the full Mission aggregate.
+   * Returns slim {@link de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto}s for
+   * every {@code PLANNED} / {@code ACTIVE} mission visible to the caller, sorted by planned start.
+   * Drives mission-picker dropdowns without pulling the full {@link Mission} aggregate.
+   *
+   * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4): the lookup mirrors the
+   * visibility predicate of {@link #searchMissions(String, java.time.Instant, java.time.Instant,
+   * List, Boolean, UUID, UUID, Pageable) searchMissions}. {@code scopeSquadronId == null} disables
+   * the squadron filter (admin "all squadrons" mode). For a non-null scope the result includes
+   * missions owned by that squadron PLUS any non-internal mission of any other squadron — so a
+   * member from squadron A no longer learns the names of squadron B's internal missions through the
+   * dropdown.
+   *
+   * @param scopeSquadronId active squadron filter, or {@code null} for admin "all squadrons" mode.
+   * @return slim reference DTOs visible to the caller.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
           + " m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE')"
-          + " ORDER BY m.plannedStartTime ASC")
-  List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference();
+          + " AND (:scopeSquadronId IS NULL OR m.owningSquadron.id = :scopeSquadronId OR"
+          + " m.isInternal = false) ORDER BY m.plannedStartTime ASC")
+  List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
+      @Param("scopeSquadronId") UUID scopeSquadronId);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
