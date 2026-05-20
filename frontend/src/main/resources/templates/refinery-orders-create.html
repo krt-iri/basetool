@@ -344,25 +344,25 @@
             if (input.name) {
                 input.name = input.name.replace(/\[\d+\]/, '[' + count + ']');
             }
+            // The delegated rfc-calc-scu handler reads data-index to know which row's
+            // SCU field to update; without renumbering, calcScu() always targets row 0.
+            if (input.hasAttribute('data-index')) {
+                input.setAttribute('data-index', count);
+            }
             if (input.tagName.toLowerCase() === 'select') {
                 input.selectedIndex = 0;
             } else {
                 input.value = '';
             }
         });
-        
+
         const displaySpan = template.querySelector('span[id^="outputMaterialDisplay_"]');
         if (displaySpan) {
             displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + count);
             displaySpan.innerText = '-';
             displaySpan.style.opacity = '0.7';
         }
-        
-        const outputUnitInput = template.querySelector('input[id="outputQuantity_' + count + '"]');
-        if (outputUnitInput) {
-            outputUnitInput.setAttribute('oninput', 'calcScu(' + count + ')');
-        }
-        
+
         const labels = template.querySelectorAll('label');
         labels.forEach(label => {
             const forAttr = label.getAttribute('for');
@@ -377,7 +377,7 @@
     function removeMaterialRow(button) {
         const entry = button.closest('.material-entry');
         entry.remove();
-        
+
         const container = document.getElementById('materials-container');
         const entries = container.querySelectorAll('.material-entry');
         entries.forEach((entry, index) => {
@@ -389,7 +389,14 @@
                 if (input.name) {
                     input.name = input.name.replace(/\[\d+\]/, '[' + index + ']');
                 }
+                if (input.hasAttribute('data-index')) {
+                    input.setAttribute('data-index', index);
+                }
             });
+            const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
+            if (displaySpan) {
+                displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + index);
+            }
             const labels = entry.querySelectorAll('label');
             labels.forEach(label => {
                 const forAttr = label.getAttribute('for');
