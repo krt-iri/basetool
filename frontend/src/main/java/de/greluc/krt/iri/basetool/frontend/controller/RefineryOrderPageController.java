@@ -840,7 +840,13 @@ public class RefineryOrderPageController {
             backendApiClient.get(
                 "/api/v1/users/me", de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-          log.info("Granting logistician by backend flag for user: {}", principal.getName());
+          // M-16: do NOT log {@code principal.getName()} (the Keycloak username — PII). Log only
+          // a stable short pseudonym derived from the principal name's hashCode, in the same
+          // shape as {@code BackendRoleSyncFilter.maskPrincipal}. The narrower {@code log.debug}
+          // a few lines down does not carry the principal at all.
+          log.info(
+              "Granting logistician by backend flag for user: u-{}",
+              Integer.toHexString(principal.getName().hashCode()));
           result = true;
         }
       } catch (Exception e) {

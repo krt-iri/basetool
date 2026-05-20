@@ -652,14 +652,17 @@ public class GlobalExceptionHandler {
             ? hs
             : HttpStatus.valueOf(ex.getStatusCode().value());
     String code = codeForStatus(status);
+    // M-7: never echo {@code ex.getMessage()} verbatim. Spring's {@link
+    // ResponseStatusException#getMessage()} synthesises "&lt;status&gt; &lt;phrase&gt;
+    // \"&lt;reason&gt;\";
+    // nested exception is …" — the "; nested exception is" suffix carries the underlying
+    // exception's class name and message, which on WebClient-relay paths (see {@code
+    // HangarImportProxyController.forwardImport}) wraps the upstream Spring/Hibernate error
+    // verbatim. Echoing that leaks SQL constraint names / class FQDNs / internal paths (CWE-209).
+    // Use the caller-friendly {@code reason} only, or the bare status reason phrase as fallback.
+    String safeDetail = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
     ProblemDetail pd =
-        problem(
-            status,
-            ex.getReason() != null ? ex.getReason() : status.getReasonPhrase(),
-            ex.getMessage(),
-            request,
-            Integer.toString(status.value()),
-            code);
+        problem(status, safeDetail, safeDetail, request, Integer.toString(status.value()), code);
     logProblem(
         request, pd, "ResponseStatusException", Map.of("reason", String.valueOf(ex.getReason())));
     return toEntity(pd);

@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.frontend.model.form;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -11,11 +12,19 @@ import jakarta.validation.constraints.Size;
  * scheduleVersion} and {@code flagsVersion} drive optimistic locking — they enable concurrent users
  * to edit disjoint sections (core / schedule / flags) on the same mission without producing
  * spurious 409 conflicts.
+ *
+ * <p>{@code calendarLink} is rendered as an {@code &lt;a href&gt;} on the public landing page. The
+ * {@code @Pattern} forces an {@code https://} prefix so a mission manager cannot persist a {@code
+ * javascript:fetch(document.cookie)} stored-XSS payload — Thymeleaf's {@code th:href} only
+ * HTML-escapes the value, not the scheme. The backend mirrors the same constraint on its DTO so
+ * both layers reject the payload independently (audit finding H-1).
  */
 public record MissionForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
     @Size(max = 2000) String description,
-    @Size(max = 2048) String calendarLink,
+    @Size(max = 2048)
+        @Pattern(regexp = "^(https://.*)?$", message = "{validation.calendarLink.httpsOnly}")
+        String calendarLink,
     @NotBlank(message = "{validation.status.required}") String status,
     String meetingTime,
     String plannedStartTime,

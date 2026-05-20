@@ -120,7 +120,12 @@ public class UserService {
       // indicates a misconfigured authorization server. Refuse rather than
       // falling back to a different claim and silently identifying users by
       // a value an admin might rename in Keycloak.
-      log.error("JWT has no subject (sub). Refusing the request. Claims: {}", jwt.getClaims());
+      // Audit finding H-10: only log the claim keys, never the values. Full claims map contains
+      // preferred_username / given_name / family_name / email which PiiMasker only partially
+      // scrubs — the keys still help diagnose a Keycloak mapper misconfiguration.
+      log.error(
+          "JWT has no subject (sub). Refusing the request. Claim keys: {}",
+          jwt.getClaims().keySet());
       throw new org.springframework.security.authentication.AuthenticationServiceException(
           "JWT subject (sub) must be present");
     }

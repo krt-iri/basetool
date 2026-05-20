@@ -50,7 +50,7 @@ class BotProtectionFilterTest {
         "/shell.php",
         "/cgi-bin/test",
         "/vendor/autoload.php",
-        "/robots.txt",
+        // M-17: /robots.txt removed — served as a static file with "Disallow: /".
         "/sitemap.xml",
         "/sitemap-users-1.xml",
         "/actuator/env",
@@ -100,7 +100,7 @@ class BotProtectionFilterTest {
       strings = {
         "/WP-ADMIN/install.php",
         "/Wp-Login.php",
-        "/ROBOTS.TXT",
+        // M-17: /ROBOTS.TXT no longer blocked — see static robots.txt + isBotPath test.
         "/ACTUATOR/env",
         "/.ENV",
         "/PHPMYADMIN/",
@@ -294,7 +294,6 @@ class BotProtectionFilterTest {
     // /actuator/health sub-path is whitelisted, see test below.
     assertTrue(filter.isBotPath("/actuator"));
     assertTrue(filter.isBotPath("/actuator/env"));
-    assertTrue(filter.isBotPath("/robots.txt"));
     assertTrue(filter.isBotPath("/.env"));
     assertTrue(filter.isBotPath("/phpmyadmin/"));
   }
@@ -306,6 +305,9 @@ class BotProtectionFilterTest {
     assertFalse(filter.isBotPath("/orders"));
     assertFalse(filter.isBotPath("/hangar"));
     assertFalse(filter.isBotPath("/css/main.css"));
+    // M-17: /robots.txt is now served as a regular static file ("Disallow: /"); the bot
+    // filter does NOT short-circuit it anymore.
+    assertFalse(filter.isBotPath("/robots.txt"));
   }
 
   @Test

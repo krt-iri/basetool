@@ -18,6 +18,7 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -121,21 +122,22 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   /**
    * Resolves the rate-limit key for the incoming request. {@code X-Forwarded-For} is only honored
-   * when the immediate peer ({@code request.getRemoteAddr()}) is listed by exact match in {@code
+   * when the immediate peer ({@code request.getRemoteAddr()}) matches an entry in {@code
    * app.rate-limit.trusted-proxies}; the literal {@code "*"} is intentionally NOT a valid trust
    * value, since blanket trust lets any client spoof the header and obtain a fresh bucket per
    * request.
+   *
+   * <p>Audit finding H-8: each trusted-proxies entry may be either an exact IP ({@code 172.17.0.1})
+   * or a CIDR range ({@code 172.17.0.0/16}). Matching delegates to Spring Security's {@link
+   * IpAddressMatcher} so docker-network ranges (typically {@code 172.17.0.0/16}, {@code
+   * 10.0.0.0/8}, etc.) can be configured without enumerating every proxy IP individually.
    */
   private String resolveClientIp(HttpServletRequest request) {
     String remoteAddr = request.getRemoteAddr();
     List<String> trusted = properties.getTrustedProxies();
 
     boolean isTrusted =
-        trusted != null
-            && !trusted.isEmpty()
-            && trusted.stream()
-                .filter(p -> p != null && !"*".equals(p))
-                .anyMatch(remoteAddr::equals);
+        trusted != null && trusted.stream().anyMatch(p -> matchesProxy(p, remoteAddr));
 
     if (isTrusted) {
       String xff = request.getHeader("X-Forwarded-For");
@@ -147,6 +149,28 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     return remoteAddr;
+  }
+
+  /**
+   * Matches a {@code trusted-proxies} entry against the immediate peer's IP. Supports exact IP
+   * literals (e.g. {@code 172.17.0.1}) and CIDR ranges (e.g. {@code 172.17.0.0/16}). The literal
+   * {@code "*"} is explicitly rejected to keep the blanket-trust foot-gun closed.
+   */
+  private static boolean matchesProxy(String entry, String remoteAddr) {
+    if (entry == null || entry.isBlank() || "*".equals(entry)) {
+      return false;
+    }
+    try {
+      return new IpAddressMatcher(entry).matches(remoteAddr);
+    } catch (IllegalArgumentException ex) {
+      // Malformed CIDR / IP entry in config — log once and ignore so a typo cannot disable the
+      // entire filter. (The misconfiguration surfaces in logs at WARN.)
+      log.warn(
+          "Invalid app.rate-limit.trusted-proxies entry '{}'; ignoring. Reason: {}",
+          entry,
+          ex.getMessage());
+      return false;
+    }
   }
 
   private String firstMatchingPattern(String path, List<String> patterns) {

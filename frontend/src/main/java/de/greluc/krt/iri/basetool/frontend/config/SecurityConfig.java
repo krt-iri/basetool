@@ -38,7 +38,16 @@ public class SecurityConfig {
   private final RequestLoggingFilter requestLoggingFilter;
   private final BackendRoleSyncFilter backendRoleSyncFilter;
   private final BotProtectionFilter botProtectionFilter;
-  private final SessionDebugFilter sessionDebugFilter;
+
+  /**
+   * Optional — only wired in {@code dev} / {@code test} profiles (see {@link SessionDebugFilter}'s
+   * {@code @Profile} annotation). In prod the bean does not exist and the filter is skipped (audit
+   * finding M-15: the filter logs raw session ids + principal names which must never reach prod
+   * logs even if an operator flips the per-class log level).
+   */
+  private final org.springframework.beans.factory.ObjectProvider<SessionDebugFilter>
+      sessionDebugFilter;
+
   private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
   private final CspNonceFilter cspNonceFilter;
 
@@ -55,11 +64,22 @@ public class SecurityConfig {
   // >script-src-attr</a>), which slams the door on stored-XSS via a future template that
   // accidentally re-introduces an inline event handler. {@code <script>} elements stay
   // nonce-gated through {@code script-src} below — unchanged.
+  // Audit findings M-9 + M-10:
+  //   * M-10: dropped the broad {@code https:} fallback from {@code script-src}. Browsers that
+  //     understand {@code 'strict-dynamic'} (Chrome 52+, Firefox 52+, Safari 15.4+) ignore the
+  //     fallback anyway, but older browsers fell back to "any HTTPS origin loads scripts" — that
+  //     widened the policy unnecessarily for &lt;1% of installed-base browsers. With the fallback
+  //     removed the policy is uniformly strict across browsers.
+  //   * M-9: added {@code form-action 'self'} (an injected {@code &lt;form action=evil&gt;} cannot
+  //     POST any visible field — including the CSRF token — to a third-party origin) and {@code
+  //     upgrade-insecure-requests} (auto-rewrites HTTP subresources to HTTPS so a mixed-content
+  //     bug never falls back to plain HTTP).
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
+          + "form-action 'self'; upgrade-insecure-requests; "
           + "img-src 'self' data:; font-src 'self' data:; "
           + "style-src 'self' 'unsafe-inline'; "
-          + "script-src 'nonce-%s' 'strict-dynamic' https:";
+          + "script-src 'nonce-%s' 'strict-dynamic'";
 
   private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
     return (request, response) -> {
@@ -104,35 +124,66 @@ public class SecurityConfig {
         .addFilterBefore(
             botProtectionFilter,
             org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
-                .class)
-        .addFilterBefore(
-            sessionDebugFilter,
-            org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
-                .class)
-        .addFilterBefore(
+                .class);
+    // M-15: SessionDebugFilter is only registered in dev / test (see its {@code @Profile}). In
+    // prod the bean does not exist; we skip the addFilterBefore call entirely to keep the chain
+    // clean rather than wiring a no-op.
+    sessionDebugFilter.ifAvailable(
+        f ->
+            http.addFilterBefore(
+                f,
+                org.springframework.security.web.context.request.async
+                    .WebAsyncManagerIntegrationFilter.class));
+    http.addFilterBefore(
             requestLoggingFilter,
             org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
                 .class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
-        .csrf(
-            csrf ->
-                csrf.ignoringRequestMatchers(
-                    "/missions/**",
-                    "/operations/**",
-                    "/hangar/import/ships",
-                    "/hangar/import/fleetview",
-                    "/hangar/ships/all",
-                    "/inventory/**"))
+        // Audit finding H-6: previously `/missions/**`, `/operations/**`, `/hangar/import/**`,
+        // `/hangar/ships/all` and `/inventory/**` were carved out of CSRF protection entirely.
+        // Those routes are session-cookie-authenticated frontend handlers — exactly the surface
+        // CSRF protects. `SameSite=Strict` on the session cookie mitigates classical cross-site
+        // form-POSTs, but defence-in-depth wants the token check enabled too. AJAX call sites
+        // already attach `X-XSRF-TOKEN` (see `mission-subresource.js`); Thymeleaf forms with
+        // `th:action` auto-include the `_csrf` hidden field through Spring Security's view
+        // integration. The default Spring Security CSRF setup is therefore left intact, no
+        // ignoringRequestMatchers needed.
+        .csrf(org.springframework.security.config.Customizer.withDefaults())
         .headers(
             headers -> {
               headers.addHeaderWriter(cspNonceHeaderWriter());
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+              // M-12: Cross-Origin-Opener-Policy + Cross-Origin-Resource-Policy. Same rationale
+              // as the backend — COOP isolates the browsing context group, CORP prevents
+              // cross-origin embedding of frontend resources via {@code <img>} / {@code <script>}.
+              headers.crossOriginOpenerPolicy(
+                  coop ->
+                      coop.policy(
+                          org.springframework.security.web.header.writers
+                              .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy
+                              .SAME_ORIGIN));
+              headers.crossOriginResourcePolicy(
+                  corp ->
+                      corp.policy(
+                          org.springframework.security.web.header.writers
+                              .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
+                              .SAME_ORIGIN));
+              // Audit finding H-9: explicit HSTS. Frontend is reached over HTTPS in production;
+              // behind nginx-proxy-manager with X-Forwarded-Proto the default writer works,
+              // but pinning the policy here makes the contract explicit and prod-safe even if
+              // the proxy headers are misconfigured.
+              headers.httpStrictTransportSecurity(
+                  hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
               headers.addHeaderWriter(
                   new org.springframework.security.web.header.writers.StaticHeadersWriter(
                       "Permissions-Policy",
-                      "geolocation=(), camera=(), microphone=(), fullscreen=()"));
+                      // L-3: explicit deny for every browser feature the app does not use.
+                      "geolocation=(), camera=(), microphone=(), fullscreen=(),"
+                          + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
+                          + " gyroscope=(), magnetometer=(), display-capture=(),"
+                          + " clipboard-read=(), clipboard-write=(), interest-cohort=()"));
               headers.contentTypeOptions(Customizer.withDefaults());
             })
         .authorizeHttpRequests(
@@ -160,7 +211,11 @@ public class SecurityConfig {
                         "/fonts/**",
                         "/impressum",
                         "/privacy",
-                        "/terms")
+                        "/terms",
+                        // M-17: static robots.txt with "Disallow: /" so legitimate crawlers
+                        // (Google, Bing, archive.org) get an explicit no-index preference
+                        // instead of a custom-app-signal 404.
+                        "/robots.txt")
                     .permitAll()
                     .requestMatchers("/missions", "/missions/")
                     .permitAll()
@@ -201,8 +256,39 @@ public class SecurityConfig {
                         request ->
                             request.getRequestURI().equals(request.getContextPath() + "/logout"))
                     .logoutSuccessHandler(oidcLogoutSuccessHandler))
-        .exceptionHandling(ex -> ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint));
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint))
+        // M-14: explicit session-management policy.
+        //   * sessionFixation(changeSessionId) is Spring Security's default since 4.x; pinning it
+        //     here makes the contract explicit so a future regression that switches to {@code
+        //     none} or {@code migrateSession} is visible in code review.
+        //   * maximumSessions(2) caps a single user to two concurrent sessions (e.g. desktop +
+        //     phone); a stolen cookie used in parallel will eventually push the legitimate
+        //     session out. maxSessionsPreventsLogin(false) keeps the UX as "most recent login
+        //     wins" rather than "new login refused" — combined with the cookie SameSite=Strict
+        //     this is the right trade-off for a member-facing app.
+        .sessionManagement(
+            sm ->
+                sm.sessionFixation(
+                        org.springframework.security.config.annotation.web.configurers
+                                .SessionManagementConfigurer.SessionFixationConfigurer
+                            ::changeSessionId)
+                    .maximumSessions(2)
+                    .maxSessionsPreventsLogin(false));
     return http.build();
+  }
+
+  /**
+   * Publishes Spring's session-lifecycle events so {@link
+   * org.springframework.security.core.session.SessionRegistry} (used by {@code
+   * sessionManagement().maximumSessions(...)}) can track session creation / destruction. Without
+   * this bean the concurrent-session control silently no-ops. Audit finding M-14.
+   *
+   * @return the publisher bean
+   */
+  @Bean
+  public org.springframework.security.web.session.HttpSessionEventPublisher
+      httpSessionEventPublisher() {
+    return new org.springframework.security.web.session.HttpSessionEventPublisher();
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
@@ -263,7 +349,13 @@ public class SecurityConfig {
           authority -> {
             mappedAuthorities.add(authority);
             if (authority instanceof OidcUserAuthority oidcUserAuthority) {
-              log.debug("OidcUserAuthority attributes: {}", oidcUserAuthority.getAttributes());
+              // Audit finding H-11: only log the attribute keys, never the values. The full
+              // attribute map carries `email`, `preferred_username`, `given_name`, `family_name`
+              // — all of which the PiiMasker only partially scrubs and which this package's
+              // TRACE-by-default Logback config would emit on every login in production.
+              log.debug(
+                  "OidcUserAuthority attribute keys: {}",
+                  oidcUserAuthority.getAttributes().keySet());
               Map<String, Object> realmAccess =
                   (Map<String, Object>) oidcUserAuthority.getAttributes().get("realm_access");
               if (realmAccess != null && realmAccess.containsKey("roles")) {

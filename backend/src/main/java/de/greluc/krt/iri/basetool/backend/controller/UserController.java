@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ public class UserController {
 
   private final UserService userService;
   private final UserMapper userMapper;
+  private final AuthHelperService authHelperService;
 
   /**
    * Paged user list. Open to every authenticated member because the participant pickers in the
@@ -60,7 +62,8 @@ public class UserController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.iri.basetool.backend.model.User> p = userService.findAll(pageable);
-    List<UserDto> content = p.getContent().stream().map(userMapper::toDto).toList();
+    List<UserDto> content =
+        p.getContent().stream().map(userMapper::toDto).map(this::redactForPeerIfNeeded).toList();
     return new PageResponse<>(
         content,
         p.getNumber(),
@@ -99,7 +102,8 @@ public class UserController {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.iri.basetool.backend.model.User> p =
         userService.searchByUsername(query, pageable);
-    List<UserDto> content = p.getContent().stream().map(userMapper::toDto).toList();
+    List<UserDto> content =
+        p.getContent().stream().map(userMapper::toDto).map(this::redactForPeerIfNeeded).toList();
     return new PageResponse<>(
         content,
         p.getNumber(),
@@ -119,7 +123,7 @@ public class UserController {
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
-    return userMapper.toDto(userService.findById(id));
+    return redactForPeerIfNeeded(userMapper.toDto(userService.findById(id)));
   }
 
   /**
@@ -268,5 +272,48 @@ public class UserController {
     private String description;
     private String displayName;
     @jakarta.validation.constraints.NotNull private Long version;
+  }
+
+  /**
+   * Strips the PII that a peer (non-Officer, non-Admin) does not need to see. Returns the input
+   * unchanged for officers/admins and the caller's own row (admins/officers may legitimately need
+   * the email + real-name fields for moderation / payouts). Audit finding H-4: previously any
+   * SQUADRON_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email +
+   * first/last name.
+   *
+   * <p>The peer view keeps {@code id}, {@code username}, {@code displayName}, {@code
+   * effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code version} — enough
+   * for the participant pickers in the mission editor to identify peers visually; drops {@code
+   * email}, {@code firstName}, {@code lastName}, {@code description}, {@code roles}, {@code
+   * permissions}, {@code lastReadAnnouncementId}, {@code isLogistician}, {@code isMissionManager},
+   * {@code joinDate}.
+   *
+   * @param dto the persisted user DTO
+   * @return the redacted DTO for non-elevated callers, or the original for officer/admin
+   */
+  private UserDto redactForPeerIfNeeded(UserDto dto) {
+    if (dto == null || authHelperService.isLogisticianOrAbove()) {
+      return dto;
+    }
+    return new UserDto(
+        dto.id(),
+        dto.username(),
+        dto.displayName(),
+        dto.effectiveName(),
+        null, // firstName
+        null, // lastName
+        null, // email
+        dto.rank(),
+        null, // description
+        null, // roles
+        null, // permissions
+        null, // lastReadAnnouncementId
+        false, // isLogistician
+        false, // isMissionManager
+        dto.inKeycloak(),
+        dto.squadron(),
+        dto.version(),
+        null // joinDate
+        );
   }
 }

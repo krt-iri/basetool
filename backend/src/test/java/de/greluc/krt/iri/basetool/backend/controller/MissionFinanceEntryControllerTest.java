@@ -81,7 +81,7 @@ class MissionFinanceEntryControllerTest {
   }
 
   @Test
-  void createFinanceEntry_passesDtoThroughToService() {
+  void createFinanceEntry_authenticatedCaller_passesDtoThroughToService() {
     UUID missionId = UUID.randomUUID();
     MissionFinanceEntryCreateDto request =
         new MissionFinanceEntryCreateDto(
@@ -89,7 +89,13 @@ class MissionFinanceEntryControllerTest {
     MissionFinanceEntryDto created = entry(missionId, FinanceType.INCOME, new BigDecimal("500.00"));
     when(service.createEntry(request)).thenReturn(created);
 
-    MissionFinanceEntryDto result = controller.createFinanceEntry(request);
+    // Non-null Jwt → controller must NOT redact, just pass the persisted DTO straight through.
+    org.springframework.security.oauth2.jwt.Jwt jwt =
+        org.springframework.security.oauth2.jwt.Jwt.withTokenValue("t")
+            .header("alg", "none")
+            .claim("sub", "tester")
+            .build();
+    MissionFinanceEntryDto result = controller.createFinanceEntry(request, jwt);
 
     assertThat(result).isSameAs(created);
     verify(service).createEntry(request);

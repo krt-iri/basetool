@@ -66,10 +66,10 @@ class MissionUnitManagementTest {
     ship.setShipType(st);
     shipRepository.save(ship);
 
-    mission = new Mission();
-    mission.setName("Test Mission Unit Mgmt");
-    mission.setStatus("PLANNED");
-    mission = missionService.createMission(mission);
+    mission =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Test Mission Unit Mgmt", null, null, "PLANNED", null, null, null, false, null));
 
     mission =
         missionService.addUnitToMission(

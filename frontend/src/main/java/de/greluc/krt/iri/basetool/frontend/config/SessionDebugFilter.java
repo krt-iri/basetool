@@ -22,7 +22,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Redis-backed Spring Session store, such as sessions not surviving frontend restarts, unexpected
  * session creation, or authentication loss after restart.
  *
- * <p>To enable in production, set the following in {@code application-prod.yml}:
+ * <p>The filter logs session ids and {@code Authentication#getName()} (the Keycloak username). Both
+ * are PII / secret material — audit finding M-15 restricts the filter to the {@code dev} and {@code
+ * test} Spring profiles so a misconfigured production log level cannot accidentally emit session
+ * ids to disk / log shipper. Enable in dev/test via:
  *
  * <pre>
  * logging:
@@ -31,6 +34,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * </pre>
  */
 @Component
+@org.springframework.context.annotation.Profile({"dev", "test"})
 @Slf4j
 public class SessionDebugFilter extends OncePerRequestFilter {
 

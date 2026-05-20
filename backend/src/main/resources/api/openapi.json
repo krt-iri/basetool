@@ -4547,7 +4547,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MissionDto"
+                "$ref" : "#/components/schemas/UpdateMissionRequest"
               }
             }
           },
@@ -12320,7 +12320,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MissionDto"
+                "$ref" : "#/components/schemas/CreateMissionRequest"
               }
             }
           },
@@ -12838,7 +12838,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MissionDto"
+                "$ref" : "#/components/schemas/CreateMissionRequest"
               }
             }
           },
@@ -22712,6 +22712,106 @@
         }
       }
     },
+    "/api/v1/operations/lookup" : {
+      "get" : {
+        "tags" : [ "Operations" ],
+        "summary" : "Lookup operations",
+        "description" : "Returns a slim id + name reference list of every operation in the caller's squadron scope, sorted by name. Designed for dropdowns and typeaheads where the full OperationDto payload is overkill.",
+        "operationId" : "lookupOperations",
+        "responses" : {
+          "200" : {
+            "description" : "Reference list returned.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OperationReferenceDto"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{missionId}/finance-entries" : {
       "get" : {
         "tags" : [ "mission-finance-entry-controller" ],
@@ -28236,14 +28336,17 @@
             "format" : "uuid"
           },
           "handle" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
           },
           "materials" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/CreateJobOrderMaterialDto"
             },
-            "minItems" : 1
+            "maxItems" : 50,
+            "minItems" : 0
           },
           "version" : {
             "type" : "integer",
@@ -28270,6 +28373,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
+            "maximum" : 100000,
             "minimum" : 0
           }
         },
@@ -28552,6 +28656,64 @@
             "type" : "string"
           }
         }
+      },
+      "UpdateMissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "description" : {
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
+          },
+          "calendarLink" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0,
+            "pattern" : "^(https://.*)?$"
+          },
+          "status" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "actualStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "actualEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "operationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "name", "version" ]
       },
       "FrequencyTypeDto" : {
         "type" : "object",
@@ -29026,10 +29188,14 @@
             "format" : "uuid"
           },
           "comment" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
           },
           "guestName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           },
           "startTime" : {
             "type" : "string",
@@ -29165,7 +29331,9 @@
         "type" : "object",
         "properties" : {
           "note" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
           },
           "type" : {
             "type" : "string",
@@ -29173,6 +29341,7 @@
           },
           "amount" : {
             "type" : "number",
+            "maximum" : 1.0E9,
             "minimum" : 0.0
           },
           "version" : {
@@ -29579,6 +29748,52 @@
         },
         "required" : [ "name", "status" ]
       },
+      "CreateMissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "description" : {
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
+          },
+          "calendarLink" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0,
+            "pattern" : "^(https://.*)?$"
+          },
+          "status" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "operationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "name" ]
+      },
       "AddCrewRequest" : {
         "type" : "object",
         "properties" : {
@@ -29615,14 +29830,18 @@
             "format" : "uuid"
           },
           "guestName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           },
           "desiredJobTypeId" : {
             "type" : "string",
             "format" : "uuid"
           },
           "comment" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
           },
           "squadronId" : {
             "type" : "string",
@@ -29771,7 +29990,9 @@
             "format" : "uuid"
           },
           "note" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
           },
           "type" : {
             "type" : "string",
@@ -29779,6 +30000,7 @@
           },
           "amount" : {
             "type" : "number",
+            "maximum" : 1.0E9,
             "minimum" : 0.0
           }
         },
@@ -29937,7 +30159,8 @@
           "calendarLink" : {
             "type" : "string",
             "maxLength" : 2048,
-            "minLength" : 0
+            "minLength" : 0,
+            "pattern" : "^(https://.*)?$"
           },
           "status" : {
             "type" : "string",
@@ -30866,6 +31089,18 @@
             "items" : {
               "$ref" : "#/components/schemas/MissionFinanceSummaryDto"
             }
+          }
+        }
+      },
+      "OperationReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
           }
         }
       },

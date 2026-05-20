@@ -19,7 +19,12 @@ class SecurityConfigTest {
     RequestLoggingFilter loggingFilter = mock(RequestLoggingFilter.class);
     BackendRoleSyncFilter roleSyncFilter = mock(BackendRoleSyncFilter.class);
     BotProtectionFilter botProtectionFilter = mock(BotProtectionFilter.class);
-    SessionDebugFilter sessionDebugFilter = mock(SessionDebugFilter.class);
+    // M-15: SessionDebugFilter is now wired via ObjectProvider so prod (where the bean does not
+    // exist) doesn't break. The userAuthoritiesMapper code path under test doesn't touch the
+    // filter, so an empty mock provider is sufficient.
+    @SuppressWarnings("unchecked")
+    org.springframework.beans.factory.ObjectProvider<SessionDebugFilter> sessionDebugFilter =
+        org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
     SsoReAuthenticationEntryPoint ssoEntryPoint = mock(SsoReAuthenticationEntryPoint.class);
     CspNonceFilter cspNonceFilter = mock(CspNonceFilter.class);
     SecurityConfig config =

@@ -92,7 +92,14 @@
         </root>
     </springProfile>
 
-    <logger name="de.greluc.krt.iri.basetool" level="TRACE" />
+    <!--
+        Audit finding H-11: the application package used to default to TRACE, which meant DEBUG /
+        TRACE calls in `config/` and `controller/` were written to disk in production. Several of
+        those call sites log OIDC attributes / principal names / session metadata. We default to
+        INFO and let an on-call engineer narrow to DEBUG/TRACE per sub-package via env override
+        (`logging.level.de.greluc.krt.iri.basetool.<pkg>=DEBUG`) when triaging a specific incident.
+    -->
+    <logger name="de.greluc.krt.iri.basetool" level="INFO" />
     <logger name="org.springframework.web" level="INFO" />
     <logger name="org.springframework.security" level="INFO" />
     <logger name="io.github.resilience4j" level="INFO" />

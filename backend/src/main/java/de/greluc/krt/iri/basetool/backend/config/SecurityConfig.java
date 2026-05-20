@@ -132,10 +132,23 @@ public class SecurityConfig {
           org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
               ::disable);
     } else {
+      // L-2: pin the CSRF cookie's Secure + SameSite attributes explicitly. Spring's default
+      // CookieCsrfTokenRepository does not set SameSite, leaving the browser to fall back to
+      // {@code Lax}; pinning {@code Strict} aligns the XSRF cookie with the session cookie
+      // (see frontend application*.yml `server.servlet.session.cookie.same-site: strict`).
+      CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+      csrfRepo.setCookieCustomizer(c -> c.sameSite("Strict").secure(true));
       http.csrf(
           csrf ->
-              csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+              csrf.csrfTokenRepository(csrfRepo)
                   .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                  // L-10: keep the ignore list co-located with one comment so a future
+                  // reviewer sees the contract. Every entry here MUST be JSON-only +
+                  // bearer-token-authenticated (no session cookie). Adding {@code
+                  // /api/v1/announcement} would technically be consistent because the
+                  // controller is also JSON+bearer — left out for now because no client
+                  // hits it from a session-cookie context, so the missing entry costs
+                  // nothing in practice.
                   .ignoringRequestMatchers(
                       "/api/v1/missions/**",
                       "/api/v1/operations/**",
@@ -147,18 +160,51 @@ public class SecurityConfig {
         .headers(
             headers -> {
               headers.contentSecurityPolicy(
+                  // Audit finding M-9: added {@code form-action 'self'} and {@code
+                  // upgrade-insecure-requests}. The backend serves Swagger UI in addition to the
+                  // JSON API, so form-action restricts where a (theoretical) injected form on the
+                  // Swagger HTML could POST, and upgrade-insecure-requests prevents the rare
+                  // mixed-content download link from falling back to HTTP.
                   csp ->
                       csp.policyDirectives(
                           "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors"
-                              + " 'none'; connect-src 'self'; img-src 'self' data:; font-src 'self'"
-                              + " data:; style-src 'self' 'unsafe-inline'; script-src 'self'"));
+                              + " 'none'; form-action 'self'; upgrade-insecure-requests;"
+                              + " connect-src 'self'; img-src 'self' data:; font-src 'self' data:;"
+                              + " style-src 'self' 'unsafe-inline'; script-src 'self'"));
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+              // M-12: Cross-Origin-Opener-Policy + Cross-Origin-Resource-Policy. COOP isolates
+              // the browsing-context group so a popup cannot reach back via {@code window.opener}
+              // (OAuth-redirect timing attacks etc.); CORP prevents cross-origin embedding via
+              // {@code <img src=…>} / {@code <script src=…>}.
+              headers.crossOriginOpenerPolicy(
+                  coop ->
+                      coop.policy(
+                          org.springframework.security.web.header.writers
+                              .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy
+                              .SAME_ORIGIN));
+              headers.crossOriginResourcePolicy(
+                  corp ->
+                      corp.policy(
+                          org.springframework.security.web.header.writers
+                              .CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy
+                              .SAME_ORIGIN));
+              // Audit finding H-9: explicit HSTS. Spring Security's default writer only emits the
+              // header when {@code request.isSecure()} is true; behind a reverse proxy without
+              // forward-headers configuration that check silently disables HSTS. Setting it here
+              // makes the policy explicit and independent of the request-scoped scheme detection.
+              headers.httpStrictTransportSecurity(
+                  hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
               headers.addHeaderWriter(
                   new org.springframework.security.web.header.writers.StaticHeadersWriter(
                       "Permissions-Policy",
-                      "geolocation=(), camera=(), microphone=(), fullscreen=()"));
+                      // L-3: explicit deny for every browser feature the app does not use, so
+                      // an injected iframe / shared context cannot opt-in.
+                      "geolocation=(), camera=(), microphone=(), fullscreen=(),"
+                          + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
+                          + " gyroscope=(), magnetometer=(), display-capture=(),"
+                          + " clipboard-read=(), clipboard-write=(), interest-cohort=()"));
               headers.contentTypeOptions(Customizer.withDefaults());
             })
         .authorizeHttpRequests(
@@ -288,8 +334,15 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(
-            oauth2 ->
-                oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+            oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+        // L-11: backend is a pure JWT-bearer resource server — no HTTP session needed for any
+        // endpoint. Pinning STATELESS makes the contract explicit: a future bug that introduces
+        // {@code @SessionAttributes} or {@code request.getSession(true)} on a permitAll POST is
+        // caught at startup rather than silently creating a session per anonymous caller.
+        .sessionManagement(
+            sm ->
+                sm.sessionCreationPolicy(
+                    org.springframework.security.config.http.SessionCreationPolicy.STATELESS));
 
     return http.build();
   }

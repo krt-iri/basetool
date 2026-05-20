@@ -2,6 +2,12 @@ server:
   tomcat:
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
+  # Audit finding H-8: behind nginx-proxy-manager the immediate peer for `request.getRemoteAddr()`
+  # is NPM's docker-internal IP — every client looks the same to the rate-limit filter and the
+  # global bucket collapses into a single org-wide budget. With `framework` strategy Spring
+  # consumes X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host, exposes the real client IP
+  # to downstream filters, and lets HSTS detect the proxy-terminated TLS scheme correctly.
+  forward-headers-strategy: framework
   max-http-request-header-size: 65536
   http2:
     enabled: true
@@ -25,6 +31,16 @@ server:
     mime-types: application/json,application/problem+json,text/html,text/plain,text/css,application/javascript,application/xml,image/svg+xml
 
 spring:
+  servlet:
+    multipart:
+      # Audit finding M-8: explicit multipart caps. Without these, Spring Boot's implicit
+      # defaults (1MB file / 10MB request) apply — restrictive enough today but fragile to a
+      # Spring Boot version bump that might change them. The only legitimate multipart-uploading
+      # endpoints in the backend are the hangar ship-list / fleetview imports
+      # (`HangarController.importShips` / `importFleetview`); real fleetview JSON tops out
+      # under ~500 KB for a 100-ship hangar, so 2 MB covers it by an order of magnitude.
+      max-file-size: 2MB
+      max-request-size: 2MB
   threads:
     virtual:
       enabled: true

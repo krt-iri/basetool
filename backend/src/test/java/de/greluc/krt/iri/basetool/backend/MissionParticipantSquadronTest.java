@@ -79,8 +79,13 @@ class MissionParticipantSquadronTest {
   }
 
   @Test
-  void addParticipant_Guest_WithSquadronId_ShouldAssignSquadron() {
-    // Act
+  void addParticipant_Guest_AnonymousCallerSquadronIdSilentlyCoerced() {
+    // Audit finding H-3: anonymous callers cannot claim affiliation with any squadron — the
+    // service silently coerces any caller-supplied `squadronId` to null before the lookup so the
+    // forged "guest of squadron X" entry never lands in the database. This @SpringBootTest runs
+    // without an authenticated SecurityContext, exercising exactly that path. Authenticated
+    // officers can still legitimately label a guest with their own squadron — verified at the
+    // service-test level via `canEditSquadron` rather than here.
     Mission updatedMission =
         missionService.addParticipant(
             mission.getId(), null, "Guest", null, "Comment", testSquadron.getId());
@@ -92,8 +97,9 @@ class MissionParticipantSquadronTest {
             .findFirst()
             .orElseThrow();
 
-    assertNotNull(participant.getSquadron());
-    assertEquals("TSQ", participant.getSquadron().getShorthand());
+    assertNull(
+        participant.getSquadron(),
+        "anonymous guest must not be able to claim affiliation with any squadron (H-3)");
   }
 
   @Test

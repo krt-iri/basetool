@@ -9,10 +9,13 @@
       MDC-enriched pattern.
       - %X{correlationId:-} renders the per-request correlation id set by CorrelationIdFilter.
       - %X{userId:-anonymous} renders the JWT `sub` of the authenticated user (or "anonymous").
-      These two fields are the single most important addition for production debugging / support.
+      - %X{squadronId:-} renders the active squadron context (audit finding L-5 / CLAUDE.md
+        MULTI_SQUADRON_PLAN section 7). Empty for anonymous callers and admins in "all squadrons"
+        mode; the bracket stays so the column position is stable for log parsing.
+      These three fields are the audit-trail backbone for multi-tenant incident triage.
     -->
-    <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
-    <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr([%X{squadronId:-}]){cyan} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] [%X{squadronId:-}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
@@ -82,6 +85,9 @@
             <encoder class="de.greluc.krt.iri.basetool.backend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
+                <!-- L-5: squadronId on the structured JSON appender too, so log shippers can
+                     index it as a first-class field for multi-tenant incident triage. -->
+                <includeMdcKeyName>squadronId</includeMdcKeyName>
                 <customFields>{"app":"basetool-backend"}</customFields>
             </encoder>
         </appender>

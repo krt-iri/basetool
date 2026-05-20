@@ -1,0 +1,151 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
+import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Pins the C-3 mass-assignment fix at the HTTP layer: write endpoints for missions accept the
+ * dedicated {@link CreateMissionRequest} record, so dangerous fields a client might smuggle into
+ * the JSON ({@code id}, {@code version}, {@code owningSquadron}, {@code parent}, {@code owner},
+ * {@code managers}, collections) are physically absent from the binding target and never reach the
+ * service. The tests use Jackson's default lenient behaviour (unknown JSON fields are silently
+ * dropped) and verify via {@link ArgumentCaptor} that the service was invoked with a request record
+ * carrying only the caller-supplied {@code name}/{@code description}/etc.
+ */
+@SpringBootTest
+class MissionControllerCreatePathTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private MissionService missionService;
+  @MockitoBean private MissionSecurityService missionSecurityService;
+  @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static SimpleGrantedAuthority member() {
+    return new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER");
+  }
+
+  @Test
+  void createMission_dangerousFieldsInJson_areSilentlyDroppedByDtoBinding() throws Exception {
+    when(missionService.createMission(any(CreateMissionRequest.class))).thenReturn(new Mission());
+
+    UUID attackerTargetId = UUID.randomUUID();
+    UUID attackerSquadronId = UUID.randomUUID();
+    // Craft a JSON payload that ATTEMPTS to mass-assign id / version / owningSquadron / parent /
+    // owner / managers. Jackson drops unknown fields silently (we want them dropped — strict mode
+    // would 400 valid frontend payloads that include the read-DTO fields).
+    String body =
+        "{"
+            + "\"id\":\""
+            + attackerTargetId
+            + "\","
+            + "\"version\":99,"
+            + "\"coreVersion\":99,"
+            + "\"scheduleVersion\":99,"
+            + "\"flagsVersion\":99,"
+            + "\"owningSquadron\":{\"id\":\""
+            + attackerSquadronId
+            + "\"},"
+            + "\"owner\":{\"id\":\""
+            + UUID.randomUUID()
+            + "\"},"
+            + "\"managers\":[],"
+            + "\"participants\":[],"
+            + "\"name\":\"Attacker Mission\","
+            + "\"description\":\"benign field\","
+            + "\"isInternal\":true"
+            + "}";
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(
+                    jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(member())))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<CreateMissionRequest> captor =
+        ArgumentCaptor.forClass(CreateMissionRequest.class);
+    Mockito.verify(missionService).createMission(captor.capture());
+    CreateMissionRequest forwarded = captor.getValue();
+
+    // Caller-supplied benign fields flow through ...
+    org.junit.jupiter.api.Assertions.assertEquals("Attacker Mission", forwarded.name());
+    org.junit.jupiter.api.Assertions.assertEquals("benign field", forwarded.description());
+    org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, forwarded.isInternal());
+
+    // ... but the CreateMissionRequest record has no slots for id/version/owningSquadron/etc., so
+    // the binding layer cannot smuggle them in. The service receives a record whose only
+    // information about the request is the safe subset. This is the structural fix for C-3.
+    // (No assertions on "absent" fields needed — they don't exist as accessors on the record.)
+  }
+
+  @Test
+  void createSubMission_dangerousFieldsInJson_areSilentlyDroppedByDtoBinding() throws Exception {
+    UUID parentId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(eq(parentId), any())).thenReturn(true);
+    when(missionService.addSubMission(eq(parentId), any(CreateMissionRequest.class)))
+        .thenReturn(new Mission());
+
+    String body =
+        "{"
+            + "\"id\":\""
+            + UUID.randomUUID()
+            + "\","
+            + "\"version\":42,"
+            + "\"owningSquadron\":{\"id\":\""
+            + UUID.randomUUID()
+            + "\"},"
+            + "\"parent\":{\"id\":\""
+            + UUID.randomUUID()
+            + "\"},"
+            + "\"name\":\"Sub\""
+            + "}";
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/sub-missions", parentId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(
+                    jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(member())))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<CreateMissionRequest> captor =
+        ArgumentCaptor.forClass(CreateMissionRequest.class);
+    Mockito.verify(missionService).addSubMission(eq(parentId), captor.capture());
+    org.junit.jupiter.api.Assertions.assertEquals("Sub", captor.getValue().name());
+  }
+}

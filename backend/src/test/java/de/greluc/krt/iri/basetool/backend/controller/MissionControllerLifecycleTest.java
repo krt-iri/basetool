@@ -17,6 +17,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
@@ -77,6 +78,7 @@ class MissionControllerLifecycleTest {
   @Mock private MissionMapper missionMapper;
   @Mock private UserMapper userMapper;
   @Mock private MissionSecurityService missionSecurityService;
+  @Mock private de.greluc.krt.iri.basetool.backend.service.AuthHelperService authHelperService;
 
   @InjectMocks private MissionController controller;
 
@@ -703,29 +705,27 @@ class MissionControllerLifecycleTest {
     verify(missionMapper).toDto(raw);
   }
 
-  // ── createSubMission delegates through the entity round-trip ─────────
+  // ── createSubMission forwards request → service → DTO ───────────────
 
   @Test
-  void createSubMission_roundTripsMissionDtoThroughMapperEntityServiceAndBack() {
+  void createSubMission_forwardsCreateRequestToServiceAndMapsResult() {
     UUID parentId = UUID.randomUUID();
-    MissionDto submissionDto = fullMissionDto(UUID.randomUUID());
-    Mission parsedEntity = new Mission();
+    CreateMissionRequest request =
+        new CreateMissionRequest("Sub", "desc", null, "PLANNED", null, null, null, false, null);
     Mission persistedParent = new Mission();
     MissionDto parentDto = fullMissionDto(parentId);
-    when(missionMapper.toEntity(submissionDto)).thenReturn(parsedEntity);
-    when(missionService.addSubMission(parentId, parsedEntity)).thenReturn(persistedParent);
+    when(missionService.addSubMission(parentId, request)).thenReturn(persistedParent);
     when(missionMapper.toDto(persistedParent)).thenReturn(parentDto);
 
-    MissionDto result = controller.createSubMission(parentId, submissionDto);
+    MissionDto result = controller.createSubMission(parentId, request);
 
-    // The DTO→entity→service→DTO round-trip is the canonical "no JPA entity at boundary"
-    // contract. Pinning the call sequence (toEntity → addSubMission → toDto) guarantees a
-    // future refactor that "optimises" the round-trip by passing the DTO straight through
-    // would break here — and that is exactly the regression the ArchUnit rule cannot catch
-    // statically.
+    // Audit finding C-3 migration: the controller no longer maps a full MissionDto into a fresh
+    // Mission entity (that path enabled the id/version/owningSquadron mass-assignment vector). It
+    // now forwards the dedicated CreateMissionRequest record straight to the service and only
+    // round-trips back through toDto on the response. The mapper.toEntity(MissionDto) overload was
+    // deleted; this test pins the new, narrower contract.
     assertThat(result).isSameAs(parentDto);
-    verify(missionMapper).toEntity(submissionDto);
-    verify(missionService).addSubMission(parentId, parsedEntity);
+    verify(missionService).addSubMission(parentId, request);
     verify(missionMapper).toDto(persistedParent);
   }
 

@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -166,6 +167,17 @@ public class SquadronScopeService {
    * internal missions only from the owning squadron and admins. Non-existent ids return {@code
    * false}.
    *
+   * <p>Audit hardenings on top of the cross-staffel rule:
+   *
+   * <ul>
+   *   <li><b>M-2</b>: anonymous callers do not see {@code COMPLETED} / {@code CANCELLED} missions
+   *       at all. The mission archive is restricted to authenticated members so a guest cannot
+   *       (re-)write the participant list / finance ledger of an already-archived mission.
+   *   <li><b>M-3</b>: walks the {@code parent} chain — a sub-mission with {@code isInternal=false}
+   *       below an {@code isInternal=true} parent does not leak the parent's existence to anonymous
+   *       callers. If ANY ancestor is internal-and-foreign, access is denied.
+   * </ul>
+   *
    * @param missionId mission to inspect; never {@code null}.
    */
   public boolean canSeeMission(@NotNull UUID missionId) {
@@ -173,15 +185,33 @@ public class SquadronScopeService {
         .findById(missionId)
         .map(
             m -> {
-              if (m.getOwningSquadron() == null) {
-                return true;
+              if (!authHelper.isAuthenticated()
+                  && ("COMPLETED".equals(m.getStatus()) || "CANCELLED".equals(m.getStatus()))) {
+                return false;
               }
-              if (canSeeSquadron(m.getOwningSquadron().getId())) {
-                return true;
+              for (Mission ancestor = m; ancestor != null; ancestor = ancestor.getParent()) {
+                if (!canSeeMissionRow(ancestor)) {
+                  return false;
+                }
               }
-              return !Boolean.TRUE.equals(m.getIsInternal());
+              return true;
             })
         .orElse(false);
+  }
+
+  /**
+   * Per-row visibility check shared by {@link #canSeeMission(UUID)} and its parent-chain walk: a
+   * mission is visible iff its owning squadron is null (unscoped, legacy rows), the caller may see
+   * that owning squadron, or the mission is explicitly non-internal.
+   */
+  private boolean canSeeMissionRow(Mission m) {
+    if (m.getOwningSquadron() == null) {
+      return true;
+    }
+    if (canSeeSquadron(m.getOwningSquadron().getId())) {
+      return true;
+    }
+    return !Boolean.TRUE.equals(m.getIsInternal());
   }
 
   /**

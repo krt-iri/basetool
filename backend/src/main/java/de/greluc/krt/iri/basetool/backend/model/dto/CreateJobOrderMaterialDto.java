@@ -16,4 +16,9 @@ public record CreateJobOrderMaterialDto(
             description = "Minimale Qualität, wird serverseitig fest auf 700 gesetzt",
             example = "700")
         Integer minQuality,
-    @NotNull @Min(0) Double amount) {}
+    // @Max caps the per-material amount at 100 000 units so an anonymous caller cannot push a
+    // 1e308 value through the public create-order endpoint (audit finding H-2: ledger pollution
+    // + downstream BigDecimal aggregation overflow). Tightening from "no upper bound" to
+    // 100 000 covers any realistic legitimate Star Citizen cargo manifest by an order of
+    // magnitude.
+    @NotNull @Min(0) @Max(100_000) Double amount) {}

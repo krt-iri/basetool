@@ -55,11 +55,13 @@ class MissionExpansionTest {
     ship.setOwner(savedUser);
     ship = shipRepository.save(ship);
 
-    // 3. Create Mission
-    Mission mission = new Mission();
-    mission.setName("Test Mission");
-    mission.setStatus("PLANNED");
-    mission = missionService.createMission(mission);
+    // 3. Create Mission — uses the new CreateMissionRequest record (audit finding C-3 migration:
+    // the legacy createMission(Mission) signature is gone, no caller can smuggle id/version/
+    // owningSquadron through the create path anymore).
+    Mission mission =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Test Mission", null, null, "PLANNED", null, null, null, false, null));
 
     // 4. Add Ship to Mission
     mission =

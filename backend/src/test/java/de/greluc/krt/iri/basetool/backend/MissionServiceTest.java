@@ -12,6 +12,8 @@ import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
@@ -44,6 +46,10 @@ class MissionServiceTest {
 
   @Mock
   private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService squadronScopeService;
+
+  @Mock private de.greluc.krt.iri.basetool.backend.service.UserService userService;
+
+  @Mock private de.greluc.krt.iri.basetool.backend.service.AuthHelperService authHelperService;
 
   @InjectMocks private MissionService missionService;
 
@@ -83,14 +89,18 @@ class MissionServiceTest {
     List<String> status =
         List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
 
+    // M-1: searchMissions now forces {@code isInternal=false} for anonymous callers. This
+    // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
+    // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
     Pageable pageable = PageRequest.of(0, 10);
-    when(missionRepository.searchMissions(query, start, end, status, null, null, null, pageable))
+    when(missionRepository.searchMissions(
+            query, start, end, status, Boolean.FALSE, null, null, pageable))
         .thenReturn(Page.empty());
 
-    Page<Mission> result =
-        missionService.searchMissions(query, start, end, null, null, null, pageable);
+    missionService.searchMissions(query, start, end, null, null, null, pageable);
 
-    verify(missionRepository).searchMissions(query, start, end, status, null, null, null, pageable);
+    verify(missionRepository)
+        .searchMissions(query, start, end, status, Boolean.FALSE, null, null, pageable);
   }
 
   @Test
@@ -100,9 +110,11 @@ class MissionServiceTest {
     existing.setId(id);
     existing.setStatus("PLANNED");
     existing.setActualStartTime(null);
+    existing.setVersion(0L);
 
-    Mission details = new Mission();
-    details.setStatus("ACTIVE");
+    UpdateMissionRequest details =
+        new UpdateMissionRequest(
+            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -118,11 +130,12 @@ class MissionServiceTest {
     Mission existing = new Mission();
     existing.setId(id);
     existing.setStatus("PLANNED");
+    existing.setVersion(0L);
 
-    Mission details = new Mission();
-    details.setStatus("ACTIVE");
     Instant manualStart = Instant.now().minus(1, ChronoUnit.HOURS);
-    details.setActualStartTime(manualStart);
+    UpdateMissionRequest details =
+        new UpdateMissionRequest(
+            "Test", null, null, "ACTIVE", null, null, null, manualStart, null, null, null, 0L);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -139,9 +152,11 @@ class MissionServiceTest {
     existing.setId(id);
     existing.setStatus("ACTIVE");
     existing.setActualStartTime(null);
+    existing.setVersion(0L);
 
-    Mission details = new Mission();
-    details.setStatus("ACTIVE");
+    UpdateMissionRequest details =
+        new UpdateMissionRequest(
+            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -157,10 +172,11 @@ class MissionServiceTest {
     Mission existing = new Mission();
     existing.setId(id);
     existing.setCalendarLink("old-link");
+    existing.setVersion(0L);
 
-    Mission details = new Mission();
-    details.setStatus("PLANNED");
-    details.setCalendarLink("new-link");
+    UpdateMissionRequest details =
+        new UpdateMissionRequest(
+            "Test", null, "new-link", "PLANNED", null, null, null, null, null, null, null, 0L);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -172,19 +188,106 @@ class MissionServiceTest {
 
   @Test
   void createMission_ShouldThrowException_WhenMeetingTimeAfterPlannedStart() {
-    Mission mission = new Mission();
-    mission.setPlannedStartTime(Instant.now());
-    mission.setMeetingTime(Instant.now().plus(1, ChronoUnit.HOURS));
+    Instant plannedStart = Instant.now();
+    CreateMissionRequest request =
+        new CreateMissionRequest(
+            "Test",
+            null,
+            null,
+            null,
+            plannedStart.plus(1, ChronoUnit.HOURS),
+            plannedStart,
+            null,
+            false,
+            null);
 
-    assertThrows(IllegalArgumentException.class, () -> missionService.createMission(mission));
+    assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
   }
 
   @Test
   void createMission_ShouldThrowException_WhenPlannedStartAfterPlannedEnd() {
-    Mission mission = new Mission();
-    mission.setPlannedStartTime(Instant.now().plus(2, ChronoUnit.HOURS));
-    mission.setPlannedEndTime(Instant.now().plus(1, ChronoUnit.HOURS));
+    Instant now = Instant.now();
+    CreateMissionRequest request =
+        new CreateMissionRequest(
+            "Test",
+            null,
+            null,
+            null,
+            null,
+            now.plus(2, ChronoUnit.HOURS),
+            now.plus(1, ChronoUnit.HOURS),
+            false,
+            null);
 
-    assertThrows(IllegalArgumentException.class, () -> missionService.createMission(mission));
+    assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
+  }
+
+  // ── Audit finding C-4: server-side stamping of owningSquadron ────────
+  // Pins the create-mission stamping pipeline so a future refactor that re-introduces a
+  // client-supplied owningSquadron path (e.g. by adding a `UUID owningSquadronId` field to
+  // CreateMissionRequest and threading it into MissionService) breaks here. The ArchUnit rule
+  // {@code missionWriteRequestDtosMustNotCarryServerManagedFields} blocks the DTO-shape side; the
+  // tests below pin the service-side stamping behaviour itself.
+
+  @Test
+  void createMission_stampsOwningSquadronFromOwnerSquadron() {
+    Squadron home = new Squadron();
+    home.setId(UUID.randomUUID());
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setSquadron(home);
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Mission saved =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Test", null, null, "PLANNED", null, null, null, false, null));
+
+    assertEquals(home, saved.getOwningSquadron());
+    assertEquals(caller, saved.getOwner());
+  }
+
+  @Test
+  void createMission_fallsBackToCurrentSquadronScopeWhenOwnerHasNoSquadron() {
+    User callerWithoutHome = new User();
+    callerWithoutHome.setId(UUID.randomUUID());
+    callerWithoutHome.setSquadron(null);
+    Squadron scopeSquadron = new Squadron();
+    scopeSquadron.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(callerWithoutHome));
+    when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Mission saved =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Test", null, null, "PLANNED", null, null, null, false, null));
+
+    assertEquals(scopeSquadron, saved.getOwningSquadron());
+  }
+
+  @Test
+  void addSubMission_inheritsOwningSquadronFromParent_ignoringScopeAndCaller() {
+    Squadron parentSquadron = new Squadron();
+    parentSquadron.setId(UUID.randomUUID());
+    UUID parentId = UUID.randomUUID();
+    Mission parent = new Mission();
+    parent.setId(parentId);
+    parent.setOwningSquadron(parentSquadron);
+
+    when(missionRepository.findById(parentId)).thenReturn(Optional.of(parent));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Mission saved =
+        missionService.addSubMission(
+            parentId,
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Sub", null, null, "PLANNED", null, null, null, false, null));
+
+    assertEquals(parentSquadron, saved.getOwningSquadron());
+    assertEquals(parent, saved.getParent());
   }
 }

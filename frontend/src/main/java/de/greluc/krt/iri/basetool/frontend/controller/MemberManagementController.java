@@ -60,23 +60,24 @@ public class MemberManagementController {
       @RequestParam(required = false) Integer size,
       Model model) {
     try {
-      String base =
+      // L-1: build the URI via UriComponentsBuilder so query-param encoding is correct and a
+      // crafted `search` cannot inject extra parameters (e.g. `foo&size=99999`).
+      org.springframework.web.util.UriComponentsBuilder uriBuilder =
           (search == null || search.isBlank())
-              ? "/api/v1/users"
-              : "/api/v1/users/search?query=" + search;
-      StringBuilder uri = new StringBuilder(base);
-      uri.append(base.contains("?") ? "&" : "?");
+              ? org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users")
+              : org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
+                  .queryParam("query", search);
       if (page != null) {
-        uri.append("page=").append(page).append("&");
+        uriBuilder.queryParam("page", page);
       }
       if (size != null) {
-        uri.append("size=").append(size).append("&");
+        uriBuilder.queryParam("size", size);
       }
-      uri.append("sort=username,asc");
+      uriBuilder.queryParam("sort", "username,asc");
 
       PageResponse<UserDto> pageResponse =
           backendApiClient.get(
-              uri.toString(), new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+              uriBuilder.toUriString(), new ParameterizedTypeReference<PageResponse<UserDto>>() {});
       List<UserDto> users = pageResponse == null ? null : pageResponse.content();
       model.addAttribute("users", users);
       model.addAttribute("usersPage", pageResponse);
@@ -98,10 +99,15 @@ public class MemberManagementController {
   @GetMapping("/api/search")
   @ResponseBody
   public List<UserDto> searchMembers(@RequestParam String query) {
+    // L-1: UriComponentsBuilder so the user-supplied query is properly query-param-encoded.
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
+            .queryParam("query", query)
+            .queryParam("size", 1000)
+            .queryParam("sort", "username,asc")
+            .toUriString();
     PageResponse<UserDto> page =
-        backendApiClient.get(
-            "/api/v1/users/search?query=" + query + "&size=1000&sort=username,asc",
-            new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+        backendApiClient.get(uri, new ParameterizedTypeReference<PageResponse<UserDto>>() {});
     return page == null ? null : page.content();
   }
 
