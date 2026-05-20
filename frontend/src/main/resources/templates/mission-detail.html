@@ -4,7 +4,7 @@
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
 <script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .form-group { margin-bottom: 1.5rem; }
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
         input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }

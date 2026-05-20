@@ -4,7 +4,7 @@
     <title th:text="#{promotion.admin.topics.title} + ' - ' + ${appTitle}">Themenbereiche verwalten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .admin-topic-card {
             background: var(--color-bg-dark-gray);
             border: 1px solid var(--color-gray-3);

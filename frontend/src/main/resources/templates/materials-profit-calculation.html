@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.profit_calculation} + ' - ' + ${appTitle}">Profitberechnung - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style>
+        <style th:attr="nonce=${cspNonce}">
             .filter-container {
                 display: flex;
                 flex-wrap: wrap;

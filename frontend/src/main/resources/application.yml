@@ -66,7 +66,13 @@ spring:
           keycloak:
             client-id: basetool-frontend
             client-authentication-method: none
-            scope: openid, profile, email, roles, offline_access
+            # Audit finding L-4 (2026-05-20): `offline_access` produces a long-lived refresh
+            # token. Refresh tokens are persisted in the Redis-backed Spring Session anyway, so
+            # the scope adds no functional capability — but its presence widens the blast radius
+            # of a Redis snapshot leak (the offline refresh token can outlive the Spring Session
+            # and re-establish access). The session-based flow handles refresh via the regular
+            # OAuth2 client-registration, no `offline_access` required.
+            scope: openid, profile, email, roles
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:

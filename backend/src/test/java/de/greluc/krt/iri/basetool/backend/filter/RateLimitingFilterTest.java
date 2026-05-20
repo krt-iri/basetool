@@ -392,6 +392,193 @@ class RateLimitingFilterTest {
   }
 
   // ---------------------------------------------------------------
+  // Endpoint-specific rules layered on top of the global default — audit finding L-5.
+  // The per-rule budgets are designed to trip before the loose global budget on the
+  // anonymous-spam POST endpoints (mission create, joborder create, finance-entry,
+  // participant CRUD); the tests below pin the layered semantics.
+  // ---------------------------------------------------------------
+
+  @Nested
+  class EndpointSpecificRuleTests {
+
+    @Test
+    void specificRule_runsOutFirst_andDoesNotDrainGlobalBucket() throws Exception {
+      // Global default leaves plenty of headroom (10/min), the rule is tight (2/min). After 2
+      // POSTs the per-rule bucket is empty -> 429, but the global bucket has only consumed 2 of
+      // 10 tokens, so a different endpoint covered only by the global default still goes through.
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 2);
+      properties.setRules(List.of(missionCreate));
+
+      // Drain the per-rule bucket with two POSTs to /api/v1/missions.
+      assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
+      // Third POST: rule depleted -> 429.
+      MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.50");
+      assertEquals(429, blocked.getStatus());
+      // Headers attribute the rejection to the per-rule limit (2), not the global (10).
+      assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
+
+      // Different endpoint, same IP -> global bucket still has tokens -> 200. Proves the per-rule
+      // failure short-circuited without draining the global bucket for unrelated paths.
+      assertEquals(200, get("/api/v1/orders", "192.0.2.50"));
+    }
+
+    @Test
+    void specificRule_consumed_alsoDebitsGlobalBucket() throws Exception {
+      // The global bucket DOES still tick on every request that matches a tight rule — that's the
+      // layered "defense-in-depth" semantics: an attacker who finds an unlimited rule can't use
+      // it to escape the global cap.
+      properties.setCapacity(3);
+      properties.setRefillTokens(3);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule(
+              "mission-create",
+              List.of("POST"),
+              List.of("/api/v1/missions"),
+              100); // huge per-rule budget
+      properties.setRules(List.of(missionCreate));
+
+      // Three POSTs drain the global bucket.
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
+      // Fourth POST: global bucket empty -> 429 with the GLOBAL capacity reflected in the header
+      // (the per-rule bucket is the loose one this time).
+      MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.60");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("3", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void specificRule_doesNotApply_whenMethodMismatches() throws Exception {
+      // The rule targets POST; a GET to the same path must NOT be limited by the rule. The global
+      // bucket (capacity 10) is the only check.
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
+      properties.setRules(List.of(missionCreate));
+
+      // Three GETs to /api/v1/missions are fine even though the per-rule capacity is 1.
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+      assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
+    }
+
+    @Test
+    void specificRule_emptyMethodsList_matchesAnyMethod() throws Exception {
+      // Empty methods list means "any HTTP method" — mirrors how Spring's @RequestMapping treats
+      // an empty methods array.
+      properties.setCapacity(10);
+      properties.setRefillTokens(10);
+
+      RateLimitProperties.Rule mutateParticipants =
+          newRule(
+              "participant-mutations", List.of(), List.of("/api/v1/missions/*/participants/**"), 1);
+      properties.setRules(List.of(mutateParticipants));
+
+      assertEquals(200, put("/api/v1/missions/abc/participants/xyz/slim", "192.0.2.71"));
+      // Second mutation of any kind on a participants sub-resource -> 429.
+      MockHttpServletResponse blocked =
+          postResponse("/api/v1/missions/abc/participants/xyz/check-in/slim", "192.0.2.71");
+      assertEquals(429, blocked.getStatus());
+    }
+
+    @Test
+    void twoRulesMatchSameRequest_tightestRunsOutFirst() throws Exception {
+      // Two overlapping rules: a wider participants umbrella (5/min) and a tighter check-in slot
+      // (2/min). The filter must trip the tightest first; the wider one only kicks in if the
+      // request streams keep hitting after the tight cap recovers.
+      properties.setCapacity(50);
+      properties.setRefillTokens(50);
+
+      RateLimitProperties.Rule wide =
+          newRule("participant-wide", List.of(), List.of("/api/v1/missions/*/participants/**"), 5);
+      RateLimitProperties.Rule tight =
+          newRule(
+              "participant-check-in",
+              List.of("POST"),
+              List.of("/api/v1/missions/*/participants/*/check-in/slim"),
+              2);
+      properties.setRules(List.of(wide, tight));
+
+      String path = "/api/v1/missions/m1/participants/p1/check-in/slim";
+      assertEquals(200, post(path, "192.0.2.80"));
+      assertEquals(200, post(path, "192.0.2.80"));
+      // Third hit: tight bucket exhausted; wide still has 3 tokens, global has 47.
+      MockHttpServletResponse blocked = postResponse(path, "192.0.2.80");
+      assertEquals(429, blocked.getStatus());
+      // The 429 must attribute the rejection to the tight rule (capacity 2).
+      assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void specificRule_buckets_perIp_independently() throws Exception {
+      // The per-rule bucket key includes the client IP, so a flooder on one IP cannot starve a
+      // legitimate user on another IP.
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule missionCreate =
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
+      properties.setRules(List.of(missionCreate));
+
+      // IP A drains its rule bucket.
+      assertEquals(200, post("/api/v1/missions", "203.0.113.1"));
+      assertEquals(429, postResponse("/api/v1/missions", "203.0.113.1").getStatus());
+      // IP B still has its own fresh bucket.
+      assertEquals(200, post("/api/v1/missions", "203.0.113.2"));
+    }
+
+    private RateLimitProperties.Rule newRule(
+        String name, List<String> methods, List<String> paths, int capacity) {
+      RateLimitProperties.Rule r = new RateLimitProperties.Rule();
+      r.setName(name);
+      r.setMethods(methods);
+      r.setPaths(paths);
+      r.setCapacity(capacity);
+      r.setRefillTokens(capacity);
+      r.setRefillPeriod(Duration.ofMinutes(1));
+      return r;
+    }
+
+    private int post(String path, String ip) throws ServletException, IOException {
+      return postResponse(path, ip).getStatus();
+    }
+
+    private MockHttpServletResponse postResponse(String path, String ip)
+        throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter.doFilter(req, resp, new MockFilterChain());
+      return resp;
+    }
+
+    private int get(String path, String ip) throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("GET", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter.doFilter(req, resp, new MockFilterChain());
+      return resp.getStatus();
+    }
+
+    private int put(String path, String ip) throws ServletException, IOException {
+      MockHttpServletRequest req = new MockHttpServletRequest("PUT", path);
+      req.setRemoteAddr(ip);
+      MockHttpServletResponse resp = new MockHttpServletResponse();
+      filter.doFilter(req, resp, new MockFilterChain());
+      return resp.getStatus();
+    }
+  }
+
+  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 

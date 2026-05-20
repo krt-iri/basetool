@@ -112,18 +112,41 @@ class JobOrderControllerTest {
   // ── POST /api/v1/orders (permitAll) ──────────────────────────────────
 
   @Test
-  void createJobOrder_permitAll_neverConsultsJwtOrRoleHelper() {
+  void createJobOrder_authenticatedCaller_passesThroughUnredacted() {
     CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
-    JobOrderDto result = controller.createJobOrder(request);
+    JobOrderDto result =
+        controller.createJobOrder(request, jwt("00000000-0000-0000-0000-000000000099"));
 
-    // The public form must be usable by an unauthenticated guest — the controller must NOT touch
-    // the JWT helper or the role helper for the creation path. Pinning this prevents a future
-    // refactor from sneaking in "let's just record the creator's id" and breaking the
-    // anonymous-request flow.
+    // Authenticated callers see the full DTO — the guest-redaction pass kicks in only when the
+    // JWT is null. Pinning this also confirms the controller does not touch the JWT helper / role
+    // helper on the create path — they remain unused for the authenticated branch as well, so a
+    // future refactor cannot sneak in "let's just record the creator's id" without breaking this
+    // test.
     assertThat(result).isSameAs(created);
+    verifyNoInteractions(userService, authHelperService);
+  }
+
+  @Test
+  void createJobOrder_anonymousCaller_redactsAssigneesHandoversAndVersion() {
+    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", List.of(), null);
+    JobOrderDto created = jobOrderDto(UUID.randomUUID());
+    when(jobOrderService.createJobOrder(request)).thenReturn(created);
+
+    JobOrderDto result = controller.createJobOrder(request, null);
+
+    // Audit finding C-1 family for JobOrder: an anonymous caller submitting the public request
+    // form must get a slim acknowledgement — assignees / handovers wiped (defence-in-depth: a
+    // freshly-created order has neither, but a future regression that pre-populates either would
+    // leak member PII), version stripped (anonymous cannot update so it has no purpose).
+    assertThat(result.id()).isEqualTo(created.id());
+    assertThat(result.displayId()).isEqualTo(created.displayId());
+    assertThat(result.handle()).isEqualTo(created.handle());
+    assertThat(result.assignees()).isEmpty();
+    assertThat(result.handovers()).isEmpty();
+    assertThat(result.version()).isNull();
     verifyNoInteractions(userService, authHelperService);
   }
 

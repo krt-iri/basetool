@@ -114,24 +114,64 @@ public class UserController {
   }
 
   /**
-   * Returns the user DTO.
+   * Returns the user DTO. Multi-tenancy: a non-admin caller asking for a user that belongs to a
+   * foreign squadron always gets the peer-redacted shape, even when the caller carries {@code
+   * ROLE_LOGISTICIAN} or {@code ROLE_OFFICER}. Without the squadron-scope gate an officer of
+   * squadron A could fetch the email / real name of any user in squadron B by guessing a UUID (the
+   * list endpoints are squadron-scoped via {@link
+   * de.greluc.krt.iri.basetool.backend.service.UserService#findAll}; this {@code byId} path was the
+   * only multi-tenancy hole left after the 2026-05-20 audit, finding H-3).
    *
    * @param id user id
-   * @return the user DTO
+   * @return the user DTO, peer-redacted for cross-squadron non-admin callers
    */
   @GetMapping("/{id}")
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
-    return redactForPeerIfNeeded(userMapper.toDto(userService.findById(id)));
+    de.greluc.krt.iri.basetool.backend.model.User user = userService.findById(id);
+    UserDto dto = userMapper.toDto(user);
+    if (isCrossSquadronNonAdmin(user)) {
+      return redactToPeerShape(dto);
+    }
+    return redactForPeerIfNeeded(dto);
   }
 
   /**
-   * Returns the calling user's own record (derived from the JWT subject).
+   * Returns {@code true} when the caller is a non-admin and the target user belongs to a foreign
+   * squadron (or to a squadron the caller cannot see via {@code SquadronScopeService}). Used to
+   * tighten {@link #getUserById} to "same squadron or admin" for full-PII access. Users without a
+   * squadron (admins, unassigned) are treated as cross-squadron for non-admin callers — full PII on
+   * an unassigned account remains admin-only.
    *
+   * @param user target user resolved by id; never {@code null}
+   * @return {@code true} if the caller is a non-admin and the user is not in the caller's squadron
+   *     scope
+   */
+  private boolean isCrossSquadronNonAdmin(
+      @NotNull de.greluc.krt.iri.basetool.backend.model.User user) {
+    if (authHelperService.isAdmin()) {
+      return false;
+    }
+    if (user.getSquadron() == null) {
+      return true;
+    }
+    return !authHelperService.canSeeSquadron(user.getSquadron().getId());
+  }
+
+  /**
+   * Returns the calling user's own record (derived from the JWT subject). The {@code @PreAuthorize}
+   * is redundant with the {@link de.greluc.krt.iri.basetool.backend.config.SecurityConfig} URL
+   * matcher that already gates {@code /api/v1/users/me} as {@code authenticated()}, but having it
+   * on the handler keeps the guarantee local to this method — if the URL pattern is ever
+   * refactored, the {@code @Jwt} binding here would NPE on anonymous instead of failing safely.
+   * Audit finding L-2 (2026-05-20).
+   *
+   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}
    * @return the user DTO
    */
   @GetMapping("/me")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
     return userMapper.toDto(userService.findById(userService.getUserIdFromJwt(jwt)));
@@ -295,6 +335,20 @@ public class UserController {
     if (dto == null || authHelperService.isLogisticianOrAbove()) {
       return dto;
     }
+    return redactToPeerShape(dto);
+  }
+
+  /**
+   * Returns the slim peer view of {@code dto} unconditionally — drops PII fields ({@code email},
+   * first/last name, description, roles, permissions, flags, joinDate, lastReadAnnouncementId) and
+   * keeps the public callsign tuple. Used by {@link #getUserById} for the cross-squadron non-admin
+   * path (audit finding H-3), where role-based escalation does NOT widen the view — an officer of
+   * squadron A must not see PII of squadron B's members.
+   *
+   * @param dto persisted user DTO; never {@code null}
+   * @return the slim peer-view DTO
+   */
+  private UserDto redactToPeerShape(@NotNull UserDto dto) {
     return new UserDto(
         dto.id(),
         dto.username(),

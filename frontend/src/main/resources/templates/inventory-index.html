@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Lagerverwaltung - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<style>
+<style th:attr="nonce=${cspNonce}">
         .actions-bar {
             display: flex;
             gap: 1rem;

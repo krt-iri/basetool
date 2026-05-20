@@ -92,25 +92,43 @@ public class MissionService {
   private final AuthHelperService authHelperService;
 
   /**
-   * Returns paged mission list.
+   * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
+   * references the method signature; every controller-facing list endpoint MUST go through {@link
+   * #searchMissions(String, Instant, Instant, List, Boolean, UUID, Pageable)} so the
+   * MULTI_SQUADRON_PLAN §1 visibility rule is applied. A direct {@code missionRepository.findAll}
+   * leaks every squadron's internal missions cross-tenant. Audit finding M-5 (2026-05-20): this
+   * method is unused on the controller path and is retained at {@code @Deprecated(forRemoval)} with
+   * a hard {@link UnsupportedOperationException} body so a future caller fails immediately instead
+   * of silently widening visibility.
    *
-   * @param pageable page request
-   * @return paged mission list
+   * @param pageable unused
+   * @return never; always throws
+   * @throws UnsupportedOperationException always — use {@link #searchMissions} instead.
+   * @deprecated use {@link #searchMissions} with appropriate filters.
    */
+  @Deprecated(forRemoval = true)
   public Page<Mission> getAllMissions(@NotNull Pageable pageable) {
-    return missionRepository.findAll(pageable);
+    throw new UnsupportedOperationException(
+        "getAllMissions bypasses the multi-squadron visibility filter and must not be used; "
+            + "call searchMissions with the appropriate isInternal / scopeSquadronId filters "
+            + "instead (MULTI_SQUADRON_PLAN.md §1, audit finding M-5).");
   }
 
   /**
-   * Returns lightweight reference projection of active missions (id + display name + status) used
-   * by typeaheads.
+   * Returns lightweight reference projection of active missions (id + display name + status +
+   * planned start) used by typeaheads. Squadron-scoped via {@link
+   * SquadronScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's
+   * missions PLUS any non-internal mission of any squadron, mirroring {@link
+   * #searchMissions(String, Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all
+   * squadrons" mode get the unfiltered cross-staffel list. Audit finding H-4: the previous
+   * implementation leaked the names of foreign squadrons' internal missions through this dropdown.
    *
-   * @return lightweight reference projection of active missions (id + display name + status) used
-   *     by typeaheads
+   * @return lightweight reference projection of active missions visible to the caller
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
-    return missionRepository.findAllActiveReference();
+    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return missionRepository.findAllActiveReference(scopeSquadronId);
   }
 
   /**
@@ -850,7 +868,12 @@ public class MissionService {
             .ifPresent(participant::setSquadron);
       }
     } else {
-      log.info("Updating guest participant: {} with name: {}", participant.getId(), guestName);
+      // Audit finding M-3 (2026-05-20): logging the raw {@code guestName} leaks PII —
+      // free-text names often contain real-life names of third parties that PiiMasker does not
+      // catch (regex covers emails / JWTs / token keywords only). Log just the participant id;
+      // the linked-vs-guest distinction is implicit because the linked-user branch above logged
+      // nothing either.
+      log.info("Updating guest participant: {}", participant.getId());
       if (guestName != null) {
         participant.setGuestName(guestName);
       }

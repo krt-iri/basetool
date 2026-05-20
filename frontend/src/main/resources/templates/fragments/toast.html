@@ -195,7 +195,7 @@
         };
     </script>
 
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         .krt-confirm-overlay {
             position: fixed;
             inset: 0;

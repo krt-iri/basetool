@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{promotion.manage.title} + ' - ' + ${appTitle}">Bewertungsverwaltung - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-    <style>
+    <style th:attr="nonce=${cspNonce}">
         /* ================================================================
            TOOLBAR (search, filters, bulk, expand/collapse, CSV, queue)
            ================================================================ */
