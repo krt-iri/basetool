@@ -506,10 +506,10 @@
                                               th:text="${#numbers.formatInteger(payout.payoutAmount, 3, 'POINT')} + ' aUEC'">0 aUEC</span>
                                         <span class="payout-amount-reimbursement"
                                               th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatDecimal(payout.personalExpenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(davon 0,00 aUEC Auslagen)</span>
+                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC)'">(davon 0 aUEC Auslagen)</span>
                                         <span class="payout-amount-transferfee"
                                               th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatDecimal(payout.transferFee, 1, 'POINT', 2, 'COMMA')} + ' aUEC)'">(bereits abgezogene Überweisungsgebühr: 0,00 aUEC)</span>
+                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC)'">(bereits abgezogene Überweisungsgebühr: 0 aUEC)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
@@ -550,7 +550,7 @@
                     <div style="margin-bottom: 1.5rem; text-align: center;">
                         <h3 style="margin: 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-primary);">
                             <span th:text="#{operation.finances.total}">Gesamtergebnis</span>:
-                            <span th:text="${operationFinance != null ? #numbers.formatDecimal(operationFinance.totalSum, 1, 'POINT', 2, 'COMMA') : '0,00'} + ' aUEC'">0,00 aUEC</span>
+                            <span th:text="${operationFinance != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'} + ' aUEC'">0 aUEC</span>
                         </h3>
                     </div>
 
@@ -562,7 +562,7 @@
                                  data-trigger="operation-toggle-mission-finances">
                                 <strong style="color: var(--color-primary);" th:text="${msnFin.missionName}">Mission Name</strong>
                                 <span>
-                                    <span th:text="${#numbers.formatDecimal(msnFin.totalSum, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">0,00 aUEC</span>
+                                    <span th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                                     <span class="toggle-icon-msn">&#9660;</span>
                                 </span>
                             </div>
@@ -585,8 +585,8 @@
                                                 </td>
                                                 <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
                                                 <td th:text="${entry.note}">Notiz</td>
-                                                <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'"
-                                                    th:class="${entry.type.name() == 'INCOME'} ? 'text-success' : 'text-danger'">0,00 aUEC</td>
+                                                <td th:text="${#numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'"
+                                                    th:class="${entry.type.name() == 'INCOME'} ? 'text-success' : 'text-danger'">0 aUEC</td>
                                             </tr>
                                             <tr th:each="order : ${msnFin.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
                                                 <td>
@@ -594,7 +594,7 @@
                                                 </td>
                                                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                                 <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color:var(--color-primary);text-decoration:none;">Raffinerieauftrag</a></td>
-                                                <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC'" class="text-danger">0,00 aUEC</td>
+                                                <td th:text="${#numbers.formatInteger(@moneyFormat.round(order.expenses), 1, 'POINT')} + ' aUEC'" class="text-danger">0 aUEC</td>
                                             </tr>
                                         </tbody>
                                     </table>
