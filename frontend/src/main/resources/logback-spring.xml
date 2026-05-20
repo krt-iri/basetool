@@ -58,6 +58,27 @@
         </encoder>
     </appender>
 
+    <!--
+      Async wrappers for the disk-backed appenders. The request thread now hands the formatted
+      event to a bounded queue instead of blocking on file I/O / PII-masking layout work; a single
+      dedicated worker drains the queue. discardingThreshold=0 means no event is ever dropped from
+      the queue (audit-trail integrity over throughput) — the queue is sized generously so this
+      only matters under extreme sustained load, at which point the calling thread backpressures
+      rather than losing audit data. CONSOLE stays synchronous on purpose: stdout is cheap and we
+      want the last lines before a JVM crash to flush deterministically.
+    -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>128</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="ERROR_FILE" />
+    </appender>
+
     <!-- Structured JSON appender for the `prod` profile, consumable by ELK/Loki/CloudWatch. -->
     <springProfile name="prod">
         <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -74,21 +95,27 @@
                 <customFields>{"app":"basetool-frontend"}</customFields>
             </encoder>
         </appender>
+
+        <appender name="ASYNC_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>512</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <appender-ref ref="JSON_FILE" />
+        </appender>
     </springProfile>
 
     <springProfile name="prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
-            <appender-ref ref="JSON_FILE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
+            <appender-ref ref="ASYNC_JSON_FILE" />
         </root>
     </springProfile>
     <springProfile name="!prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
         </root>
     </springProfile>
 

@@ -67,6 +67,27 @@
     </appender>
 
     <!--
+      Async wrappers for the disk-backed appenders. The request thread now hands the formatted
+      event to a bounded queue instead of blocking on file I/O / PII-masking layout work; a single
+      dedicated worker drains the queue. discardingThreshold=0 means no event is ever dropped from
+      the queue (audit-trail integrity over throughput) — the queue is sized generously so this
+      only matters under extreme sustained load, at which point the calling thread backpressures
+      rather than losing audit data. CONSOLE stays synchronous on purpose: stdout is cheap and we
+      want the last lines before a JVM crash to flush deterministically.
+    -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>128</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="ERROR_FILE" />
+    </appender>
+
+    <!--
       Optional structured JSON appender, enabled for the `prod` Spring profile via
       <springProfile>. LogstashEncoder preserves all MDC entries (correlationId, userId) as
       first-class JSON fields so ELK/Loki/CloudWatch can index them natively. The feature flag
@@ -91,25 +112,40 @@
                 <customFields>{"app":"basetool-backend"}</customFields>
             </encoder>
         </appender>
+
+        <appender name="ASYNC_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>512</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <appender-ref ref="JSON_FILE" />
+        </appender>
     </springProfile>
 
     <springProfile name="prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
-            <appender-ref ref="JSON_FILE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
+            <appender-ref ref="ASYNC_JSON_FILE" />
         </root>
     </springProfile>
     <springProfile name="!prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
-            <appender-ref ref="FILE" />
-            <appender-ref ref="ERROR_FILE" />
+            <appender-ref ref="ASYNC_FILE" />
+            <appender-ref ref="ASYNC_ERROR_FILE" />
         </root>
     </springProfile>
 
-    <logger name="de.greluc.krt.iri.basetool" level="TRACE" />
+    <!--
+      Default application log level. TRACE in prod (the previous value) wrote DEBUG/TRACE calls
+      from controller/, service/, config/ and security/ on every request — several of those call
+      sites log JWT attributes / squadron context / principal names, which made prod log volume
+      explode and dominated request latency through the synchronous appender chain. The frontend
+      module's logback-spring.xml was already corrected to INFO (audit finding H-11); this brings
+      the backend in line. Engineers can narrow to DEBUG/TRACE per sub-package via env override
+      (`logging.level.de.greluc.krt.iri.basetool.<pkg>=DEBUG`) when triaging a specific incident.
+    -->
+    <logger name="de.greluc.krt.iri.basetool" level="INFO" />
     <logger name="org.springframework.web" level="INFO" />
     <logger name="org.springframework.security" level="INFO" />
 
