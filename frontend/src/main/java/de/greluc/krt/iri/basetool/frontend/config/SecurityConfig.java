@@ -74,12 +74,26 @@ public class SecurityConfig {
   //     POST any visible field — including the CSRF token — to a third-party origin) and {@code
   //     upgrade-insecure-requests} (auto-rewrites HTTP subresources to HTTPS so a mixed-content
   //     bug never falls back to plain HTTP).
+  // Audit finding L-3 (2026-05-20): {@code style-src} no longer carries {@code 'unsafe-inline'}.
+  // Every {@code <style>} block in the templates ({@code grep} verified: 38 blocks across the
+  // page set) was patched to {@code <style th:attr="nonce=${cspNonce}">}, so {@code <style>}
+  // elements now load only with the per-request nonce — an injected {@code <style>} tag from a
+  // stored-XSS vector cannot be evaluated by the browser anymore. The {@code style=""}
+  // attributes on individual elements (859 across the templates) are a separate CSP3 directive
+  // and stay allowed via the explicit {@code style-src-attr 'unsafe-inline'} fallback: rewriting
+  // them out is a much larger refactor (many are dynamically computed via {@code th:style} —
+  // progress bars, color swatches, conditional visibility) and they cannot run JavaScript, so
+  // the residual attack surface is restricted to visual / CSS-injection harm. The directive is
+  // pinned explicitly so a future tightening can move from {@code 'unsafe-inline'} to a
+  // {@code 'unsafe-hashes' 'sha256-…'} allow-list incrementally without touching {@code
+  // style-src}.
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
           + "form-action 'self'; upgrade-insecure-requests; "
           + "img-src 'self' data:; font-src 'self' data:; "
-          + "style-src 'self' 'unsafe-inline'; "
-          + "script-src 'nonce-%s' 'strict-dynamic'";
+          + "style-src 'self' 'nonce-%1$s'; "
+          + "style-src-attr 'unsafe-inline'; "
+          + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
   private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
     return (request, response) -> {

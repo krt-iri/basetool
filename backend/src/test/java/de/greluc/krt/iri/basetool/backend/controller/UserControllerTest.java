@@ -57,6 +57,13 @@ class UserControllerTest {
     // Default the gate to {@code true} (officer view) here so those tests keep asserting the
     // delegation invariants; the dedicated H-4 tests override the stub with {@code false}.
     org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    // Audit finding H-3 (2026-05-20): {@link UserController#getUserById} additionally checks the
+    // squadron-scope of the target user — a non-admin caller asking for a foreign-squadron user
+    // (or a squadron-less account: admins, guests) is always given the peer-redacted shape, even
+    // when their role would otherwise unlock full PII. Default {@code isAdmin} to {@code true}
+    // for the delegation tests so they keep asserting the "controller hands the DTO through
+    // as-is" invariant; the H-3 cross-squadron tests below flip it to {@code false}.
+    org.mockito.Mockito.lenient().when(authHelperService.isAdmin()).thenReturn(true);
   }
 
   // ── GET / (list) ────────────────────────────────────────────────────────
@@ -172,6 +179,80 @@ class UserControllerTest {
     assertNull(redacted.email());
     assertNull(redacted.firstName());
     assertNull(redacted.lastName());
+  }
+
+  // ── Audit finding H-3 (2026-05-20): cross-squadron isolation on getUserById ────────────
+
+  @Test
+  void getUserById_officerFromForeignSquadron_redactsPii() {
+    // Officer of squadron A asking for a user that lives in squadron B. Without H-3 the
+    // role-based gate {@code isLogisticianOrAbove()} would unlock full PII; with H-3 the
+    // squadron-scope check overrides that for non-admin callers.
+    when(authHelperService.isAdmin()).thenReturn(false);
+    UUID userId = UUID.randomUUID();
+    UUID foreignSquadronId = UUID.randomUUID();
+    when(authHelperService.canSeeSquadron(foreignSquadronId)).thenReturn(false);
+
+    User entity = new User();
+    de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    squadron.setId(foreignSquadronId);
+    entity.setSquadron(squadron);
+    UserDto fullDto = fullPiiUserDto(userId);
+    when(userService.findById(userId)).thenReturn(entity);
+    when(userMapper.toDto(entity)).thenReturn(fullDto);
+
+    UserDto result = controller.getUserById(userId);
+
+    // Slim peer view: callsign + displayName remain, PII fields are wiped — same shape as the
+    // existing peer-redaction path.
+    assertEquals("bob.callsign", result.username());
+    assertNull(result.email(), "cross-squadron non-admin must not see email");
+    assertNull(result.firstName(), "cross-squadron non-admin must not see first name");
+    assertNull(result.lastName(), "cross-squadron non-admin must not see last name");
+    assertNull(result.joinDate(), "cross-squadron non-admin must not see joinDate");
+  }
+
+  @Test
+  void getUserById_unassignedUser_redactsPiiForNonAdmin() {
+    // Squadron-less users (admins, freshly-imported guests) are always treated as
+    // cross-squadron for non-admin callers — full PII on those rows stays admin-only.
+    when(authHelperService.isAdmin()).thenReturn(false);
+    UUID userId = UUID.randomUUID();
+    User entity = new User();
+    entity.setSquadron(null);
+    UserDto fullDto = fullPiiUserDto(userId);
+    when(userService.findById(userId)).thenReturn(entity);
+    when(userMapper.toDto(entity)).thenReturn(fullDto);
+
+    UserDto result = controller.getUserById(userId);
+
+    assertNull(result.email());
+    assertNull(result.firstName());
+    assertNull(result.lastName());
+  }
+
+  @Test
+  void getUserById_sameSquadronOfficer_keepsPii() {
+    // Officer of squadron A asking for a user in squadron A: H-3 must NOT block — they need the
+    // PII for moderation / payouts inside their own squadron.
+    when(authHelperService.isAdmin()).thenReturn(false);
+    UUID userId = UUID.randomUUID();
+    UUID sharedSquadronId = UUID.randomUUID();
+    when(authHelperService.canSeeSquadron(sharedSquadronId)).thenReturn(true);
+
+    User entity = new User();
+    de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    squadron.setId(sharedSquadronId);
+    entity.setSquadron(squadron);
+    UserDto fullDto = fullPiiUserDto(userId);
+    when(userService.findById(userId)).thenReturn(entity);
+    when(userMapper.toDto(entity)).thenReturn(fullDto);
+
+    UserDto result = controller.getUserById(userId);
+
+    assertSame(fullDto, result, "same-squadron officer must see the original DTO unredacted");
   }
 
   private static UserDto fullPiiUserDto(UUID id) {

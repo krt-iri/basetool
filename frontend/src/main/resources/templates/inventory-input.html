@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{inventory.input.title} + ' - IRIDIUM Basetool'">Lagereintrag einbuchen - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<style>
+<style th:attr="nonce=${cspNonce}">
         .form-container {
             max-width: 600px;
         }

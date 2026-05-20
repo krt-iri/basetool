@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Thin REST proxy that forwards material-related read requests from the browser to the backend.
@@ -52,6 +53,13 @@ public class MaterialProxyController {
    * repeated {@code starSystemNames} query parameter (Spring's default list-binding form). The
    * star-system filter is optional — omitting it returns the calculation across all systems.
    *
+   * <p>Audit finding M-2 (2026-05-20): the URL is built via {@link UriComponentsBuilder} so each
+   * query value gets URL-encoded. The previous string-concat path let a star-system name containing
+   * {@code &} or {@code =} inject additional query parameters into the backend call (e.g. {@code
+   * ?starSystemNames=foo&shipId=…}) — harmless on this specific endpoint (read-only, authenticated,
+   * typed {@code shipId}) but a tempting pattern to copy into a riskier proxy. Mirrors the encoding
+   * {@code UserProxyController#searchUsers} already does.
+   *
    * @param shipId chosen ship's id (defines capacity)
    * @param starSystemNames optional list of star-system names to constrain the source terminals
    * @return list of profit-calculation rows, never {@code null}
@@ -61,17 +69,17 @@ public class MaterialProxyController {
   public List<Map<String, Object>> getProfitCalculation(
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
 
-    StringBuilder url =
-        new StringBuilder("/api/v1/materials/profit-calculation?shipId=").append(shipId);
+    UriComponentsBuilder builder =
+        UriComponentsBuilder.fromPath("/api/v1/materials/profit-calculation")
+            .queryParam("shipId", shipId);
     if (starSystemNames != null && !starSystemNames.isEmpty()) {
-      for (String system : starSystemNames) {
-        url.append("&starSystemNames=").append(system);
-      }
+      builder.queryParam("starSystemNames", starSystemNames.toArray());
     }
 
     List<Map<String, Object>> response =
         backendApiClient.get(
-            url.toString(), new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            builder.build().toUriString(),
+            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
     return response != null ? response : List.of();
   }
 }

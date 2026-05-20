@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style>
+        <style th:attr="nonce=${cspNonce}">
             html, body { overflow-x: hidden; }
             /* Constrain long descriptions so the row never forces horizontal page scroll. */
             .operations-table {

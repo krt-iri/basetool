@@ -687,10 +687,14 @@ public class JobOrderService {
    *   <li>Explicit {@code creatingSquadronIdOverride} from the create DTO — only honored when the
    *       caller is an admin (admin override path).
    *   <li>Caller's active squadron context ({@link SquadronScopeService#currentSquadron()}).
+   *   <li>Anonymous caller without context — falls back to the canonical IRIDIUM squadron so the
+   *       public job-order request form (CLAUDE.md: anonymous job-order creation is intended)
+   *       always resolves to a known audit-trail owner. Verified by {@code
+   *       JobOrderServiceCreateAnonymousTest}.
    *   <li>Admin in "all squadrons" mode without override → {@link BadRequestException} (400). The
    *       Plan is explicit on this: a focused stamp is required so the column is populated
-   *       correctly for the V86 NOT NULL tightening; silently falling back to IRIDIUM would mask a
-   *       real misconfiguration.
+   *       correctly for the V86 NOT NULL tightening, and an admin with no selection has more than
+   *       one valid choice that the system cannot guess.
    * </ol>
    *
    * @param creatingSquadronIdOverride optional explicit value from the create DTO; rejected for
@@ -720,8 +724,22 @@ public class JobOrderService {
     if (active.isPresent()) {
       return active.orElseThrow();
     }
-    // No active context AND no explicit override. Plan-compliant 400: admin in all-squadrons
-    // mode must pick a creator explicitly so the audit trail stays meaningful.
+    // Anonymous caller (public request form). The SecurityConfig permits POST /api/v1/orders
+    // for unauthenticated callers because the squadron uses the form for external sympathisers /
+    // visitors who want to request a job. Stamp the canonical IRIDIUM squadron so the row has a
+    // valid owner for the V86 NOT NULL constraint.
+    if (!authHelperService.isAuthenticated()) {
+      return squadronRepository
+          .findById(Squadron.IRIDIUM_ID)
+          .orElseThrow(
+              () ->
+                  new BadRequestException(
+                      "IRIDIUM squadron seed row is missing; cannot resolve creating squadron for"
+                          + " anonymous job-order creation."));
+    }
+    // Authenticated caller without a resolvable squadron context — only happens for an admin in
+    // "all squadrons" mode. Plan-compliant 400: a focused stamp is required so the audit trail
+    // stays meaningful.
     throw new BadRequestException(
         "No active squadron context — admins in 'all squadrons' mode must supply"
             + " creatingSquadronId explicitly when creating a job order.");

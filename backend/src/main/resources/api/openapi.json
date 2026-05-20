@@ -22825,11 +22825,30 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "pageable",
+          "name" : "page",
           "in" : "query",
-          "required" : true,
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "createdAt,desc"
           }
         } ],
         "responses" : {
@@ -31182,27 +31201,6 @@
           "totalPages" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "sort" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        }
-      },
-      "Pageable" : {
-        "type" : "object",
-        "properties" : {
-          "page" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
           },
           "sort" : {
             "type" : "array",

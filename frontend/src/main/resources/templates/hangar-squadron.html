@@ -31,7 +31,7 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
-        <style>
+        <style th:attr="nonce=${cspNonce}">
             .details-row {
                 display: none;
             }

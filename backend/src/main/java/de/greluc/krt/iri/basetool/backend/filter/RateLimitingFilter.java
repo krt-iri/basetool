@@ -14,6 +14,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,11 +28,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Per-IP token-bucket rate limiter implemented with Bucket4j buckets in a Caffeine cache.
  *
  * <p>Active only on URI patterns listed in {@code app.rate-limit.paths} and disabled wholesale via
- * {@code app.rate-limit.enabled=false}. Buckets are keyed by {@code clientIp + "|" + pattern} so
- * each user-pattern combination gets its own token budget — a flood on {@code /api/v1/login} does
- * not consume the budget for {@code /api/v1/missions}. The Caffeine cache expires entries after one
- * hour of inactivity (1h hibernate-window keeps abusive clients limited across short pauses) and is
- * capped at 100 000 entries to bound memory under a Slowloris-style attack.
+ * {@code app.rate-limit.enabled=false}. Buckets are keyed by {@code clientIp + "|" + slot} where
+ * {@code slot} is either {@code "path:<pattern>"} for the global default or {@code "rule:<name>"}
+ * for an endpoint-specific rule (audit finding L-5, 2026-05-20). The Caffeine cache expires entries
+ * after one hour of inactivity (1h hibernate-window keeps abusive clients limited across short
+ * pauses) and is capped at 100 000 entries to bound memory under a Slowloris-style attack.
+ *
+ * <p>When both the global default and one or more endpoint-specific rules match, the filter
+ * iterates them tightest-first and aborts on the first depleted bucket — so spam against the
+ * anonymous-reachable POST endpoints (mission create, joborder create, finance-entry create,
+ * participant CRUD) trips its per-endpoint budget before the loose global budget is touched. The
+ * {@code X-Rate-Limit-Limit} / {@code X-Rate-Limit-Remaining} response headers reflect the tightest
+ * matching budget on the happy path.
  *
  * <p>{@code X-Forwarded-For} is only honored when the immediate peer is listed in {@code
  * app.rate-limit.trusted-proxies}; blanket trust (the literal {@code "*"}) is explicitly rejected
@@ -54,7 +63,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * idle-expiry, 100 000 entries max). Both properties classes carry the validated
    * {@code @ConfigurationProperties} values pulled from {@code application.yml}.
    *
-   * @param properties bucket capacity/refill configuration plus path patterns and trusted proxies
+   * @param properties bucket capacity/refill configuration plus path patterns, endpoint-specific
+   *     rules and trusted proxies
    * @param problemProperties RFC&nbsp;7807 problem-type base URI used in the 429 response body
    */
   public RateLimitingFilter(
@@ -92,32 +102,113 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
 
     String clientIp = resolveClientIp(request);
-    String pattern = firstMatchingPattern(request.getRequestURI(), properties.getPaths());
-    String key = clientIp + "|" + (pattern != null ? pattern : "");
-    Bucket bucket =
-        bucketCache.get(
-            key,
-            k ->
-                createNewBucket(
-                    properties.getCapacity(),
-                    properties.getRefillTokens(),
-                    properties.getRefillPeriod()));
-
-    ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-    if (probe.isConsumed()) {
-      response.setHeader("X-Rate-Limit-Limit", String.valueOf(properties.getCapacity()));
-      response.setHeader("X-Rate-Limit-Remaining", String.valueOf(probe.getRemainingTokens()));
+    List<BucketSlot> slots = resolveSlots(request);
+    if (slots.isEmpty()) {
+      // The umbrella {@code paths} match was confirmed by {@link #shouldNotFilter}; if no slots
+      // survive the rule walk that means none of the configured limits apply to this request
+      // (e.g. a future config that lists rules but no global path-pattern). Pass through.
       filterChain.doFilter(request, response);
-    } else {
-      long nanosToWait = probe.getNanosToWaitForRefill();
-      long secondsToWait = (long) Math.ceil(nanosToWait / 1_000_000_000.0);
-      log.warn(
-          "Rate limit exceeded: ip={}, path={}, retryAfterSeconds={}",
-          clientIp,
-          request.getRequestURI(),
-          secondsToWait);
-      writeTooManyRequests(response, request, secondsToWait);
+      return;
     }
+
+    // Tightest first: a spam attack on an anonymous endpoint trips the per-endpoint budget before
+    // the loose global budget is debited. Tie-break on slot key so the iteration order is
+    // deterministic when two rules share a capacity — important for the 429-header attribution.
+    slots.sort(Comparator.comparingInt(BucketSlot::capacity).thenComparing(BucketSlot::key));
+
+    int tightestLimit = Integer.MAX_VALUE;
+    long tightestRemaining = Long.MAX_VALUE;
+    for (BucketSlot slot : slots) {
+      Bucket bucket = bucketCache.get(clientIp + "|" + slot.key(), k -> createNewBucket(slot));
+      ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+      if (!probe.isConsumed()) {
+        long nanosToWait = probe.getNanosToWaitForRefill();
+        long secondsToWait = (long) Math.ceil(nanosToWait / 1_000_000_000.0);
+        log.warn(
+            "Rate limit exceeded: ip={}, slot={}, path={}, retryAfterSeconds={}",
+            clientIp,
+            slot.key(),
+            request.getRequestURI(),
+            secondsToWait);
+        writeTooManyRequests(response, request, slot.capacity(), secondsToWait);
+        return;
+      }
+      if (slot.capacity() < tightestLimit) {
+        tightestLimit = slot.capacity();
+        tightestRemaining = probe.getRemainingTokens();
+      }
+    }
+
+    response.setHeader("X-Rate-Limit-Limit", String.valueOf(tightestLimit));
+    response.setHeader("X-Rate-Limit-Remaining", String.valueOf(tightestRemaining));
+    filterChain.doFilter(request, response);
+  }
+
+  /**
+   * Builds the list of bucket slots that apply to the current request — the global default (when
+   * the path matches {@link RateLimitProperties#getPaths()}) plus every endpoint-specific rule that
+   * matches both the request URI AND the HTTP method. Order is irrelevant here; the caller sorts
+   * tightest-first before consumption.
+   */
+  private List<BucketSlot> resolveSlots(HttpServletRequest request) {
+    String path = request.getRequestURI();
+    String method = request.getMethod();
+    List<BucketSlot> slots = new ArrayList<>();
+
+    String globalPattern = firstMatchingPattern(path, properties.getPaths());
+    if (globalPattern != null) {
+      slots.add(
+          new BucketSlot(
+              "path:" + globalPattern,
+              properties.getCapacity(),
+              properties.getRefillTokens(),
+              properties.getRefillPeriod()));
+    }
+
+    List<RateLimitProperties.Rule> rules = properties.getRules();
+    if (rules != null) {
+      for (RateLimitProperties.Rule rule : rules) {
+        if (matchesMethod(rule.getMethods(), method) && matchesAnyPath(rule.getPaths(), path)) {
+          slots.add(
+              new BucketSlot(
+                  "rule:" + rule.getName(),
+                  rule.getCapacity(),
+                  rule.getRefillTokens(),
+                  rule.getRefillPeriod()));
+        }
+      }
+    }
+
+    return slots;
+  }
+
+  /**
+   * {@code true} when the rule's HTTP-method allowlist is empty (any method allowed) or contains
+   * the request's method (case-insensitive). Mirrors how Spring's {@code @RequestMapping(method =
+   * …)} treats an empty array.
+   */
+  private static boolean matchesMethod(List<String> ruleMethods, String requestMethod) {
+    if (ruleMethods == null || ruleMethods.isEmpty()) {
+      return true;
+    }
+    for (String m : ruleMethods) {
+      if (m != null && m.equalsIgnoreCase(requestMethod)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean matchesAnyPath(List<String> patterns, String path) {
+    if (patterns == null) {
+      return false;
+    }
+    for (String p : patterns) {
+      if (pathMatcher.match(p, path)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -185,18 +276,24 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     return null;
   }
 
-  private Bucket createNewBucket(int capacity, int refillTokens, Duration period) {
+  private Bucket createNewBucket(BucketSlot slot) {
     Bandwidth limit =
-        Bandwidth.builder().capacity(capacity).refillGreedy(refillTokens, period).build();
+        Bandwidth.builder()
+            .capacity(slot.capacity())
+            .refillGreedy(slot.refillTokens(), slot.refillPeriod())
+            .build();
     return Bucket.builder().addLimit(limit).build();
   }
 
   private void writeTooManyRequests(
-      HttpServletResponse response, HttpServletRequest request, long retryAfterSeconds)
+      HttpServletResponse response,
+      HttpServletRequest request,
+      int rejectedLimit,
+      long retryAfterSeconds)
       throws IOException {
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.setHeader("X-Rate-Limit-Limit", String.valueOf(properties.getCapacity()));
+    response.setHeader("X-Rate-Limit-Limit", String.valueOf(rejectedLimit));
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfterSeconds));
 
@@ -226,4 +323,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             + "}";
     response.getWriter().write(body);
   }
+
+  /**
+   * Per-request snapshot of one rate-limit slot — the data needed to look up or create the
+   * corresponding Bucket4j bucket. Carries the bucket key suffix, the bandwidth parameters and
+   * nothing else; the surrounding filter sorts {@link #capacity()} ascending so the tightest budget
+   * is consumed first.
+   *
+   * @param key bucket-key suffix combined with the client IP (e.g. {@code rule:mission-create})
+   * @param capacity max tokens for this slot
+   * @param refillTokens tokens added per {@link #refillPeriod()}
+   * @param refillPeriod time window for the {@link #refillTokens()} refill
+   */
+  private record BucketSlot(String key, int capacity, int refillTokens, Duration refillPeriod) {}
 }

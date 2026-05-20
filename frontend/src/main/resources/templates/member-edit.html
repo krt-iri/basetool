@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
-<style>
+<style th:attr="nonce=${cspNonce}">
         .form-group {
             margin-bottom: 1.5rem;
         }

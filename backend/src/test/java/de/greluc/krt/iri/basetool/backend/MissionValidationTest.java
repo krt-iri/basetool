@@ -222,20 +222,19 @@ class MissionValidationTest {
    * taken.".
    */
   @Test
-  void testAddParticipantPublic_AuthenticatedFreetextName_IsResolvedToMember() throws Exception {
-    User lordAdley = new User();
-    lordAdley.setId(UUID.randomUUID());
-    lordAdley.setUsername("lord_adley");
-    lordAdley.setSquadron(iridium);
-    userRepository.save(lordAdley);
-
+  void testAddParticipantPublic_AuthenticatedFreetextNameMatchesCaller_resolvesToSelf()
+      throws Exception {
+    // Original "freetext name is resolved" scenario, narrowed to self-enrol per audit finding H-1
+    // (2026-05-20): the caller may always look themselves up by name; adding *another* registered
+    // user requires {@code canManageMission}. The test below exercises the self-resolve branch —
+    // the caller types their own name (mixed case + whitespace) instead of using the autocomplete
+    // dropdown, and the backend must transparently link them.
     User caller = new User();
     caller.setId(UUID.randomUUID());
-    caller.setUsername("caller");
+    caller.setUsername("lord_adley");
     caller.setSquadron(iridium);
     userRepository.save(caller);
 
-    // Intentionally mixed case + whitespace to verify case-insensitive, trimmed match.
     AddParticipantPublicRequest request =
         new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null);
 
@@ -253,9 +252,45 @@ class MissionValidationTest {
     Mission refreshed = missionRepository.findById(mission.getId()).orElseThrow();
     boolean linked =
         refreshed.getParticipants().stream()
-            .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(lordAdley.getId()));
+            .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(caller.getId()));
     org.junit.jupiter.api.Assertions.assertTrue(
         linked, "Freetext participant name must be resolved to the matching registered user.");
+  }
+
+  /**
+   * Audit finding H-1 (2026-05-20): an authenticated squadron member typing the name of ANOTHER
+   * registered member must not silently end up signing that member up — only mission managers may
+   * add foreign users as participants (the {@code addParticipantSlim} branch already enforced this;
+   * the legacy {@code /participants/add} path used to let any authenticated caller through).
+   */
+  @Test
+  void testAddParticipantPublic_AuthenticatedNonManager_addingOtherMember_isForbidden()
+      throws Exception {
+    User target = new User();
+    target.setId(UUID.randomUUID());
+    target.setUsername("lord_adley");
+    target.setSquadron(iridium);
+    userRepository.save(target);
+
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setUsername("caller");
+    caller.setSquadron(iridium);
+    userRepository.save(caller);
+
+    AddParticipantPublicRequest request =
+        new AddParticipantPublicRequest(null, "Lord_Adley", null, null, null);
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(caller.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isForbidden());
   }
 
   /**

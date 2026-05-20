@@ -440,10 +440,22 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(missionRepository.findAllActiveReference()).thenReturn(java.util.List.of());
+    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.empty());
+    when(missionRepository.findAllActiveReference(null)).thenReturn(java.util.List.of());
 
     assertNotNull(service.findAllActiveReference());
-    verify(missionRepository).findAllActiveReference();
+    verify(missionRepository).findAllActiveReference(null);
+  }
+
+  @Test
+  void findAllActiveReference_passesCurrentSquadronIdToRepository() {
+    java.util.UUID squadronId = java.util.UUID.randomUUID();
+    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.of(squadronId));
+    when(missionRepository.findAllActiveReference(squadronId)).thenReturn(java.util.List.of());
+
+    service.findAllActiveReference();
+
+    verify(missionRepository).findAllActiveReference(squadronId);
   }
 
   // ---------------------------------------------------------------

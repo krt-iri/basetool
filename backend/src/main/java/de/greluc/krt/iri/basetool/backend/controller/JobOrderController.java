@@ -172,10 +172,16 @@ public class JobOrderController {
 
   /**
    * Creates a new job order. {@code permitAll()} so any squadron member — including unauthenticated
-   * guests using the public request form — can file a request.
+   * guests using the public request form — can file a request. Anonymous callers receive a redacted
+   * response that drops {@code assignees}, {@code handovers} and {@code version}: the created order
+   * has no assignees / handovers at create time anyway, and the optimistic-lock version has no
+   * purpose for a caller that cannot update the order (PUT/DELETE require LOGISTICIAN+). The {@code
+   * cleanup…ForGuest} naming follows the convention recognised by the ArchUnit rule {@code
+   * anonymousReadableMissionEndpointsMustRedactGuestPii}.
    *
    * @param dto create payload
-   * @return the persisted DTO
+   * @param jwt the caller's JWT, or {@code null} for anonymous callers
+   * @return the persisted DTO (redacted for anonymous callers)
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
@@ -183,8 +189,40 @@ public class JobOrderController {
       summary = "Create a new job order",
       description = "Allows anyone to create a job order.")
   @PreAuthorize("permitAll()")
-  public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
-    return jobOrderService.createJobOrder(dto);
+  public JobOrderDto createJobOrder(
+      @RequestBody @Valid CreateJobOrderDto dto, @AuthenticationPrincipal Jwt jwt) {
+    JobOrderDto created = jobOrderService.createJobOrder(dto);
+    if (jwt == null) {
+      created = cleanupJobOrderForGuest(created);
+    }
+    return created;
+  }
+
+  /**
+   * Strips fields from a job-order DTO that an anonymous caller has no business seeing or that
+   * carry no value for them: the {@code assignees} list (would expose member PII if the order ever
+   * had assignees at create time — defence-in-depth), the {@code handovers} list (logistician audit
+   * trail) and the optimistic-lock {@code version} (anonymous cannot update the order). The {@code
+   * id} / {@code displayId} / squadron references / materials / status are preserved so the public
+   * form can show a confirmation page with the order number.
+   *
+   * @param dto the persisted job-order DTO
+   * @return a slim acknowledgement DTO safe for anonymous callers
+   */
+  private JobOrderDto cleanupJobOrderForGuest(JobOrderDto dto) {
+    return new JobOrderDto(
+        dto.id(),
+        dto.displayId(),
+        dto.creatingSquadron(),
+        dto.requestingSquadron(),
+        dto.handle(),
+        dto.priority(),
+        dto.status(),
+        dto.materials(),
+        java.util.Collections.emptyList(),
+        java.util.Collections.emptyList(),
+        dto.createdAt(),
+        null);
   }
 
   /**
