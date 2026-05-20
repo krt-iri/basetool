@@ -2513,7 +2513,19 @@
     // CSP-safe delegated bindings (replaces the 11 inline on*= handlers on the mission detail
     // page — open/close finance modals fall through to the global *-modal-display common
     // handlers, the rest call into page-local functions defined above).
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+    //
+    // Defer until DOMContentLoaded if the document is still parsing: a future head-script
+    // load-order regression (cf. 56751e2) that leaves `window.krtEvents` undefined at
+    // parse time would otherwise silently drop every registration, with the Jetzt button
+    // (mission-set-now) and Owner/Manager/Toggle/Payout/Finance handlers all stuck inert.
+    // Logging the missing global makes the next breakage visible in the console instead
+    // of silently failing.
+    function registerMissionDetailEventHandlers() {
+        if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+            console.error('[mission-detail] window.krtEvents missing — page click handlers not registered. '
+                + 'event-delegation.js must load before mission-detail body scripts.');
+            return;
+        }
         window.krtEvents.on('click', 'mission-set-now', function (el) {
             setNowToInput(el.getAttribute('data-input-id'));
         });
@@ -2537,6 +2549,11 @@
                 el.getAttribute('data-version')
             );
         });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', registerMissionDetailEventHandlers);
+    } else {
+        registerMissionDetailEventHandlers();
     }
 </script>
 <!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
