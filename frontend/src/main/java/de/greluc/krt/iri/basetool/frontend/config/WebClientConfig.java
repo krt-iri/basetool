@@ -20,8 +20,13 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import java.security.KeyStore;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.TrustManagerFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.ssl.NoSuchSslBundleException;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -49,14 +54,27 @@ public class WebClientConfig {
   private final WebClientLoggingFilter webClientLoggingFilter;
   private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
   private final org.springframework.core.env.Environment environment;
+  private final SslBundles sslBundles;
 
   /**
-   * Builds the Netty SSL context for the backend WebClient. {@link InsecureTrustManagerFactory} (=
-   * accept any certificate) is only attached when the active Spring profile is {@code dev} or
-   * {@code test} — the bundled bootstrap {@code keystore.p12} cert is self-signed and the test
-   * docker stack uses an ephemeral cert. In every other profile (including {@code prod}) the
-   * default JVM trust store is used, so a man-in-the-middle on the network between frontend and
-   * backend cannot intercept the bearer-token-relay traffic (audit finding M-13).
+   * Builds the Netty SSL context for the backend WebClient. Three behaviours, picked by active
+   * profile and presence of a configured SSL bundle:
+   *
+   * <ul>
+   *   <li>{@code dev} / {@code test}: {@link InsecureTrustManagerFactory} (= accept any
+   *       certificate). The bundled bootstrap {@code keystore.p12} cert is self-signed and the test
+   *       docker stack uses an ephemeral cert; trust validation would only get in the way.
+   *   <li>Other profiles WITH a {@code backend-trust} Spring SSL bundle configured (production
+   *       default — the bundle is defined in {@code application-prod.yml} and points at the same
+   *       bind-mounted {@code keystore.p12} that Tomcat uses for the frontend's own HTTPS
+   *       listener): the bundle's truststore is loaded and pinned as the only valid trust anchor
+   *       for the backend WebClient. This is what makes the {@code https://backend:11261} call work
+   *       when the backend serves a self-signed cert — without restoring the indiscriminate {@code
+   *       InsecureTrustManagerFactory} that the 2026-05-20 audit (finding M-13) closed.
+   *   <li>Other profiles WITHOUT the bundle (e.g. a future operator fronts the backend with a
+   *       publicly-trusted cert): falls back to the default JVM trust store. No MITM exposure
+   *       because the cert chain must validate against a well-known CA.
+   * </ul>
    */
   private ReactorClientHttpConnector connector() {
     try {
@@ -64,6 +82,21 @@ public class WebClientConfig {
       java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
       if (profiles.contains("dev") || profiles.contains("test")) {
         builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
+      } else {
+        try {
+          SslBundle bundle = sslBundles.getBundle("backend-trust");
+          KeyStore truststore = bundle.getStores().getTrustStore();
+          TrustManagerFactory tmf =
+              TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+          tmf.init(truststore);
+          builder = builder.trustManager(tmf);
+        } catch (NoSuchSslBundleException ignored) {
+          // No `backend-trust` SSL bundle defined for the active profile —
+          // fall back to the JVM default trust store. This path supports
+          // deployments where the backend is fronted by a publicly-trusted
+          // cert (Let's Encrypt, internal corporate CA already in cacerts,
+          // etc.) and no per-deployment truststore configuration is needed.
+        }
       }
       SslContext sslContext = builder.build();
 

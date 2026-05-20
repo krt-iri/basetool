@@ -27,6 +27,26 @@ spring:
       host: redis
       port: 6379
       password: ${REDIS_PASSWORD}
+  # Spring Boot SSL bundle that exposes the bind-mounted `keystore.p12` as a
+  # truststore for the backend WebClient. The backend's HTTPS endpoint
+  # (`https://backend:11261`) is served by the same self-signed cert that this
+  # keystore carries, so by trusting the keystore the frontend trusts the
+  # backend without falling back to the InsecureTrustManagerFactory (which
+  # M-13 in the 2026-05-20 audit rightly restricted to dev/test). The location
+  # and password resolve from the same env vars Tomcat already consumes for
+  # the frontend's own HTTPS listener -- no new compose secrets needed.
+  # Consumed by WebClientConfig via `SslBundles.getBundle("backend-trust")`;
+  # if the bundle is absent (e.g. a future operator fronts the backend with a
+  # publicly-trusted cert), WebClientConfig falls back to the default JVM
+  # trust store.
+  ssl:
+    bundle:
+      jks:
+        backend-trust:
+          truststore:
+            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            type: PKCS12
 
 spring.thymeleaf.cache: true
 
