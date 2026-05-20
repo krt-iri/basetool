@@ -16,18 +16,49 @@
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
     <!--
+      Bootstrap stub for `window.krtEvents`. Defines a tiny queuing implementation
+      synchronously, BEFORE any external script tag. Every inline `<script>` block on
+      every page template can therefore call `window.krtEvents.on(...)` without
+      worrying about load order, defer/async timing, network speed or browser cache:
+      registrations made before `event-delegation.js` loads are buffered, then drained
+      by `event-delegation.js` when it installs the real implementation (see its IIFE,
+      which checks `_isBootstrapStub` and replays the queue).
+
+      Why this exists: we have been bitten THREE times by the same regression — an
+      inline `window.krtEvents.on(...)` call ran before `event-delegation.js` had
+      installed `window.krtEvents`, the silent `if (window.krtEvents && …)` guard in
+      the templates swallowed the failure, and the registration was lost without a
+      console error. The stub makes that race structurally impossible regardless of
+      whether `event-delegation.js` ships deferred, gets stuck in cache, fails CSP
+      or arrives slowly over the network. The watchdog in `event-delegation.js`
+      additionally logs an error if the stub is still active 5 s after page load
+      (i.e. the real implementation never replaced it).
+    -->
+    <script th:attr="nonce=${cspNonce}">
+        window.krtEvents = window.krtEvents || (function () {
+            var queue = [];
+            return {
+                _isBootstrapStub: true,
+                _queuedRegistrations: queue,
+                on: function (eventType, actionName, handler) {
+                    queue.push([eventType, actionName, handler]);
+                }
+            };
+        })();
+    </script>
+    <!--
       `defer` on the utility scripts whose globals are only consumed from inside event-handler
       callbacks (escape-html, safe-url, datetime-splitter): they execute in document order AFTER
       the HTML has been parsed, so they no longer block first contentful paint.
 
       `event-delegation.js` and `common-handlers.js` deliberately load WITHOUT `defer` because
       page templates call `window.krtEvents.on(...)` from synchronous inline `<script>` blocks at
-      the bottom of the body — those inline scripts run during HTML parsing, BEFORE any deferred
-      script has executed, so a deferred event-delegation.js would leave `window.krtEvents`
-      undefined at the call site and silently drop every per-page handler registration (observed
-      symptom: the index-page Information section did not expand on click). The two files are
-      tiny IIFEs that only register globals / `document.addEventListener` listeners, so they are
-      safe to evaluate before the DOM tree is built.
+      the bottom of the body. The bootstrap stub above already guarantees that those calls do
+      not silently drop, but loading these two files synchronously also keeps the real handler
+      registry online before the browser starts firing user events, so the buffered window stays
+      tiny in normal operation. The two files are tiny IIFEs that only register globals /
+      `document.addEventListener` listeners, so they are safe to evaluate before the DOM tree
+      is built.
     -->
     <script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
