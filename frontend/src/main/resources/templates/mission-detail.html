@@ -768,8 +768,8 @@
             <div class="col-content" id="col-finance-content">
                 <div class="hud-box">
                     <h3 style="color: var(--color-dept-mining); font-family: 'Lato', sans-serif; font-weight: 700;" th:if="${financeSum != null}">
-                        <span th:text="#{mission.finance.total}">Gesamtsumme:</span> 
-                        <span th:text="${#numbers.formatDecimal(financeSum, 1, 'POINT', 2, 'COMMA')}">0,00</span> aUEC
+                        <span th:text="#{mission.finance.total}">Gesamtsumme:</span>
+                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span> aUEC
                     </h3>
                     <div class="mb-1">
                         <button class="btn btn-small" data-trigger="open-modal-display" data-modal-id="finance-modal" th:text="#{mission.finance.add}">Neuer Eintrag</button>
@@ -792,7 +792,7 @@
                                         <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #4CAF50;">Einnahme</span>
                                         <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
                                     </td>
-                                    <td th:text="${#numbers.formatDecimal(entry.amount, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
+                                    <td th:text="${#numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td th:text="${entry.note}">Notiz</td>
                                     <td sec:authorize="isAuthenticated()">
                                         <div class="flex-gap-xs">
@@ -816,7 +816,7 @@
                                     <td>
                                         <span th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
                                     </td>
-                                    <td th:text="${#numbers.formatDecimal(order.expenses, 1, 'POINT', 2, 'COMMA')} + ' aUEC'">1.000,00</td>
+                                    <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td>
                                         <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-mining); text-decoration: underline;">Raffinerieauftrag</a>
                                     </td>
