@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -57,11 +58,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private final AppProblemProperties problemProperties;
   private final AntPathMatcher pathMatcher = new AntPathMatcher();
   private final Cache<String, Bucket> bucketCache;
+  private final List<IpAddressMatcher> trustedProxyMatchers;
 
   /**
    * Constructs the filter with the bucket cache sized from compile-time constants ({@code 1h}
    * idle-expiry, 100 000 entries max). Both properties classes carry the validated
-   * {@code @ConfigurationProperties} values pulled from {@code application.yml}.
+   * {@code @ConfigurationProperties} values pulled from {@code application.yml}. The trusted-proxy
+   * list is compiled into {@link IpAddressMatcher} instances once during construction so that the
+   * per-request {@link #resolveClientIp} hot path no longer allocates a fresh matcher (and
+   * re-parses the CIDR / IP literal) on every call. Malformed entries are logged once here and
+   * dropped from the cached list, exactly as the previous per-request path did.
    *
    * @param properties bucket capacity/refill configuration plus path patterns, endpoint-specific
    *     rules and trusted proxies
@@ -76,6 +82,35 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
             .maximumSize(BUCKET_MAX_ENTRIES)
             .build();
+    this.trustedProxyMatchers = compileTrustedProxies(properties.getTrustedProxies());
+  }
+
+  /**
+   * Compiles each entry of the trusted-proxies list into an {@link IpAddressMatcher} once at filter
+   * construction. Blank entries and the literal {@code "*"} blanket-trust sentinel are explicitly
+   * excluded (the latter would let any client spoof {@code X-Forwarded-For}); malformed CIDR / IP
+   * literals are logged at WARN and dropped so a configuration typo cannot disable the rest of the
+   * trusted list. Returns an unmodifiable list because the field is shared across request threads.
+   */
+  private static List<IpAddressMatcher> compileTrustedProxies(List<String> entries) {
+    if (entries == null || entries.isEmpty()) {
+      return List.of();
+    }
+    List<IpAddressMatcher> matchers = new ArrayList<>(entries.size());
+    for (String entry : entries) {
+      if (entry == null || entry.isBlank() || "*".equals(entry)) {
+        continue;
+      }
+      try {
+        matchers.add(new IpAddressMatcher(entry));
+      } catch (IllegalArgumentException ex) {
+        log.warn(
+            "Invalid app.rate-limit.trusted-proxies entry '{}'; ignoring. Reason: {}",
+            entry,
+            ex.getMessage());
+      }
+    }
+    return Collections.unmodifiableList(matchers);
   }
 
   @Override
@@ -213,9 +248,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   /**
    * Resolves the rate-limit key for the incoming request. {@code X-Forwarded-For} is only honored
-   * when the immediate peer ({@code request.getRemoteAddr()}) matches an entry in {@code
-   * app.rate-limit.trusted-proxies}; the literal {@code "*"} is intentionally NOT a valid trust
-   * value, since blanket trust lets any client spoof the header and obtain a fresh bucket per
+   * when the immediate peer ({@code request.getRemoteAddr()}) matches one of the trusted-proxy
+   * matchers compiled at filter construction; the literal {@code "*"} is intentionally NOT a valid
+   * trust value, since blanket trust lets any client spoof the header and obtain a fresh bucket per
    * request.
    *
    * <p>Audit finding H-8: each trusted-proxies entry may be either an exact IP ({@code 172.17.0.1})
@@ -225,10 +260,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    */
   private String resolveClientIp(HttpServletRequest request) {
     String remoteAddr = request.getRemoteAddr();
-    List<String> trusted = properties.getTrustedProxies();
-
-    boolean isTrusted =
-        trusted != null && trusted.stream().anyMatch(p -> matchesProxy(p, remoteAddr));
+    boolean isTrusted = false;
+    for (IpAddressMatcher matcher : trustedProxyMatchers) {
+      if (matcher.matches(remoteAddr)) {
+        isTrusted = true;
+        break;
+      }
+    }
 
     if (isTrusted) {
       String xff = request.getHeader("X-Forwarded-For");
@@ -240,28 +278,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     return remoteAddr;
-  }
-
-  /**
-   * Matches a {@code trusted-proxies} entry against the immediate peer's IP. Supports exact IP
-   * literals (e.g. {@code 172.17.0.1}) and CIDR ranges (e.g. {@code 172.17.0.0/16}). The literal
-   * {@code "*"} is explicitly rejected to keep the blanket-trust foot-gun closed.
-   */
-  private static boolean matchesProxy(String entry, String remoteAddr) {
-    if (entry == null || entry.isBlank() || "*".equals(entry)) {
-      return false;
-    }
-    try {
-      return new IpAddressMatcher(entry).matches(remoteAddr);
-    } catch (IllegalArgumentException ex) {
-      // Malformed CIDR / IP entry in config — log once and ignore so a typo cannot disable the
-      // entire filter. (The misconfiguration surfaces in logs at WARN.)
-      log.warn(
-          "Invalid app.rate-limit.trusted-proxies entry '{}'; ignoring. Reason: {}",
-          entry,
-          ex.getMessage());
-      return false;
-    }
   }
 
   private String firstMatchingPattern(String path, List<String> patterns) {
