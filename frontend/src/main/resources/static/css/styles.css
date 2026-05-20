@@ -801,6 +801,13 @@ input[type="radio"]:focus {
     border-left: 4px solid var(--color-success);
 }
 
+.alert-warning {
+    background-color: rgba(255, 210, 63, 0.15);
+    border-color: var(--color-warning);
+    color: var(--color-gray-1);
+    border-left: 4px solid var(--color-warning);
+}
+
 /* Text Colors */
 .text-danger { color: var(--color-danger) !important; }
 .text-success { color: var(--color-success) !important; }

@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationPayoutStatusRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
@@ -99,6 +100,7 @@ public class OperationService {
   private static final BigDecimal MAX_TRANSFER_FEE_RATE = BigDecimal.ONE;
 
   private final OperationRepository operationRepository;
+  private final MissionRepository missionRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationPayoutStatusRepository payoutStatusRepository;
@@ -143,6 +145,27 @@ public class OperationService {
     return operationRepository
         .findById(id)
         .orElseThrow(() -> new NotFoundException("Operation not found"));
+  }
+
+  /**
+   * Returns {@code true} if at least one mission of the operation still lacks an {@code
+   * actualStartTime} or {@code actualEndTime}. The operation-detail page reads this flag to decide
+   * whether to render the "payout figures are preliminary" warning above the payout table — the
+   * payout breakdown silently skips missions without both timestamps (see {@link
+   * #computeParticipationBreakdown(Operation)}), so percentages can rebalance once every mission is
+   * properly closed.
+   *
+   * <p>Implemented as a single existence-style {@code COUNT > 0} query on {@code Mission} so the
+   * detail endpoint only pays one cheap round-trip on top of the existing {@code findById} hit; no
+   * lazy collection traversal on the operation graph.
+   *
+   * @param id operation primary key
+   * @return {@code true} when at least one mission has a {@code null actualStartTime} or {@code
+   *     actualEndTime}, {@code false} when every mission is fully time-stamped (including the
+   *     empty-operation case)
+   */
+  public boolean hasUnfinishedMissions(@NotNull UUID id) {
+    return missionRepository.existsByOperationIdWithUnfinishedActualTime(id);
   }
 
   /**

@@ -27,6 +27,7 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationPayoutStatusRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
@@ -55,6 +56,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class OperationServiceTest {
 
   @Mock private OperationRepository operationRepository;
+  @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository financeEntryRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
@@ -1448,6 +1450,29 @@ class OperationServiceTest {
       u.setId(UUID.randomUUID());
       u.setUsername(username);
       return u;
+    }
+  }
+
+  @Nested
+  class HasUnfinishedMissionsTests {
+
+    @Test
+    void returnsTrue_whenRepositoryReportsAtLeastOneUnfinishedMission() {
+      UUID operationId = UUID.randomUUID();
+      when(missionRepository.existsByOperationIdWithUnfinishedActualTime(operationId))
+          .thenReturn(true);
+
+      assertTrue(operationService.hasUnfinishedMissions(operationId));
+      verify(missionRepository, times(1)).existsByOperationIdWithUnfinishedActualTime(operationId);
+    }
+
+    @Test
+    void returnsFalse_whenRepositoryReportsAllMissionsFullyTimestamped() {
+      UUID operationId = UUID.randomUUID();
+      when(missionRepository.existsByOperationIdWithUnfinishedActualTime(operationId))
+          .thenReturn(false);
+
+      assertFalse(operationService.hasUnfinishedMissions(operationId));
     }
   }
 }

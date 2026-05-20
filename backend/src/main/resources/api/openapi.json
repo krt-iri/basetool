@@ -4048,6 +4048,7 @@
       "get" : {
         "tags" : [ "Operations" ],
         "summary" : "Get operation by ID",
+        "description" : "Returns the operation DTO. The `payoutPreliminary` field is authoritative on this endpoint: it is `true` when at least one mission of the operation still lacks an `actualStartTime` or `actualEndTime` — the operation-detail page reads this to render a 'payout figures are preliminary' warning above the payout table. List and create/update responses leave the field `null`.",
         "operationId" : "getOperationById",
         "parameters" : [ {
           "name" : "id",
@@ -28618,6 +28619,9 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "payoutPreliminary" : {
+            "type" : "boolean"
           }
         }
       },

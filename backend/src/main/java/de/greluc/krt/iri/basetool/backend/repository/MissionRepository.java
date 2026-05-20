@@ -168,4 +168,25 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       nativeQuery = true)
   void removeManager(
       @org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+
+  /**
+   * Returns {@code true} if the given operation has at least one mission whose actual time window
+   * is incomplete — either {@code actualStartTime} or {@code actualEndTime} is {@code null}. Drives
+   * the "payout figures are preliminary" warning on the operation-detail page: as long as any
+   * mission has not been started or has not been finalized, the operation's payout breakdown cannot
+   * include the unfinished mission's checked-in time (see {@code
+   * OperationService#computeParticipationBreakdown} which skips such missions), so the percentages
+   * may rebalance once every mission is closed.
+   *
+   * <p>Implemented as a single {@code COUNT > 0} / {@code EXISTS}-equivalent JPQL query so the
+   * detail-endpoint adds at most one cheap round-trip on top of the existing {@code findById} hit.
+   *
+   * @param operationId the operation to inspect
+   * @return {@code true} if at least one mission of the operation lacks {@code actualStartTime} or
+   *     {@code actualEndTime}, {@code false} otherwise (including the empty-operation case)
+   */
+  @Query(
+      "SELECT CASE WHEN COUNT(m) > 0 THEN TRUE ELSE FALSE END FROM Mission m WHERE m.operation.id ="
+          + " :operationId AND (m.actualStartTime IS NULL OR m.actualEndTime IS NULL)")
+  boolean existsByOperationIdWithUnfinishedActualTime(@Param("operationId") UUID operationId);
 }
