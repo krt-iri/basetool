@@ -229,7 +229,7 @@ jobs:
           touch "/tmp/digests/${{ matrix.module }}/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           # Distinct per-arch artifact name so the four parallel build jobs
           # do not collide. The merge job downloads the pair for its module
@@ -293,7 +293,7 @@ jobs:
 
     steps:
       - name: Download per-arch digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: /tmp/digests/${{ matrix.module }}
           # Pull both `digest-<module>-linux-amd64` and `digest-<module>-linux-arm64`
