@@ -141,6 +141,12 @@ public class OperationPageController {
       // app_user.is_mission_manager flag through the JWT-converter, so the
       // role check here matches what the backend enforces.
       model.addAttribute("canEdit", hasMissionManagerRole(authentication));
+      // The "Bezahlt"-checkbox is asymmetric: any mission manager can set
+      // it to paid, but only an officer or admin may clear it back to
+      // unpaid. The template uses this flag to disable an already-checked
+      // checkbox for plain mission managers — mirrors the asymmetric
+      // @PreAuthorize on the backend's payouts/paid-out endpoint.
+      model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
 
     } catch (Exception e) {
       log.error("Error loading operation details", e);
@@ -161,6 +167,15 @@ public class OperationPageController {
                 "ROLE_ADMIN".equals(role)
                     || "ROLE_OFFICER".equals(role)
                     || "ROLE_MISSION_MANAGER".equals(role));
+  }
+
+  private static boolean hasOfficerOrAdminRole(Authentication authentication) {
+    if (authentication == null) {
+      return false;
+    }
+    return authentication.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_OFFICER".equals(role));
   }
 
   /**
@@ -220,12 +235,18 @@ public class OperationPageController {
    * re-renders the affected payout row and we hand it back as JSON so the client can patch a single
    * table row without refetching the whole breakdown.
    *
+   * <p>Authorization is asymmetric and mirrors the backend: any mission manager (or higher via the
+   * role hierarchy) can set {@code paidOut=true}, but only ADMIN or OFFICER can clear it back to
+   * {@code false}. The SpEL guard returns 403 for a plain mission manager attempting to uncheck the
+   * box; the JS handler surfaces this as the {@code operation.payout.paid.forbidden} toast.
+   *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
    * @return refreshed payout row on success, or a 403 / 500 mirroring the backend status
    */
   @PostMapping("/{id}/payouts/paid-out")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize(
+      "hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
   @ResponseBody
   public ResponseEntity<OperationPayoutDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
