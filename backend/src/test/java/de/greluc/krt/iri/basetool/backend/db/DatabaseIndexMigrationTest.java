@@ -38,6 +38,7 @@ class DatabaseIndexMigrationTest {
    *   <li>V35 (pg_trgm GIN index used by the ILIKE search endpoints)
    *   <li>V48 (mission owner/manager indexes added with the ownership rewrite)
    *   <li>V65 (personal inventory composite owner+name index)
+   *   <li>V92 (backfill FK indexes that escaped V34's blanket sweep)
    * </ul>
    *
    * The test is intentionally not exhaustive: it acts as an early-warning canary that Flyway
@@ -60,6 +61,10 @@ class DatabaseIndexMigrationTest {
     assertIndexExists(jdbc, "mission", "idx_mission_owner");
     // V65: composite owner+name index on personal_inventory_item
     assertIndexExists(jdbc, "personal_inventory_item", "idx_personal_inventory_item_owner_name");
+    // V92: FK index on mission.operation_id (powers the operation filter on the missions list)
+    assertIndexExists(jdbc, "mission", "idx_mission_operation_id");
+    // V92: FK index on inventory_item.job_order_id (powers the job order detail page)
+    assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_job_order_id");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
