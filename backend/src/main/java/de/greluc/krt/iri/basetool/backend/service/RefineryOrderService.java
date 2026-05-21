@@ -674,6 +674,26 @@ public class RefineryOrderService {
     return result;
   }
 
+  /**
+   * Convenience overload that resolves {@code locationId} via {@link LocationRepository} and
+   * delegates to {@link #getYieldBonusByMaterialForLocation(Location)}. Returns an empty map when
+   * the id is {@code null} or unknown — the caller (typically the AJAX endpoint that refreshes the
+   * detail page's yield badges after the user picks a new refinery) treats "unknown location" the
+   * same as "no yield data", so a 404 would only force redundant error handling on the client.
+   *
+   * @param locationId target location id; may be {@code null}
+   * @return per-material yield bonus map for the location, never {@code null}
+   */
+  public Map<UUID, Integer> getYieldBonusByMaterialForLocationId(UUID locationId) {
+    if (locationId == null) {
+      return Map.of();
+    }
+    return locationRepository
+        .findById(locationId)
+        .map(this::getYieldBonusByMaterialForLocation)
+        .orElseGet(Map::of);
+  }
+
   private void validateLocationHasRefinery(
       de.greluc.krt.iri.basetool.backend.model.Location location) {
     boolean hasRefinery = false;

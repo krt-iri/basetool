@@ -904,6 +904,50 @@ class RefineryOrderServiceTest {
     }
 
     @Test
+    void byLocationId_nullId_returnsEmpty() {
+      assertTrue(refineryOrderService.getYieldBonusByMaterialForLocationId(null).isEmpty());
+    }
+
+    @Test
+    void byLocationId_unknownId_returnsEmpty() {
+      UUID missing = UUID.randomUUID();
+      when(locationRepository.findById(missing)).thenReturn(Optional.empty());
+
+      Map<UUID, Integer> result =
+          refineryOrderService.getYieldBonusByMaterialForLocationId(missing);
+
+      assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void byLocationId_delegatesToLocationVariant() {
+      UUID matA = UUID.randomUUID();
+      Material a = new Material();
+      a.setId(matA);
+
+      RefineryYield y = new RefineryYield();
+      y.setMaterial(a);
+      y.setYieldBonus(7);
+
+      City lorville = new City();
+      lorville.setName("Lorville");
+
+      UUID locId = UUID.randomUUID();
+      Location loc = new Location();
+      loc.setId(locId);
+      loc.setCity(lorville);
+
+      when(locationRepository.findById(locId)).thenReturn(Optional.of(loc));
+      when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
+          .thenReturn(List.of(y));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocationId(locId);
+
+      assertEquals(1, result.size());
+      assertEquals(7, result.get(matA));
+    }
+
+    @Test
     void yieldWithNullMaterial_isSkipped() {
       RefineryYield orphan = new RefineryYield();
       orphan.setMaterial(null);
