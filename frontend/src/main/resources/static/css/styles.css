@@ -1387,20 +1387,6 @@ input[type="radio"]:focus {
     top: -0.6rem !important;
 }
 
-/* Discreet build-version label rendered by AppVersionAdvice under the
-   language switcher. Low-emphasis grey, small caps, no interaction. The
-   label is purely informational — never wrap it in a link or button. */
-.sidebar-version {
-    margin-top: 1.5rem;
-    color: var(--color-gray-3);
-    font-family: 'Lato', sans-serif;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    user-select: text;
-    cursor: default;
-}
-
 /* Multi-squadron switcher + context chip.
    The chip is fixed top-right and shown to every authenticated user so the
    active squadron context is visible from any page without opening the
