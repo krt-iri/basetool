@@ -224,7 +224,7 @@
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
-                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rfc-calc-scu">
+                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rfc-calc-scu" required>
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -507,6 +507,16 @@
     // re-run on the same DOM events as before).
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
+        // Restore "0" if the user clears one of the money fields and tabs away. Uses
+        // `focusout` (which bubbles) instead of `blur` because event delegation listens
+        // on `document` and `blur` does not bubble. The profit-preview re-runs after the
+        // restore so the read-only Gewinn/Verlust field reflects the implicit 0 immediately.
+        window.krtEvents.on('focusout', 'rfc-update-profit', function (el) {
+            if (el.value.trim() === '') {
+                el.value = '0';
+                updateProfitPreview();
+            }
+        });
         window.krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
         window.krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
         window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);

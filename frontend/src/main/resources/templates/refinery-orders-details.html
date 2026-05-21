@@ -62,6 +62,21 @@
                 background-color: var(--color-gray-5);
                 border: 1px solid var(--color-gray-3);
             }
+            /*
+             * When the input-quantity label contains the yield bonus badge, the
+             * global `.form-group:has([required]) > label::after` asterisk lands
+             * AFTER the badge ("Eingangsmenge (Units) -5% *"), which reads as if
+             * the badge itself were the required marker. Override: anchor the
+             * asterisk to the first <span> (the field name) instead, and suppress
+             * the outer ::after for these labels.
+             */
+            .form-group:has([required]) > label:has(> .yield-bonus-badge) > span:first-child::after {
+                content: " *";
+                color: var(--color-primary);
+            }
+            .form-group:has([required]) > label:has(> .yield-bonus-badge)::after {
+                content: none;
+            }
             /* Small "Material #N" header at the top of every material entry.
                Hosts the per-entry Remove button on the right so it never overlaps
                the input fields (the previously absolute-positioned button sat on
@@ -283,7 +298,7 @@
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
-                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" th:readonly="${!canEdit}">
+                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -853,6 +868,16 @@
     // input/change/submit semantics so the page behaves identically to the prior version).
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
+        // Restore "0" if the user clears one of the money fields and tabs away. Uses
+        // `focusout` (which bubbles) instead of `blur` because event delegation listens
+        // on `document` and `blur` does not bubble. The profit-preview re-runs after the
+        // restore so the read-only Gewinn/Verlust field reflects the implicit 0 immediately.
+        window.krtEvents.on('focusout', 'rod-update-profit', function (el) {
+            if (el.value.trim() === '') {
+                el.value = '0';
+                updateProfitPreview();
+            }
+        });
         window.krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
         window.krtEvents.on('change', 'rod-update-method', updateMethodRatings);
         window.krtEvents.on('click', 'rod-add-material', addMaterialRow);
