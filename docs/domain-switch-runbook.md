@@ -1,6 +1,6 @@
 # Domain-Wechsel: `iri-base.org` → `profit-base.online`
 
-Schritt-für-Schritt-Runbook für den Operator. Die Code-Änderungen (Tool-Name "Profit Basetool", neue URL in allen YML / Java / Tests / Doku) sind bereits im Repo committed und in der Release-Pipeline. Diese Anleitung deckt nur die **Operator-Aktionen auf dem Production-Host** ab, die Code allein nicht bewältigt.
+Schritt-für-Schritt-Runbook für den Operator. Die Code-Änderungen (Tool-Name "Profit Basetool", neuer Hostname `profit-base.online` in allen YML / Java / Tests / Doku, neues Header-Logo `krt_logo.svg`) liegen als **PR #165** vor: <https://github.com/krt-iri/basetool/pull/165> — mehrfach gegen `main` rebased, alle Tests grün. Diese Anleitung deckt nur die **Operator-Aktionen auf dem Production-Host** ab, die der Code-PR allein nicht bewältigt. Voraussetzung: der PR ist auf `main` gemerged, sonst sind die neuen `KC_HOSTNAME`-/`KEYCLOAK_ISSUER_URI`-Defaults nicht im Image.
 
 > **Geschätztes Wartungsfenster:** 30–60 Minuten Down-Time für die User (zwischen "Stack stop" und "Smoke-Test grün"). Vorbereitung (Phase 0–2) kann mehrere Stunden im Voraus laufen, ohne Service-Impact.
 
@@ -80,31 +80,37 @@ sudo -u deploy docker compose --profile prod images backend frontend
 
 ## Phase 1 — Release der Code-Änderungen (kein Service-Impact)
 
-Diese Phase produziert die neuen Container-Images mit dem `Profit Basetool`-Branding und der neuen URL in den Default-Configs.
+Diese Phase produziert die neuen Container-Images mit dem `Profit Basetool`-Branding, dem neuen `krt_logo.svg`, und der neuen URL in den Default-Configs.
 
-### 1.1 Worktree-Branch mergen
+### 1.1 PR #165 mergen
 
-Lokal (auf dem Developer-Rechner, nicht auf dem Prod-Host):
+PR liegt fertig: <https://github.com/krt-iri/basetool/pull/165>. Der Branch
+`claude/trusting-archimedes-c2a20e` ist bereits mehrfach gegen `main` rebased,
+alle CI-Checks (Tests, Spotless, Checkstyle, SpotBugs, DCO) grün. Über die
+GitHub-UI mergen (Squash- oder Rebase-Merge — beides funktioniert, weil der
+Branch nur einen Commit hat). Sobald auf `main`, baut `release-images.yml`
+automatisch.
+
+Optional (empfohlen für saubereren Rollback-Punkt): direkt nach dem Merge einen
+versionierten Tag setzen, damit `release-images.yml` auch mit `:1.5.0`-Tags
+versieht statt nur `:edge` / `:latest`:
 
 ```bash
-# Branch testen, dann PR erstellen und mergen.
-# Sobald auf main, baut release-images.yml automatisch.
-# Alternativ: explizit einen Tag setzen, dann triggert release-images.yml mit
-# version-getaggten Images (saubererer Rollback-Punkt):
-git tag -a v1.5.0 -m "Rename to Profit Basetool + URL switch to profit-base.online"
+git fetch origin main
+git tag -a v1.5.0 main -m "Rename to Profit Basetool + URL switch to profit-base.online"
 git push origin v1.5.0
 ```
 
 ### 1.2 Release-Pipeline durchlaufen lassen
 
-Im GitHub-UI unter Actions → "release-images.yml" verifizieren, dass beide Module gebaut und nach GHCR gepusht wurden:
+Im GitHub-UI unter Actions → "release-images.yml" verifizieren, dass beide Module für beide Architekturen gebaut und nach GHCR gepusht wurden:
 
 ```
-ghcr.io/krt-iri/basetool-backend:1.5.0
+ghcr.io/krt-iri/basetool-backend:1.5.0   (linux/amd64 + linux/arm64 als Multi-Arch-Index)
 ghcr.io/krt-iri/basetool-frontend:1.5.0
 ```
 
-Dauer typisch 8–12 Minuten (ARM64 läuft unter QEMU langsamer).
+Seit der Pipeline-Migration in #162 / #163 läuft ARM64 nativ auf GitHubs `ubuntu-24.04-arm`-Fleet (vorher unter QEMU), beide Architekturen finishen in ähnlicher Wallclock-Zeit. Dauer typisch 8–15 Minuten (4 parallele Build-Jobs + 2 Merge-Jobs).
 
 ### 1.3 Stable-Promote NOCH NICHT triggern
 
