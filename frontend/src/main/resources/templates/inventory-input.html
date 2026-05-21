@@ -112,7 +112,7 @@
                     <label for="jobOrderId">Auftrag zuordnen (optional)</label>
                     <select id="jobOrderId" th:field="*{jobOrderId}">
                         <option value="">-- Kein Auftrag --</option>
-                        <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.squadron + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
+                        <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
                     </select>
                 </div>
                 
