@@ -111,21 +111,21 @@
             <div class="dropdown">
                 <button class="dropbtn">
                 <span th:if="${#locale.language == 'de'}" class="flex-gap-sm">
-                     <img th:src="@{/images/flags/de.svg}" class="flag-icon" alt="DE">
+                     <img th:src="@{/images/flags/de.svg}" width="24" height="16" class="flag-icon" alt="DE">
                      <span th:text="#{lang.de}">DE</span>
                 </span>
                     <span th:unless="${#locale.language == 'de'}" class="flex-gap-sm">
-                     <img th:src="@{/images/flags/gb.svg}" class="flag-icon" alt="EN">
+                     <img th:src="@{/images/flags/gb.svg}" width="24" height="16" class="flag-icon" alt="EN">
                      <span th:text="#{lang.en}">EN</span>
                 </span>
                 </button>
                 <div class="dropdown-content">
                     <a th:href="@{''(lang='de')}">
-                        <img th:src="@{/images/flags/de.svg}" class="flag-icon" alt="DE">
+                        <img th:src="@{/images/flags/de.svg}" width="24" height="16" class="flag-icon" alt="DE">
                         <span th:text="#{lang.de}">DE</span>
                     </a>
                     <a th:href="@{''(lang='en')}">
-                        <img th:src="@{/images/flags/gb.svg}" class="flag-icon" alt="EN">
+                        <img th:src="@{/images/flags/gb.svg}" width="24" height="16" class="flag-icon" alt="EN">
                         <span th:text="#{lang.en}">EN</span>
                     </a>
                 </div>

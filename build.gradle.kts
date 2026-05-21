@@ -38,6 +38,17 @@ subprojects {
       if (mockitoCore != null) {
         jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
       }
+      // Deliberately NOT setting `maxParallelForks > 1` here even though the
+      // M-1 audit recommended it. A trial run with (cores / 2) destabilised
+      // `WebClientResilienceTest.timeLimiter_ShouldTimeoutSlowResponses` — the
+      // test asserts that a slow upstream times out within ~2 s, and under
+      // forked CPU contention the JVM scheduler delay alone ate the budget.
+      // Cross-module parallel (`org.gradle.parallel=true` in gradle.properties)
+      // already runs backend and frontend test tasks concurrently, which is
+      // most of the win for a 2-module build; revisit per-module forking once
+      // the timing-sensitive resilience tests get refactored onto virtual time
+      // (e.g. StepVerifier.withVirtualTime) so they no longer race against
+      // wall-clock GC pauses.
     }
 
     tasks.withType<JavaCompile>().configureEach {
@@ -91,6 +102,14 @@ subprojects {
       finalizedBy(tasks.named("jacocoTestReport"))
     }
     tasks.named<JacocoReport>("jacocoTestReport") {
+      // L-1: only generate the JaCoCo report when actually running in CI.
+      // Locally a developer running `./gradlew :backend:test` from the IDE pays
+      // the JaCoCo instrumentation overhead twice (test-runtime + the report
+      // task) for output nobody looks at — Codecov / SonarQube only consume it
+      // from CI runs. The `CI` env var is set by GitHub Actions by default,
+      // GitLab CI, CircleCI, Drone and every other major runner; setting it
+      // locally via `CI=true ./gradlew test` opts in explicitly when needed.
+      onlyIf { System.getenv("CI") != null }
       reports {
         xml.required.set(true)
         csv.required.set(true)

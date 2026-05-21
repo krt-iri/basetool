@@ -267,6 +267,109 @@ class UexClientTest {
     assertHitsEndpoint(client::getRefineriesYields, "/refineries_yields");
   }
 
+  // ─── ETag conditional GET (M-5) ─────────────────────────────────────────
+  // The fetchList helper captures the response ETag and replays it as
+  // If-None-Match on the next request to the same endpoint. A 304 short-
+  // circuits with an empty list (sync services treat that as "skip this
+  // run"). A 200 with a new ETag overwrites the stored value so the next
+  // call uses the fresh one. The behaviour is per-endpoint, so star-system
+  // and commodity ETags do not interfere.
+
+  @Test
+  void firstCall_sendsNoIfNoneMatch_andRemembersResponseEtag() throws Exception {
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"abc-123\""));
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"abc-123\""));
+
+    client.getCommodities(); // primes the ETag store
+    List<UexCommodityDto> second = client.getCommodities(); // replays the ETag
+
+    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(first);
+    assertNull(
+        first.getHeader("If-None-Match"),
+        "first call must not send If-None-Match (nothing stored yet)");
+
+    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(secondReq);
+    assertEquals(
+        "\"abc-123\"",
+        secondReq.getHeader("If-None-Match"),
+        "second call must replay the ETag from the first response");
+    assertTrue(second.isEmpty(), "304 response must surface as an empty list");
+  }
+
+  @Test
+  void notModifiedResponse_returnsEmptyListWithoutDecodingBody() {
+    // 304 responses carry no body. The helper must not try to parse one
+    // (the previous .retrieve().bodyToMono(...) chain would have thrown a
+    // DecodingException on the missing body and dropped to the fallback,
+    // which still returned empty - this test pins the explicit short-circuit
+    // so the cleaner path stays intact).
+    server.enqueue(new MockResponse().setResponseCode(304));
+
+    List<UexCommodityDto> result = client.getCommodities();
+
+    assertNotNull(result);
+    assertTrue(result.isEmpty(), "304 Not Modified must yield an empty list");
+  }
+
+  @Test
+  void updatedEtagOnNewResponse_replacesPreviouslyStoredEtag() throws Exception {
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"v1\""));
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"v2\""));
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"v2\""));
+
+    client.getCommodities(); // stores v1
+    client.getCommodities(); // sends v1, server returns 200 + v2 → stores v2
+    client.getCommodities(); // sends v2
+
+    server.takeRequest(1, TimeUnit.SECONDS); // discard the first
+    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("\"v1\"", secondReq.getHeader("If-None-Match"));
+    RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals(
+        "\"v2\"",
+        thirdReq.getHeader("If-None-Match"),
+        "third call must use the v2 ETag from the second response");
+  }
+
+  @Test
+  void etagStorage_isPerEndpoint_starSystemsEtagDoesNotLeakIntoCommodities() throws Exception {
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"star-sys-1\""));
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
+
+    client.getStarSystems(); // stores ETag under /star_systems
+    client.getCommodities(); // /commodities — different key, no ETag
+
+    server.takeRequest(1, TimeUnit.SECONDS); // star_systems
+    RecordedRequest commoditiesReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNull(
+        commoditiesReq.getHeader("If-None-Match"),
+        "/commodities must not receive the /star_systems ETag");
+  }
+
+  @Test
+  void serverErrorClearsNoStoredEtag_andLeavesCachedValueIntact() throws Exception {
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"keep-me\""));
+    server.enqueue(new MockResponse().setResponseCode(500));
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"keep-me\""));
+
+    client.getCommodities(); // stores keep-me
+    List<UexCommodityDto> midError = client.getCommodities(); // 500 - fallback empty
+    List<UexCommodityDto> thirdCall = client.getCommodities(); // should still send keep-me
+
+    assertTrue(midError.isEmpty(), "5xx must still surface as empty list");
+    assertTrue(thirdCall.isEmpty(), "subsequent 304 also yields empty list");
+
+    server.takeRequest(1, TimeUnit.SECONDS); // first
+    server.takeRequest(1, TimeUnit.SECONDS); // mid error - request was issued, response was 500
+    RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals(
+        "\"keep-me\"",
+        thirdReq.getHeader("If-None-Match"),
+        "a server error in between must not clear the stored ETag (it was not invalidated)");
+  }
+
   // ─── helpers ────────────────────────────────────────────────────────────
 
   private MockResponse jsonOk(String body) {

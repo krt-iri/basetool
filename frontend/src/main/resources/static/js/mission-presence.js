@@ -13,11 +13,22 @@
  *
  * All user-visible strings are read from window.MISSION_PRESENCE_I18N, populated
  * by mission-detail.html from Thymeleaf messages.
+ *
+ * Heartbeat cadence (L-7 from the performance audit): raised from 10 s to 60 s.
+ * The backend's MissionPresenceService.ENTRY_TTL was raised from 30 s to 120 s
+ * in lockstep, so two missed beats of slack remain before a stale editor gets
+ * reaped from a peer's indicator. The trade-off: peers now see "user stopped
+ * editing" up to ~120 s after the editor navigates away (was ~30 s before),
+ * but the WebSocket frame traffic per active editor drops by 6×. The presence
+ * panel never claims real-time precision; this script is bundled only by
+ * mission-detail.html so the cost only matters there. If the UX feedback is
+ * that the indicator lingers too long, drop both values together — never one
+ * without the other, or the indicator will flicker / drop editors prematurely.
  */
 (function () {
     'use strict';
 
-    const HEARTBEAT_MS = 10000;
+    const HEARTBEAT_MS = 60000;
     const INITIAL_BACKOFF_MS = 1000;
     const MAX_BACKOFF_MS = 30000;
     const SECTION_SELECTOR = '[data-panel-key]';

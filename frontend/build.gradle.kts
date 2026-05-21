@@ -171,3 +171,64 @@ tasks.cyclonedxBom {
   includeBuildSystem = true
 }
 
+// L-2 from the performance audit: minify CSS files inside the built jar so the
+// shipped payload is smaller than the readable sources under
+// `src/main/resources/static/css/`. The source files stay untouched (so editing
+// and diffing remain pleasant) — `minifyStaticCss` runs after `processResources`
+// has copied them into `build/resources/main/static/css/` and overwrites those
+// copies in place. Wired as a dependency of `classes` so it always runs before
+// the jar is assembled and before `bootRun` serves the resources.
+//
+// The minifier is deliberately conservative: it strips `/* ... */` block
+// comments, drops blank lines, and trims leading/trailing whitespace per line.
+// It does NOT touch whitespace around selectors or values, because CSS treats a
+// space as the descendant combinator (`a :hover` vs `a:hover`) and an
+// over-eager regex would silently change selector semantics. The savings target
+// is ~25–30 % on `styles.css` (the only big file), which is what the audit
+// estimated.
+//
+// No new build-time dependency was added — a battle-tested minifier
+// (yuicompressor / closure-stylesheets) would compress more aggressively, but
+// the LOW-priority finding does not justify a new classpath entry. Revisit if
+// the CSS surface grows beyond ~200 KB.
+tasks.register("minifyStaticCss") {
+  group = "build"
+  description = "Strips comments and blank lines from CSS files in the resources output (L-2)."
+  dependsOn("processResources")
+
+  val resourcesOutputDir = layout.buildDirectory.dir("resources/main/static/css")
+  inputs.files(fileTree("src/main/resources/static/css").matching { include("**/*.css") })
+  outputs.dir(resourcesOutputDir)
+
+  doLast {
+    val cssDir = resourcesOutputDir.get().asFile
+    if (!cssDir.exists()) {
+      logger.lifecycle("minifyStaticCss: no CSS directory at ${cssDir}; skipping")
+      return@doLast
+    }
+    val blockComment = Regex("""/\*[\s\S]*?\*/""")
+    var totalBefore = 0L
+    var totalAfter = 0L
+    cssDir.walkTopDown().filter { it.isFile && it.extension == "css" }.forEach { file ->
+      val original = file.readText(Charsets.UTF_8)
+      val withoutComments = blockComment.replace(original, "")
+      val minified =
+          withoutComments
+              .lineSequence()
+              .map { it.trim() }
+              .filter { it.isNotEmpty() }
+              .joinToString(separator = "\n")
+              .plus("\n")
+      file.writeText(minified, Charsets.UTF_8)
+      totalBefore += original.toByteArray(Charsets.UTF_8).size.toLong()
+      totalAfter += minified.toByteArray(Charsets.UTF_8).size.toLong()
+    }
+    if (totalBefore > 0) {
+      val pct = 100.0 * (totalBefore - totalAfter) / totalBefore
+      logger.lifecycle(
+          "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)")
+    }
+  }
+}
+tasks.named("classes").configure { dependsOn("minifyStaticCss") }
+

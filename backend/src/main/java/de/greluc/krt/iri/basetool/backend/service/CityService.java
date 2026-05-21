@@ -1,10 +1,13 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.config.CacheConfig;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.City;
 import de.greluc.krt.iri.basetool.backend.repository.CityRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -13,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Read service plus admin-override mutators for the city catalogue. The records themselves are
  * owned by {@link UexUniverseSyncService}; this service only exposes the read API and the
- * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page.
+ * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are
+ * cached against {@link CacheConfig#CITIES_CACHE}; the override mutators evict the whole cache. The
+ * 2-minute Caffeine TTL absorbs background-sync writes from {@link UexUniverseSyncService} without
+ * an explicit evict — admin edits via this service still see immediate consistency.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,11 +29,13 @@ public class CityService {
   private final CityRepository cityRepository;
 
   /**
-   * Returns the paged city catalogue.
+   * Returns the paged city catalogue. The page is cached per {@link Pageable} (default key
+   * generator) so list-page renders that hit the same sort/page combo skip the repository.
    *
    * @param pageable page request
    * @return one page of cities, sorted by the pageable's sort
    */
+  @Cacheable(cacheNames = CacheConfig.CITIES_CACHE)
   public Page<City> getAllCities(Pageable pageable) {
     return cityRepository.findAll(pageable);
   }
@@ -39,6 +47,7 @@ public class CityService {
    * @return the managed city entity
    * @throws NotFoundException when no city matches the id
    */
+  @Cacheable(cacheNames = CacheConfig.CITIES_CACHE)
   public City getCity(UUID id) {
     return cityRepository.findById(id).orElseThrow(() -> new NotFoundException("City not found"));
   }
@@ -52,6 +61,7 @@ public class CityService {
    * @return the persisted city
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.CITIES_CACHE, allEntries = true)
   public City setLoadingDockOverride(UUID id, boolean value) {
     City city = getCity(id);
     city.setHasLoadingDock(value);
@@ -67,6 +77,7 @@ public class CityService {
    * @return the persisted city
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.CITIES_CACHE, allEntries = true)
   public City clearLoadingDockOverride(UUID id) {
     City city = getCity(id);
     city.setHasLoadingDockOverridden(false);

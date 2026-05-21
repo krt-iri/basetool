@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves the squadron context of the current request and answers the "may the caller see / edit
@@ -45,6 +46,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class SquadronScopeService {
 
   /**
