@@ -14,10 +14,18 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      # Conservative Connection Pool Defaults for Production
-      maximum-pool-size: 10
+      # Production pool sizing — raised from the previous 10/30000 ms defaults after the
+      # performance audit (H-5). Resilience4j's bulkhead caps fan-out at 50 concurrent
+      # backend calls (see frontend application.yml) and Tomcat now runs virtual threads,
+      # so 10 JDBC connections starved the pool under ~10 concurrent users. 15 leaves
+      # headroom for the page-render fan-out (ParallelPageLoader issues 4 parallel calls
+      # per mission-detail / hangar render) without inflating idle-connection cost.
+      # connection-timeout 10 s replaces the previous 30 s: long enough to absorb
+      # legitimate transient pool pressure, short enough that a runaway query no longer
+      # makes a fresh request hang for half a minute before failing.
+      maximum-pool-size: 15
       minimum-idle: 2
-      connection-timeout: 30000
+      connection-timeout: 10000
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:

@@ -23,9 +23,12 @@ import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -33,12 +36,18 @@ import reactor.core.publisher.Mono;
 /**
  * Read-only HTTP client for the UEX (uexcorp.space) catalog API.
  *
- * <p>Every public {@code get…()} method follows the same pattern: a {@code GET} to the path
- * declared in {@link UexProperties}, a 30-second per-call timeout, JSON-decode into the matching
- * {@code UexResponseDto<UexXxxDto>}, and on ANY error return an empty list — the calling sync
- * services treat an empty payload as "skip this run" and explicitly never wipe local tables based
- * on it (see the UEX sync services for the rationale). This keeps a transient upstream outage from
- * truncating the local catalog.
+ * <p>Every public {@code get…()} method delegates to the shared {@link #fetchList} helper which
+ * adds {@code If-None-Match} to the request when a previous ETag is known for the same endpoint
+ * (M-5 from the performance audit), unwraps the {@code UexResponseDto<T>} envelope into a plain
+ * {@code List<T>}, applies a 30-second per-call timeout, and on ANY error or {@code 304 Not
+ * Modified} returns an empty list — the calling sync services treat an empty payload as "skip this
+ * run" and explicitly never wipe local tables based on it, so a transient outage or a feed that has
+ * not changed since the last sync both result in the same no-op behaviour.
+ *
+ * <p>ETag storage is an in-memory {@link ConcurrentHashMap} keyed by endpoint URL; entries survive
+ * for the lifetime of the application context and are deliberately not persisted (a restart pays
+ * the cost of one full sync per endpoint to repopulate them, which is the desired "fresh start"
+ * behaviour and avoids stale ETags surviving across a UEX-side cache flush).
  *
  * <p>The reactive {@code Mono} chain is collapsed with {@code blockOptional()} because all callers
  * are scheduled background tasks that have nothing else to do while waiting — synchronous code here
@@ -54,6 +63,9 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class UexClient {
 
+  /** Per-call timeout for the underlying reactive request. */
+  private static final Duration CALL_TIMEOUT = Duration.ofSeconds(30);
+
   private final WebClient.Builder webClientBuilder;
   private final UexProperties uexProperties;
 
@@ -64,6 +76,14 @@ public class UexClient {
    * WebClientConfig.
    */
   private WebClient client;
+
+  /**
+   * Last-seen {@code ETag} response header value, keyed by UEX endpoint path. Populated from the
+   * response of every successful {@code 2xx} call and replayed as {@code If-None-Match} on the next
+   * request to the same endpoint, so an unchanged feed short-circuits with a {@code 304 Not
+   * Modified}. Concurrent because two scheduled syncs may overlap if the previous one ran long.
+   */
+  private final Map<String, String> etagByEndpoint = new ConcurrentHashMap<>();
 
   /**
    * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
@@ -83,26 +103,14 @@ public class UexClient {
   /**
    * Fetches the full UEX commodity catalog. See class Javadoc for the shared pattern.
    *
-   * @return all commodities, or an empty list if the upstream call fails or times out
+   * @return all commodities, or an empty list if the upstream call fails, times out, or returns
+   *     {@code 304 Not Modified}
    */
   public List<UexCommodityDto> getCommodities() {
-    log.info("Fetching all commodities from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getCommoditiesEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexCommodityDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch commodities from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexCommodityDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getCommoditiesEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "commodities");
   }
 
   /**
@@ -110,416 +118,236 @@ public class UexClient {
    * largest UEX payload by far ({@literal >}1 MB) — see the {@code maxInMemorySize} in {@link
    * #initClient()}.
    *
-   * @return all commodity prices, or an empty list on error
+   * @return all commodity prices, or an empty list on error / 304
    */
   public List<UexCommodityPriceDto> getCommoditiesPricesAll() {
-    log.info("Fetching all commodities prices from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getCommoditiesPricesEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexCommodityPriceDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch commodities prices from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexCommodityPriceDto>builder()
-                      .data(Collections.emptyList())
-                      .build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getCommoditiesPricesEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "commodities prices");
   }
 
   /**
-   * Returns all star systems, or an empty list on error.
+   * Returns all star systems, or an empty list on error / 304.
    *
-   * @return all star systems, or an empty list on error
+   * @return all star systems, or an empty list on error / 304
    */
   public List<UexStarSystemDto> getStarSystems() {
-    log.info("Fetching all star systems from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getStarSystemsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexStarSystemDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch star systems from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexStarSystemDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getStarSystemsEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "star systems");
   }
 
   /**
-   * Returns all companies (in-universe manufacturers), or an empty list on error.
+   * Returns all companies (in-universe manufacturers), or an empty list on error / 304.
    *
-   * @return all companies (in-universe manufacturers), or an empty list on error
+   * @return all companies, or an empty list on error / 304
    */
   public List<UexCompanyDto> getCompanies() {
-    log.info("Fetching all companies from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getCompaniesEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexCompanyDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch companies from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexCompanyDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getCompaniesEndpoint(), new ParameterizedTypeReference<>() {}, "companies");
   }
 
   /**
-   * Returns all vehicles (ships and ground vehicles), or an empty list on error.
+   * Returns all vehicles (ships and ground vehicles), or an empty list on error / 304.
    *
-   * @return all vehicles (ships and ground vehicles), or an empty list on error
+   * @return all vehicles, or an empty list on error / 304
    */
   public List<UexVehicleDto> getVehicles() {
-    log.info("Fetching all vehicles from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getVehiclesEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexVehicleDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch vehicles from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexVehicleDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getVehiclesEndpoint(), new ParameterizedTypeReference<>() {}, "vehicles");
   }
 
   /**
-   * Returns all cities, or an empty list on error.
+   * Returns all cities, or an empty list on error / 304.
    *
-   * @return all cities, or an empty list on error
+   * @return all cities, or an empty list on error / 304
    */
   public List<UexCityDto> getCities() {
-    log.info("Fetching all citys from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getCitiesEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexCityDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch citys from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexCityDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getCitiesEndpoint(), new ParameterizedTypeReference<>() {}, "cities");
   }
 
   /**
-   * Returns all in-universe factions, or an empty list on error.
+   * Returns all in-universe factions, or an empty list on error / 304.
    *
-   * @return all in-universe factions, or an empty list on error
+   * @return all factions, or an empty list on error / 304
    */
   public List<UexFactionDto> getFactions() {
-    log.info("Fetching all factions from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getFactionsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexFactionDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch factions from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexFactionDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getFactionsEndpoint(), new ParameterizedTypeReference<>() {}, "factions");
   }
 
   /**
    * Returns all jurisdictions (legal authorities covering a system or region), or an empty list on
-   * error.
+   * error / 304.
    *
-   * @return all jurisdictions (legal authorities covering a system or region), or an empty list on
-   *     error
+   * @return all jurisdictions, or an empty list on error / 304
    */
   public List<UexJurisdictionDto> getJurisdictions() {
-    log.info("Fetching all jurisdictions from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getJurisdictionsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexJurisdictionDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch jurisdictions from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexJurisdictionDto>builder()
-                      .data(Collections.emptyList())
-                      .build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getJurisdictionsEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "jurisdictions");
   }
 
   /**
-   * Returns all moons, or an empty list on error.
+   * Returns all moons, or an empty list on error / 304.
    *
-   * @return all moons, or an empty list on error
+   * @return all moons, or an empty list on error / 304
    */
   public List<UexMoonDto> getMoons() {
-    log.info("Fetching all moons from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getMoonsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexMoonDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch moons from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexMoonDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getMoonsEndpoint(), new ParameterizedTypeReference<>() {}, "moons");
   }
 
   /**
-   * Returns all orbital locations, or an empty list on error.
+   * Returns all orbital locations, or an empty list on error / 304.
    *
-   * @return all orbital locations, or an empty list on error
+   * @return all orbits, or an empty list on error / 304
    */
   public List<UexOrbitDto> getOrbits() {
-    log.info("Fetching all orbits from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getOrbitsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexOrbitDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch orbits from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexOrbitDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getOrbitsEndpoint(), new ParameterizedTypeReference<>() {}, "orbits");
   }
 
   /**
-   * Returns all outposts, or an empty list on error.
+   * Returns all outposts, or an empty list on error / 304.
    *
-   * @return all outposts, or an empty list on error
+   * @return all outposts, or an empty list on error / 304
    */
   public List<UexOutpostDto> getOutposts() {
-    log.info("Fetching all outposts from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getOutpostsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexOutpostDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch outposts from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexOutpostDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getOutpostsEndpoint(), new ParameterizedTypeReference<>() {}, "outposts");
   }
 
   /**
-   * Returns all planets, or an empty list on error.
+   * Returns all planets, or an empty list on error / 304.
    *
-   * @return all planets, or an empty list on error
+   * @return all planets, or an empty list on error / 304
    */
   public List<UexPlanetDto> getPlanets() {
-    log.info("Fetching all planets from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getPlanetsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexPlanetDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch planets from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexPlanetDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getPlanetsEndpoint(), new ParameterizedTypeReference<>() {}, "planets");
   }
 
   /**
    * Returns all points of interest (Lagrange points, derelicts, anomalies), or an empty list on
-   * error.
+   * error / 304.
    *
-   * @return all points of interest (Lagrange points, derelicts, anomalies), or an empty list on
-   *     error
+   * @return all points of interest, or an empty list on error / 304
    */
   public List<UexPoiDto> getPoi() {
-    log.info("Fetching all pois from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getPoiEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexPoiDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch pois from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexPoiDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(uexProperties.getPoiEndpoint(), new ParameterizedTypeReference<>() {}, "pois");
   }
 
   /**
-   * Returns all space stations, or an empty list on error.
+   * Returns all space stations, or an empty list on error / 304.
    *
-   * @return all space stations, or an empty list on error
+   * @return all space stations, or an empty list on error / 304
    */
   public List<UexSpaceStationDto> getSpaceStations() {
-    log.info("Fetching all spacestations from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getSpaceStationsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexSpaceStationDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch spacestations from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexSpaceStationDto>builder()
-                      .data(Collections.emptyList())
-                      .build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getSpaceStationsEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "spacestations");
   }
 
   /**
-   * Returns all terminals (trade kiosks at any location type), or an empty list on error.
+   * Returns all terminals (trade kiosks at any location type), or an empty list on error / 304.
    *
-   * @return all terminals (trade kiosks at any location type), or an empty list on error
+   * @return all terminals, or an empty list on error / 304
    */
   public List<UexTerminalDto> getTerminals() {
-    log.info("Fetching all terminals from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getTerminalsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexTerminalDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch terminals from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexTerminalDto>builder().data(Collections.emptyList()).build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getTerminalsEndpoint(), new ParameterizedTypeReference<>() {}, "terminals");
   }
 
   /**
    * Fetches all refining methods (e.g. {@code Cormack}, {@code Pyrometric}, …). Drives the local
    * refining-method catalog used by the refinery-order pricing.
    *
-   * @return all refining methods, or an empty list on error
+   * @return all refining methods, or an empty list on error / 304
    */
   public List<UexRefiningMethodDto> getRefineriesMethods() {
-    log.info("Fetching all refineries methods from UEX API");
-
-    return client
-        .get()
-        .uri(uexProperties.getRefineriesMethodsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexRefiningMethodDto>>() {})
-        .timeout(Duration.ofSeconds(30))
-        .onErrorResume(
-            e -> {
-              log.error("Failed to fetch refineries methods from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexRefiningMethodDto>builder()
-                      .data(Collections.emptyList())
-                      .build());
-            })
-        .blockOptional()
-        .map(UexResponseDto::data)
-        .orElse(Collections.emptyList());
+    return fetchList(
+        uexProperties.getRefineriesMethodsEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "refineries methods");
   }
 
   /**
    * Fetches refinery yield ratios per (terminal, method, commodity). Used by the refinery sync to
    * compute expected output quantities for a given input.
    *
-   * @return all refinery yields, or an empty list on error
+   * @return all refinery yields, or an empty list on error / 304
    */
   public List<UexRefineryYieldDto> getRefineriesYields() {
-    log.info("Fetching all refineries yields from UEX API");
+    return fetchList(
+        uexProperties.getRefineriesYieldsEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "refineries yields");
+  }
 
-    return client
-        .get()
-        .uri(uexProperties.getRefineriesYieldsEndpoint())
-        .retrieve()
-        .bodyToMono(new ParameterizedTypeReference<UexResponseDto<UexRefineryYieldDto>>() {})
-        .timeout(Duration.ofSeconds(30))
+  /**
+   * Shared request pipeline for every UEX list endpoint. Implements the conditional GET (M-5)
+   * behaviour and the unified error / empty-list fallback.
+   *
+   * <ol>
+   *   <li>If we have a previous ETag for {@code endpoint}, attach it as {@code If-None-Match}.
+   *   <li>If the response is {@code 304 Not Modified}, log at DEBUG and return an empty list — sync
+   *       services treat this as "skip this run", exactly the right behaviour for unchanged data.
+   *   <li>On {@code 2xx}, store the response's ETag (if any) keyed by endpoint URL for the next
+   *       call, then deserialise the body into {@code UexResponseDto<T>} and unwrap the data list.
+   *   <li>On non-2xx (and non-304) responses, propagate the {@link
+   *       org.springframework.web.reactive.function.client.WebClientResponseException} through
+   *       {@code .createError()} into the unified {@code onErrorResume} fallback.
+   *   <li>On any error (timeout, decoding failure, server error), log at ERROR and return an empty
+   *       list — the caller MUST treat the result as "skip this run", not as "the table is empty".
+   * </ol>
+   *
+   * @param <T> the per-row payload type inside {@code UexResponseDto.data}
+   * @param endpoint UEX endpoint path (e.g. {@code /commodities}); also serves as the cache key
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log messages (singular/plural to taste)
+   * @return parsed list of {@code T}, or an empty list on error / 304
+   */
+  private <T> List<T> fetchList(
+      String endpoint,
+      ParameterizedTypeReference<UexResponseDto<T>> typeRef,
+      String resourceLabel) {
+    log.info("Fetching all {} from UEX API", resourceLabel);
+    WebClient.RequestHeadersSpec<?> request = client.get().uri(endpoint);
+    String previousEtag = etagByEndpoint.get(endpoint);
+    if (previousEtag != null) {
+      request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
+    }
+    return request
+        .exchangeToMono(
+            response -> {
+              if (response.statusCode().value() == 304) {
+                log.debug(
+                    "UEX {} unchanged since last sync (304 Not Modified) — skipping",
+                    resourceLabel);
+                return Mono.just(Collections.<T>emptyList());
+              }
+              if (!response.statusCode().is2xxSuccessful()) {
+                return response.createError();
+              }
+              String etag = response.headers().asHttpHeaders().getETag();
+              if (etag != null && !etag.isBlank()) {
+                etagByEndpoint.put(endpoint, etag);
+              }
+              return response.bodyToMono(typeRef).map(UexResponseDto::data);
+            })
+        .timeout(CALL_TIMEOUT)
         .onErrorResume(
             e -> {
-              log.error("Failed to fetch refineries yields from UEX API", e);
-              return Mono.just(
-                  UexResponseDto.<UexRefineryYieldDto>builder()
-                      .data(Collections.emptyList())
-                      .build());
+              log.error("Failed to fetch {} from UEX API", resourceLabel, e);
+              return Mono.just(Collections.<T>emptyList());
             })
         .blockOptional()
-        .map(UexResponseDto::data)
         .orElse(Collections.emptyList());
   }
 }

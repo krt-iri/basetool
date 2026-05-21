@@ -2,6 +2,17 @@ server:
   tomcat:
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
+    # Same M-3 connector-level tuning as the backend. The frontend's request
+    # profile is even more burst-prone than the backend's because every page
+    # render is a fan-out of 1..4 backend WebClient calls; under load a hung
+    # backend ties up the frontend request worker for the entire response
+    # timeout and the accept queue is what decides between "request queues" and
+    # "request gets refused at the socket layer".
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 200
+    max-connections: 10000
   max-http-request-header-size: 65536
   http2:
     enabled: true

@@ -38,10 +38,16 @@ public class MissionPresenceService {
 
   /**
    * Time after the last heartbeat at which a presence entry is considered stale and removed.
-   * Heartbeats arrive every ~10s from the client; 30s gives two missed beats of slack before the
-   * indicator disappears.
+   * Heartbeats arrive every ~60s from the client (see {@code HEARTBEAT_MS} in {@code
+   * mission-presence.js}); 120s gives two missed beats of slack before the indicator disappears.
+   *
+   * <p>L-7 from the performance audit raised both this value and the client-side heartbeat from 30s
+   * / 10s to keep the two-missed-beats safety ratio. Per-editor WebSocket frame traffic drops by 6×
+   * as a result; the UX cost is that a peer sees "user stopped editing" up to ~120s after the
+   * editor navigates away (was ~30s before). Tune both values together — lowering this in isolation
+   * would reap editors that are still actively heartbeating.
    */
-  public static final Duration ENTRY_TTL = Duration.ofSeconds(30);
+  public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
 
   private final Map<UUID, Map<String, Map<String, Entry>>> byMission = new ConcurrentHashMap<>();
 

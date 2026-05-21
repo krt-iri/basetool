@@ -134,13 +134,14 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("scopeSquadronId") UUID scopeSquadronId,
       Pageable pageable);
 
-  @Override
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
-  List<Mission> findAll();
-
   /**
-   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
+   * Lists every mission as a page. Overridden here to attach an {@code @EntityGraph} so the
+   * mission-list render does not N+1 on {@code participants} and {@code assignedUnits}. The
+   * unbounded {@code List<Mission> findAll()} sibling was deleted (M-9 from the performance audit)
+   * because the audit found zero production callers and an ArchUnit guard now blocks anyone from
+   * re-introducing a no-arg list-returning override on any repository in this package — every
+   * mission read path must go through paged search, the scoped search query, or a {@code findById}
+   * lookup.
    */
   @Override
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})

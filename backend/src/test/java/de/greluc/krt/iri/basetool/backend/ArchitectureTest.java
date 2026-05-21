@@ -348,6 +348,52 @@ class ArchitectureTest {
   }
 
   @Test
+  void repositoriesMustNotDeclareNoArgFindAll() {
+    // Reasoning: M-9 from the performance audit. A repository that overrides the inherited
+    // {@code List<T> findAll()} typically does so to attach an {@code @EntityGraph} — which
+    // means it intends to load every row WITH its eager-fetched collections in one shot.
+    // That is a latency / OOM bomb the moment the table grows: an unbounded result set joined
+    // against multiple collections produces a Cartesian explosion, and there is no pagination
+    // gate to catch it. Every read path through our repositories must go through
+    // {@code findAll(Pageable)}, a scoped query method (e.g. {@code searchMissions}), or a
+    // {@code findById} lookup. The inherited {@code CrudRepository.findAll()} cannot be
+    // blocked here (it lives on the parent interface), but at least our own code must not
+    // re-declare it — this rule fails the build the moment someone adds the override back.
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .resideInAPackage("..backend.repository..")
+        .and()
+        .haveName("findAll")
+        .and()
+        .haveRawParameterTypes(new Class<?>[0])
+        .should(failArchitectureCheckBecauseM9())
+        .because(
+            "Repositories must not override no-arg findAll() (M-9 from the performance "
+                + "audit). Use findAll(Pageable) or a scoped query method instead.")
+        // The intended steady state is zero matches: nothing in our repository package
+        // re-declares no-arg findAll(). ArchUnit fails empty `should` clauses by default
+        // ("did your rule actually run?"), so opt out — the inverse `noMethods` framing
+        // would also work but reads worse with the custom violation message above.
+        .allowEmptyShould(true)
+        .check(CLASSES);
+  }
+
+  private static ArchCondition<JavaMethod> failArchitectureCheckBecauseM9() {
+    return new ArchCondition<>("not exist (no-arg findAll() override violates M-9)") {
+      @Override
+      public void check(JavaMethod method, ConditionEvents events) {
+        events.add(
+            SimpleConditionEvent.violated(
+                method,
+                method.getFullName()
+                    + " — no-arg findAll() in a repository is the M-9 anti-pattern. "
+                    + "Switch to findAll(Pageable) or a scoped query method."));
+      }
+    };
+  }
+
+  @Test
   void writeEndpointsMustDeclareAnAuthorisationAnnotation() {
     // Reasoning: tightens `everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation`
     // from "the class declares *some* @PreAuthorize" to "every state-changing endpoint
