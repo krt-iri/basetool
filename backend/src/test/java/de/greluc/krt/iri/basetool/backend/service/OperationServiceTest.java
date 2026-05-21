@@ -124,6 +124,84 @@ class OperationServiceTest {
     assertEquals(1, result.getTotalElements());
   }
 
+  // --- searchOperations ----------------------------------------------------
+
+  @Nested
+  class SearchOperationsTests {
+
+    @Test
+    void forwardsCallerSuppliedStatusList_andResolvesScopeFromSquadronService() {
+      // The service must (1) honour the caller's status list verbatim and (2) read the squadron
+      // scope through SquadronScopeService, NOT bypass it - operations are a strict-staffel
+      // aggregate and a missing scope filter would leak other squadrons' operations.
+      PageRequest pageable = PageRequest.of(0, 20);
+      UUID squadronId = UUID.randomUUID();
+      List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
+
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(squadronId));
+      when(operationRepository.searchOperations("alpha", requestedStatus, squadronId, pageable))
+          .thenReturn(new PageImpl<>(List.of(new Operation())));
+
+      Page<Operation> result =
+          operationService.searchOperations("alpha", requestedStatus, pageable);
+
+      assertEquals(1, result.getTotalElements());
+      verify(operationRepository, times(1))
+          .searchOperations("alpha", requestedStatus, squadronId, pageable);
+    }
+
+    @Test
+    void nullStatusList_fallsBackToFullEnumSet() {
+      // The repository query uses `status IN (:status)` and an empty list would yield no results;
+      // the service must therefore expand `null`/empty to every OperationStatus name so callers
+      // can omit the parameter to mean "all statuses".
+      PageRequest pageable = PageRequest.of(0, 20);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
+      when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      operationService.searchOperations(null, null, pageable);
+
+      List<String> forwarded = statusCaptor.getValue();
+      assertTrue(forwarded.contains("PLANNED"));
+      assertTrue(forwarded.contains("ACTIVE"));
+      assertTrue(forwarded.contains("COMPLETED"));
+      assertTrue(forwarded.contains("CANCELED"));
+      assertEquals(4, forwarded.size(), "all four OperationStatus values must be forwarded");
+    }
+
+    @Test
+    void emptyStatusList_alsoFallsBackToFullEnumSet() {
+      // `List.of()` is a separate code path from `null` — both must produce the same fallback.
+      PageRequest pageable = PageRequest.of(0, 20);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
+      when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      operationService.searchOperations(null, List.of(), pageable);
+
+      assertEquals(4, statusCaptor.getValue().size());
+    }
+
+    @Test
+    void adminAllSquadronsMode_passesNullScopeToRepository() {
+      // SquadronScopeService.currentSquadronId() returns Optional.empty() for admins without an
+      // active squadron selection ("all squadrons" mode). The service must translate that to a
+      // null owningSquadronId so the JPA query disables the scope filter.
+      PageRequest pageable = PageRequest.of(0, 20);
+      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(operationRepository.searchOperations(any(), any(), any(), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      operationService.searchOperations(null, List.of("PLANNED"), pageable);
+
+      verify(operationRepository, times(1))
+          .searchOperations(null, List.of("PLANNED"), null, pageable);
+    }
+  }
+
   @Test
   void shouldDeleteOperation() {
     // Given

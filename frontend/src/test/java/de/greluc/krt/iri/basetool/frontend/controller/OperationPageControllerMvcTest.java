@@ -80,7 +80,9 @@ class OperationPageControllerMvcTest {
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
-            startsWith("/api/v1/operations?"), any(ParameterizedTypeReference.class), anyBoolean()))
+            startsWith("/api/v1/operations/search?"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
         .thenReturn(page);
 
     mockMvc
@@ -102,7 +104,9 @@ class OperationPageControllerMvcTest {
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
-            startsWith("/api/v1/operations?"), any(ParameterizedTypeReference.class), anyBoolean()))
+            startsWith("/api/v1/operations/search?"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
         .thenReturn(page);
 
     // English locale resolves to messages_en.properties → "ACTIVE".
