@@ -286,6 +286,11 @@
                                 </label>
                                 <input type="text" inputmode="numeric" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required th:readonly="${!canEdit}">
                             </div>
+
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label th:for="'quality_' + ${stat.index}" th:text="#{refineryorder.form.material.quality}">Qualität</label>
+                                <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" th:readonly="${!canEdit}">
+                            </div>
                         </div>
 
                         <div class="material-row mt-1-5">
@@ -304,11 +309,6 @@
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
                                 <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-5); cursor: not-allowed;">
-                            </div>
-                            
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                                <label th:for="'quality_' + ${stat.index}" th:text="#{refineryorder.form.material.quality}">Qualität</label>
-                                <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" th:readonly="${!canEdit}">
                             </div>
                         </div>
                     </div>
