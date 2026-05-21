@@ -71,7 +71,7 @@
     }
     .status-row {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 2rem;
     }
     .status-badge {
       display: inline-flex;
@@ -97,17 +97,6 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50%      { opacity: 0.4; transform: scale(0.7); }
     }
-    h1 {
-      font-family: 'Arial Black', 'Helvetica Neue', sans-serif;
-      color: var(--color-primary);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 1.6rem;
-      line-height: 1.15;
-      margin: 0 0 1.5rem;
-      text-align: center;
-      font-weight: 900;
-    }
     .lang-block {
       margin-top: 1.5rem;
       padding-top: 1.25rem;
@@ -117,15 +106,6 @@
       margin-top: 0;
       padding-top: 0;
       border-top: none;
-    }
-    .lang-label {
-      display: inline-block;
-      font-size: 0.68rem;
-      color: var(--color-primary);
-      text-transform: uppercase;
-      letter-spacing: 0.22em;
-      margin-bottom: 0.6rem;
-      font-weight: 700;
     }
     h2 {
       font-family: 'Arial Black', 'Helvetica Neue', sans-serif;
@@ -161,41 +141,34 @@
     @media (min-width: 768px) {
       body { padding: 2rem; }
       main.panel { padding: 3rem 2.5rem; }
-      h1 { font-size: 2.1rem; }
       h2 { font-size: 1.2rem; }
       p  { font-size: 1rem; }
     }
     /* Desktop (>= 1024px). */
     @media (min-width: 1024px) {
       main.panel { max-width: 760px; padding: 3.5rem 3rem; }
-      h1 { font-size: 2.4rem; }
       h2 { font-size: 1.25rem; }
       p  { font-size: 1.05rem; }
     }
     /* Ultra-wide (>= 1600px). */
     @media (min-width: 1600px) {
       main.panel { max-width: 820px; }
-      h1 { font-size: 2.6rem; }
     }
   </style>
 </head>
 <body>
-  <main class="panel" role="main" aria-labelledby="page-title">
+  <main class="panel" role="main" aria-label="Maintenance">
     <div class="status-row">
       <span class="status-badge"><span class="pulse" aria-hidden="true"></span>Maintenance</span>
     </div>
 
-    <h1 id="page-title">System Maintenance</h1>
-
     <section class="lang-block" lang="de">
-      <span class="lang-label">Deutsch</span>
       <h2>Wartungsarbeiten</h2>
       <p>Das IRIDIUM Basetool wird gerade aktualisiert. Bitte habt etwas Geduld &mdash; diese Seite lädt sich automatisch neu, sobald das System wieder erreichbar ist.</p>
       <p>Normalerweise dauert das nur wenige Augenblicke.</p>
     </section>
 
     <section class="lang-block" lang="en">
-      <span class="lang-label">English</span>
       <h2>Maintenance in Progress</h2>
       <p>The IRIDIUM Basetool is currently being updated. Please stand by &mdash; this page reloads automatically as soon as the system is back online.</p>
       <p>This typically only takes a few moments.</p>
