@@ -20,6 +20,7 @@ import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -462,7 +463,9 @@ public class RefineryOrderPageController {
     model.addAttribute("methods", fetchMethods());
     model.addAttribute("locations", fetchLocations());
     model.addAttribute("allLocations", fetchAllLocations());
-    model.addAttribute("missions", fetchMissions());
+    RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
+    UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
+    model.addAttribute("missions", fetchMissions(preserveMissionId));
     model.addAttribute("users", fetchUsers());
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("roundingMode", fetchRoundingMode());
@@ -780,16 +783,71 @@ public class RefineryOrderPageController {
   }
 
   private List<MissionListDto> fetchMissions() {
+    return fetchMissions(null);
+  }
+
+  /**
+   * Fetches the missions catalog for the refinery-order dropdowns, restricted to the last three
+   * months of {@code plannedStartTime} (future-scheduled missions are included) and sorted
+   * newest-first. Older missions are dropped so the dropdown does not balloon with historical
+   * operations the user is unlikely to pick. Pass {@code preserveMissionId} to retain a specific
+   * mission regardless of its plannedStartTime — used on the detail page so an existing order's
+   * linked mission stays visible even when it falls outside the three-month window.
+   *
+   * @param preserveMissionId mission id to keep in the result regardless of its plannedStartTime,
+   *     or {@code null} to apply the cut-off without preservation.
+   * @return mutable list of missions in newest-first order; empty on backend failure.
+   */
+  private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
       PageResponse<MissionListDto> p =
           backendApiClient.get("/api/v1/missions?size=1000", new ParameterizedTypeReference<>() {});
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
+      if (p == null) {
+        return new ArrayList<>();
       }
+      java.time.Instant cutoff =
+          java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMonths(3).toInstant();
+      return filterAndSortMissionsForDropdown(p.content(), cutoff, preserveMissionId);
     } catch (Exception e) {
       log.error("Failed to fetch missions", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Filters the given missions to those whose {@code plannedStartTime} is on or after {@code
+   * cutoff} (missions without a planned start are dropped) and sorts the result newest-first. If
+   * {@code preserveMissionId} is non-null and the matching mission is in {@code all} but missing
+   * from the filtered slice, it is appended to the end so the caller can keep it as a selected
+   * option without losing it from the dropdown.
+   *
+   * <p>Package-private for direct unit testing — the date arithmetic in the surrounding {@link
+   * #fetchMissions(UUID)} would otherwise be hidden behind the API client mock.
+   *
+   * @param all unfiltered mission list from the backend (may be {@code null} or empty).
+   * @param cutoff inclusive lower bound for {@code plannedStartTime}.
+   * @param preserveMissionId mission id to retain regardless of the cut-off, or {@code null}.
+   * @return mutable list of missions in newest-first order.
+   */
+  static List<MissionListDto> filterAndSortMissionsForDropdown(
+      List<MissionListDto> all, java.time.Instant cutoff, UUID preserveMissionId) {
+    if (all == null || all.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<MissionListDto> filtered =
+        new ArrayList<>(
+            all.stream()
+                .filter(m -> m.plannedStartTime() != null && !m.plannedStartTime().isBefore(cutoff))
+                .sorted(Comparator.comparing(MissionListDto::plannedStartTime).reversed())
+                .toList());
+    if (preserveMissionId != null
+        && filtered.stream().noneMatch(m -> preserveMissionId.equals(m.id()))) {
+      all.stream()
+          .filter(m -> preserveMissionId.equals(m.id()))
+          .findFirst()
+          .ifPresent(filtered::add);
+    }
+    return filtered;
   }
 
   private List<UserDto> fetchUsers() {
