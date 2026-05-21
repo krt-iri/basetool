@@ -77,6 +77,26 @@
             .form-group:has([required]) > label:has(> .yield-bonus-badge)::after {
                 content: none;
             }
+            /* Small "Material #N" header at the top of every material entry.
+               Hosts the per-entry Remove button on the right so it never overlaps
+               the input fields, matching the layout the detail page already uses. */
+            .material-entry-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 1px solid var(--color-gray-3);
+            }
+            .material-entry-title {
+                color: var(--color-primary);
+                font-family: var(--font-body);
+                font-weight: bold;
+                font-size: 0.85rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
         </style>
         <script th:src="@{/js/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
     </th:block>
@@ -241,9 +261,12 @@
                 </div>
                 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem; position: relative;">
-                        <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
-                        
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem;">
+                        <div class="material-entry-header">
+                            <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
+                            <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                        </div>
+
                         <div class="material-row">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
@@ -306,6 +329,8 @@
     window.krtRefineryYield.init(
         /*[[${materialYieldBonuses}]]*/ {},
         /*[[#{refineryorder.form.material.yieldBonus.help}]]*/ '');
+    const MATERIAL_ENTRY_TITLE_LABEL = /*[[#{refineryorder.form.material.entryTitle}]]*/ 'Material';
+    const MATERIAL_REMOVE_LABEL = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
 
     function calcScu(index) {
         const unitInput = document.getElementById('outputQuantity_' + index);
@@ -377,17 +402,30 @@
         const container = document.getElementById('materials-container');
         const entries = container.querySelectorAll('.material-entry');
         const count = entries.length;
-        
+
         const template = entries[0].cloneNode(true);
-        
+
+        // Renumber the title in the header. Source is row 0 ("Material #1") so without an
+        // update the cloned row would also read "Material #1" until the page is reloaded.
+        const title = template.querySelector('.material-entry-title');
+        if (title) {
+            title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (count + 1);
+        }
+
+        // Row 0 has no Remove button (the very first material can't be removed) — inject one
+        // into the cloned row's header. Wired through the delegated 'rfc-remove-material'
+        // krtEvents handler via data-trigger, matching the server-rendered button.
         if (!template.querySelector('.remove-btn')) {
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-secondary remove-btn';
-            removeBtn.style.cssText = 'position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;';
-            removeBtn.innerText = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
-            removeBtn.onclick = function() { removeMaterialRow(this); };
-            template.appendChild(removeBtn);
+            const header = template.querySelector('.material-entry-header');
+            if (header) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-secondary remove-btn';
+                removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+                removeBtn.setAttribute('data-trigger', 'rfc-remove-material');
+                removeBtn.innerText = MATERIAL_REMOVE_LABEL;
+                header.appendChild(removeBtn);
+            }
         }
         
         const inputs = template.querySelectorAll('input, select');
@@ -462,6 +500,10 @@
             const yieldBadge = entry.querySelector('span[id^="yieldBonus_"]');
             if (yieldBadge) {
                 yieldBadge.id = 'yieldBonus_' + index;
+            }
+            const title = entry.querySelector('.material-entry-title');
+            if (title) {
+                title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (index + 1);
             }
             const labels = entry.querySelectorAll('label');
             labels.forEach(label => {
