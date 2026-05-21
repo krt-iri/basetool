@@ -48,42 +48,14 @@
                 min-height: 44px;
             }
         }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.8);
-        }
 
-        .modal-content {
-            background-color: var(--color-bg-dark-gray);
-            margin: 10% auto;
-            padding: 2rem;
-            border: 1px solid var(--color-primary);
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 0 15px rgba(231, 126, 35, 0.3);
-        }
-
-        .close {
-            color: var(--color-gray-2);
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close:hover,
-        .close:focus {
-            color: var(--color-primary);
-            text-decoration: none;
-        }
+        /*
+         * Modal, .modal-content, and .close styles come from the central definition
+         * in styles.css. Do NOT re-declare them here — the previous local copy used
+         * z-index 1000 and clashed with the global 3000 (squadron-chip z-index 1200,
+         * sidebar overlay 1999 would otherwise render on top of an open inventory
+         * modal). See audit Phase 3 / K1.
+         */
 
         @media (max-width: 768px) {
             .my-inventory-filter {
@@ -393,9 +365,9 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="modal" th:style="${showBookOutModal != null ? 'display:block' : 'display:none'}">
+<div id="bookOutModal" class="modal" th:style="${showBookOutModal != null ? 'display:flex' : 'display:none'}">
     <div class="modal-content hud-box">
-        <span class="close" data-trigger="inv-my-close-bookout">&times;</span>
+        <span class="close" data-trigger="inv-my-close-bookout"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
         <h2 style="margin-top:0;" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
             <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
@@ -479,7 +451,7 @@
 
 <div id="noteModal" class="modal" style="display:none;">
     <div class="modal-content hud-box">
-        <span class="close" data-trigger="inv-my-close-note">&times;</span>
+        <span class="close" data-trigger="inv-my-close-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
         <h2 style="margin-top:0;" th:text="#{inventory.note.label}">Notiz</h2>
         <div class="form-group mb-1">
             <label for="noteModalTextarea" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.note.label}">Notiz</label>
@@ -499,7 +471,7 @@
 
 <div id="bulkCheckoutModal" class="modal" style="display:none;">
     <div class="modal-content hud-box">
-        <span class="close" data-trigger="inv-my-close-bulk">&times;</span>
+        <span class="close" data-trigger="inv-my-close-bulk"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
         <h2 style="margin-top:0;" th:text="#{inventory.bulk.checkout.modal.title}">Massenausbuchung bestätigen</h2>
         <p id="bulkCheckoutModalMessage" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; margin-bottom: 1.5rem;"></p>
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -563,7 +535,7 @@
         var msg = bulkI18n.modalMessage.replace('{0}', ids.length);
         var msgEl = document.getElementById('bulkCheckoutModalMessage');
         if (msgEl) msgEl.textContent = msg;
-        document.getElementById('bulkCheckoutModal').style.display = 'block';
+        document.getElementById('bulkCheckoutModal').style.display = 'flex';
     }
 
     function closeBulkCheckoutModal() {
@@ -643,7 +615,7 @@
         var note = btn.getAttribute('data-note') || '';
         ta.value = note;
         updateNoteCounter();
-        modal.style.display = 'block';
+        modal.style.display = 'flex';
         setTimeout(function () { ta.focus(); }, 0);
     }
 

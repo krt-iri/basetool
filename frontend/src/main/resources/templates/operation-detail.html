@@ -4,7 +4,6 @@
     <title th:text="#{operation.details} + ' - ' + ${appTitle}">Operation Details - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
         <style th:attr="nonce=${cspNonce}">
-            .form-group { margin-bottom: 1.5rem; }
             label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
             input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
             input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
@@ -591,7 +590,7 @@
                                         <tbody>
                                             <tr th:each="entry : ${msnFin.entries}">
                                                 <td>
-                                                    <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #28a745;">Einnahme</span>
+                                                    <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: var(--color-success);">Einnahme</span>
                                                     <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" class="text-danger">Ausgabe</span>
                                                 </td>
                                                 <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
@@ -623,8 +622,8 @@
 </div>
 
 <!-- Delete Modal -->
-<div id="delete-operation-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
-    <div class="modal-content hud-box" style="background:#141414; padding:2rem; max-width:500px; width:100%; margin: 10% auto; border: 1px solid var(--color-danger);">
+<div id="delete-operation-modal" class="modal" style="display:none;">
+    <div class="modal-content hud-box" style="max-width:500px; border-color: var(--color-danger);">
         <h2 th:text="#{general.confirm}" class="text-danger">Confirm Delete</h2>
         <p th:text="#{operation.delete.confirm}" style="margin: 1.5rem 0;">Confirm that you want to delete this operation.</p>
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">

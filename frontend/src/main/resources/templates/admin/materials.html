@@ -6,9 +6,6 @@
         .data-section {
             margin-bottom: 3rem;
         }
-        .form-group {
-            margin-bottom: 1rem;
-        }
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
@@ -132,7 +129,7 @@
                 <tbody>
                     <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}">
                         <td>
-                            <span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: #ffc107; margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
+                            <span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
                         </td>
                         <td>
                             <div style="white-space: nowrap;">

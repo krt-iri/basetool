@@ -1,30 +1,60 @@
+/*
+ * KRT Keycloak login theme.
+ *
+ * DESIGN-TOKEN SOURCE OF TRUTH: the canonical KRT design tokens (colors,
+ * typography stack, spacing) are defined in `frontend/src/main/resources/
+ * static/css/styles.css :root`. This file mirrors the same values so the
+ * Keycloak login renders identically to the in-app screens (same orange,
+ * same dark background, same Ethnocentric headlines, same Lato body).
+ *
+ * MAINTENANCE RULE: any styleguide change to a token must be reflected in
+ * both files in the same commit. The `.btn` / `.btn-secondary` aliases at
+ * the bottom of this file let templates use the same class names the
+ * frontend uses, so future Keycloak template patches do not have to learn
+ * a second naming convention.
+ */
+
 /* Fonts */
+/*
+ * WOFF2 first (~40% the size of TTF/OTF), TTF/OTF as a fallback for legacy
+ * browsers. `font-display: swap` shows the system fallback immediately and
+ * swaps in the brand font once it has arrived, eliminating the FOIT blank
+ * period that the default `auto` causes. Matches frontend/static/css/styles.css.
+ */
 @font-face {
     font-family: 'Ethnocentric';
-    src: url('../fonts/Ethnocentric Rg.otf') format('opentype');
+    src: url('../fonts/Ethnocentric Rg.woff2') format('woff2'),
+         url('../fonts/Ethnocentric Rg.otf') format('opentype');
     font-weight: normal;
     font-style: normal;
+    font-display: swap;
 }
 
 @font-face {
     font-family: 'Lato';
-    src: url('../fonts/Lato-Light.ttf') format('truetype');
+    src: url('../fonts/Lato-Light.woff2') format('woff2'),
+         url('../fonts/Lato-Light.ttf') format('truetype');
     font-weight: 300;
     font-style: normal;
+    font-display: swap;
 }
 
 @font-face {
     font-family: 'Lato';
-    src: url('../fonts/Lato-Regular.ttf') format('truetype');
+    src: url('../fonts/Lato-Regular.woff2') format('woff2'),
+         url('../fonts/Lato-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
+    font-display: swap;
 }
 
 @font-face {
     font-family: 'Lato';
-    src: url('../fonts/Lato-Bold.ttf') format('truetype');
+    src: url('../fonts/Lato-Bold.woff2') format('woff2'),
+         url('../fonts/Lato-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
+    font-display: swap;
 }
 
 :root {
@@ -122,6 +152,19 @@ body {
 .login-container::after {
     bottom: -2px; right: -2px;
     border-left: none; border-top: none;
+}
+
+/*
+ * Brand mark above the login title. Kept small so it complements but does
+ * not dominate the "IRIDIUM BASETOOL" headline below. Uses the same SVG the
+ * frontend renders in the page header so users see one consistent mark
+ * across browser SSO redirects and the in-app navigation.
+ */
+.login-logo {
+    display: block;
+    width: 96px;
+    height: auto;
+    margin: 0 auto 20px auto;
 }
 
 h1 {
@@ -806,4 +849,52 @@ input[type="checkbox"]:checked::after,
 .krt-qr-code-img {
     max-width: 100% !important;
     height: auto !important;
+}
+
+/*
+ * Frontend-class aliases.
+ *
+ * The in-app frontend uses `.btn`, `.btn-secondary`, `.btn-danger` for
+ * buttons. The Keycloak FTL templates historically use `.krt-button` /
+ * `.krt-button-secondary` because that is what the upstream FTL fragments
+ * expect to be overridden. To keep templates portable and to let an
+ * engineer copy a snippet from the app into a Keycloak template (or vice
+ * versa) without renaming classes, both naming conventions render the
+ * same visuals — these rules forward to the `.krt-button*` cascade above.
+ */
+.btn {
+    width: auto;
+    display: inline-block;
+    padding: 12px 15px;
+    background-color: var(--color-primary);
+    color: var(--color-bg-black);
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background-color 0.3s, transform 0.1s;
+    font-weight: normal;
+    text-decoration: none;
+    box-sizing: border-box;
+    border-radius: 0;
+    min-height: 44px;
+}
+.btn:hover {
+    background-color: var(--color-accent-light);
+}
+.btn-secondary {
+    background-color: var(--color-gray-3);
+    color: var(--color-gray-1);
+    border: 1px solid var(--color-gray-3);
+}
+.btn-secondary:hover {
+    background-color: var(--color-gray-2);
+}
+.btn-danger {
+    background-color: var(--color-dept-combat, #A3000A);
+    color: #FFFFFF;
+}
+.btn-danger:hover {
+    background-color: #D41A25;
 }
