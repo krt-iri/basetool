@@ -1074,7 +1074,12 @@
             confirmBtn.disabled = true;
             cancelBtn.disabled = true;
 
-            fetch('/inventory/all', { method: 'DELETE', credentials: 'same-origin' })
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+            const reqHeaders = {};
+            if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
+
+            fetch('/inventory/all', { method: 'DELETE', headers: reqHeaders, credentials: 'same-origin' })
                 .then(function(resp) {
                     if (!resp.ok) {
                         throw new Error(resp.status);
