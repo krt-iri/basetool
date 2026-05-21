@@ -80,18 +80,6 @@ body {
     font-weight: 300;
     margin: 0;
     padding: 0;
-    /*
-     * Make the body a flex column so the global footer (injected by
-     * sidebar.html JS at the bottom of <body>) sits below the content
-     * even on short pages, while still letting <main> grow to fill the
-     * viewport when content is taller.
-     */
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-}
-body > main {
-    flex: 1 0 auto;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -293,14 +281,14 @@ tr:hover {
  * looking for Impressum / Datenschutz / Nutzungsbedingungen can find them
  * without opening the navigation drawer.
  */
+/*
+ * The footer is included from `fragments/sidebar.html` near the top of
+ * <body>, before <header> and <main>. Sidebar JS moves the element to be
+ * the last child of <body> on DOMContentLoaded so it renders below the
+ * content without forcing body into a flex layout (which would break the
+ * width calculation of <main { max-width; margin: 0 auto }>).
+ */
 .krt-footer {
-    flex: 0 0 auto;
-    /*
-     * The footer is included from `fragments/sidebar.html` near the top of
-     * <body>, before <header> and <main>. We use `order: 999` so the flex
-     * column layout still renders it last regardless of DOM position.
-     */
-    order: 999;
     margin-top: 2rem;
     padding: 1rem 2rem;
     background-color: var(--color-bg-dark-gray);
@@ -1576,8 +1564,6 @@ input[type="radio"]:focus {
     border: 1px solid var(--color-primary);
     width: 80%;
     max-width: 800px;
-    max-height: 90vh;
-    overflow-y: auto;
     box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
 }
 

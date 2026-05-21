@@ -181,6 +181,17 @@
                 }
             }
 
+            // Relocate the global footer to the bottom of <body>. The footer
+            // fragment is included from this sidebar fragment, which Thymeleaf
+            // renders near the top of <body> — before <header> and <main>. We
+            // move it to be the last child so it renders below the content
+            // without forcing <body> into a flex layout (which would break
+            // the width calculation of <main { max-width; margin: 0 auto }>).
+            const footerEl = document.querySelector('body > .krt-footer');
+            if (footerEl && footerEl !== document.body.lastElementChild) {
+                document.body.appendChild(footerEl);
+            }
+
             const sidebarEl = document.getElementById('sidebar');
             const overlayEl = document.getElementById('sidebar-overlay');
             const closeBtn = document.getElementById('close-sidebar');
