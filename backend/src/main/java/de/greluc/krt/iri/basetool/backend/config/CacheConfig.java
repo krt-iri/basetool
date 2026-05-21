@@ -2,7 +2,6 @@ package de.greluc.krt.iri.basetool.backend.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
-import java.util.List;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -12,65 +11,134 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Caffeine-backed Spring cache manager for the project's reference-data caches.
  *
- * <p>Every cache has the same policy ({@code maximumSize=1000}, {@code expireAfterWrite=2m},
- * statistics recording on). 2&nbsp;minutes is short enough that admin edits in Keycloak / the
- * master-data screens become visible without manual cache eviction and long enough to amortize the
- * cost of the catalog lookups that fire on every list-page render. {@code setAllowNullValues=false}
- * forces services to never store {@code null} — a missed lookup must remain a miss so the next call
- * retries instead of caching the absence.
+ * <p>Per-cache TTLs (L-4 from the performance audit) instead of one global value, because the
+ * caches have very different freshness requirements:
+ *
+ * <ul>
+ *   <li><b>Master data (30 min)</b> — cities, materials, ship types, locations, frequency types,
+ *       job types, manufacturers, refining methods, star systems, mission lead types, material
+ *       categories. Quasi-static: editor flows already trigger {@code @CacheEvict
+ *       (allEntries=true)} on writes, so a stale entry only survives until the next admin write or
+ *       the 30 min lapse — whichever comes first. The previous 2 min global TTL kept paying the
+ *       underlying DB-hit cost 15× per hour for data that almost never changes.
+ *   <li><b>Squadrons (10 min)</b> — slower than master data because admins toggle the active
+ *       squadron mid-session via the {@code X-Active-Squadron-Id} header, but the squadron entity
+ *       itself rarely changes. {@code SquadronService} already evicts on writes.
+ *   <li><b>Roles (2 min)</b> — kept short. A Keycloak role change should propagate quickly so a
+ *       freshly-elevated officer does not stare at a 30 min cached "you don't have permission"
+ *       page; 2 min is the audit's recommended fast-propagation floor for permission-sensitive
+ *       data.
+ * </ul>
+ *
+ * <p>All caches share the same Caffeine sizing ({@code maximumSize=1000}, statistics on) and the
+ * {@code setAllowNullValues=false} contract — a missed lookup must remain a miss so the next call
+ * retries instead of caching the absence. The {@link CaffeineCacheManager#registerCustomCache} API
+ * lets us keep one manager bean while giving each cache its own builder, instead of falling back to
+ * {@code SimpleCacheManager} (which would change the bean type and trip the existing {@code
+ * CacheConfigTest.cacheManagerIsTheCaffeineBackedOne} assertion).
  */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
+  /** Default cache size in entries — the same value historically used for every cache. */
+  private static final long MAX_CACHE_SIZE = 1000;
+
+  /** TTL for quasi-static master data; explicit {@code @CacheEvict} on writes handles updates. */
+  private static final Duration MASTER_DATA_TTL = Duration.ofMinutes(30);
+
+  /** TTL for squadron context — slower than master data, still infrequently changing. */
+  private static final Duration SQUADRONS_TTL = Duration.ofMinutes(10);
+
+  /** TTL for permission-sensitive data; Keycloak role changes must propagate quickly. */
+  private static final Duration ROLES_TTL = Duration.ofMinutes(2);
+
+  /** Cache name for the city reference catalogue. */
   public static final String CITIES_CACHE = "cities";
+
+  /** Cache name for the frequency-type reference catalogue. */
   public static final String FREQUENCY_TYPES_CACHE = "frequencyTypes";
+
+  /** Cache name for the job-type reference catalogue. */
   public static final String JOB_TYPES_CACHE = "jobTypes";
+
+  /** Cache name for the squadron reference catalogue. */
   public static final String SQUADRONS_CACHE = "squadrons";
+
+  /** Cache name for the location reference catalogue. */
   public static final String LOCATIONS_CACHE = "locations";
+
+  /** Cache name for the manufacturer reference catalogue. */
   public static final String MANUFACTURERS_CACHE = "manufacturers";
+
+  /** Cache name for the material-category reference catalogue. */
   public static final String MATERIAL_CATEGORIES_CACHE = "materialCategories";
+
+  /** Cache name for the material reference catalogue. */
   public static final String MATERIALS_CACHE = "materials";
+
+  /** Cache name for the mission-lead-type reference catalogue. */
   public static final String MISSION_LEAD_TYPES_CACHE = "missionLeadTypes";
+
+  /** Cache name for the refining-method reference catalogue. */
   public static final String REFINING_METHODS_CACHE = "refiningMethods";
+
+  /** Cache name for the role / permission catalogue. */
   public static final String ROLES_CACHE = "roles";
+
+  /** Cache name for the ship-type reference catalogue. */
   public static final String SHIP_TYPES_CACHE = "shipTypes";
+
+  /** Cache name for the star-system reference catalogue. */
   public static final String STAR_SYSTEMS_CACHE = "starSystems";
 
   /**
-   * Builds the shared {@link CacheManager} with the project's standard Caffeine policy and the
-   * fixed set of named caches above. Cache names are referenced from the {@code @Cacheable}
-   * annotations on the service layer; an unknown name throws at startup rather than silently
-   * creating a new cache.
+   * Builds the shared {@link CacheManager} with per-cache Caffeine specs. Every cache name is
+   * pre-registered via {@link CaffeineCacheManager#registerCustomCache(String,
+   * com.github.benmanes.caffeine.cache.Cache)} so an unknown name on a {@code @Cacheable}
+   * annotation throws at startup rather than silently creating a default-policy cache.
    *
-   * @return configured Caffeine cache manager
+   * @return configured Caffeine cache manager with per-cache TTLs (see class Javadoc)
    */
   @Bean
   public CacheManager cacheManager() {
-    Caffeine<Object, Object> builder =
-        Caffeine.newBuilder()
-            .maximumSize(1000)
-            .expireAfterWrite(Duration.ofMinutes(2))
-            .recordStats();
-
     CaffeineCacheManager manager = new CaffeineCacheManager();
-    manager.setCaffeine(builder);
     manager.setAllowNullValues(false);
-    manager.setCacheNames(
-        List.of(
-            CITIES_CACHE,
-            FREQUENCY_TYPES_CACHE,
-            JOB_TYPES_CACHE,
-            SQUADRONS_CACHE,
-            LOCATIONS_CACHE,
-            MANUFACTURERS_CACHE,
-            MATERIAL_CATEGORIES_CACHE,
-            MATERIALS_CACHE,
-            MISSION_LEAD_TYPES_CACHE,
-            REFINING_METHODS_CACHE,
-            ROLES_CACHE,
-            SHIP_TYPES_CACHE,
-            STAR_SYSTEMS_CACHE));
+
+    register(manager, CITIES_CACHE, MASTER_DATA_TTL);
+    register(manager, FREQUENCY_TYPES_CACHE, MASTER_DATA_TTL);
+    register(manager, JOB_TYPES_CACHE, MASTER_DATA_TTL);
+    register(manager, LOCATIONS_CACHE, MASTER_DATA_TTL);
+    register(manager, MANUFACTURERS_CACHE, MASTER_DATA_TTL);
+    register(manager, MATERIAL_CATEGORIES_CACHE, MASTER_DATA_TTL);
+    register(manager, MATERIALS_CACHE, MASTER_DATA_TTL);
+    register(manager, MISSION_LEAD_TYPES_CACHE, MASTER_DATA_TTL);
+    register(manager, REFINING_METHODS_CACHE, MASTER_DATA_TTL);
+    register(manager, SHIP_TYPES_CACHE, MASTER_DATA_TTL);
+    register(manager, STAR_SYSTEMS_CACHE, MASTER_DATA_TTL);
+
+    register(manager, SQUADRONS_CACHE, SQUADRONS_TTL);
+    register(manager, ROLES_CACHE, ROLES_TTL);
+
     return manager;
+  }
+
+  /**
+   * Registers a Caffeine cache under {@code name} with the shared sizing/statistics policy and the
+   * supplied TTL. Centralised here so changing the shared sizing later is a one-line edit and the
+   * per-cache lines above stay focused on the policy decision.
+   *
+   * @param manager target Spring cache manager
+   * @param name cache name (the constant referenced from {@code @Cacheable(cacheNames = …)})
+   * @param ttl write-expire duration
+   */
+  private static void register(CaffeineCacheManager manager, String name, Duration ttl) {
+    manager.registerCustomCache(
+        name,
+        Caffeine.newBuilder()
+            .maximumSize(MAX_CACHE_SIZE)
+            .expireAfterWrite(ttl)
+            .recordStats()
+            .build());
   }
 }

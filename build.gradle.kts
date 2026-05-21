@@ -102,6 +102,14 @@ subprojects {
       finalizedBy(tasks.named("jacocoTestReport"))
     }
     tasks.named<JacocoReport>("jacocoTestReport") {
+      // L-1: only generate the JaCoCo report when actually running in CI.
+      // Locally a developer running `./gradlew :backend:test` from the IDE pays
+      // the JaCoCo instrumentation overhead twice (test-runtime + the report
+      // task) for output nobody looks at — Codecov / SonarQube only consume it
+      // from CI runs. The `CI` env var is set by GitHub Actions by default,
+      // GitLab CI, CircleCI, Drone and every other major runner; setting it
+      // locally via `CI=true ./gradlew test` opts in explicitly when needed.
+      onlyIf { System.getenv("CI") != null }
       reports {
         xml.required.set(true)
         csv.required.set(true)
