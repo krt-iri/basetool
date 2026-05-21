@@ -112,6 +112,57 @@ public class OperationController {
   }
 
   /**
+   * Filtered + paged operation search. Mirrors {@link
+   * de.greluc.krt.iri.basetool.backend.controller.MissionController#searchMissions} within the
+   * limits of the operation aggregate: free-text query and status list. Operations have no {@code
+   * plannedStartTime} of their own (that field lives on the underlying missions), so the missions'
+   * date-range filter has no meaningful equivalent here and is deliberately omitted. Empty {@code
+   * status} from the caller is forwarded as-is and the service falls back to every {@code
+   * OperationStatus}; an explicit list narrows the result.
+   *
+   * @param query free-text name/description fragment
+   * @param status status filter (one or more)
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort token (default {@code createdAt,desc})
+   * @return paged operation DTOs
+   */
+  @GetMapping("/search")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Search operations (paginated)",
+      description =
+          "Returns operations matching the supplied filters (free-text query + status list). "
+              + "Operations have no `plannedStartTime` of their own - that field lives on the "
+              + "underlying missions - so the missions' date-range filter has no equivalent here. "
+              + "Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. "
+              + "`id` is appended automatically as a stable tiebreaker.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Paginated list of operations."),
+    @ApiResponse(responseCode = "400", description = "Unsupported sort field."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
+  })
+  @Transactional(readOnly = true)
+  public PageResponse<OperationDto> searchOperations(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false, defaultValue = "0") Integer page,
+      @RequestParam(required = false, defaultValue = "10") Integer size,
+      @RequestParam(required = false, defaultValue = "createdAt,desc") String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
+    Page<OperationDto> dtoPage =
+        operationService.searchOperations(query, status, pageable).map(operationMapper::toDto);
+    return new PageResponse<>(
+        dtoPage.getContent(),
+        dtoPage.getNumber(),
+        dtoPage.getSize(),
+        dtoPage.getTotalElements(),
+        dtoPage.getTotalPages(),
+        PaginationUtil.toSortStrings(dtoPage.getSort()));
+  }
+
+  /**
    * Slim id + name projection of every operation visible to the caller, sorted by name. Drives the
    * mission-detail page's operation-picker dropdown — replaces the previous {@code
    * /api/v1/operations?page=0&size=1000} call that pulled the full {@code OperationDto} payload for

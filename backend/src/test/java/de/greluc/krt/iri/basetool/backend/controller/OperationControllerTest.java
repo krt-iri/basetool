@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.mapper.OperationMapper;
@@ -180,5 +181,57 @@ class OperationControllerTest {
     OperationDto result = operationController.getOperationById(id);
 
     assertEquals(Boolean.FALSE, result.payoutPreliminary());
+  }
+
+  // --- searchOperations ----------------------------------------------------
+
+  @Test
+  void searchOperations_forwardsFiltersToServiceAndWrapsPageResponse() {
+    List<String> statuses = List.of("PLANNED", "ACTIVE");
+    Operation entity = new Operation();
+    OperationDto dto =
+        new OperationDto(
+            UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, null, 0L, null, null, null);
+
+    when(operationService.searchOperations(eq("alpha"), eq(statuses), any(Pageable.class)))
+        .thenAnswer(invocation -> new PageImpl<>(List.of(entity), invocation.getArgument(2), 1));
+    when(operationMapper.toDto(entity)).thenReturn(dto);
+
+    PageResponse<OperationDto> resp =
+        operationController.searchOperations("alpha", statuses, 0, 10, "createdAt,desc");
+
+    assertEquals(1, resp.totalElements());
+    assertEquals(dto, resp.content().getFirst());
+    verify(operationService, times(1))
+        .searchOperations(eq("alpha"), eq(statuses), any(Pageable.class));
+  }
+
+  @Test
+  void searchOperations_rejectsUnknownSortField_with400() {
+    // Defence-in-depth: the search endpoint reuses the same ALLOWED_SORT whitelist as
+    // getAllOperations, so an attacker probing typical column names must be short-circuited
+    // before the service is ever called.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operationController.searchOperations(null, null, 0, 10, "password,asc"));
+
+    verify(operationService, never()).searchOperations(any(), any(), any(Pageable.class));
+  }
+
+  @Test
+  void searchOperations_appendsIdAsStableTiebreaker() {
+    // Two operations created at the same Instant would otherwise swap order between pages —
+    // PaginationUtil must append `id` as a secondary sort because it's in the whitelist.
+    when(operationService.searchOperations(any(), any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    operationController.searchOperations(null, null, 0, 10, "createdAt,desc");
+
+    ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+    verify(operationService).searchOperations(any(), any(), captor.capture());
+    Sort sort = captor.getValue().getSort();
+    assertNotNull(sort.getOrderFor("createdAt"));
+    assertNotNull(
+        sort.getOrderFor("id"), "PaginationUtil must append `id` as a stable secondary sort");
   }
 }

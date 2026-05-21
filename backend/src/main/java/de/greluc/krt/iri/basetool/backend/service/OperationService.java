@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationPayoutStatus;
+import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -23,6 +24,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -117,6 +119,32 @@ public class OperationService {
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
     UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
     return operationRepository.findAllScoped(owningSquadronId, pageable);
+  }
+
+  /**
+   * Free-text + status + scope search across operations. Mirrors {@code
+   * MissionService.searchMissions} within the limits of the operation aggregate: operations have no
+   * {@code plannedStartTime} of their own (that field lives on the underlying missions), so the
+   * missions' date-range filter has no meaningful equivalent here and is deliberately omitted.
+   * Falls back to the full {@link OperationStatus} enum set when {@code status} is {@code null} or
+   * empty - the SQL contract requires a non-empty list. The squadron scope is resolved through
+   * {@link SquadronScopeService} (admin "all squadrons" mode resolves to {@code null}).
+   *
+   * @param query free-text name/description fragment, may be {@code null}
+   * @param status status list (string names of {@link OperationStatus}); {@code null}/empty means
+   *     all statuses
+   * @param pageable page request
+   * @return paged matching operations
+   */
+  @NotNull
+  public Page<Operation> searchOperations(
+      @Nullable String query, @Nullable List<String> status, @NotNull Pageable pageable) {
+    List<String> effectiveStatus =
+        (status == null || status.isEmpty())
+            ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
+            : status;
+    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    return operationRepository.searchOperations(query, effectiveStatus, owningSquadronId, pageable);
   }
 
   /**

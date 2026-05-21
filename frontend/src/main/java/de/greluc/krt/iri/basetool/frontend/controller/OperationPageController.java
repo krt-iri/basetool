@@ -9,6 +9,8 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,30 +57,66 @@ public class OperationPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the paginated operations list.
+   * Renders the paginated, filtered operations list. Mirrors the missions overview filter contract
+   * within the limits of the operation aggregate: free-text {@code search} matches name +
+   * description, and {@code showPast} flips the default status filter from {@code PLANNED}+{@code
+   * ACTIVE} to the full set. Operations have no {@code plannedStartTime} of their own (that field
+   * lives on the underlying missions), so the date-range filter from the missions overview has no
+   * meaningful equivalent here and is deliberately omitted. When {@code fragment=results} is
+   * supplied the controller returns just the results fragment so the client-side AJAX filter can
+   * patch the list in place without a full page reload.
    *
+   * @param search free-text query, may be {@code null}
+   * @param showPast when {@code true} (and authenticated), include COMPLETED and CANCELED
    * @param page zero-based page index
    * @param size page size (default 20)
+   * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @return the {@code operations-index} view name
+   * @param principal current OIDC user (null for guests — the endpoint stays auth-only via
+   *     {@code @PreAuthorize}, this is used to decide whether {@code showPast} is honoured)
+   * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String listOperations(
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false, defaultValue = "false") boolean showPast,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
-      Model model) {
+      @RequestParam(required = false) String fragment,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
+    if (search != null && !search.isBlank()) {
+      uri.append("query=").append(URLEncoder.encode(search, StandardCharsets.UTF_8)).append("&");
+    }
+    uri.append("page=").append(page).append("&");
+    uri.append("size=").append(size).append("&");
+    uri.append("sort=createdAt,desc&");
+
+    boolean effectiveShowPast = showPast && principal != null;
+    if (effectiveShowPast) {
+      uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
+    } else {
+      uri.append("status=PLANNED&status=ACTIVE&");
+    }
+
     try {
       PageResponse<OperationDto> operationsPage =
           backendApiClient.get(
-              "/api/v1/operations?page=" + page + "&size=" + size + "&sort=createdAt,desc",
+              uri.toString(),
               new ParameterizedTypeReference<PageResponse<OperationDto>>() {},
               false);
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
+      model.addAttribute("search", search);
+      model.addAttribute("showPast", effectiveShowPast);
     } catch (Exception e) {
       log.error("Error loading operations", e);
       model.addAttribute("error", "error.operations.load");
+    }
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "operations-index :: operationsResults";
     }
     return "operations-index";
   }
