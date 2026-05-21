@@ -28101,7 +28101,7 @@
             "format" : "int32"
           }
         },
-        "required" : [ "inputMaterial", "inputQuantity" ]
+        "required" : [ "inputMaterial", "inputQuantity", "outputQuantity" ]
       },
       "RefineryOrderDto" : {
         "type" : "object",

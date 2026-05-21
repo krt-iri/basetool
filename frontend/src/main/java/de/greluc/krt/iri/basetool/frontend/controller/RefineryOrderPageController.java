@@ -252,7 +252,7 @@ public class RefineryOrderPageController {
                   g.getInputQuantity(),
                   outMat,
                   g.getOutputQuantity(),
-                  g.getQuality(),
+                  g.getQuality() != null ? g.getQuality() : 0,
                   null,
                   null));
         }
@@ -591,7 +591,7 @@ public class RefineryOrderPageController {
                   g.getInputQuantity(),
                   outMat,
                   g.getOutputQuantity(),
-                  g.getQuality(),
+                  g.getQuality() != null ? g.getQuality() : 0,
                   null,
                   null));
         }

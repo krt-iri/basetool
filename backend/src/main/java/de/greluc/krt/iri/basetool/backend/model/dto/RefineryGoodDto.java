@@ -20,6 +20,6 @@ public record RefineryGoodDto(
     @NotNull MaterialDto inputMaterial,
     @NotNull @Min(1) Integer inputQuantity,
     MaterialDto outputMaterial,
-    @Min(1) Integer outputQuantity,
+    @NotNull @Min(1) Integer outputQuantity,
     Integer quality,
     Integer yieldBonusPercent) {}
