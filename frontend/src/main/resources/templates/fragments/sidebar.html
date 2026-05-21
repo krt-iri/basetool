@@ -130,14 +130,6 @@
                     </a>
                 </div>
             </div>
-            <!-- Discreet build-version label. Sourced from `BuildProperties` via
-                 `AppVersionAdvice` (gradle `bootBuildInfo` task writes
-                 META-INF/build-info.properties at package time). Sits below the
-                 language switcher as a low-emphasis footnote — never an
-                 interactive control. -->
-            <div class="sidebar-version"
-                 th:title="#{app.version.tooltip}"
-                 th:text="#{app.version.display(${appVersion})}">v0.0.1</div>
         </div>
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
