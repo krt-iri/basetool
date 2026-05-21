@@ -12,6 +12,7 @@ import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -101,11 +102,32 @@ public class RefineryOrderController {
     if (authHelperService.isLogisticianOrAbove()
         || (order.getOwner() != null
             && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
-      return mapper.toDto(order);
+      return mapper.toDto(
+          order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
     }
 
     // For now, allow read access to everyone if they can see the list
-    return mapper.toDto(order);
+    return mapper.toDto(
+        order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
+  }
+
+  /**
+   * Returns the UEX-derived refinery bonus/malus per input material for the refinery at {@code
+   * locationId}, as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code
+   * 0} = explicit baseline). Used by the refinery-order detail page to refresh the yield badge
+   * client-side when the user changes the input material or the picked location. An unknown or null
+   * location id returns an empty map (200, not 404) because the client treats "unknown location"
+   * identically to "no yield data" — see {@link
+   * RefineryOrderService#getYieldBonusByMaterialForLocationId(UUID)}.
+   *
+   * @param locationId the chosen refinery location
+   * @return per-material yield bonus map
+   */
+  @GetMapping("/locations/{locationId}/yields")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public Map<UUID, Integer> getYieldsForLocation(@PathVariable @NotNull UUID locationId) {
+    return refineryOrderService.getYieldBonusByMaterialForLocationId(locationId);
   }
 
   /**
@@ -148,8 +170,10 @@ public class RefineryOrderController {
         userId = orderDto.owner().id();
       }
     }
+    RefineryOrder saved =
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
     return mapper.toDto(
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -185,9 +209,11 @@ public class RefineryOrderController {
       }
     }
 
-    return mapper.toDto(
+    RefineryOrder saved =
         refineryOrderService.updateRefineryOrder(
-            targetUserId, id, mapper.toEntity(orderDto), isLogistician));
+            targetUserId, id, mapper.toEntity(orderDto), isLogistician);
+    return mapper.toDto(
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -291,8 +317,10 @@ public class RefineryOrderController {
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    RefineryOrder saved =
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
     return mapper.toDto(
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -306,8 +334,10 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
       @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    RefineryOrder saved =
+        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true);
     return mapper.toDto(
-        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /** Logistician-only: cancels a target user's refinery order. */

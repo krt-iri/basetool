@@ -21,6 +21,7 @@ import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /** REST controller for RefineryOrderPageController endpoints. */
@@ -251,6 +253,7 @@ public class RefineryOrderPageController {
                   outMat,
                   g.getOutputQuantity(),
                   g.getQuality(),
+                  null,
                   null));
         }
       }
@@ -463,7 +466,60 @@ public class RefineryOrderPageController {
     model.addAttribute("users", fetchUsers());
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("roundingMode", fetchRoundingMode());
+
+    // Pre-load the UEX yield map for the order's current location so the detail page can render
+    // the bonus badge for every input material in the dropdown on first paint, without an extra
+    // network round-trip. The same map is then refreshed client-side via the AJAX endpoint below
+    // whenever the user picks a different refinery from the location dropdown.
+    UUID currentLocationId = null;
+    Object orderAttr = model.getAttribute("order");
+    if (orderAttr instanceof RefineryOrderDto orderForLookup && orderForLookup.location() != null) {
+      currentLocationId = orderForLookup.location().id();
+    }
+    model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(currentLocationId));
     return "refinery-orders-details";
+  }
+
+  /**
+   * AJAX endpoint that proxies the backend's {@code GET
+   * /api/v1/refinery-orders/locations/{locationId}/yields} so the detail page's bonus badges can
+   * refresh client-side when the user picks a different refinery without a full page reload.
+   * Returns the UEX {@code materialId -> percent} map as JSON (positive = bonus, negative = malus,
+   * 0 = explicit baseline, absent key = no UEX row known for the (location, material) pair). Errors
+   * land as an empty map rather than a 5xx so a transient backend hiccup just falls back to an
+   * empty badge instead of breaking the form.
+   *
+   * @param locationId target refinery location
+   * @return per-material yield map keyed by material UUID
+   */
+  @GetMapping("/locations/{locationId}/yields")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public Map<String, Integer> getYieldsForLocation(@PathVariable UUID locationId) {
+    return fetchYieldsForLocation(locationId);
+  }
+
+  /**
+   * Pulls the per-material UEX bonus/malus map from the backend for {@code locationId}. Wraps every
+   * failure mode in an empty map: a {@code null} id (the order has no location picked yet), an
+   * unknown id (the backend returns an empty map by design), or a transient network/backend error
+   * (logged at WARN). The detail page's badge JS treats "empty map" identically to "no UEX data" so
+   * all three branches fall through cleanly.
+   */
+  private Map<String, Integer> fetchYieldsForLocation(UUID locationId) {
+    if (locationId == null) {
+      return Map.of();
+    }
+    try {
+      Map<String, Integer> yields =
+          backendApiClient.get(
+              "/api/v1/refinery-orders/locations/" + locationId + "/yields",
+              new ParameterizedTypeReference<>() {});
+      return yields != null ? yields : Map.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch refinery yields for location {}: {}", locationId, e.getMessage());
+      return Map.of();
+    }
   }
 
   /**
@@ -536,6 +592,7 @@ public class RefineryOrderPageController {
                   outMat,
                   g.getOutputQuantity(),
                   g.getQuality(),
+                  null,
                   null));
         }
       }

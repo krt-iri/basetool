@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.iri.basetool.backend.model.City;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Material;
@@ -21,6 +22,8 @@ import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.RefineryGood;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.RefineryYield;
+import de.greluc.krt.iri.basetool.backend.model.SpaceStation;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreItemDto;
@@ -29,10 +32,12 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -81,6 +86,7 @@ class RefineryOrderServiceTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private RefineryYieldRepository refineryYieldRepository;
 
   @InjectMocks private RefineryOrderService refineryOrderService;
 
@@ -784,5 +790,182 @@ class RefineryOrderServiceTest {
     good.setOutputMaterial(outputMaterial);
     good.setOutputQuantity(1); // initial value to detect when it's overwritten
     return good;
+  }
+
+  /**
+   * Tests for the UEX-derived yield-bonus lookup. The contract: pick the right name field
+   * (city.name vs spaceStation.name) and map back to {@code materialId → yieldBonus}; never
+   * fabricate data for a location that has no city/station hook into the universe sync.
+   */
+  @Nested
+  class GetYieldBonusByMaterialForLocationTests {
+
+    @Test
+    void nullLocation_returnsEmpty() {
+      assertTrue(refineryOrderService.getYieldBonusByMaterialForLocation(null).isEmpty());
+    }
+
+    @Test
+    void locationWithoutCityAndStation_returnsEmpty() {
+      Location naked = new Location();
+      naked.setId(UUID.randomUUID());
+      naked.setName("Custom");
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(naked);
+
+      assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void cityLocation_queriesByCityName_andReturnsMaterialBonusMap() {
+      UUID matA = UUID.randomUUID();
+      UUID matB = UUID.randomUUID();
+      Material a = new Material();
+      a.setId(matA);
+      Material b = new Material();
+      b.setId(matB);
+
+      RefineryYield y1 = new RefineryYield();
+      y1.setMaterial(a);
+      y1.setYieldBonus(5);
+      RefineryYield y2 = new RefineryYield();
+      y2.setMaterial(b);
+      y2.setYieldBonus(-3);
+
+      City lorville = new City();
+      lorville.setName("Lorville");
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      loc.setCity(lorville);
+
+      when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
+          .thenReturn(List.of(y1, y2));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
+
+      assertEquals(2, result.size());
+      assertEquals(5, result.get(matA));
+      assertEquals(-3, result.get(matB));
+    }
+
+    @Test
+    void spaceStationLocation_queriesByStationName() {
+      UUID matA = UUID.randomUUID();
+      Material a = new Material();
+      a.setId(matA);
+
+      RefineryYield y = new RefineryYield();
+      y.setMaterial(a);
+      y.setYieldBonus(2);
+
+      SpaceStation arcL1 = new SpaceStation();
+      arcL1.setName("ARC-L1 Wide Forest Station");
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      loc.setSpaceStation(arcL1);
+
+      when(refineryYieldRepository.findAllForLocation(eq(null), eq("ARC-L1 Wide Forest Station")))
+          .thenReturn(List.of(y));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
+
+      assertEquals(1, result.size());
+      assertEquals(2, result.get(matA));
+    }
+
+    @Test
+    void zeroBonusValue_isPreserved_notTreatedAsMissing() {
+      // A 0% yield row is a real UEX-published value (the commodity refines at the baseline
+      // yield) — it must end up in the map so the UI can distinguish it from "no data".
+      UUID matA = UUID.randomUUID();
+      Material a = new Material();
+      a.setId(matA);
+
+      RefineryYield y = new RefineryYield();
+      y.setMaterial(a);
+      y.setYieldBonus(0);
+
+      SpaceStation station = new SpaceStation();
+      station.setName("CRU-L1");
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      loc.setSpaceStation(station);
+
+      when(refineryYieldRepository.findAllForLocation(eq(null), eq("CRU-L1")))
+          .thenReturn(List.of(y));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
+
+      assertTrue(result.containsKey(matA));
+      assertEquals(0, result.get(matA));
+    }
+
+    @Test
+    void byLocationId_nullId_returnsEmpty() {
+      assertTrue(refineryOrderService.getYieldBonusByMaterialForLocationId(null).isEmpty());
+    }
+
+    @Test
+    void byLocationId_unknownId_returnsEmpty() {
+      UUID missing = UUID.randomUUID();
+      when(locationRepository.findById(missing)).thenReturn(Optional.empty());
+
+      Map<UUID, Integer> result =
+          refineryOrderService.getYieldBonusByMaterialForLocationId(missing);
+
+      assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void byLocationId_delegatesToLocationVariant() {
+      UUID matA = UUID.randomUUID();
+      Material a = new Material();
+      a.setId(matA);
+
+      RefineryYield y = new RefineryYield();
+      y.setMaterial(a);
+      y.setYieldBonus(7);
+
+      City lorville = new City();
+      lorville.setName("Lorville");
+
+      UUID locId = UUID.randomUUID();
+      Location loc = new Location();
+      loc.setId(locId);
+      loc.setCity(lorville);
+
+      when(locationRepository.findById(locId)).thenReturn(Optional.of(loc));
+      when(refineryYieldRepository.findAllForLocation(eq("Lorville"), eq(null)))
+          .thenReturn(List.of(y));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocationId(locId);
+
+      assertEquals(1, result.size());
+      assertEquals(7, result.get(matA));
+    }
+
+    @Test
+    void yieldWithNullMaterial_isSkipped() {
+      RefineryYield orphan = new RefineryYield();
+      orphan.setMaterial(null);
+      orphan.setYieldBonus(99);
+
+      City city = new City();
+      city.setName("Area18");
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      loc.setCity(city);
+
+      when(refineryYieldRepository.findAllForLocation(eq("Area18"), eq(null)))
+          .thenReturn(List.of(orphan));
+
+      Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
+
+      assertTrue(result.isEmpty());
+    }
   }
 }

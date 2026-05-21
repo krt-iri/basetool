@@ -83,7 +83,7 @@ class RefineryOrderControllerTest {
       RefineryOrder updated = new RefineryOrder();
       when(service.updateRefineryOrder(eq(OTHER_USER_ID), eq(ORDER_ID), eq(mapped), eq(true)))
           .thenReturn(updated);
-      when(mapper.toDto(updated)).thenReturn(incoming);
+      when(mapper.toDto(eq(updated), any())).thenReturn(incoming);
 
       RefineryOrderDto result = controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -111,7 +111,7 @@ class RefineryOrderControllerTest {
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -137,7 +137,7 @@ class RefineryOrderControllerTest {
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -161,7 +161,7 @@ class RefineryOrderControllerTest {
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -221,7 +221,7 @@ class RefineryOrderControllerTest {
       RefineryOrder mapped = new RefineryOrder();
       when(mapper.toEntity(incoming)).thenReturn(mapped);
       when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
@@ -242,7 +242,7 @@ class RefineryOrderControllerTest {
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID); // spoof attempt
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
@@ -262,7 +262,7 @@ class RefineryOrderControllerTest {
       RefineryOrderDto incoming = dtoWithOwner(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
@@ -335,7 +335,7 @@ class RefineryOrderControllerTest {
       RefineryOrderDto incoming = dtoWithOwner(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createUserRefineryOrder(OTHER_USER_ID, incoming);
 
@@ -349,7 +349,7 @@ class RefineryOrderControllerTest {
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.updateUserRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming);
 
@@ -375,11 +375,25 @@ class RefineryOrderControllerTest {
       RefineryOrder order = newOrder(CALLER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(order);
       RefineryOrderDto out = dtoWithOwner(CALLER_ID);
-      when(mapper.toDto(order)).thenReturn(out);
+      when(mapper.toDto(eq(order), any())).thenReturn(out);
 
       RefineryOrderDto result = controller.getRefineryOrder(jwt, ORDER_ID);
 
       assertSame(out, result);
+    }
+
+    @Test
+    void getYieldsForLocation_delegatesToService_andReturnsTheMap() {
+      UUID locationId = UUID.randomUUID();
+      UUID matA = UUID.randomUUID();
+      UUID matB = UUID.randomUUID();
+      java.util.Map<UUID, Integer> expected = java.util.Map.of(matA, 5, matB, -3);
+      when(service.getYieldBonusByMaterialForLocationId(locationId)).thenReturn(expected);
+
+      java.util.Map<UUID, Integer> result = controller.getYieldsForLocation(locationId);
+
+      assertSame(expected, result);
+      verify(service).getYieldBonusByMaterialForLocationId(locationId);
     }
   }
 
