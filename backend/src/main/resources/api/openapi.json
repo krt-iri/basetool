@@ -27987,6 +27987,10 @@
           "quality" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "yieldBonusPercent" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         },
         "required" : [ "inputMaterial", "inputQuantity" ]

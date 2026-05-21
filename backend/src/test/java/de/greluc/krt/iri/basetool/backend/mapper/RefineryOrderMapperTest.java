@@ -3,10 +3,18 @@ package de.greluc.krt.iri.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.iri.basetool.backend.model.Location;
+import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.RefineryGood;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryGoodDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderDto;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -216,5 +224,101 @@ class RefineryOrderMapperTest {
     assertNull(mapper.toListDto(null));
     assertNull(mapper.toEntity(null));
     assertNull(mapper.locationToDto(null));
+  }
+
+  @Test
+  void toDtoWithYieldMap_populatesYieldBonusPercent_onMatchingGoods() {
+    // Given — an order with two goods, two materials
+    UUID matA = UUID.randomUUID();
+    UUID matB = UUID.randomUUID();
+
+    Material a = newRawMaterial(matA, "Quantanium");
+    Material b = newRawMaterial(matB, "Laranite");
+
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+    order.setOreSales(0d);
+    order.setExpenses(0d);
+
+    RefineryGood g1 = new RefineryGood();
+    g1.setInputMaterial(a);
+    g1.setInputQuantity(100);
+    RefineryGood g2 = new RefineryGood();
+    g2.setInputMaterial(b);
+    g2.setInputQuantity(50);
+
+    Set<RefineryGood> goods = new HashSet<>();
+    goods.add(g1);
+    goods.add(g2);
+    order.setGoods(goods);
+
+    // When
+    RefineryOrderDto dto = mapper.toDto(order, Map.of(matA, 5, matB, -3));
+
+    // Then — both goods carry their respective bonus; ordering is undefined (Set) but every
+    // good in the output finds its bonus in the map.
+    assertNotNull(dto);
+    assertNotNull(dto.goods());
+    assertEquals(2, dto.goods().size());
+    for (RefineryGoodDto good : dto.goods()) {
+      Integer expected = good.inputMaterial().id().equals(matA) ? 5 : -3;
+      assertEquals(expected, good.yieldBonusPercent());
+    }
+  }
+
+  @Test
+  void toDtoWithYieldMap_leavesYieldNull_whenMaterialMissingFromMap() {
+    UUID matA = UUID.randomUUID();
+    Material a = newRawMaterial(matA, "Quantanium");
+
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+
+    RefineryGood g = new RefineryGood();
+    g.setInputMaterial(a);
+    g.setInputQuantity(100);
+    Set<RefineryGood> goods = new HashSet<>();
+    goods.add(g);
+    order.setGoods(goods);
+
+    // Map without the good's material — bonus stays null (caller must distinguish from 0)
+    RefineryOrderDto dto = mapper.toDto(order, Map.of(UUID.randomUUID(), 5));
+
+    assertNotNull(dto);
+    assertEquals(1, dto.goods().size());
+    assertNull(dto.goods().iterator().next().yieldBonusPercent());
+  }
+
+  @Test
+  void toDtoWithYieldMap_emptyMap_returnsSameAsBaseDto() {
+    UUID matA = UUID.randomUUID();
+    Material a = newRawMaterial(matA, "Quantanium");
+
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+    RefineryGood g = new RefineryGood();
+    g.setInputMaterial(a);
+    g.setInputQuantity(100);
+    Set<RefineryGood> goods = new HashSet<>();
+    goods.add(g);
+    order.setGoods(goods);
+
+    RefineryOrderDto dto = mapper.toDto(order, Map.of());
+
+    assertNotNull(dto);
+    assertNull(dto.goods().iterator().next().yieldBonusPercent());
+  }
+
+  @Test
+  void toDtoWithYieldMap_nullEntity_returnsNull() {
+    assertNull(mapper.toDto(null, Map.of(UUID.randomUUID(), 5)));
+  }
+
+  private static Material newRawMaterial(UUID id, String name) {
+    Material m = new Material();
+    m.setId(id);
+    m.setName(name);
+    m.setType(MaterialType.RAW);
+    return m;
   }
 }

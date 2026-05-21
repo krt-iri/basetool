@@ -1,7 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
+import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.iri.basetool.backend.model.RefineryYield;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreItemDto;
@@ -11,9 +13,12 @@ import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -50,6 +55,7 @@ public class RefineryOrderService {
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
+  private final RefineryYieldRepository refineryYieldRepository;
   private final SquadronScopeService squadronScopeService;
 
   /**
@@ -630,6 +636,42 @@ public class RefineryOrderService {
       good.setOutputQuantity(clamped);
       return;
     }
+  }
+
+  /**
+   * Returns a {@code materialId → yieldBonusPercent} map for the refinery sitting at {@code
+   * location}. The value semantics come straight from UEX: a positive integer is a bonus, a
+   * negative integer is a malus, both expressed in percent (5 = +5%, -3 = -3%). An empty map means
+   * "no UEX yield data is known for this location" (either the location was never picked, or the
+   * UEX universe sync has not yet matched the location's city/space-station name to a terminal that
+   * has yield rows).
+   *
+   * <p>Used by the controller to enrich {@code RefineryGoodDto.yieldBonusPercent} on outbound
+   * payloads and to feed the detail page's reactive bonus display in the form. Same lookup runs for
+   * every order detail render and every order write, so the underlying query is bounded by the
+   * number of yield rows at one terminal (small).
+   *
+   * @param location the order's chosen location, may be {@code null}
+   * @return map keyed by material UUID, never {@code null}
+   */
+  public Map<UUID, Integer> getYieldBonusByMaterialForLocation(Location location) {
+    if (location == null) {
+      return Map.of();
+    }
+    String cityName = location.getCity() != null ? location.getCity().getName() : null;
+    String stationName =
+        location.getSpaceStation() != null ? location.getSpaceStation().getName() : null;
+    if (cityName == null && stationName == null) {
+      return Map.of();
+    }
+    Map<UUID, Integer> result = new HashMap<>();
+    for (RefineryYield yield : refineryYieldRepository.findAllForLocation(cityName, stationName)) {
+      if (yield.getMaterial() == null || yield.getMaterial().getId() == null) {
+        continue;
+      }
+      result.putIfAbsent(yield.getMaterial().getId(), yield.getYieldBonus());
+    }
+    return result;
   }
 
   private void validateLocationHasRefinery(

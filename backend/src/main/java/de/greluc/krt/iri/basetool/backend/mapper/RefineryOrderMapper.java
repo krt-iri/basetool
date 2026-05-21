@@ -5,8 +5,12 @@ import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderListDto;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -22,6 +26,45 @@ public interface RefineryOrderMapper {
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   RefineryOrderDto toDto(RefineryOrder entity);
+
+  /**
+   * Same as {@link #toDto(RefineryOrder)} but additionally fills {@code yieldBonusPercent} on every
+   * good whose {@code inputMaterial} appears in {@code yieldByMaterialId}. Goods whose material is
+   * not in the map stay {@code null} (caller must distinguish "no data" from "explicit zero" — a 0%
+   * yield row from UEX is a perfectly valid value).
+   *
+   * @param entity the refinery order to map, may be {@code null}
+   * @param yieldByMaterialId per-material yield bonus map (see {@code
+   *     RefineryOrderService.getYieldBonusByMaterialForLocation})
+   * @return enriched DTO, or {@code null} when {@code entity} is {@code null}
+   */
+  default RefineryOrderDto toDto(RefineryOrder entity, Map<UUID, Integer> yieldByMaterialId) {
+    RefineryOrderDto base = toDto(entity);
+    if (base == null
+        || base.goods() == null
+        || yieldByMaterialId == null
+        || yieldByMaterialId.isEmpty()) {
+      return base;
+    }
+    List<RefineryGoodDto> enriched =
+        base.goods().stream().map(g -> applyYield(g, yieldByMaterialId)).toList();
+    return new RefineryOrderDto(
+        base.id(),
+        base.owner(),
+        base.location(),
+        base.mission(),
+        base.startedAt(),
+        base.durationMinutes(),
+        base.expenses(),
+        base.otherExpenses(),
+        base.oreSales(),
+        base.profit(),
+        base.refiningMethod(),
+        base.status(),
+        enriched,
+        base.owningSquadron(),
+        base.version());
+  }
 
   /** Slim list-row DTO of a {@link RefineryOrder}; reuses the same profit computation. */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
@@ -46,6 +89,30 @@ public interface RefineryOrderMapper {
     double costs = entity.getExpenses() != null ? entity.getExpenses() : 0d;
     double other = entity.getOtherExpenses() != null ? entity.getOtherExpenses() : 0d;
     return sales - costs - other;
+  }
+
+  /**
+   * Returns a copy of {@code good} with {@code yieldBonusPercent} set from {@code
+   * yieldByMaterialId} when a row for the input material exists; the original DTO when the lookup
+   * misses or {@code inputMaterial} is null. Records are immutable, hence the copy.
+   */
+  private static RefineryGoodDto applyYield(
+      RefineryGoodDto good, Map<UUID, Integer> yieldByMaterialId) {
+    if (good == null || good.inputMaterial() == null || good.inputMaterial().id() == null) {
+      return good;
+    }
+    Integer bonus = yieldByMaterialId.get(good.inputMaterial().id());
+    if (bonus == null) {
+      return good;
+    }
+    return new RefineryGoodDto(
+        good.id(),
+        good.inputMaterial(),
+        good.inputQuantity(),
+        good.outputMaterial(),
+        good.outputQuantity(),
+        good.quality(),
+        bonus);
   }
 
   /** Nested mapping for the order's {@link Location}. */

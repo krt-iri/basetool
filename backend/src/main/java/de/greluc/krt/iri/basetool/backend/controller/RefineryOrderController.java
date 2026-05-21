@@ -101,11 +101,13 @@ public class RefineryOrderController {
     if (authHelperService.isLogisticianOrAbove()
         || (order.getOwner() != null
             && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
-      return mapper.toDto(order);
+      return mapper.toDto(
+          order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
     }
 
     // For now, allow read access to everyone if they can see the list
-    return mapper.toDto(order);
+    return mapper.toDto(
+        order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
   }
 
   /**
@@ -148,8 +150,10 @@ public class RefineryOrderController {
         userId = orderDto.owner().id();
       }
     }
+    RefineryOrder saved =
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
     return mapper.toDto(
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -185,9 +189,11 @@ public class RefineryOrderController {
       }
     }
 
-    return mapper.toDto(
+    RefineryOrder saved =
         refineryOrderService.updateRefineryOrder(
-            targetUserId, id, mapper.toEntity(orderDto), isLogistician));
+            targetUserId, id, mapper.toEntity(orderDto), isLogistician);
+    return mapper.toDto(
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -291,8 +297,10 @@ public class RefineryOrderController {
   @PreAuthorize("hasRole('LOGISTICIAN')")
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    RefineryOrder saved =
+        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
     return mapper.toDto(
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto)));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /**
@@ -306,8 +314,10 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
       @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+    RefineryOrder saved =
+        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true);
     return mapper.toDto(
-        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true));
+        saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
 
   /** Logistician-only: cancels a target user's refinery order. */

@@ -60,7 +60,8 @@ class RefineryOrderStorageCalculationTest {
             false,
             0L);
     RefineryGoodDto good =
-        new RefineryGoodDto(UUID.randomUUID(), pieceMaterial, 100, pieceMaterial, 15, 100, null);
+        new RefineryGoodDto(
+            UUID.randomUUID(), pieceMaterial, 100, pieceMaterial, 15, 100, null, null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(
             orderId,
@@ -115,7 +116,8 @@ class RefineryOrderStorageCalculationTest {
             false,
             0L);
     RefineryGoodDto good =
-        new RefineryGoodDto(UUID.randomUUID(), scuMaterial, 100, scuMaterial, 1234, 100, null);
+        new RefineryGoodDto(
+            UUID.randomUUID(), scuMaterial, 100, scuMaterial, 1234, 100, null, null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(
             orderId,
