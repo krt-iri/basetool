@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.config.CacheConfig;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.FrequencyType;
 import de.greluc.krt.iri.basetool.backend.repository.FrequencyTypeRepository;
@@ -7,6 +8,8 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Frequency types model the radio-channel categories used on a mission. Soft-delete via {@code
  * active=false}. The reorder endpoint persists a new {@code sort_index} per id; the admin UI uses
- * drag-and-drop and posts the full new ordering.
+ * drag-and-drop and posts the full new ordering. Read methods are cached against {@link
+ * CacheConfig#FREQUENCY_TYPES_CACHE}; every mutator (create / update / delete / activate / reorder)
+ * evicts the whole cache so the next read observes the new state.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ public class FrequencyTypeService {
    * @param pageable page request
    * @return paged frequency type list
    */
+  @Cacheable(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE)
   public Page<FrequencyType> getAllFrequencyTypes(Boolean active, @NotNull Pageable pageable) {
     return frequencyTypeRepository.findAllByActive(active, pageable);
   }
@@ -44,6 +50,7 @@ public class FrequencyTypeService {
    * @return the frequency type
    * @throws NotFoundException when no match
    */
+  @Cacheable(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE)
   public FrequencyType getFrequencyType(@NotNull UUID id) {
     return frequencyTypeRepository
         .findById(id)
@@ -57,6 +64,7 @@ public class FrequencyTypeService {
    * @return the persisted frequency type
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public FrequencyType createFrequencyType(@NotNull FrequencyType frequencyType) {
     return frequencyTypeRepository.save(frequencyType);
   }
@@ -71,6 +79,7 @@ public class FrequencyTypeService {
    * @throws NotFoundException when no match
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public FrequencyType updateFrequencyType(@NotNull UUID id, @NotNull FrequencyType frequencyType) {
     FrequencyType existing = getFrequencyType(id);
     existing.setName(frequencyType.getName());
@@ -86,6 +95,7 @@ public class FrequencyTypeService {
    * @throws NotFoundException when no match
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public void deleteFrequencyType(@NotNull UUID id) {
     if (!frequencyTypeRepository.existsById(id)) {
       throw new NotFoundException("FrequencyType not found");
@@ -102,6 +112,7 @@ public class FrequencyTypeService {
    * @throws NotFoundException when no match
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public void activateFrequencyType(@NotNull UUID id) {
     FrequencyType existing = getFrequencyType(id);
     existing.setActive(true);
@@ -116,6 +127,7 @@ public class FrequencyTypeService {
    * @param ids ids in the desired new order
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public void reorderFrequencyTypes(@NotNull List<UUID> ids) {
     for (int i = 0; i < ids.size(); i++) {
       int index = i;

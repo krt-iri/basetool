@@ -23,10 +23,13 @@ import org.springframework.context.annotation.Configuration;
 @EnableCaching
 public class CacheConfig {
 
+  public static final String CITIES_CACHE = "cities";
+  public static final String FREQUENCY_TYPES_CACHE = "frequencyTypes";
   public static final String JOB_TYPES_CACHE = "jobTypes";
   public static final String SQUADRONS_CACHE = "squadrons";
   public static final String LOCATIONS_CACHE = "locations";
   public static final String MANUFACTURERS_CACHE = "manufacturers";
+  public static final String MATERIAL_CATEGORIES_CACHE = "materialCategories";
   public static final String MATERIALS_CACHE = "materials";
   public static final String MISSION_LEAD_TYPES_CACHE = "missionLeadTypes";
   public static final String REFINING_METHODS_CACHE = "refiningMethods";
@@ -55,10 +58,13 @@ public class CacheConfig {
     manager.setAllowNullValues(false);
     manager.setCacheNames(
         List.of(
+            CITIES_CACHE,
+            FREQUENCY_TYPES_CACHE,
             JOB_TYPES_CACHE,
             SQUADRONS_CACHE,
             LOCATIONS_CACHE,
             MANUFACTURERS_CACHE,
+            MATERIAL_CATEGORIES_CACHE,
             MATERIALS_CACHE,
             MISSION_LEAD_TYPES_CACHE,
             REFINING_METHODS_CACHE,
