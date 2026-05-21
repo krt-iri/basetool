@@ -27,8 +27,8 @@
 
     <div class="hud-box mt-2">
 
-        <form id="missions-filter-form" method="get" th:action="@{/missions}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
-            <div style="display:flex; flex-direction:column; gap:0.2rem; flex:1; min-width: 150px;">
+        <form id="missions-filter-form" method="get" th:action="@{/missions}" class="search-form no-track">
+            <div class="search-form-flex-1">
                 <label for="mission-search" th:text="#{mission.search}">Search</label>
                 <input type="text" id="mission-search" name="search" th:value="${search}" th:placeholder="#{mission.search.placeholder}">
             </div>
@@ -51,15 +51,15 @@
                 </div>
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:0.2rem;" sec:authorize="isAuthenticated()">
-                <div style="height: 1.2rem;"></div>
-                <label style="display:flex; align-items:center; cursor:pointer; gap:0.5rem; padding: 0.5rem 0.75rem; border: 1px solid transparent;">
+            <div class="search-form-checkbox-col" sec:authorize="isAuthenticated()">
+                <div class="search-form-checkbox-spacer"></div>
+                <label class="search-form-checkbox-label">
                     <input type="checkbox" name="showPast" th:checked="${showPast}">
                     <span th:text="#{mission.filter.show_past}">Show Past</span>
                 </label>
             </div>
 
-            <div style="align-self: flex-end; display: flex; gap: 0.5rem;">
+            <div class="search-form-actions">
                 <button type="button" id="missions-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zurücksetzen</button>
                 <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" th:text="#{mission.create}">Create New</a>
             </div>

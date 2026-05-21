@@ -5,7 +5,6 @@
     <th:block th:fragment="extraLinks">
 <script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
     <style th:attr="nonce=${cspNonce}">
-        .form-group { margin-bottom: 1.5rem; }
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
         input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
@@ -789,8 +788,8 @@
                                 <tr th:each="entry : ${financeEntries}">
                                     <td th:text="${entry.participant != null ? (entry.participant.user != null ? entry.participant.user.effectiveName : entry.participant.guestName) : '-'}">Nutzer</td>
                                     <td>
-                                        <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: #4CAF50;">Einnahme</span>
-                                        <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
+                                        <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: var(--color-success);">Einnahme</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: var(--color-danger);">Ausgabe</span>
                                     </td>
                                     <td th:text="${#numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td th:text="${entry.note}">Notiz</td>
@@ -814,7 +813,7 @@
                                 <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
                                     <td>
-                                        <span th:text="#{mission.finance.type.expense}" style="color: #F44336;">Ausgabe</span>
+                                        <span th:text="#{mission.finance.type.expense}" style="color: var(--color-danger);">Ausgabe</span>
                                     </td>
                                     <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td>

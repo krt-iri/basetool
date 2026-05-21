@@ -4,6 +4,7 @@
         ${msg("loginAccountTitle")}
     <#elseif section = "form">
         <div class="login-container">
+            <img src="${url.resourcesPath}/img/iridium.svg" alt="IRIDIUM" class="login-logo">
             <h1>IRIDIUM BASETOOL</h1>
             <form id="kc-form-login" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
                 <div class="form-group">

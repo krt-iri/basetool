@@ -83,6 +83,18 @@ body {
     font-weight: 300;
     margin: 0;
     padding: 0;
+    /*
+     * Make the body a flex column so the global footer (injected by
+     * sidebar.html JS at the bottom of <body>) sits below the content
+     * even on short pages, while still letting <main> grow to fill the
+     * viewport when content is taller.
+     */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+body > main {
+    flex: 1 0 auto;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -110,6 +122,35 @@ header {
     position: sticky;
     top: 0;
     z-index: 1000;
+}
+
+/*
+ * Admin-mode header tint. Applied by sidebar.html JS when the URL path
+ * starts with `/admin/`, so admins can tell at a glance that they are
+ * looking at a privileged view (otherwise the in-page chrome is
+ * identical to the regular user UI). The chip uses the same brand
+ * orange as the rest of the HUD; the darker bottom border (accent-dark
+ * instead of primary) signals "elevated context" without screaming.
+ */
+body.admin-mode header {
+    border-bottom-color: var(--color-accent-dark);
+}
+.admin-mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    padding: 0.35rem 0.7rem;
+    background-color: rgba(196, 92, 0, 0.15);
+    border: 1px solid var(--color-accent-dark);
+    color: var(--color-accent-light);
+    font-family: var(--font-headline);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+}
+body:not(.admin-mode) .admin-mode-chip {
+    display: none;
 }
 
 nav {
@@ -235,8 +276,68 @@ tr {
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/*
+ * Subtle zebra striping for long data tables. The 0.02 alpha is intentionally
+ * minimal — strong enough to break the eye line on dense rows, weak enough
+ * not to compete with hover or with department-tinted rows (e.g. the
+ * `.unit-color-*` palette on mission-detail). Hover still wins.
+ */
+tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
 tr:hover {
     background-color: var(--color-gray-3);
+}
+
+/*
+ * Global page footer (injected by sidebar.html JS). Legal links also live in
+ * the sidebar, but a visible footer matches standard web convention so users
+ * looking for Impressum / Datenschutz / Nutzungsbedingungen can find them
+ * without opening the navigation drawer.
+ */
+.krt-footer {
+    flex: 0 0 auto;
+    /*
+     * The footer is included from `fragments/sidebar.html` near the top of
+     * <body>, before <header> and <main>. We use `order: 999` so the flex
+     * column layout still renders it last regardless of DOM position.
+     */
+    order: 999;
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+    background-color: var(--color-bg-dark-gray);
+    border-top: 1px solid var(--color-gray-3);
+    color: var(--color-gray-2);
+    font-size: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+}
+.krt-footer-links {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.krt-footer-links a {
+    color: var(--color-gray-1);
+    text-decoration: none;
+}
+.krt-footer-links a:hover {
+    color: var(--color-primary);
+}
+.krt-footer-version {
+    color: var(--color-gray-2);
+    font-family: monospace;
+    font-size: 0.75rem;
+}
+@media (max-width: 768px) {
+    .krt-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 .datetime-split-inputs {
@@ -410,11 +511,10 @@ select.association-select {
 
 /*
  * Alignment for .search-form filter bars (Einsatzuebersicht,
- * Mitgliederuebersicht). The form itself uses `align-items: flex-end`
- * (set inline in the templates), so we only need to ensure that every
- * filter column (direct child div of .search-form) has IDENTICAL total
- * height. If heights are identical, flex-end aligns all bottoms onto
- * the same horizontal line. We achieve this by:
+ * Mitgliederuebersicht). The form itself flex-rows the columns and
+ * uses `align-items: flex-end` so every filter column (direct child
+ * div) lines up on its bottom edge. We ensure identical column
+ * heights via:
  *   - forcing a single label row height (min-height: 1.25rem, single
  *     line via white-space: nowrap) so labels contribute exactly the
  *     same vertical space regardless of text length
@@ -422,11 +522,59 @@ select.association-select {
  *     above)
  *   - forcing .datetime-split-inputs wrapper height to 2.5rem so a
  *     date/time column is visually identical to a plain-input column
- * No !important hacks on the column div itself, so template inline
- * styles (display:flex; flex-direction:column; gap:0.2rem) are kept.
  */
+.search-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
 .search-form > div {
     gap: 0.2rem;
+}
+
+/*
+ * Action column at the right end of the search bar: holds the Reset /
+ * Create-New buttons. Always rendered as a flex row so the buttons sit
+ * next to each other regardless of label-column ordering.
+ */
+.search-form-actions {
+    align-self: flex-end;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/*
+ * Single-line text-search column that should grow with the available
+ * space so the search input always dominates the filter bar visually.
+ */
+.search-form-flex-1 {
+    flex: 1;
+    min-width: 150px;
+}
+
+/*
+ * Checkbox-only column. Holds a single checkbox + label pair. The
+ * empty spacer keeps the checkbox aligned with the bottom edge of
+ * other inputs (same height as a label row would contribute).
+ */
+.search-form-checkbox-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.search-form-checkbox-spacer {
+    height: 1.2rem;
+}
+.search-form-checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid transparent;
 }
 
 /*
@@ -717,10 +865,53 @@ input[type="radio"]:focus {
     border-color: var(--color-primary);
 }
 
-/* Buttons (if any) */
-.btn {
+/*
+ * Form-group spacing — central definition so every page that uses .form-group
+ * gets the same vertical rhythm without having to redeclare margin-bottom in
+ * its own inline <style> block. Pages that need a different cadence (e.g. the
+ * materials-overview filter row sitting at 0, or a row that participates in a
+ * grid layout) can still override the value with a more specific selector.
+ */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+/*
+ * Icon sprite — the <svg> sprite from fragments/icons.html must not take up
+ * any layout space. Individual icons reference it via `<svg class="krt-icon">
+ * <use href="#krt-icon-NAME"/></svg>` and inherit text colour through the
+ * symbol's `currentColor` strokes/fills.
+ */
+.krt-icon-sprite {
+    width: 0;
+    height: 0;
+    position: absolute;
+    overflow: hidden;
+}
+.krt-icon {
     display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+    fill: currentColor;
+    color: currentColor;
+}
+.krt-icon-lg { width: 1.5em; height: 1.5em; }
+.krt-icon-xl { width: 2em; height: 2em; }
+
+/* Buttons (if any) */
+/*
+ * min-height enforces the Styleguide 44px touch-target rule on every device class,
+ * not just mobile. Touch-laptops and hybrid devices report as desktop but still
+ * need the larger hit area, so we apply it unconditionally rather than only inside
+ * the mobile media query.
+ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0.5rem 1rem;
+    min-height: 44px;
     background-color: var(--color-primary);
     color: var(--color-bg-black);
     font-family: var(--font-body);
@@ -1351,7 +1542,21 @@ input[type="radio"]:focus {
     border-left: 4px solid var(--color-secondary, #FFD23F);
 }
 
-/* Modal Styles */
+/*
+ * Modal Styles — KRT canonical modal pattern.
+ *
+ * Toggle convention: the element starts with inline `style="display:none"` and
+ * pages flip it to `display:flex` to open (either via Thymeleaf `th:style` or via
+ * JS `element.style.display = 'flex'`). The flex layout centres `.modal-content`
+ * inside the viewport without any margin maths.
+ *
+ * Two sister patterns exist for specific use cases and share this visual language:
+ *   - `.modal-overlay` / `.modal-box` (promotion-admin.css) — toggled by adding the
+ *     `.active` class instead of touching inline styles; used when JS only manages
+ *     class state.
+ *   - `.krt-confirm-overlay` / `.krt-confirm-dialog` (fragments/toast.html) —
+ *     fully JS-generated, ephemeral confirm dialog injected on demand.
+ */
 .modal {
     position: fixed;
     z-index: 3000;
@@ -1374,6 +1579,8 @@ input[type="radio"]:focus {
     border: 1px solid var(--color-primary);
     width: 80%;
     max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
 }
 

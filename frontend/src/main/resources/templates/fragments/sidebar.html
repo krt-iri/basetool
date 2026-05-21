@@ -165,6 +165,22 @@
         });
 
         document.addEventListener("DOMContentLoaded", function() {
+            // Admin-mode visual marker: every page under /admin/* gets a
+            // `.admin-mode` body class plus a small "ADMIN" chip injected
+            // into the page header. Pure UX cue — does NOT grant any
+            // permission, the backend still enforces hasRole('ADMIN').
+            if (window.location.pathname.indexOf('/admin/') === 0) {
+                document.body.classList.add('admin-mode');
+                const navEl = document.querySelector('header > nav');
+                if (navEl && !document.querySelector('.admin-mode-chip')) {
+                    const chip = document.createElement('span');
+                    chip.className = 'admin-mode-chip';
+                    chip.setAttribute('aria-label', 'Administration');
+                    chip.textContent = 'ADMIN';
+                    navEl.appendChild(chip);
+                }
+            }
+
             const sidebarEl = document.getElementById('sidebar');
             const overlayEl = document.getElementById('sidebar-overlay');
             const closeBtn = document.getElementById('close-sidebar');
@@ -236,6 +252,8 @@
     </script>
     <th:block th:replace="~{fragments/toast :: toast}" />
     <th:block th:replace="~{fragments/unsaved-modal :: unsavedModal}" />
+    <th:block th:replace="~{fragments/footer :: footer}" />
+    <th:block th:replace="~{fragments/icons :: sprite}" />
     <script th:src="@{/js/unsaved-changes.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>

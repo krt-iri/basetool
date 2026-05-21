@@ -14,16 +14,23 @@
 
 /* ============================================================
    MODAL OVERLAY / BOX
-   ============================================================ */
+   ============================================================
+   Class-toggled variant of the canonical .modal pattern from styles.css.
+   Used when JS only manages class state (here: the promotion admin pages
+   add/remove `.active`). Visual properties (z-index, backdrop, shadow)
+   intentionally match .modal/.modal-content so an open .modal-overlay and an
+   open .modal look identical to the user.
+*/
 .modal-overlay {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: 3000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
 }
 .modal-overlay.active {
     display: flex;
@@ -31,12 +38,12 @@
     justify-content: center;
 }
 .modal-box {
-    background: var(--color-bg-dark-gray);
+    background-color: var(--color-bg-dark-gray);
     border: 1px solid var(--color-primary);
     padding: 2rem;
     width: 90%;
     max-width: 520px;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.3);
+    box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
     max-height: 90vh;
     overflow-y: auto;
 }
@@ -58,9 +65,7 @@
 /* ============================================================
    FORM CONTROLS (used inside the modals above)
    ============================================================ */
-.form-group {
-    margin-bottom: 1rem;
-}
+/* .form-group spacing comes from the central definition in styles.css */
 .form-input {
     width: 100%;
     background: var(--color-gray-5);
@@ -75,7 +80,7 @@
     outline: none;
 }
 .form-input[readonly] {
-    background: #1f1f1f;
+    background: var(--color-gray-4);
     color: var(--color-gray-2);
     cursor: not-allowed;
 }
@@ -102,13 +107,13 @@
    ============================================================ */
 /*
  * Compact button used inside per-row action stacks and the rank-group
- * action bar. Half the size of a regular .btn but still meets the
- * 38px touch-target minimum.
+ * action bar. Visually denser than a default .btn (smaller padding +
+ * font size) but still honours the Styleguide 44px touch-target rule.
  */
 .pa-btn-tiny {
     padding: 0.35rem 0.7rem;
     font-size: 0.75rem;
-    min-height: 38px;
+    min-height: 44px;
 }
 
 /*
@@ -234,7 +239,7 @@
     display: flex;
     align-items: flex-start;
     gap: 0.5rem;
-    background: #1a1a1a;
+    background: var(--color-gray-4);
     border: 1px solid var(--color-gray-3);
     padding: 0.4rem 0.6rem;
     margin-bottom: 0.5rem;

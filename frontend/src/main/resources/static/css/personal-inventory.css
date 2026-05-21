@@ -20,7 +20,7 @@
 .krt-personal-inventory-header .krt-subtitle {
     font-family: 'Lato', sans-serif;
     font-weight: 300;
-    color: var(--color-gray-1, #d6d6d6);
+    color: var(--color-gray-1, #D2D2D2);
     margin: 0;
     max-width: 80ch;
 }
@@ -64,9 +64,9 @@
 }
 .krt-pi-userform select {
     min-height: 44px;
-    background-color: var(--color-gray-4, #1f1f1f);
-    border: 1px solid var(--color-gray-3, #2a2a2a);
-    color: var(--color-gray-1, #d6d6d6);
+    background-color: var(--color-gray-4, #1C1C1C);
+    border: 1px solid var(--color-gray-3, #282828);
+    color: var(--color-gray-1, #D2D2D2);
     /* Reserve right space for the SVG arrow injected by styles.css */
     padding: 0.4rem 2rem 0.4rem 0.6rem;
     min-width: 240px;
@@ -88,9 +88,9 @@
 }
 .krt-pi-search-input {
     min-height: 44px;
-    background-color: var(--color-gray-4, #1f1f1f);
-    border: 1px solid var(--color-gray-3, #2a2a2a);
-    color: var(--color-gray-1, #d6d6d6);
+    background-color: var(--color-gray-4, #1C1C1C);
+    border: 1px solid var(--color-gray-3, #282828);
+    color: var(--color-gray-1, #D2D2D2);
     padding: 0.4rem 0.6rem;
     min-width: 220px;
 }
@@ -105,7 +105,7 @@
 }
 .krt-pi-table td.krt-pi-empty {
     text-align: center;
-    color: var(--color-gray-2, #9a9a9a);
+    color: var(--color-gray-2, #646464);
     padding: 1.25rem;
 }
 .krt-pi-actions {
@@ -147,9 +147,9 @@
 #krt-pi-modal .form-group textarea {
     width: 100%;
     min-height: 44px;
-    background-color: var(--color-gray-4, #1f1f1f);
-    border: 1px solid var(--color-gray-3, #2a2a2a);
-    color: var(--color-gray-1, #d6d6d6);
+    background-color: var(--color-gray-4, #1C1C1C);
+    border: 1px solid var(--color-gray-3, #282828);
+    color: var(--color-gray-1, #D2D2D2);
     font-family: 'Lato', sans-serif;
     padding: 0.5rem;
     box-sizing: border-box;
@@ -162,9 +162,9 @@
 #krt-pi-modal .form-group select {
     width: 100%;
     min-height: 44px;
-    background-color: var(--color-gray-4, #1f1f1f);
-    border: 1px solid var(--color-gray-3, #2a2a2a);
-    color: var(--color-gray-1, #d6d6d6);
+    background-color: var(--color-gray-4, #1C1C1C);
+    border: 1px solid var(--color-gray-3, #282828);
+    color: var(--color-gray-1, #D2D2D2);
     font-family: 'Lato', sans-serif;
     padding: 0.5rem 2rem 0.5rem 0.5rem;
     box-sizing: border-box;
@@ -185,7 +185,7 @@
     text-align: left;
 }
 .krt-pi-help {
-    color: var(--color-gray-2, #9a9a9a);
+    color: var(--color-gray-2, #646464);
     font-size: 0.8rem;
     display: block;
     margin-top: 0.25rem;
@@ -202,7 +202,7 @@
     position: absolute;
     top: 0.6rem;
     right: 0.9rem;
-    color: var(--color-gray-1, #d6d6d6);
+    color: var(--color-gray-1, #D2D2D2);
     font-size: 1.8rem;
     line-height: 1;
     font-weight: bold;
@@ -267,7 +267,7 @@
     text-align: left;
     background: transparent;
     border: none;
-    color: var(--color-gray-1, #d6d6d6);
+    color: var(--color-gray-1, #D2D2D2);
     padding: 0.6rem 0.8rem;
     font-family: 'Lato', sans-serif;
     cursor: pointer;
@@ -275,15 +275,15 @@
 }
 .krt-pi-typeahead-item:hover,
 .krt-pi-typeahead-item:focus {
-    background-color: var(--color-gray-4, #1f1f1f);
+    background-color: var(--color-gray-4, #1C1C1C);
     color: var(--color-primary, #E77E23);
 }
 .krt-pi-typeahead-name { font-weight: 700; }
-.krt-pi-typeahead-meta { color: var(--color-gray-2, #9a9a9a); font-size: 0.85rem; margin-left: auto; }
+.krt-pi-typeahead-meta { color: var(--color-gray-2, #646464); font-size: 0.85rem; margin-left: auto; }
 .krt-pi-typeahead-loading,
 .krt-pi-typeahead-empty {
     padding: 0.75rem 1rem;
-    color: var(--color-gray-2, #9a9a9a);
+    color: var(--color-gray-2, #646464);
     font-style: italic;
 }
 
