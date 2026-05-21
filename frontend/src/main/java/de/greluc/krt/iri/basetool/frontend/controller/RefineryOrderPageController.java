@@ -286,9 +286,9 @@ public class RefineryOrderPageController {
               (long)
                   ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60
                       + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-              zeroToNull(form.getExpenses()),
-              zeroToNull(form.getOtherExpenses()),
-              zeroToNull(form.getOreSales()),
+              nullToZero(form.getExpenses()),
+              nullToZero(form.getOtherExpenses()),
+              nullToZero(form.getOreSales()),
               null,
               form.getRefiningMethodId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(
@@ -364,7 +364,7 @@ public class RefineryOrderPageController {
             form.setDurationHours((int) (orderDto.durationMinutes() / 60));
             form.setDurationMinutes((int) (orderDto.durationMinutes() % 60));
           }
-          form.setExpenses(orderDto.expenses());
+          form.setExpenses(orderDto.expenses() != null ? orderDto.expenses() : 0d);
           form.setOtherExpenses(orderDto.otherExpenses() != null ? orderDto.otherExpenses() : 0d);
           form.setOreSales(orderDto.oreSales() != null ? orderDto.oreSales() : 0d);
           if (orderDto.location() != null) {
@@ -624,9 +624,9 @@ public class RefineryOrderPageController {
               (long)
                   ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60
                       + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-              zeroToNull(form.getExpenses()),
-              zeroToNull(form.getOtherExpenses()),
-              zeroToNull(form.getOreSales()),
+              nullToZero(form.getExpenses()),
+              nullToZero(form.getOtherExpenses()),
+              nullToZero(form.getOreSales()),
               null,
               form.getRefiningMethodId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(
@@ -853,16 +853,15 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Sets a Double value to {@code null} if it is {@code null} or {@code 0.0}. Used when saving a
-   * refinery order for the optional money fields ({@code expenses}, {@code otherExpenses}, {@code
-   * oreSales}) because these are pre-filled with 0 in the frontend but should semantically count as
-   * "not set".
+   * Returns {@code 0.0} when the value is {@code null}. Used when saving a refinery order for the
+   * money fields ({@code expenses}, {@code otherExpenses}, {@code oreSales}): the frontend
+   * pre-fills these with 0 and a blur-handler restores 0 when the user clears the field, but
+   * Spring's form-binding still produces {@code null} for an empty submission. Normalising to 0
+   * means the backend always sees an explicit numeric value and the displayed-vs-stored value never
+   * disagrees on re-render.
    */
-  private static Double zeroToNull(Double value) {
-    if (value == null) {
-      return null;
-    }
-    return value == 0.0 ? null : value;
+  private static Double nullToZero(Double value) {
+    return value != null ? value : 0d;
   }
 
   private boolean isLogistician(OidcUser principal) {
