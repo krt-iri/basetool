@@ -80,6 +80,19 @@ body {
     font-weight: 300;
     margin: 0;
     padding: 0;
+    /*
+     * Flex column so the JS-relocated footer (moved by sidebar.html to the
+     * end of <body> on DOMContentLoaded) sticks to the bottom of the
+     * viewport on short pages while still flowing naturally after content
+     * on long pages. The width regression that this layout used to cause
+     * on <main> is fixed by the explicit `width: 100%; box-sizing: border-box`
+     * on the <main> rule below — without it, the auto-margins on a flex
+     * item override the stretch default and main collapses to its
+     * intrinsic content width.
+     */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -204,8 +217,16 @@ nav .links a:hover {
 
 main {
     padding: 2rem;
+    width: 100%;
     max-width: 1200px;
     margin: 0 auto;
+    box-sizing: border-box;
+    /*
+     * Push the global footer to the bottom of the viewport on short pages.
+     * `flex: 1 0 auto` makes main grow to fill the remaining flex column
+     * space without shrinking past its content size.
+     */
+    flex: 1 0 auto;
 }
 
 .greeting {
