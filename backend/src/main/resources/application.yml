@@ -2,6 +2,20 @@ server:
   tomcat:
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
+    # Connector-level limits made explicit (M-3 from the performance audit). With
+    # `spring.threads.virtual.enabled=true` Tomcat hands every request off to a
+    # virtual-thread executor, so `threads.max` mostly documents intent for the
+    # non-virtual fallback case (e.g. classpath without --enable-preview). The
+    # NIO selector's accept queue (`accept-count`) and concurrent connection cap
+    # (`max-connections`) however apply BEFORE the worker layer and are the real
+    # gates under burst load — the Tomcat defaults (100 / 8192) used to drop
+    # requests under spikes that the virtual-thread pool could otherwise have
+    # absorbed. 200/10000 covers our public-internet exposure with headroom.
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 200
+    max-connections: 10000
   # Audit finding H-8: behind nginx-proxy-manager the immediate peer for `request.getRemoteAddr()`
   # is NPM's docker-internal IP — every client looks the same to the rate-limit filter and the
   # global bucket collapses into a single org-wide budget. With `framework` strategy Spring

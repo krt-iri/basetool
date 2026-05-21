@@ -38,6 +38,17 @@ subprojects {
       if (mockitoCore != null) {
         jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
       }
+      // Deliberately NOT setting `maxParallelForks > 1` here even though the
+      // M-1 audit recommended it. A trial run with (cores / 2) destabilised
+      // `WebClientResilienceTest.timeLimiter_ShouldTimeoutSlowResponses` — the
+      // test asserts that a slow upstream times out within ~2 s, and under
+      // forked CPU contention the JVM scheduler delay alone ate the budget.
+      // Cross-module parallel (`org.gradle.parallel=true` in gradle.properties)
+      // already runs backend and frontend test tasks concurrently, which is
+      // most of the win for a 2-module build; revisit per-module forking once
+      // the timing-sensitive resilience tests get refactored onto virtual time
+      // (e.g. StepVerifier.withVirtualTime) so they no longer race against
+      // wall-clock GC pauses.
     }
 
     tasks.withType<JavaCompile>().configureEach {
