@@ -33,7 +33,7 @@
                     align-items: stretch;
                 }
             }
-            /* UEX refinery yield bonus/malus next to the input-quantity label.
+            /* UEX refinery yield bonus/malus next to the output-quantity label.
                Positive = green (Profit department color), negative = red (Combat),
                zero = muted. Matches the semantic-color palette in styles.css. */
             .yield-bonus-badge {
@@ -63,12 +63,12 @@
                 border: 1px solid var(--color-gray-3);
             }
             /*
-             * When the input-quantity label contains the yield bonus badge, the
+             * When the output-quantity label contains the yield bonus badge, the
              * global `.form-group:has([required]) > label::after` asterisk lands
-             * AFTER the badge ("Eingangsmenge (Units) -5% *"), which reads as if
-             * the badge itself were the required marker. Override: anchor the
-             * asterisk to the first <span> (the field name) instead, and suppress
-             * the outer ::after for these labels.
+             * AFTER the badge ("Erwartete Ausgangsmenge (Units) -5% *"), which
+             * reads as if the badge itself were the required marker. Override:
+             * anchor the asterisk to the first <span> (the field name) instead,
+             * and suppress the outer ::after for these labels.
              */
             .form-group:has([required]) > label:has(> .yield-bonus-badge) > span:first-child::after {
                 content: " *";
@@ -274,16 +274,7 @@
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                                <label th:for="'inputQuantity_' + ${stat.index}">
-                                    <span th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge</span>
-                                    <span class="yield-bonus-badge"
-                                          th:id="'yieldBonus_' + ${stat.index}"
-                                          th:with="bonus=${(order != null and order.goods != null and stat.index &lt; #lists.size(order.goods)) ? order.goods[__${stat.index}__].yieldBonusPercent : null}"
-                                          th:if="${bonus != null}"
-                                          th:classappend="${bonus > 0} ? ' yield-positive' : (${bonus &lt; 0} ? ' yield-negative' : ' yield-zero')"
-                                          th:title="#{refineryorder.form.material.yieldBonus.help}"
-                                          th:text="${(bonus > 0 ? '+' : '') + bonus + '%'}">+5%</span>
-                                </label>
+                                <label th:for="'inputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge</label>
                                 <input type="text" inputmode="numeric" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required th:readonly="${!canEdit}">
                             </div>
 
@@ -302,7 +293,16 @@
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                                <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
+                                <label th:for="'outputQuantity_' + ${stat.index}">
+                                    <span th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</span>
+                                    <span class="yield-bonus-badge"
+                                          th:id="'yieldBonus_' + ${stat.index}"
+                                          th:with="bonus=${(order != null and order.goods != null and stat.index &lt; #lists.size(order.goods)) ? order.goods[__${stat.index}__].yieldBonusPercent : null}"
+                                          th:if="${bonus != null}"
+                                          th:classappend="${bonus > 0} ? ' yield-positive' : (${bonus &lt; 0} ? ' yield-negative' : ' yield-zero')"
+                                          th:title="#{refineryorder.form.material.yieldBonus.help}"
+                                          th:text="${(bonus > 0 ? '+' : '') + bonus + '%'}">+5%</span>
+                                </label>
                                 <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
                             </div>
 
@@ -549,7 +549,7 @@
     }
 
     function setYieldBadge(rowIndex, bonus) {
-        const label = document.querySelector('label[for="inputQuantity_' + rowIndex + '"]');
+        const label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
         if (!label) return;
         let badge = label.querySelector('#yieldBonus_' + rowIndex);
         if (bonus === undefined || bonus === null) {
