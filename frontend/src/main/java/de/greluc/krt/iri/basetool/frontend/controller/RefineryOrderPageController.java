@@ -178,6 +178,14 @@ public class RefineryOrderPageController {
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("users", fetchUsers());
     model.addAttribute("roundingMode", fetchRoundingMode());
+
+    // Preload the UEX yield map for any location already picked on the form (POST-validation
+    // re-render), so the bonus badges render on first paint without an extra round-trip. A
+    // fresh GET has no location yet, falls through to an empty map, and the client-side
+    // onLocationChange handler will fetch the map when the user picks a refinery.
+    RefineryOrderForm formForYields = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
+    UUID preselectedLocationId = formForYields != null ? formForYields.getLocationId() : null;
+    model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(preselectedLocationId));
     return "refinery-orders-create";
   }
 
@@ -506,8 +514,8 @@ public class RefineryOrderPageController {
    * Pulls the per-material UEX bonus/malus map from the backend for {@code locationId}. Wraps every
    * failure mode in an empty map: a {@code null} id (the order has no location picked yet), an
    * unknown id (the backend returns an empty map by design), or a transient network/backend error
-   * (logged at WARN). The detail page's badge JS treats "empty map" identically to "no UEX data" so
-   * all three branches fall through cleanly.
+   * (logged at WARN). The shared yield-badge JS module treats "empty map" identically to "no UEX
+   * data" so all three branches fall through cleanly on both the create and the detail page.
    */
   private Map<String, Integer> fetchYieldsForLocation(UUID locationId) {
     if (locationId == null) {
