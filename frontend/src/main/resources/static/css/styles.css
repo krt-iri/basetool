@@ -482,6 +482,39 @@ select.association-select {
 }
 
 /*
+ * Per-template <style> blocks on the form pages (refinery-orders-*,
+ * orders-create, inventory-input, ship-data, hangar, materials,
+ * material-detail, admin/*) ship a single combined rule of the form
+ *   .form-group input, .form-group select, .form-group textarea {
+ *       width: 100%;
+ *       padding: 0.75rem;
+ *       ...
+ *   }
+ * The 0.75-rem padding makes <input> look fine (input height is pinned
+ * to 2.75rem by the global rule above) but inflates <select>: with the
+ * 1.5-line-height text plus 12-px padding all sides plus border, the
+ * select's intrinsic height grows to ~50 px, well past the 2.75rem
+ * min-height — so inside a `.material-row` the select sits ~6 px
+ * taller than the input next to it and the labels above end up on
+ * different Y positions.
+ *
+ * Revert the padding for `.form-group select` to the descender-safe
+ * value the stand-alone `select` rule above uses. The 0.375-rem top/
+ * bottom padding keeps the natural height at ~38 px so the min-height
+ * (2.75rem == 44 px) cleanly pads the box up to match the input.
+ *
+ * Specificity bump (main .form-group select == 0/1/2) deliberately
+ * exceeds the per-template `.form-group select` (0/1/1) and is dwarfed
+ * by `.krt-personal-inventory .form-group select` /
+ * `.materials-overview-main .form-group select` (both 0/2/1) — those
+ * pages already have correct select padding scoped to their own
+ * containers and stay untouched.
+ */
+main .form-group select {
+    padding: 0.375rem 2rem 0.375rem 0.75rem;
+}
+
+/*
  * Wrapper für die innere Detailtabelle in Lagereinträgen.
  * Ermöglicht horizontales Scrollen auf kleinen Bildschirmen,
  * damit die Select-Felder nicht abgeschnitten werden.
