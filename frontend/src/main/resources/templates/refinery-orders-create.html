@@ -33,7 +33,72 @@
                     align-items: stretch;
                 }
             }
+            /* UEX refinery yield bonus/malus next to the output-quantity label.
+               Positive = green (Profit department color), negative = red (Combat),
+               zero = muted. Matches the semantic-color palette in styles.css. */
+            .yield-bonus-badge {
+                display: inline-block;
+                margin-left: 0.5rem;
+                padding: 0.05rem 0.4rem;
+                font-family: var(--font-body);
+                font-weight: bold;
+                font-size: 0.75rem;
+                letter-spacing: 0;
+                border-radius: 2px;
+                text-transform: none;
+            }
+            .yield-bonus-badge.yield-positive {
+                color: var(--color-dept-profit);
+                background-color: rgba(35, 158, 51, 0.12);
+                border: 1px solid var(--color-dept-profit);
+            }
+            .yield-bonus-badge.yield-negative {
+                color: var(--color-dept-combat);
+                background-color: rgba(163, 0, 10, 0.12);
+                border: 1px solid var(--color-dept-combat);
+            }
+            .yield-bonus-badge.yield-zero {
+                color: var(--color-gray-2);
+                background-color: var(--color-gray-5);
+                border: 1px solid var(--color-gray-3);
+            }
+            /*
+             * When the output-quantity label contains the yield bonus badge, the
+             * global `.form-group:has([required]) > label::after` asterisk lands
+             * AFTER the badge ("Erwartete Ausgangsmenge (Units) -5% *"), which
+             * reads as if the badge itself were the required marker. Override:
+             * anchor the asterisk to the first <span> (the field name) instead,
+             * and suppress the outer ::after for these labels.
+             */
+            .form-group:has([required]) > label:has(> .yield-bonus-badge) > span:first-child::after {
+                content: " *";
+                color: var(--color-primary);
+            }
+            .form-group:has([required]) > label:has(> .yield-bonus-badge)::after {
+                content: none;
+            }
+            /* Small "Material #N" header at the top of every material entry.
+               Hosts the per-entry Remove button on the right so it never overlaps
+               the input fields, matching the layout the detail page already uses. */
+            .material-entry-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 1px solid var(--color-gray-3);
+            }
+            .material-entry-title {
+                color: var(--color-primary);
+                font-family: var(--font-body);
+                font-weight: bold;
+                font-size: 0.85rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
         </style>
+        <script th:src="@{/js/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
@@ -139,7 +204,7 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
                         <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
-                        <select id="locationId" th:field="*{locationId}" required>
+                        <select id="locationId" th:field="*{locationId}" required data-trigger="rfc-location-change">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                         </select>
@@ -196,9 +261,12 @@
                 </div>
                 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem; position: relative;">
-                        <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
-                        
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem;">
+                        <div class="material-entry-header">
+                            <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
+                            <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                        </div>
+
                         <div class="material-row">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
@@ -228,7 +296,9 @@
                             </div>
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                                <label th:for="'outputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</label>
+                                <label th:for="'outputQuantity_' + ${stat.index}">
+                                    <span th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</span>
+                                </label>
                                 <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rfc-calc-scu" required>
                             </div>
 
@@ -253,6 +323,15 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
 
+    // Initialize the shared yield-badge module. On the create form the map is empty until the
+    // user picks a refinery from the location dropdown (then onLocationChange fetches the map
+    // via the /refinery-orders/locations/{id}/yields proxy and refreshAll() re-renders every row).
+    window.krtRefineryYield.init(
+        /*[[${materialYieldBonuses}]]*/ {},
+        /*[[#{refineryorder.form.material.yieldBonus.help}]]*/ '');
+    const MATERIAL_ENTRY_TITLE_LABEL = /*[[#{refineryorder.form.material.entryTitle}]]*/ 'Material';
+    const MATERIAL_REMOVE_LABEL = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
+
     function calcScu(index) {
         const unitInput = document.getElementById('outputQuantity_' + index);
         const scuInput = document.getElementById('outputQuantityScu_' + index);
@@ -272,7 +351,7 @@
         const entryBlock = selectElement.closest('.material-entry');
         const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
         const selectedOption = selectElement.options[selectElement.selectedIndex];
-        
+
         if (selectedOption) {
             const refinedName = selectedOption.getAttribute('data-refined-name');
             if (refinedName) {
@@ -283,6 +362,11 @@
                 outputDisplay.style.opacity = '0.7';
             }
         }
+
+        // Refresh the yield badge against the shared module's map. With no location picked the
+        // map is empty and the badge stays hidden; once the user picks a refinery the map is
+        // populated and the badge appears for the rows whose input material has UEX data.
+        window.krtRefineryYield.refreshFor(selectElement);
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -292,6 +376,7 @@
                 updateOutputMaterial(select);
             }
         });
+        window.krtRefineryYield.refreshAll();
     });
 
     function setStartedAtNow() {
@@ -317,17 +402,30 @@
         const container = document.getElementById('materials-container');
         const entries = container.querySelectorAll('.material-entry');
         const count = entries.length;
-        
+
         const template = entries[0].cloneNode(true);
-        
+
+        // Renumber the title in the header. Source is row 0 ("Material #1") so without an
+        // update the cloned row would also read "Material #1" until the page is reloaded.
+        const title = template.querySelector('.material-entry-title');
+        if (title) {
+            title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (count + 1);
+        }
+
+        // Row 0 has no Remove button (the very first material can't be removed) — inject one
+        // into the cloned row's header. Wired through the delegated 'rfc-remove-material'
+        // krtEvents handler via data-trigger, matching the server-rendered button.
         if (!template.querySelector('.remove-btn')) {
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-secondary remove-btn';
-            removeBtn.style.cssText = 'position: absolute; top: 1rem; right: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;';
-            removeBtn.innerText = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
-            removeBtn.onclick = function() { removeMaterialRow(this); };
-            template.appendChild(removeBtn);
+            const header = template.querySelector('.material-entry-header');
+            if (header) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-secondary remove-btn';
+                removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+                removeBtn.setAttribute('data-trigger', 'rfc-remove-material');
+                removeBtn.innerText = MATERIAL_REMOVE_LABEL;
+                header.appendChild(removeBtn);
+            }
         }
         
         const inputs = template.querySelectorAll('input, select');
@@ -357,6 +455,14 @@
             displaySpan.style.opacity = '0.7';
         }
 
+        // A cloned row inherits the source row's yield badge — but the new row's material is
+        // empty so the badge has no meaning. Drop it; the shared module re-creates it as soon as
+        // the user picks a material that has a yield row for the current refinery.
+        const yieldBadge = template.querySelector('span[id^="yieldBonus_"]');
+        if (yieldBadge) {
+            yieldBadge.remove();
+        }
+
         const labels = template.querySelectorAll('label');
         labels.forEach(label => {
             const forAttr = label.getAttribute('for');
@@ -364,7 +470,7 @@
                 label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + count));
             }
         });
-        
+
         container.appendChild(template);
     }
     
@@ -390,6 +496,14 @@
             const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
             if (displaySpan) {
                 displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + index);
+            }
+            const yieldBadge = entry.querySelector('span[id^="yieldBonus_"]');
+            if (yieldBadge) {
+                yieldBadge.id = 'yieldBonus_' + index;
+            }
+            const title = entry.querySelector('.material-entry-title');
+            if (title) {
+                title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (index + 1);
             }
             const labels = entry.querySelectorAll('label');
             labels.forEach(label => {
@@ -522,6 +636,7 @@
         window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);
         window.krtEvents.on('click', 'rfc-remove-material', function (el) { removeMaterialRow(el); });
         window.krtEvents.on('change', 'rfc-update-output', function (el) { updateOutputMaterial(el); });
+        window.krtEvents.on('change', 'rfc-location-change', function (el) { window.krtRefineryYield.onLocationChange(el); });
         window.krtEvents.on('input', 'rfc-calc-scu', function (el) {
             calcScu(el.getAttribute('data-index'));
         });
