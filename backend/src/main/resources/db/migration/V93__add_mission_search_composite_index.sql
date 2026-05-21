@@ -1,0 +1,38 @@
+-- =====================================================================
+-- V93 - Composite index for the mission-list / mission-search hot path
+-- =====================================================================
+-- Why: MissionRepository.searchMissions drives every mission-list render
+-- (the missions index page, the operation detail page's nested mission
+-- table, the mission picker on order / refinery flows). Its WHERE clause
+-- combines three columns that PostgreSQL can serve from a single B-tree
+-- if they are arranged in the right leading order:
+--
+--     WHERE (m.owning_squadron_id = :scope OR m.is_internal = false)
+--       AND (m.status IN (:status))
+--       AND (other optional filters: query, time range, operation_id)
+--
+-- V91 already added a 2-column `(owning_squadron_id, is_internal)` index
+-- for the visibility clause. Adding `status` as the third column turns
+-- that into a covering index for the dominant page-render query: the
+-- planner can satisfy the entire WHERE clause from one index scan,
+-- without falling back to a heap-fetch-then-filter on status. The 2-col
+-- index is retained because PostgreSQL's left-prefix matching makes it
+-- a strict superset of itself only for the *first two* columns of the
+-- new 3-col index — and for queries that filter by `(squadron, status)`
+-- without an is_internal predicate the cost-based planner may still
+-- prefer the older shape. Drop V91's 2-col composite in a future cleanup
+-- pass once production EXPLAIN ANALYZE confirms it is unused.
+--
+-- Status column is plain text (the enum is stored as String via
+-- @Enumerated(EnumType.STRING)) so the B-tree index works without any
+-- expression wrapping.
+--
+-- Idempotent via IF NOT EXISTS so the migration is safe against
+-- developer DBs that may have hand-created the index. Regular CREATE
+-- INDEX (no CONCURRENTLY) because Flyway runs each migration inside a
+-- single transaction and the mission table is small enough that the
+-- brief AccessExclusiveLock during build is acceptable on every
+-- environment we ship to.
+
+CREATE INDEX IF NOT EXISTS idx_mission_squadron_internal_status
+    ON mission(owning_squadron_id, is_internal, status);
