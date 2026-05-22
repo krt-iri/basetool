@@ -74,15 +74,42 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
+    // No caller resolved → service falls back to currentSquadron(), which we leave empty here
+    // because the test doesn't care about the stamp value, only that the save runs.
+    when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
     when(ownerScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
 
     // When
-    Operation result = operationService.createOperation(operation);
+    Operation result = operationService.createOperation(operation, null);
 
     // Then
     assertNotNull(result);
     assertEquals("Test Op", result.getName());
     verify(operationRepository, times(1)).save(operation);
+  }
+
+  @Test
+  void createOperation_withResolvedCallerAndPickerOutput_delegatesToOwnerScopeResolver() {
+    Operation operation = new Operation();
+    operation.setName("Picker Op");
+    operation.setStatus(OperationStatus.PLANNED);
+
+    de.greluc.krt.iri.basetool.backend.model.User caller =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    caller.setId(UUID.randomUUID());
+    de.greluc.krt.iri.basetool.backend.model.Squadron picked =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    picked.setId(UUID.randomUUID());
+    UUID pickedOrgUnitId = picked.getId();
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveSquadronForPickerOutput(caller, pickedOrgUnitId))
+        .thenReturn(picked);
+    when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
+
+    assertEquals(picked, saved.getOwningSquadron(), "picker output must be honoured verbatim");
   }
 
   @Test

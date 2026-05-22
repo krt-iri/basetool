@@ -31394,6 +31394,10 @@
           "status" : {
             "type" : "string",
             "enum" : [ "PLANNED", "ACTIVE", "COMPLETED", "CANCELED" ]
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "name", "status" ]

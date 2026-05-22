@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### Added
+- **Owner-Picker auf der Operation-Anlage integriert (R5.d.e).** Im Create-Modal auf `/operations` erscheint unter dem Status-Dropdown das Owner-Picker-Fragment mit den OrgUnits, in denen der Aufrufer Mitglied ist. `OperationCreateDto` und `OperationService.createOperation` akzeptieren ab jetzt ein optionales `owningOrgUnitId` und routen die Stempelung über `OwnerScopeService.resolveSquadronForPickerOutput`. Der historische Fallback "stempel aus aktivem Scope" bleibt für den Fall ohne authentifizierten Aufrufer (admin in "alle Staffeln"-Modus, anonymer Form-Submit) erhalten. SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` fällt.
+
+### Added
 - **Owner-Picker auf der Missionserstellung integriert (R5.d.d).** Auf `/missions/new` (Form lebt in `mission-detail.html` via `isNew`-Conditional) erscheint unter der "Intern"-Checkbox das Picker-Dropdown mit den OrgUnits, in denen der aufrufende User Mitglied ist. Das `CreateMissionRequest`-Record und der `MissionService.createMission` nehmen ab jetzt ein optionales `owningOrgUnitId` entgegen und routen die Stempelung uber `OwnerScopeService.resolveSquadronForPickerOutput`. Frontend-seitig schickt der Create-Flow jetzt einen kompakten `CreateMissionRequest` statt einer ueberbreiten `MissionDto` mit 28 Null-Feldern — der bessere Schnitt fuer den Write-Pfad. SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` faellt.
 
 ### Added
