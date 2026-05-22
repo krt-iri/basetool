@@ -58,6 +58,7 @@ class RefineryOrderStorageCalculationTest {
             false,
             false,
             false,
+            false,
             0L);
     RefineryGoodDto good =
         new RefineryGoodDto(
@@ -109,6 +110,7 @@ class RefineryOrderStorageCalculationTest {
             null,
             null,
             null,
+            false,
             false,
             false,
             false,

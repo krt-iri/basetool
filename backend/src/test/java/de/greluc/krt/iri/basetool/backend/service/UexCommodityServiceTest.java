@@ -182,6 +182,62 @@ class UexCommodityServiceTest {
   }
 
   @Test
+  void commoditySync_clearsIsManualEntry_whenNameMatchAdoptsManualMaterial() {
+    // Given a manually-entered material with isManualEntry=true and no id_commodity yet
+    Material manual = new Material();
+    manual.setName("Raw Ouratite");
+    manual.setIdCommodity(null);
+    manual.setIsManualEntry(true);
+    manual.setIsManualRawMaterial(true);
+
+    UexCommodityDto upstream = commodity(42, "Raw Ouratite", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(42)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Raw Ouratite")).thenReturn(Optional.of(manual));
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — id_commodity backfilled AND the audit flag is cleared so the manual badge
+    // disappears on the next render. The admin-set isManualRawMaterial override stays
+    // intact (UEX may not classify the commodity as a raw input).
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertSame(manual, cap.getValue());
+    assertEquals(42, cap.getValue().getIdCommodity());
+    assertEquals(
+        Boolean.FALSE,
+        cap.getValue().getIsManualEntry(),
+        "Manual-entry flag must clear once UEX adopts the commodity");
+    assertEquals(
+        Boolean.TRUE,
+        cap.getValue().getIsManualRawMaterial(),
+        "Admin-set isManualRawMaterial override must remain untouched");
+  }
+
+  @Test
+  void commoditySync_leavesIsManualEntryFalse_whenAdoptedByNameMatchOnNonManualRow() {
+    // Existing row matched by name but never marked manual → flag stays false (no-op).
+    Material existing = new Material();
+    existing.setName("Bexalite");
+    existing.setIdCommodity(null);
+    existing.setIsManualEntry(false);
+
+    UexCommodityDto fresh = commodity(77, "Bexalite", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(fresh));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(77)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Bexalite")).thenReturn(Optional.of(existing));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertEquals(Boolean.FALSE, cap.getValue().getIsManualEntry());
+  }
+
+  @Test
   void commoditySync_skipsDtoWithoutIdOrName() {
     UexCommodityDto noId = commodity(null, "Has Name", 0, 0);
     UexCommodityDto noName = commodity(99, null, 0, 0);

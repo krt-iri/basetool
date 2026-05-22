@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import de.greluc.krt.iri.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.TerminalMapper;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto;
@@ -209,20 +210,18 @@ public class MaterialController {
   }
 
   /**
-   * Creates a material manually. {@link MaterialMapper#stripServerManaged} clears client-supplied
-   * id/version/category/refinedMaterial so the create path cannot mass-assign relationships.
+   * Creates a material manually. Uses the dedicated {@link MaterialCreateDto} (UEX-imported columns
+   * are absent) — the service resolves {@code refinedMaterialId} / {@code categoryId} by id and
+   * stamps {@code isManualEntry=true} so the admin UI can badge it and the next UEX sync can clear
+   * the flag on a name-match.
    *
    * @param material create payload
    * @return the persisted DTO
    */
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
-  public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialDto material) {
-    // stripServerManaged drops client-supplied id / version / refinedMaterial /
-    // category so JPA performs a clean INSERT instead of merging onto an existing
-    // row, and foreign-key relationships cannot be re-pointed via the request body.
-    Material entity = MaterialMapper.stripServerManaged(materialMapper.toEntity(material));
-    return materialMapper.toDto(materialService.createMaterial(entity));
+  public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialCreateDto material) {
+    return materialMapper.toDto(materialService.createMaterial(material));
   }
 
   /**

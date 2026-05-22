@@ -75,7 +75,20 @@ class MaterialMapperTest {
     UUID id = UUID.randomUUID();
     MaterialDto dto =
         new MaterialDto(
-            id, "Laranite", "RAW", "SCU", null, null, null, true, false, true, false, true, 1L);
+            id,
+            "Laranite",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            true,
+            false,
+            true,
+            false,
+            true,
+            null,
+            1L);
 
     // When
     Material entity = mapper.toEntity(dto);
@@ -103,6 +116,7 @@ class MaterialMapperTest {
             "Tin",
             "RAW",
             "SCU",
+            null,
             null,
             null,
             null,

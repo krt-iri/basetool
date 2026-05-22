@@ -1,7 +1,9 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::style})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.materials.title} + ' - ' + ${appTitle}">Materialien verwalten - IRIDIUM Basetool</title>
+    <th:block th:fragment="extraLinks">
+    <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
     <style th:attr="nonce=${cspNonce}">
         .data-section {
             margin-bottom: 3rem;
@@ -32,7 +34,45 @@
             width: auto;
             flex-grow: 1;
         }
+        .material-manual-badge {
+            display: inline-block;
+            margin-right: 0.4rem;
+            padding: 0.05rem 0.4rem;
+            font-size: 0.7rem;
+            font-family: var(--font-headline);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-bg-dark);
+            background-color: var(--color-primary);
+            border-radius: 2px;
+            vertical-align: middle;
+        }
+        .modal-box-create-material {
+            max-width: 640px;
+        }
+        .modal-box-create-material .form-checkboxes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+        .modal-box-create-material .form-checkboxes label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+            color: var(--color-gray-1);
+            text-transform: none;
+            margin: 0;
+            min-height: 44px;
+        }
+        @media (max-width: 768px) {
+            .modal-box-create-material .form-checkboxes {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -94,22 +134,25 @@
         <div class="data-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
-                <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
-                    <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
-                    <!--/*
-                      Material names are exposed to JavaScript via this server-
-                      rendered <datalist> instead of a Thymeleaf JS-inline
-                      expression. Thymeleaf 3.1 truncates the surrounding
-                      <script> block right after the first List/Collection
-                      JS-inline serialisation, so the data-krt-confirm form
-                      delete-confirmation handlers + updateMaterial bindings
-                      defined further down in the script would silently never
-                      be wired. Keep the datalist; do NOT move this back into
-                      the <script> block.
-                    */-->
-                    <datalist id="materialNames-data" style="display: none;">
-                        <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
-                    </datalist>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                    <button type="button" class="btn" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
+                    <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
+                        <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
+                        <!--/*
+                          Material names are exposed to JavaScript via this server-
+                          rendered <datalist> instead of a Thymeleaf JS-inline
+                          expression. Thymeleaf 3.1 truncates the surrounding
+                          <script> block right after the first List/Collection
+                          JS-inline serialisation, so the data-krt-confirm form
+                          delete-confirmation handlers + updateMaterial bindings
+                          defined further down in the script would silently never
+                          be wired. Keep the datalist; do NOT move this back into
+                          the <script> block.
+                        */-->
+                        <datalist id="materialNames-data" style="display: none;">
+                            <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
+                        </datalist>
+                    </div>
                 </div>
             </div>
 
@@ -129,7 +172,7 @@
                 <tbody>
                     <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}">
                         <td>
-                            <span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
+                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
                         </td>
                         <td>
                             <div style="white-space: nowrap;">
@@ -179,6 +222,77 @@
         </div>
     </div>
 </main>
+
+<!-- Create Material Modal -->
+<div id="modal-create-material" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
+    <div class="modal-box modal-box-create-material">
+        <div id="modal-create-material-title" class="modal-title" th:text="#{admin.materials.create.modal.title}">Neues Material anlegen</div>
+        <p class="form-hint" style="margin-bottom: 1rem;" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
+
+        <div class="form-group">
+            <label class="form-label" for="cm-name" th:text="#{admin.materials.create.field.name}">Name</label>
+            <input id="cm-name" class="form-input" type="text" maxlength="255" required th:placeholder="#{admin.materials.create.field.name.placeholder}">
+            <span class="form-hint" th:text="#{admin.materials.create.field.name.help}">Eindeutig, identisch zum späteren UEX-Namen.</span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="cm-type" th:text="#{admin.materials.create.field.type}">Typ</label>
+                <select id="cm-type" class="form-input" required>
+                    <option value="RAW" th:text="#{material.type.RAW}">Rohmaterial</option>
+                    <option value="REFINED" th:text="#{material.type.REFINED}">Veredelt</option>
+                    <option value="NO_REFINE" th:text="#{material.type.NO_REFINE}">Nicht veredelbar</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cm-quantity-type" th:text="#{admin.materials.create.field.quantityType}">Mengentyp</label>
+                <select id="cm-quantity-type" class="form-input" required>
+                    <option value="SCU" th:text="#{admin.materials.quantityType.scu}">SCU</option>
+                    <option value="PIECE" th:text="#{admin.materials.quantityType.piece}">Stück</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="cm-description" th:text="#{admin.materials.create.field.description}">Beschreibung</label>
+            <textarea id="cm-description" class="form-input" rows="2" maxlength="4000" th:placeholder="#{admin.materials.create.field.description.placeholder}"></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="cm-refined" th:text="#{admin.materials.create.field.refined}">Veredeltes Material</label>
+                <select id="cm-refined" class="form-input">
+                    <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
+                    <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}">Refined</option>
+                </select>
+                <span class="form-hint" th:text="#{admin.materials.create.field.refined.help}">Nur bei RAW oder Manuelles Rohmaterial.</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="cm-category" th:text="#{admin.materials.create.field.category}">Kategorie</label>
+                <select id="cm-category" class="form-input">
+                    <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
+                    <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}">Category</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" th:text="#{admin.materials.create.field.flags}">Flags</label>
+            <div class="form-checkboxes">
+                <label><input id="cm-manual-raw" type="checkbox" checked> <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span></label>
+                <label><input id="cm-job-order" type="checkbox"> <span th:text="#{admin.material.job_order}">Auftrag</span></label>
+                <label><input id="cm-illegal" type="checkbox"> <span th:text="#{material.is_illegal}">Illegal</span></label>
+                <label><input id="cm-volatile-qt" type="checkbox"> <span th:text="#{material.is_volatile_qt}">Flüchtig (QT)</span></label>
+                <label><input id="cm-volatile-time" type="checkbox"> <span th:text="#{material.is_volatile_time}">Flüchtig (Zeit)</span></label>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-trigger="materials-close-create-modal" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn" data-trigger="materials-submit-create" th:text="#{admin.materials.create.submit}">Anlegen</button>
+        </div>
+    </div>
+</div>
 
 <script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
@@ -307,6 +421,110 @@
     // up by the global filter-table common-handler stays unchanged.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'admin-materials-update', function (el) { updateMaterial(el); });
+    }
+
+    // ----------------------------------------------------------------------
+    // Create-Material modal: open, close, submit. The form mirrors the
+    // backend MaterialCreateAjaxRequest; the server stamps isManualEntry=true
+    // so this dialog does not expose that flag. On success we reload to pick
+    // up the new row plus its "Manuell" badge.
+    // ----------------------------------------------------------------------
+    function openCreateMaterialModal() {
+        document.getElementById('cm-name').value = '';
+        document.getElementById('cm-type').value = 'RAW';
+        document.getElementById('cm-quantity-type').value = 'SCU';
+        document.getElementById('cm-description').value = '';
+        document.getElementById('cm-refined').value = '';
+        document.getElementById('cm-category').value = '';
+        document.getElementById('cm-manual-raw').checked = true;
+        document.getElementById('cm-job-order').checked = false;
+        document.getElementById('cm-illegal').checked = false;
+        document.getElementById('cm-volatile-qt').checked = false;
+        document.getElementById('cm-volatile-time').checked = false;
+        document.getElementById('modal-create-material').classList.add('active');
+        // Focus the first input so keyboard users can type immediately
+        setTimeout(function () { document.getElementById('cm-name').focus(); }, 50);
+    }
+    function closeCreateMaterialModal() {
+        document.getElementById('modal-create-material').classList.remove('active');
+    }
+    function submitCreateMaterial(btn) {
+        const name = document.getElementById('cm-name').value.trim();
+        if (!name) {
+            document.getElementById('cm-name').focus();
+            return;
+        }
+        const payload = {
+            name: name,
+            type: document.getElementById('cm-type').value,
+            quantityType: document.getElementById('cm-quantity-type').value,
+            description: document.getElementById('cm-description').value || null,
+            refinedMaterialId: document.getElementById('cm-refined').value || null,
+            categoryId: document.getElementById('cm-category').value || null,
+            isManualRawMaterial: document.getElementById('cm-manual-raw').checked,
+            isJobOrder: document.getElementById('cm-job-order').checked,
+            isIllegal: document.getElementById('cm-illegal').checked,
+            isVolatileQt: document.getElementById('cm-volatile-qt').checked,
+            isVolatileTime: document.getElementById('cm-volatile-time').checked
+        };
+
+        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (csrfToken && csrfHeader) {
+            headers[csrfHeader] = csrfToken;
+        }
+
+        if (btn) btn.disabled = true;
+        fetch('/admin/materials/ajax', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('create failed with status ' + response.status);
+            }
+            return response.json();
+        })
+        .then(() => {
+            if (typeof window.showFrontendSuccessToast === 'function') {
+                window.showFrontendSuccessToast(/*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.');
+            }
+            closeCreateMaterialModal();
+            setTimeout(function () { window.location.reload(); }, 400);
+        })
+        .catch(error => {
+            console.error('Error creating material:', error);
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(/*[[#{admin.materials.create.error}]]*/ 'Material konnte nicht angelegt werden.');
+            }
+        })
+        .finally(() => {
+            if (btn) btn.disabled = false;
+        });
+    }
+
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
+        window.krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
+        window.krtEvents.on('click', 'materials-submit-create', function (btn) { submitCreateMaterial(btn); });
+    }
+
+    // ESC closes the create modal; click on the overlay (outside the box) closes too.
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            const overlay = document.getElementById('modal-create-material');
+            if (overlay && overlay.classList.contains('active')) {
+                closeCreateMaterialModal();
+            }
+        }
+    });
+    const overlay = document.getElementById('modal-create-material');
+    if (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) closeCreateMaterialModal();
+        });
     }
 </script>
 </body>

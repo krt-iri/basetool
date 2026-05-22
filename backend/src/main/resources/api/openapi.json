@@ -14415,7 +14415,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MaterialDto"
+                "$ref" : "#/components/schemas/MaterialCreateDto"
               }
             }
           },
@@ -28044,6 +28044,9 @@
           "isJobOrder" : {
             "type" : "boolean"
           },
+          "isManualEntry" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -30137,6 +30140,51 @@
           }
         },
         "required" : [ "frequencyTypeId", "value" ]
+      },
+      "MaterialCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "quantityType" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string",
+            "maxLength" : 4000,
+            "minLength" : 0
+          },
+          "refinedMaterialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "isManualRawMaterial" : {
+            "type" : "boolean"
+          },
+          "isJobOrder" : {
+            "type" : "boolean"
+          },
+          "isIllegal" : {
+            "type" : "boolean"
+          },
+          "isVolatileQt" : {
+            "type" : "boolean"
+          },
+          "isVolatileTime" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "name", "quantityType", "type" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",
