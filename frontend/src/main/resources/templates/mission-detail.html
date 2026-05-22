@@ -349,6 +349,11 @@
                 </div>
             </div>
 
+            <!-- R5.d.d owner-picker: only shown on create when the caller has >1 OrgUnit membership. -->
+            <div class="form-row" th:if="${isNew}">
+                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+            </div>
+
             <div class="form-row">
             <div class="form-group datetime-split-group" th:attr="data-validate-not-past=${isNew ? 'true' : 'false'}, data-error-past=#{validation.datetime.past}">
                 <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>

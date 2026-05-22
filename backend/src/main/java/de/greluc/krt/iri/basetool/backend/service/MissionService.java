@@ -215,9 +215,17 @@ public class MissionService {
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
 
-    if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
-      mission.setOwningSquadron(mission.getOwner().getSquadron());
+    if (mission.getOwner() != null) {
+      // R5.d.d: owner present → route through the shared picker resolver, which honours an
+      // explicit owningOrgUnitId from the form if the caller is a member of that org unit, and
+      // falls back to the owner's home Staffel when the field is null.
+      mission.setOwningSquadron(
+          ownerScopeService.resolveSquadronForPickerOutput(
+              mission.getOwner(), request.owningOrgUnitId()));
     } else {
+      // No authenticated owner (admin in "all squadrons" mode or anonymous fallback) — the
+      // picker field, if supplied, cannot be membership-validated. Honour the historical
+      // behaviour: stamp from the active squadron scope.
       ownerScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
     }
 

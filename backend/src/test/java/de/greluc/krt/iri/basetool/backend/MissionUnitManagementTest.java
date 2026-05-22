@@ -69,7 +69,16 @@ class MissionUnitManagementTest {
     mission =
         missionService.createMission(
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test Mission Unit Mgmt", null, null, "PLANNED", null, null, null, false, null));
+                "Test Mission Unit Mgmt",
+                null,
+                null,
+                "PLANNED",
+                null,
+                null,
+                null,
+                false,
+                null,
+                null));
 
     mission =
         missionService.addUnitToMission(

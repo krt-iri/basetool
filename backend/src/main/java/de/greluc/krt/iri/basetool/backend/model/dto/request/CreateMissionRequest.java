@@ -19,9 +19,13 @@ import org.jetbrains.annotations.Nullable;
  *       short-circuit the optimistic-lock check.
  *   <li>{@code owner}: stamped from the authenticated caller in {@link
  *       de.greluc.krt.iri.basetool.backend.service.MissionService#createMission}.
- *   <li>{@code owningSquadron}: stamped from the owner's squadron (or the active squadron scope for
- *       admins) in {@code createMission}; sub-missions inherit from their parent in {@code
- *       addSubMission}.
+ *   <li>{@code owningSquadron}: stamped via the picker resolver on {@link
+ *       de.greluc.krt.iri.basetool.backend.service.OwnerScopeService} in {@code createMission}.
+ *       When the caller supplies {@link #owningOrgUnitId}, the resolver validates it against the
+ *       owner's memberships and honours it (rejecting Spezialkommando selections with 400 until the
+ *       destructive cleanup release loosens NOT NULL on the legacy column). When {@code null}, the
+ *       resolver falls back to the owner's home Staffel. Sub-missions inherit from their parent in
+ *       {@code addSubMission} and ignore this field.
  *   <li>{@code parent}: stamped from the path variable in {@code addSubMission} — never the body.
  *   <li>{@code managers} / participants / units / frequencies / inventory / refinery: have their
  *       own dedicated endpoints; not part of the create payload.
@@ -31,7 +35,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>This record is the security boundary for the create path (audit finding C-3): adding a field
  * here is an explicit decision to expose it to the API, while the absence of a field is a
- * structural guarantee that it cannot be smuggled in via JSON.
+ * structural guarantee that it cannot be smuggled in via JSON. The R5.d.d addition of {@link
+ * #owningOrgUnitId} follows that rule — the field is an optional picker output that the service
+ * layer validates against the caller's memberships before stamping.
  */
 public record CreateMissionRequest(
     @NotBlank @Size(max = 255) String name,
@@ -45,4 +51,5 @@ public record CreateMissionRequest(
     @Nullable Instant plannedStartTime,
     @Nullable Instant plannedEndTime,
     @Nullable Boolean isInternal,
-    @Nullable UUID operationId) {}
+    @Nullable UUID operationId,
+    @Nullable UUID owningOrgUnitId) {}
