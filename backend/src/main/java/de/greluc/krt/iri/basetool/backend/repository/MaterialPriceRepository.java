@@ -4,11 +4,13 @@ import de.greluc.krt.iri.basetool.backend.model.MaterialPrice;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialSellingTerminalDto;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,8 +22,56 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
   Optional<MaterialPrice> findByMaterialIdAndTerminalId(UUID materialId, UUID terminalId);
 
   /**
+   * Nulls out the price / SCU / status columns on every {@link MaterialPrice} row whose id is NOT
+   * in {@code seenIds}. Called at the end of a UEX commodity-price sync to neutralise rows for
+   * (material, terminal) pairs that UEX no longer returns - the price-matrix sync upserts but does
+   * not delete, so without this sweep a terminal that stops listing a commodity would keep its
+   * last-known {@code priceBuy}/{@code priceSell} forever (e.g. a stale Quantanium buy price after
+   * UEX dropped the entry).
+   *
+   * <p>The row itself is kept (no FK referrers, but preserving history is cheap and lets a future
+   * UEX sync re-populate the same row via {@code findByMaterialIdAndTerminalId} without UUID
+   * churn). Overview queries already filter on {@code priceBuy > 0} / {@code priceSell > 0}, so
+   * nulled rows fall out naturally.
+   *
+   * <p>The {@code OR}-chain in the predicate skips rows that are already cleared, so a steady state
+   * does not generate write traffic. {@code flushAutomatically = true} guarantees the preceding
+   * per-row upserts are flushed before the bulk UPDATE runs so the {@code id NOT IN} predicate sees
+   * the freshly-inserted rows.
+   *
+   * @param seenIds ids of the rows that WERE returned by UEX in the current sync; must be non-empty
+   *     (caller short-circuits an empty set to avoid wiping every row on a total-failure burst)
+   * @return number of rows whose prices were cleared
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      UPDATE MaterialPrice p
+      SET p.priceBuy = NULL,
+          p.priceSell = NULL,
+          p.scuBuy = NULL,
+          p.scuSell = NULL,
+          p.scuSellStock = NULL,
+          p.statusBuy = false,
+          p.statusSell = false
+      WHERE p.id NOT IN :seenIds
+      AND (p.priceBuy IS NOT NULL
+           OR p.priceSell IS NOT NULL
+           OR p.scuBuy IS NOT NULL
+           OR p.scuSell IS NOT NULL
+           OR p.scuSellStock IS NOT NULL
+           OR p.statusBuy = true
+           OR p.statusSell = true)
+      """)
+  int clearStalePrices(@Param("seenIds") Collection<UUID> seenIds);
+
+  /**
    * Returns paginated buy/sell prices for one material across every non-hidden terminal, projected
    * directly into {@link MaterialPriceDto} (no need to fetch the full {@link MaterialPrice} graph).
+   * Terminals that neither buy nor sell the material are excluded - this skips rows that the UEX
+   * sync's stale-row sweep ({@link #clearStalePrices}) has just neutralised so the detail page does
+   * not render an army of empty-price terminals next to the handful that actually trade the
+   * commodity. Matches the qualifier used by {@link #findSellingTerminalsByMaterialId}.
    */
   @Query(
       """
@@ -32,6 +82,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           JOIN p.terminal t
           WHERE p.material.id = :materialId
           AND (t.hidden = false OR t.hidden IS NULL)
+          AND (p.statusBuy = true OR p.statusSell = true
+               OR p.priceBuy > 0 OR p.priceSell > 0)
       """)
   Page<MaterialPriceDto> findPricesByMaterialId(
       @Param("materialId") UUID materialId, Pageable pageable);
@@ -77,6 +129,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    *
    * <p>The result is {@code null} for true system-level terminals (e.g. raw jump-point or
    * interplanetary Lagrange stations) that have no parent planet at all.
+   *
+   * <p>Excludes rows with no active buy/sell side - mirrors {@link #findPricesByMaterialId} so the
+   * matrix does not surface terminals that {@link #clearStalePrices} has just neutralised after UEX
+   * dropped the (material, terminal) pair.
    */
   @Query(
       """
@@ -98,6 +154,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       LEFT JOIN Moon mn ON mn.name = t.moonName AND mn.starSystemName = t.starSystemName
       LEFT JOIN Planet pl ON pl.name = t.orbitName AND pl.starSystemName = t.starSystemName
       WHERE (t.hidden = false OR t.hidden IS NULL)
+      AND (p.statusBuy = true OR p.statusSell = true
+           OR p.priceBuy > 0 OR p.priceSell > 0)
       """)
   Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
 
