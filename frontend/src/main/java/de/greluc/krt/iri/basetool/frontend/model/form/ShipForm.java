@@ -23,4 +23,11 @@ public class ShipForm {
   private UUID locationId;
   private boolean fitted;
   private Long version;
+
+  /**
+   * R5.d.f owner-picker output: the {@code OrgUnit} the new ship should be stamped on. {@code null}
+   * when the caller has at most one OrgUnit membership (fragment is hidden and the backend falls
+   * back to {@code user.getSquadron()} via the shared resolver).
+   */
+  private UUID owningOrgUnitId;
 }

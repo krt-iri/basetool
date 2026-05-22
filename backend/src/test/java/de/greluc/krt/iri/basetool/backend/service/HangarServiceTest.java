@@ -32,6 +32,8 @@ class HangarServiceTest {
   @Mock private LocationRepository locationRepository;
   @Mock private MissionUnitRepository missionUnitRepository;
   @Mock private EntityManager entityManager;
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.UserRepository userRepository;
+  @Mock private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
 
   @InjectMocks private HangarService hangarService;
 
@@ -52,8 +54,13 @@ class HangarServiceTest {
 
     ShipRequestDto request =
         new ShipRequestDto(
-            "Test", UUID.randomUUID(), "LTI", null, false, 0L // different version
-            );
+            "Test",
+            UUID.randomUUID(),
+            "LTI",
+            null,
+            false,
+            0L, // different version
+            null);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -153,11 +160,52 @@ class HangarServiceTest {
 
     ShipRequestDto request =
         new ShipRequestDto(
-            "Test", typeId, "LTI", null, false, 1L // matching version
-            );
+            "Test", typeId, "LTI", null, false, 1L, // matching version
+            null);
 
     hangarService.updateShip(userId, shipId, request);
 
     verify(shipRepository, times(1)).save(ship);
+  }
+
+  // --- R5.d.f addShip picker delegation -----------------------------------
+
+  @Test
+  void addShip_delegatesPickerResolutionToOwnerScopeService() {
+    java.util.UUID userId = java.util.UUID.randomUUID();
+    java.util.UUID shipTypeId = java.util.UUID.randomUUID();
+    java.util.UUID pickedOrgUnitId = java.util.UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.backend.model.User user =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    user.setId(userId);
+
+    de.greluc.krt.iri.basetool.backend.model.ShipType shipType =
+        new de.greluc.krt.iri.basetool.backend.model.ShipType();
+    shipType.setId(shipTypeId);
+
+    de.greluc.krt.iri.basetool.backend.model.Squadron resolved =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    resolved.setId(pickedOrgUnitId);
+
+    org.mockito.Mockito.when(userRepository.findById(userId))
+        .thenReturn(java.util.Optional.of(user));
+    org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
+        .thenReturn(java.util.Optional.of(shipType));
+    org.mockito.Mockito.when(
+            ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+        .thenReturn(resolved);
+    org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
+        .thenAnswer(i -> i.getArguments()[0]);
+
+    ShipRequestDto request =
+        new ShipRequestDto("Picker Ship", shipTypeId, "LTI", null, false, null, pickedOrgUnitId);
+
+    Ship saved = hangarService.addShip(userId, request);
+
+    org.junit.jupiter.api.Assertions.assertSame(
+        resolved,
+        saved.getOwningSquadron(),
+        "picker output must flow through OwnerScopeService.resolveSquadronForPickerOutput");
   }
 }

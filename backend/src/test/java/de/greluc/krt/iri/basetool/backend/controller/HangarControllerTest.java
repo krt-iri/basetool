@@ -193,7 +193,7 @@ class HangarControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -214,7 +214,7 @@ class HangarControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false, 5L);
+        new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false, 5L, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass II");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -282,7 +282,7 @@ class HangarControllerTest {
   void addUserShip_admin_passesPathUserIdAndRequestToService() {
     UUID targetUser = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.addShip(targetUser, request)).thenReturn(created);
@@ -301,7 +301,7 @@ class HangarControllerTest {
     UUID targetUser = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.updateShip(targetUser, shipId, request)).thenReturn(updated);

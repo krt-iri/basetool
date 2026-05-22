@@ -83,7 +83,8 @@ public class HangarService {
     ship.setInsurance(dto.insurance());
     ship.setFitted(dto.fitted());
     ship.setOwner(user);
-    ship.setOwningSquadron(user.getSquadron());
+    ship.setOwningSquadron(
+        ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId()));
     ship.setShipType(
         shipTypeRepository
             .findById(dto.shipTypeId())

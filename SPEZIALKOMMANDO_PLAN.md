@@ -2,13 +2,50 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, and R5.d.e (owner-picker integrated into the sixth picker — operation-create modal — with the service layer routed through the shared resolver) implemented. Releases R5.d.f ff. (rolling the picker out to the remaining two forms — hangar add-ship modal, inventory-transfer book-out modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, R5.d.e, and R5.d.f (owner-picker integrated into the seventh picker — hangar add-ship modal — with `HangarService.addShip` routed through the shared resolver) implemented. Releases R5.d.g (the eighth and final picker — inventory-transfer book-out modal, the qualitatively different "two-user transfer" case), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.f implemented (owner-picker on hangar add-ship modal)
+
+**Sections delivered:** §7.3 partial — the seventh picker integration (hangar add-ship modal in `hangar.html`). The picker is target-user-driven — but on this form the target user is always the caller, since the public hangar UI has no admin-cross-user override.
+
+**Changes:**
+
+- **Backend.**
+  - [`ShipRequestDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/ShipRequestDto.java) gains a trailing {@code @Nullable UUID owningOrgUnitId} component. Class-level Javadoc rewritten to document the picker semantics (the same shape that R5.d.b/d/e established).
+  - [`HangarService.addShip`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/HangarService.java) replaces the direct {@code ship.setOwningSquadron(user.getSquadron())} stamp with a call to {@code ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId())}. The {@code OwnerScopeService} was already injected (used by other read paths in this service), so no constructor change. Update path ({@code updateShip}) intentionally ignores the field — the existing stamp survives.
+  - Both REST endpoints ({@code POST /api/v1/hangar/ships} for self, {@code POST /api/v1/hangar/users/{userId}/ships} for admin) pick up the new field automatically through the shared DTO. Admin-cross-user creation routes through the same resolver — the picked org unit is validated against the *target user's* memberships, not the admin caller's.
+- **Frontend.**
+  - [`ShipRequestDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/ShipRequestDto.java) frontend mirror updated in lockstep (per the {@code feedback_backend_frontend_dto_mirror} memory).
+  - [`ShipForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/ShipForm.java) gains a {@code UUID owningOrgUnitId} field.
+  - [`HangarPageController.viewHangar`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/HangarPageController.java) exposes the caller's memberships as {@code ownerOptions} via a new {@code fetchCallerMembershipOptions()} helper. POST add-ship forwards {@code form.getOwningOrgUnitId()} to the DTO. POST update-ship passes {@code null} for the field (the picker is create-only).
+  - [`hangar.html`](frontend/src/main/resources/templates/hangar.html) invokes the {@code fragments/owner-picker} fragment in the add-ship modal directly under the "Fitted" checkbox. Fragment auto-hides when {@code ownerOptions.size() <= 1}.
+- **Tests.**
+  - **14 backend test sites** updated for the new trailing {@code ShipRequestDto} arg via a bulk regex on the single-line constructors plus 5 manual edits on the multi-line ones: {@code HangarControllerTest} (4), {@code FeatureExpansionTest} (1), {@code HangarIntegrationTest} (5 — incl. 2 multi-line), {@code OptimisticLockingTest} (1 multi-line), {@code HangarServiceTest} (2 multi-line), {@code ShipInsuranceTest} (1).
+  - 1 new {@code HangarServiceTest} method ({@code addShip_delegatesPickerResolutionToOwnerScopeService}) pins the picker delegation. Required adding {@code @Mock UserRepository} and {@code @Mock OwnerScopeService} to the test class — the previous tests only exercised {@code updateShip} / {@code deleteAllShipsForUser} paths that didn't touch those collaborators.
+  - Backend test count: **1845** (was 1844 on R5.d.e).
+  - **Frontend mirror compile catch:** the first {@code ./gradlew :frontend:test} run failed because the frontend's {@code ShipRequestDto} mirror DTO still carried 6 fields while the production code passed 7 args. Fixed in lockstep with the backend per the memory rule.
+
+**Intentionally NOT in R5.d.f:** the eighth and final form (inventory-transfer book-out modal — qualitatively different because the transfer happens between two users, the picker reflects the destination user's memberships). The schema loosening that lets SKs actually own ships stays deferred per the plan.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL** after one frontend-mirror-compile fix (described above). Backend 1845 tests pass.
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL**. Checkstyle + SpotBugs + Spotless clean.
+
+**Rollback plan:** revert the commit. {@code ShipRequestDto} loses the trailing field on both sides; {@code HangarService.addShip} returns to direct {@code user.getSquadron()} stamping; the hangar add-ship modal loses the picker fragment include.
+
+**Risks mitigated in this slice:**
+
+- The admin-cross-user create endpoint ({@code POST /api/v1/hangar/users/{userId}/ships}) now routes the picker through the resolver too — an admin cannot stamp a ship onto an OrgUnit the target user does not belong to. The resolver does the membership check against the target user, not the admin caller.
+- Plan §11 R9 (frontend mirror DTO drift): the rename caught at compile time on the first test run.
+
+**Next session must:** start R5.d.g — the inventory-transfer book-out modal. Located somewhere in {@code inventory-my.html} or {@code inventory-index.html} (per the R5.d.a Explore audit). This is the **last** of the seven forms in plan §7.3 and qualitatively different from the others: the transfer happens between two users (book-out from User A to User B), and the picker reflects User B's (the destination's) memberships. The shared resolver already handles the "validate org unit against a specific user's memberships" contract; what's new is wiring it on the book-out flow which today stamps {@code targetUser.getSquadron()} directly. Once R5.d.g lands, the full R5.d picker work is done and R5.e (active-context switcher widening + header rename) is the next major slice.
 
 ### 2026-05-22 — Release R5.d.e implemented (owner-picker on operation-create modal)
 

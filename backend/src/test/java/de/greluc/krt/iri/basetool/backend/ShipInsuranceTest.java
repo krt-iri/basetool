@@ -65,7 +65,7 @@ class ShipInsuranceTest {
   }
 
   private ShipRequestDto createShipWithInsurance(String insurance) {
-    return new ShipRequestDto("Test Ship", shipType.getId(), insurance, null, false, null);
+    return new ShipRequestDto("Test Ship", shipType.getId(), insurance, null, false, null, null);
   }
 
   @Test

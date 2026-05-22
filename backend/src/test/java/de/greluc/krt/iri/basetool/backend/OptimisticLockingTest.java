@@ -155,7 +155,8 @@ class OptimisticLockingTest {
                             "LTI",
                             null,
                             true,
-                            initialVersion);
+                            initialVersion,
+                            null);
                     ready.countDown();
                     if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                       otherErrorCount.incrementAndGet();

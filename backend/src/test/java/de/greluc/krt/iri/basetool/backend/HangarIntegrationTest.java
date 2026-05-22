@@ -100,7 +100,7 @@ class HangarIntegrationTest {
   void testUserManageOwnHangar() throws Exception {
     // Add Ship
     ShipRequestDto shipReq =
-        new ShipRequestDto("My Fighter", fighter.getId(), "LTI", null, true, null);
+        new ShipRequestDto("My Fighter", fighter.getId(), "LTI", null, true, null, null);
 
     String response =
         mockMvc
@@ -124,7 +124,7 @@ class HangarIntegrationTest {
     // Update Ship
     ShipRequestDto updateReq =
         new ShipRequestDto(
-            "Updated Fighter", fighter.getId(), "LTI", null, true, savedShip.version());
+            "Updated Fighter", fighter.getId(), "LTI", null, true, savedShip.version(), null);
     mockMvc
         .perform(
             put("/api/v1/hangar/ships/" + savedShip.id())
@@ -163,7 +163,8 @@ class HangarIntegrationTest {
     ship = shipRepository.save(ship);
 
     // User2 tries to update
-    ShipRequestDto upReq = new ShipRequestDto("Hacked", fighter.getId(), "LTI", null, false, 0L);
+    ShipRequestDto upReq =
+        new ShipRequestDto("Hacked", fighter.getId(), "LTI", null, false, 0L, null);
     mockMvc
         .perform(
             put("/api/v1/hangar/ships/" + ship.getId())
@@ -190,7 +191,7 @@ class HangarIntegrationTest {
   void testAdminManageUserHangar() throws Exception {
     // Admin adds ship to User1
     ShipRequestDto req =
-        new ShipRequestDto("Admin Gift", fighter.getId(), "LTI", null, false, null);
+        new ShipRequestDto("Admin Gift", fighter.getId(), "LTI", null, false, null, null);
 
     String response =
         mockMvc
@@ -219,7 +220,7 @@ class HangarIntegrationTest {
     // Admin updates ship
     ShipRequestDto upReq =
         new ShipRequestDto(
-            "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version());
+            "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version(), null);
     mockMvc
         .perform(
             put("/api/v1/hangar/users/" + user1.getId() + "/ships/" + savedShip.id())

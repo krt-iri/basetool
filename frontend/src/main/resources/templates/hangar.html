@@ -266,6 +266,8 @@
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" style="margin-bottom: 0;" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
+                <!-- R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
+                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="submit" class="btn" th:text="#{hangar.ship.save}">Speichern</button>
                     <button type="button" id="modal-delete-btn" class="btn btn-danger" style="display: none;" th:text="#{hangar.ship.delete}">Löschen</button>
