@@ -2,13 +2,46 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, and R5.a (REST CRUD API for SpecialCommand under `/api/v1/special-commands`: SpecialCommandService + SpecialCommandController + SpecialCommandDto + SpecialCommandMapper + 25 unit tests) implemented. Releases R5.b (membership endpoints under `/api/v1/special-commands/{id}/members`, OrgUnitMembershipService + Controller + DTOs, SpecialCommandSecurityService for the "ADMIN or Lead-of-this-SK" gate), R5.c (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), and a destructive cleanup release (NOT NULL tightening + V98+ drop migrations + entity-field removal) pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a (SK CRUD API), and R5.b (SK membership-management endpoints under `/api/v1/special-commands/{id}/members`: OrgUnitMembershipService + SpecialCommandSecurityService + SpecialCommandMembershipController + DTOs + mapper + 32 unit tests) implemented. Releases R5.c (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), Squadron-side membership migration (move `app_user.is_logistician` / `is_mission_manager` to the membership row), and a destructive cleanup release (NOT NULL tightening + V98+ drop migrations + entity-field removal) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.b implemented (SK membership-management endpoints + canManageMembers gate)
+
+**Sections delivered:** §5.6 (membership endpoints + the `canManageMembers` SpEL gate that backs them). Squadron-side membership flag migration and frontend UI remain deferred.
+
+**Changes:**
+
+- {@link de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipDto} — wire shape with the embedded composite key unpacked into flat {@code userId} / {@code orgUnitId} fields, the discriminator {@code kind}, the three Boolean role flags, {@code joinedAt} and a {@code @Version}. Denormalised {@code userDisplayName} so the admin roster page renders without a per-row join.
+- {@link de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest} — PATCH payload with boxed Booleans (null on either flag means "no change"), required version for optimistic-lock.
+- {@link de.greluc.krt.iri.basetool.backend.model.dto.MembershipLeadToggleRequest} — separate ADMIN-only payload for the Lead toggle so the audit trail can isolate promotion / demotion actions from the regular flag flips.
+- {@link de.greluc.krt.iri.basetool.backend.mapper.OrgUnitMembershipMapper} — MapStruct mapper unpacking the embedded id and reading {@code user.displayName} through the LAZY association. Explicit {@code @Mapping(source = "logistician")} / {@code missionManager} / {@code lead} declarations because Lombok generates {@code isLogistician()} / {@code isMissionManager()} / {@code isLead()} getters that MapStruct does not auto-match against the {@code isXxx} record components.
+- {@link de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService} — {@code listMembers}, {@code addMember}, {@code removeMember}, {@code patchFlags}, {@code toggleLead}. Every entry point loads the parent SK through {@link de.greluc.krt.iri.basetool.backend.service.SpecialCommandService#getSpecialCommandById(java.util.UUID)} first so a Squadron id accidentally routed through these endpoints surfaces as a clean 404 (via the Hibernate discriminator filter). The kind column on {@code org_unit_membership} is managed by the V95 BEFORE-INSERT trigger; the service mirrors the value on the in-memory entity so the immediate DTO mapping reads the right discriminator without re-fetching the row.
+- {@link de.greluc.krt.iri.basetool.backend.service.SpecialCommandSecurityService} — {@code canManageMembers(scId, authentication)}: ADMIN always passes, anonymous always denied, authenticated non-admin passes iff the caller has an {@code is_lead = true} membership on the exact SK referenced by the id. A Lead of a different SK does not carry over.
+- {@link de.greluc.krt.iri.basetool.backend.controller.SpecialCommandMembershipController} — mounted under {@code /api/v1/special-commands/{id}/members}. List / add / remove / patch endpoints gated on {@code @specialCommandSecurityService.canManageMembers(#id, authentication)}; the Lead toggle endpoint additionally hard-gated to {@code hasRole('ADMIN')}.
+
+**Test coverage (32 new test methods):**
+
+- {@code SpecialCommandSecurityServiceTest} (7 tests, Mockito): admin always-passes, null / anonymous denied, non-admin Lead-of-this-SC passes, non-admin member-but-not-Lead denied, Lead-of-different-SC does not carry over, no membership row at all denied, no current user id denied.
+- {@code OrgUnitMembershipServiceTest} (16 tests, Mockito): list happy path + unknown-SC 404; add happy path + duplicate-409 + unknown-user-404 + unknown-SC-404; remove happy path + non-member-404; patchFlags both flags + only-logistician (leaves missionManager) + stale-version-409 + unknown-membership-404; toggleLead promote + demote + stale-version-409.
+- {@code SpecialCommandMembershipControllerTest} (5 tests, Mockito): list → mapper round-trip; add → delegation + mapping; remove → no-arg delegation; patchFlags → delegation; toggleLead → delegation.
+
+**Intentionally NOT in R5.b:** R5.c brings the frontend (admin SK list/detail pages, member roster table, add-member modal, owner-picker fragment, active-context switcher widened to non-admins). Squadron-side membership endpoints (migration of `app_user.is_logistician` / `is_mission_manager` onto the membership row) belong to a later release.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL**. **1825 tests** pass (1771 + 32 new R5.b tests + 22 pre-existing tests that were missing from earlier counts). One transient {@code KeycloakHealthIndicatorTest} flake on the first run resolved on retry — the test depends on a network call to the Keycloak dev container's discovery endpoint and is unrelated to R5.b.
+- {@code ./gradlew :backend:checkstyleMain :backend:spotbugsMain :backend:checkstyleTest} → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert this commit. The seven new files come out cleanly. No DB migration to undo (R5.b reuses the {@code org_unit_membership} table that V95 introduced in R1). Existing {@code SpecialCommandController} from R5.a stays functional — only the member-management surface disappears.
+
+**Risks mitigated in this slice:** the R5.c frontend now has a complete backend authorisation surface (the {@code canManageMembers} gate that the admin SK detail page will call into) and a complete CRUD surface for membership rows. The Lead-toggle endpoint is admin-only so a Lead cannot escalate privileges on themselves or another member.
+
+**Next session must:** start R5.c — introduce the Thymeleaf admin pages for the SK overview and the SK detail (member roster, add/remove modals); add the owner-picker fragment ({@code fragments/owner-picker.html}) to refinery-orders-create, inventory-input, orders-create, mission-create-modal, operation-create-modal, hangar-add-modal, inventory-transfer-modal; widen the active-context switcher in {@code fragments/sidebar.html} to non-admin users with more than one membership; rename the X-Active-Squadron-Id header to X-Active-Org-Unit-Id on the frontend's WebClient relay (keep the legacy name as an alias on the backend for one release).
 
 ### 2026-05-22 — Release R5.a implemented (REST CRUD API for SpecialCommand)
 
