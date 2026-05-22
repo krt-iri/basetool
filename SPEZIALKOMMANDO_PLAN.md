@@ -2,13 +2,38 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, and R5.c (admin SK list page at `/admin/special-commands` with full lifecycle CRUD: AdminSpecialCommandsPageController + Thymeleaf template + sidebar nav link + 16 new i18n keys in DE/EN) implemented. Releases R5.c.b (per-SK detail page with member roster + add/remove/flag-toggle modals), R5.d (owner-picker fragment integrated into the seven create forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, and R5.c.b (per-SK detail page at `/admin/special-commands/{id}` with member roster + add/remove/flag-toggle/Lead-toggle modals, calling into the R5.b backend endpoints) implemented. Releases R5.d (owner-picker fragment integrated into the seven create forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.c.b implemented (per-SK detail page with member roster)
+
+**Sections delivered:** §7.6 detail-page half (member roster, add/remove/flag-toggle/Lead-toggle modals) — the R5.c list page had the SK CRUD; R5.c.b completes the admin SK administration surface by wiring the membership management UI to the R5.b backend.
+
+**Changes (3 new frontend files, 2 modified):**
+
+- [`OrgUnitMembershipDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/OrgUnitMembershipDto.java) + [`OrgUnitKind`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/OrgUnitKind.java) — frontend mirrors of the backend wire shapes. {@code OrgUnitMembershipDto} carries the embedded composite key unpacked into {@code userId} / {@code orgUnitId}, the denormalised {@code userDisplayName}, the discriminator {@code kind}, the three Boolean role flags, {@code joinedAt} and {@code version}.
+- [`admin/special-command-detail.html`](frontend/src/main/resources/templates/admin/special-command-detail.html) — Thymeleaf detail view. Header reads the SK from the model; member roster table with inline forms per row (flags PATCH form with the {@code is_logistician} / {@code is_mission_manager} checkboxes + version hidden input + Speichern button; Lead toggle form with version + boolean isLead; remove form). Add-member modal with a {@code <select>} populated from {@code /api/v1/users/lookup}. CSP-safe inline JS uses the existing {@code cspNonce} pattern.
+- [`AdminSpecialCommandsPageController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/AdminSpecialCommandsPageController.java) gains five new endpoints: {@code GET /{id}} (detail), {@code POST /{id}/members} (add via userId), {@code POST /{id}/members/{userId}/delete} (remove), {@code POST /{id}/members/{userId}/flags} (patch with version optimistic-lock), {@code POST /{id}/members/{userId}/lead} (toggle). All ADMIN-only via the class-level guard from R5.c; the Lead-toggle path additionally hard-locked to ADMIN on the backend (R5.b) so a Lead cannot escalate themselves or another member through the UI either.
+- [`admin/special-commands.html`](frontend/src/main/resources/templates/admin/special-commands.html) — each row's action cell now leads with a "Mitglieder verwalten" link to the new detail page, then the existing Edit / Delete / Activate buttons.
+- 18 new i18n keys in DE / EN. DE umlauts and the {@code ←} ("← Zurück zur Übersicht") arrow correctly escaped as {@code \uXXXX} per the CLAUDE.md properties rule.
+
+**Intentionally NOT in R5.c.b:** R5.d adds the owner-picker fragment to the seven create forms (refinery-orders-create, inventory-input, orders-create, mission-create modal, operation-create modal, hangar-add modal, inventory-transfer modal). R5.e widens the active-context switcher in {@code fragments/sidebar.html} to non-admin users with >1 membership and renames the relay header from {@code X-Active-Squadron-Id} to {@code X-Active-Org-Unit-Id}. Squadron-side membership migration (moving {@code app_user.is_logistician} / {@code is_mission_manager} onto the membership row) belongs to a later release.
+
+**Verification:**
+
+- {@code ./gradlew :frontend:test :frontend:checkstyleMain :frontend:spotbugsMain} → **BUILD SUCCESSFUL**. Existing frontend tests pass; the new controller endpoints follow the established proxy pattern and surface no new lint findings.
+- Manual UI verification deferred to the next session that spins the local dev stack — the patterns (hud-box layout, inline-form per row, CSP-safe modal wiring) are identical to the squadron management code path that has been in production for several releases.
+
+**Rollback plan:** revert this commit. Three new frontend files come out cleanly; the list-page row regains its previous shape (no "Mitglieder verwalten" button); the i18n keys disappear. No backend change to undo; the R5.b endpoints stay functional for any direct API caller.
+
+**Risks mitigated in this slice:** the SK administration surface is now end-to-end usable from the admin UI. An admin can create SKs (R5.c) and manage their member rosters (R5.c.b) without touching the API directly. The Lead-toggle endpoint is gated to ADMIN at both layers (controller via class-level {@code hasRole('ADMIN')}; backend hard {@code @PreAuthorize("hasRole('ADMIN')")}) so the privilege-escalation path stays closed.
+
+**Next session must:** start R5.d — introduce the reusable owner-picker fragment ({@code fragments/owner-picker.html}) and integrate it into the seven create / transfer forms that today implicitly stamp the user's Squadron. Each integration needs a target-user lookup (the picker offers Staffel + SKs the target user belongs to). R5.e follows with the active-context switcher widening and the header rename.
 
 ### 2026-05-22 — Release R5.c implemented (admin SK list page at /admin/special-commands)
 
