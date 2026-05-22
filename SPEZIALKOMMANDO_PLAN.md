@@ -1,0 +1,913 @@
+# Spezialkommando Extension Plan
+
+Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
+
+**Status**: Execution in progress — Release R1 (DB schema preparation) implemented. Releases R2 (code switchover) and R3 (cleanup) pending.
+
+---
+
+## Progress Log
+
+> Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R1 implemented (DB schema preparation, no application code)
+
+**Sections delivered:** §4 release R1 (V94 + V95 + V96), §3.1 (org_unit), §3.2 (org_unit_membership), §3.3 (aggregate FK columns).
+
+**Migrations written:**
+
+- [`V94__create_org_unit_and_copy_squadron.sql`](backend/src/main/resources/db/migration/V94__create_org_unit_and_copy_squadron.sql) — creates `org_unit` with `kind` discriminator + CHECK constraint enforcing "promotion only on Squadron kind"; backfills every existing `squadron` row as `kind='SQUADRON'` preserving the canonical IRIDIUM UUID; adds `idx_org_unit_kind`. Idempotent.
+- [`V95__create_org_unit_membership_and_backfill.sql`](backend/src/main/resources/db/migration/V95__create_org_unit_membership_and_backfill.sql) — creates `org_unit_membership` (composite PK, denormalised `kind` column kept in sync by `sync_org_unit_membership_kind` BEFORE-INSERT/UPDATE trigger), partial unique index `uq_org_unit_membership_one_squadron` (enforces D1's "at most one Staffel per user"), CHECK `chk_org_unit_membership_lead_only_on_special_command` (enforces D2's "is_lead only on SK"), reverse-lookup index `idx_org_unit_membership_org_unit`; backfills one Staffel membership per `app_user.squadron_id != NULL` carrying that user's existing `is_logistician` / `is_mission_manager` flags (D3 preparation — global flags stay authoritative until R2 dual-write switches over).
+- [`V96__add_owning_org_unit_columns_to_aggregates.sql`](backend/src/main/resources/db/migration/V96__add_owning_org_unit_columns_to_aggregates.sql) — adds nullable `owning_org_unit_id` to `mission`, `operation`, `ship`, `inventory_item`, `refinery_order`; adds `creating_org_unit_id` + `requesting_org_unit_id` to `job_order`; copies values from the legacy `owning_squadron_id` / `creating_squadron_id` / `requesting_squadron_id` columns; adds FK constraints to `org_unit(id)` and the matching B-tree indexes (mirrors V91's pattern, including the `mission(owning_org_unit_id, is_internal)` composite for the cross-staffel public-escape clause). `promotion_topic.owning_squadron_id` is intentionally untouched per §3.3 ("SK rows can never own promotion data" — keeping the FK targeted at `squadron` makes the constraint readable).
+
+**Application code:** unchanged. The legacy `squadron` table, `app_user.squadron_id`, `app_user.is_logistician`, `app_user.is_mission_manager`, and the legacy `owning_squadron_id` / `creating_squadron_id` / `requesting_squadron_id` columns are still read and written by the running application. Hibernate `ddl-auto=validate` is satisfied because the new columns are unmapped by any entity and the legacy columns still match their existing `@Column` annotations.
+
+**Verification:**
+
+- `./gradlew :backend:test` → **BUILD SUCCESSFUL** (the integration-test stack applies V94–V96 against the throwaway Postgres instance and every existing test continues to pass — confirms Flyway accepts the migrations, the data backfills land cleanly, and no entity-mapping regression sneaks in).
+- `./gradlew :backend:checkstyleMain :backend:spotbugsMain` → **BUILD SUCCESSFUL** (no Java changed; sanity check that the migration files do not break unrelated lint configuration).
+
+**Rollback plan if R1 needs to come back out:** drop `org_unit_membership` (V95), drop the new FK columns on the six aggregates (V96), drop `org_unit` (V94). The legacy schema is untouched and remains authoritative.
+
+**Risks mitigated in this slice:** none of the regression risks in §11 are active yet — R1 ships no behaviour change. R4 (promotion data accidentally on an SK) is pre-emptively blocked by the V94 CHECK constraint. R13 (CHECK rejects default-initialised SK row) is moot until R2 introduces the `SpecialCommand` entity; the CHECK was deliberately written `kind = 'SQUADRON' OR is_promotion_enabled = FALSE`, which any future SK insert must satisfy by setting the flag to FALSE.
+
+**Next session must:** start R2 — introduce the JPA inheritance hierarchy (`OrgUnit` abstract superclass, `Squadron` and `SpecialCommand` subclasses), the `OrgUnitMembership` entity, the new repositories, and dual-write services. Land the `OwnerScopeService` rename behind a `SquadronScopeService` shim (§5.3). Do NOT touch the legacy columns yet — that is R2 phase 2 (stop-write).
+
+---
+
+**Original plan status note (preserved):** Planning only. No code changes yet. This document is the contract for a later execution session.
+
+> Throughout this plan, `OrgUnit` is the umbrella concept for "anything an aggregate can be owned by". Concretely, `OrgUnit` has two subtypes: `Squadron` (today's `Staffel`) and `SpecialCommand`. The text uses *org unit* for the abstract concept and *Staffel* / *SK* for the concrete subtypes.
+
+---
+
+## 1. Goals & Non-Goals
+
+### Goals
+
+1. A user belongs to at most one Staffel and to any number of SKs. Some users belong only to one or more SKs and to no Staffel.
+2. Every staffel-scoped aggregate (`Mission`, `Operation`, `Ship`, `InventoryItem`, `RefineryOrder`, `JobOrder`) can be owned by either a Staffel or a SK. Filtering, visibility, and edit gates work analogously for both.
+3. The Promotion subsystem is permanently disabled for SK at the **data level** — not a flag default but a CHECK constraint. SK rows can never carry a promotion topic, category, or evaluation.
+4. Every UI flow that today implicitly stamps the user's Staffel must, when the actor holds >1 membership, let them explicitly pick the owning org unit. This covers refinery order create, inventory create, inventory transfer, job order create, mission create, operation create.
+5. Inventory transfer (`bookOutInventoryItem` with `CheckoutType.TRANSFER`) must support a destination user from a foreign Staffel or a foreign SK, and the actor explicitly chooses the destination org unit (which must be a membership of the destination user).
+6. The Promotion-Lead-style fine-grained authorization (`canEditSquadron`, `canManageMission`) survives the refactor: an Officer of Staffel X retains the same write reach in Staffel X; the equivalent right in an SK lives on the membership row as `is_lead`.
+7. **No functional regression** in any Staffel flow. Behaviour for users with exactly one Staffel and no SKs must be indistinguishable from today.
+
+### Non-Goals
+
+1. Re-shaping the role hierarchy beyond moving `is_logistician` / `is_mission_manager` from `app_user` to the membership row. ADMIN / OFFICER / SQUADRON_MEMBER / GUEST stay as global Keycloak realm roles.
+2. Cross-SK aggregate sharing or hierarchies between SKs. SKs are flat peers; a user gets the union of their memberships and that is the visibility set.
+3. SK promotion / ranks. Permanently out of scope per requirement.
+4. Renaming `app_user`, `mission`, `operation`, `ship`, `inventory_item`, `refinery_order`, `job_order` tables. Only the squadron-table and squadron-FK columns are renamed; everything else stays.
+5. Backporting SK to the legacy Hangar-import shape or the deprecated `JobOrder.squadron` VARCHAR (already dropped in V90).
+
+---
+
+## 2. Design Decisions (recorded from user)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| **D1** | Data model: **common parent table `org_unit` with `kind` discriminator**; JPA single-table inheritance. | Chosen by user. Keeps every aggregate's owner FK uniform; filter logic stays the same whether the owner is Staffel or SK. |
+| **D2** | SK administration: **ADMIN-only for create/delete; per-SK `is_lead` on membership row for member-management within one SK**. | Chosen by user. SK lifecycle parity with Squadron (Admin-only) while delegating day-to-day member admin to a designated Lead. |
+| **D3** | Roles: **fully scoped per membership**. `is_logistician` / `is_mission_manager` move from `app_user` onto each membership row; effective authority is the union across the user's memberships, evaluated against the org unit of the action. | Chosen by user. Cleanest semantics for users in multiple org units. Larger refactor — flagged as the primary regression risk. |
+| **D4** | Inventory booking: **explicit owner choice at every booking site that crosses org-unit boundaries**. | Chosen by user. Eliminates the silent default-to-target-user's-Staffel that would otherwise misbehave when the target user is SK-only or has multiple memberships. |
+
+---
+
+## 3. Data Model
+
+### 3.1 `org_unit` table (single-table inheritance)
+
+Replaces today's `squadron` table. Single Postgres table backs the JPA inheritance tree.
+
+```
+org_unit
+├── id                    UUID PK
+├── version               BIGINT NOT NULL
+├── created_at            TIMESTAMPTZ NOT NULL
+├── updated_at            TIMESTAMPTZ NOT NULL
+├── kind                  VARCHAR(32) NOT NULL    CHECK (kind IN ('SQUADRON','SPECIAL_COMMAND'))
+├── name                  VARCHAR UNIQUE NOT NULL
+├── shorthand             VARCHAR UNIQUE NOT NULL
+├── description           TEXT
+├── active                BOOLEAN NOT NULL DEFAULT TRUE
+└── is_promotion_enabled  BOOLEAN NOT NULL DEFAULT TRUE
+        CHECK (kind = 'SQUADRON' OR is_promotion_enabled = FALSE)
+```
+
+- The IRIDIUM canonical UUID `00000000-0000-0000-0000-000000000001` lives here with `kind='SQUADRON'`.
+- The DB CHECK enforces SK rows can never have `is_promotion_enabled = TRUE`. Defensive: even an UPDATE on the row from a stale code path cannot accidentally enable promotion on a SK.
+- Unique constraints on `name` / `shorthand` are global across both kinds (a SK named "IRIDIUM" is rejected — matches user intent of one organization-wide directory).
+
+#### JPA layer
+
+```java
+@Entity
+@Table(name = "org_unit")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "kind", discriminatorType = DiscriminatorType.STRING, length = 32)
+public abstract class OrgUnit extends AbstractEntity<UUID> { … }
+
+@Entity
+@DiscriminatorValue("SQUADRON")
+public class Squadron extends OrgUnit {
+    public static final UUID IRIDIUM_ID = …;
+    // isPromotionEnabled remains on OrgUnit so the existing SquadronScopeService
+    // promotion gate continues to compile unchanged at the call site
+}
+
+@Entity
+@DiscriminatorValue("SPECIAL_COMMAND")
+public class SpecialCommand extends OrgUnit {
+    // No SK-specific columns in phase 1; subclass exists so type-safe references
+    // (e.g. CreateSpecialCommandRequest) stay clean.
+}
+```
+
+The `Squadron.IRIDIUM_ID` constant stays where callers expect it; tests and seed migrations keep referencing it.
+
+### 3.2 `org_unit_membership` table (replaces `app_user.squadron_id` + global Boolean flags)
+
+```
+org_unit_membership
+├── user_id            UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE
+├── org_unit_id        UUID NOT NULL REFERENCES org_unit(id) ON DELETE CASCADE
+├── kind               VARCHAR(32) NOT NULL    -- denormalized from org_unit.kind, kept in sync by trigger
+├── is_logistician     BOOLEAN NOT NULL DEFAULT FALSE
+├── is_mission_manager BOOLEAN NOT NULL DEFAULT FALSE
+├── is_lead            BOOLEAN NOT NULL DEFAULT FALSE   -- only meaningful for SK
+├── joined_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+├── version            BIGINT NOT NULL
+├── PRIMARY KEY (user_id, org_unit_id)
+├── CHECK (is_lead = FALSE OR kind = 'SPECIAL_COMMAND')                -- Lead only on SK
+└── UNIQUE INDEX uq_user_one_squadron_membership ON (user_id) WHERE kind = 'SQUADRON'
+```
+
+- `kind` is denormalized on the row purely so the partial unique index can enforce "max one Staffel per user" without crossing tables. A trigger keeps it in sync with `org_unit.kind` on insert/update; org_unit `kind` is in practice immutable (no UI to flip it), so the trigger is a safety net.
+- `is_lead` is the per-SK admin lever (D2). A user who is Lead of SK A can add/remove members from SK A, nothing more. The constraint enforces it cannot be set on a Staffel membership (which would be ambiguous: Staffel already has Officer/Admin globally).
+- The `version` column allows optimistic locking on membership rows (relevant if a Lead is concurrently adding a member while the Lead role is being revoked).
+
+### 3.3 Aggregate FK rename: `owning_squadron_id` → `owning_org_unit_id`
+
+Every staffel-scoped aggregate needs the FK column renamed and re-pointed at `org_unit`. The migration is straightforward because today's FK already references `squadron.id` and the new `org_unit` table inherits both the IRIDIUM row and every other squadron row's PK.
+
+Tables affected (column rename + FK re-target):
+
+| Table | Today | After |
+|-------|-------|-------|
+| `mission` | `owning_squadron_id → squadron(id)` | `owning_org_unit_id → org_unit(id)` |
+| `operation` | `owning_squadron_id → squadron(id)` | `owning_org_unit_id → org_unit(id)` |
+| `ship` | `owning_squadron_id → squadron(id)` | `owning_org_unit_id → org_unit(id)` |
+| `inventory_item` | `owning_squadron_id → squadron(id)` | `owning_org_unit_id → org_unit(id)` |
+| `refinery_order` | `owning_squadron_id → squadron(id)` | `owning_org_unit_id → org_unit(id)` |
+| `promotion_topic` | `owning_squadron_id → squadron(id)` | **stays** `owning_squadron_id` — references `squadron` subtype only (DB-level CHECK + app-layer enforcement) |
+| `job_order` | `creating_squadron_id`, `requesting_squadron_id → squadron(id)` | `creating_org_unit_id`, `requesting_org_unit_id → org_unit(id)` |
+
+`promotion_topic` is the special case: by D3-derived constraint, promotion data must reference only Squadron rows. Keeping its column name unchanged makes the constraint readable (`fk_promotion_topic_squadron`) and the app-layer guard simpler ("if owner is not a Squadron, refuse").
+
+To prevent SK rows from sneaking into `promotion_topic.owning_squadron_id`, add an extra CHECK enforced via trigger:
+
+```sql
+CHECK ((SELECT kind FROM org_unit WHERE id = owning_squadron_id) = 'SQUADRON')
+```
+
+Postgres cannot inline a subquery into a CHECK, but a trigger function gated on INSERT/UPDATE delivers the same guarantee.
+
+### 3.4 Mission cross-owner visibility — public escape generalized
+
+Today `searchMissions` allows a foreign-squadron mission to be visible if `is_internal = false`. For SK-owned missions the same rule must apply: an SK's non-internal mission is visible to a Staffel user who is not a member.
+
+No new column needed — the existing `is_internal` flag generalizes cleanly. The repository's visibility predicate becomes:
+
+```sql
+:scopeOrgUnitId IS NULL
+  OR m.owningOrgUnit.id = :scopeOrgUnitId
+  OR m.owningOrgUnit.id IN (:userMemberOrgUnitIds)
+  OR m.isInternal = false
+```
+
+The third clause is new: a user's effective scope is the **union of all their org-unit memberships**, not a single id. See §6.2 for the OwnerScopeService API change.
+
+### 3.5 Effective scope vector
+
+Today: `currentSquadronId()` is `Optional<UUID>` (one Staffel or "all" for admin).
+
+Tomorrow: `currentScope()` returns a `Scope` record:
+
+```java
+record Scope(
+    boolean isAdminAllScopes,                 // admin without active selection
+    Optional<UUID> activeOrgUnitId,           // admin with active selection / null for non-admin
+    Set<UUID> memberOrgUnitIds                // every org unit the user is a member of (Staffel + all SKs)
+) {}
+```
+
+- For an admin with no active selection: `isAdminAllScopes = true`, others empty. Filters skip the org-unit clause entirely.
+- For an admin with active selection: `activeOrgUnitId = present`. Filters apply just that id (like today's `X-Active-Squadron-Id`).
+- For a non-admin user: `memberOrgUnitIds` is non-empty. Filters use `owning_org_unit_id IN (:memberOrgUnitIds)`.
+- For an anonymous caller: all empty. Filters return empty results (and the existing guest-redaction guards kick in for the mission read path).
+
+The `activeOrgUnitId` carries forward to non-admin users too — see §6.1. When a non-admin who is in 1 Staffel + 2 SKs has selected SK B as their active context, list views narrow to just SK B's data; the user can flip back to "all my org units" anytime.
+
+---
+
+## 4. Migration Roadmap
+
+V93 is the latest existing migration. SK extension claims V94 onward. We follow the same two-phase pattern (add-nullable → backfill → NOT NULL tighten → drop legacy) that V80–V93 used — and we layer it across multiple releases so each step is rollback-safe.
+
+### Release R1: data foundation (V94–V96)
+
+#### V94 — Create `org_unit`, copy from `squadron`
+
+```sql
+CREATE TABLE org_unit (LIKE squadron INCLUDING ALL);                  -- inherits columns + constraints
+ALTER TABLE org_unit ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'SQUADRON'
+    CHECK (kind IN ('SQUADRON','SPECIAL_COMMAND'));
+ALTER TABLE org_unit ADD CONSTRAINT chk_promotion_only_for_squadron
+    CHECK (kind = 'SQUADRON' OR is_promotion_enabled = FALSE);
+INSERT INTO org_unit SELECT *, 'SQUADRON' FROM squadron;               -- one-shot data copy
+```
+
+The `squadron` table is **not dropped** in V94. It continues to exist as a read-only mirror for one release so backend code can land in stages.
+
+#### V95 — Create `org_unit_membership`, backfill from `app_user`
+
+```sql
+CREATE TABLE org_unit_membership (
+    user_id            UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    org_unit_id        UUID NOT NULL REFERENCES org_unit(id) ON DELETE CASCADE,
+    kind               VARCHAR(32) NOT NULL,
+    is_logistician     BOOLEAN NOT NULL DEFAULT FALSE,
+    is_mission_manager BOOLEAN NOT NULL DEFAULT FALSE,
+    is_lead            BOOLEAN NOT NULL DEFAULT FALSE,
+    joined_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version            BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, org_unit_id),
+    CHECK (is_lead = FALSE OR kind = 'SPECIAL_COMMAND')
+);
+CREATE UNIQUE INDEX uq_user_one_squadron_membership
+    ON org_unit_membership (user_id) WHERE kind = 'SQUADRON';
+
+-- Backfill: every user with a non-null squadron_id gets a Staffel membership.
+INSERT INTO org_unit_membership (user_id, org_unit_id, kind, is_logistician, is_mission_manager, version)
+SELECT u.id, u.squadron_id, 'SQUADRON', u.is_logistician, u.is_mission_manager, 0
+FROM app_user u
+WHERE u.squadron_id IS NOT NULL;
+
+-- Sync trigger: enforce org_unit_membership.kind == org_unit.kind on INSERT/UPDATE.
+CREATE OR REPLACE FUNCTION sync_org_unit_membership_kind() …
+CREATE TRIGGER trg_org_unit_membership_kind …
+```
+
+After V95, `app_user.squadron_id` + `app_user.is_logistician` + `app_user.is_mission_manager` are still authoritative; the new table is a parallel write target. R2 will switch reader/writer.
+
+#### V96 — Rename FK columns on aggregates (Phase 1: add new, keep old)
+
+For each table that currently has `owning_squadron_id`:
+
+```sql
+ALTER TABLE mission        ADD COLUMN owning_org_unit_id UUID;
+UPDATE mission        SET owning_org_unit_id = owning_squadron_id;
+ALTER TABLE mission        ADD CONSTRAINT fk_mission_owning_org_unit
+                                   FOREIGN KEY (owning_org_unit_id) REFERENCES org_unit(id);
+-- repeat for operation, ship, inventory_item, refinery_order
+```
+
+JobOrder:
+
+```sql
+ALTER TABLE job_order ADD COLUMN creating_org_unit_id   UUID;
+ALTER TABLE job_order ADD COLUMN requesting_org_unit_id UUID;
+UPDATE job_order SET creating_org_unit_id   = creating_squadron_id;
+UPDATE job_order SET requesting_org_unit_id = requesting_squadron_id;
+-- + FK constraints to org_unit(id)
+```
+
+After V96, every aggregate carries **both** the old (`owning_squadron_id` / `creating_squadron_id` / `requesting_squadron_id`) and the new (`owning_org_unit_id` / `creating_org_unit_id` / `requesting_org_unit_id`) FK columns. Both point at the same row (since `org_unit` contains a 1:1 copy of `squadron`). The aggregates are still NOT NULL on the old columns; the new columns are still nullable.
+
+### Release R2: code switchover (no DB migration; deployable independently)
+
+This is the **code-only** release. App code reads/writes the new columns and the new membership table. The old columns/table become inert. R2 ships first **without** any V97+ migration so a rollback to R1's app code restores the old write path.
+
+Phase 1 of dual-write: the application **writes both** the old and the new columns/tables. This keeps a rollback to R1 viable.
+
+Phase 2 of stop-write (still in R2): once dual-write has been deployed and verified, the app stops writing the old columns (`squadron`, `app_user.squadron_id`, `app_user.is_logistician/is_mission_manager`, `owning_squadron_id`, `creating_squadron_id`, `requesting_squadron_id`). The values are now driven exclusively from the new shape.
+
+These two phases ship as **separate PRs** within the same release window. A second deploy ratifies stop-write.
+
+### Release R3: tighten + drop (V97–V100)
+
+After R2 has soaked one full release cycle in prod:
+
+#### V97 — Tighten NOT NULL on new columns; relax NOT NULL on old
+
+```sql
+ALTER TABLE mission        ALTER COLUMN owning_org_unit_id SET NOT NULL;
+ALTER TABLE mission        ALTER COLUMN owning_squadron_id DROP NOT NULL;
+-- repeat for operation, ship, inventory_item, refinery_order
+ALTER TABLE job_order ALTER COLUMN creating_org_unit_id   SET NOT NULL;
+ALTER TABLE job_order ALTER COLUMN requesting_org_unit_id SET NOT NULL;
+ALTER TABLE job_order ALTER COLUMN creating_squadron_id   DROP NOT NULL;
+ALTER TABLE job_order ALTER COLUMN requesting_squadron_id DROP NOT NULL;
+```
+
+#### V98 — Drop old columns on aggregates
+
+```sql
+ALTER TABLE mission        DROP COLUMN owning_squadron_id;
+-- … for operation, ship, inventory_item, refinery_order
+ALTER TABLE job_order DROP COLUMN creating_squadron_id;
+ALTER TABLE job_order DROP COLUMN requesting_squadron_id;
+```
+
+#### V99 — Drop `app_user.squadron_id`, `is_logistician`, `is_mission_manager`
+
+```sql
+ALTER TABLE app_user DROP COLUMN squadron_id;
+ALTER TABLE app_user DROP COLUMN is_logistician;
+ALTER TABLE app_user DROP COLUMN is_mission_manager;
+```
+
+#### V100 — Drop legacy `squadron` table
+
+```sql
+DROP TABLE squadron;
+```
+
+#### Indexes
+
+Throughout R1–R3, add indexes mirroring the squadron-side ones (currently in V91 / V92):
+
+- `idx_mission_owning_org_unit ON mission (owning_org_unit_id)`
+- `idx_operation_owning_org_unit ON operation (owning_org_unit_id)`
+- `idx_ship_owning_org_unit ON ship (owning_org_unit_id)`
+- `idx_inventory_item_owning_org_unit ON inventory_item (owning_org_unit_id)`
+- `idx_refinery_order_owning_org_unit ON refinery_order (owning_org_unit_id)`
+- `idx_job_order_creating_org_unit ON job_order (creating_org_unit_id)`
+- `idx_job_order_requesting_org_unit ON job_order (requesting_org_unit_id)`
+- `idx_org_unit_membership_org_unit ON org_unit_membership (org_unit_id)` — for "list members of SK X"
+
+Bundle these into V96 (initial creation) so the new columns are queryable at full speed from day one.
+
+### Rollback strategy
+
+- After V94 only: drop `org_unit`. No app code reads it yet.
+- After V95 only: drop `org_unit_membership`. `squadron_id` is still authoritative.
+- After V96 only: drop the `owning_org_unit_id` / `creating_org_unit_id` / `requesting_org_unit_id` columns; FK constraints come down with them. No code uses them yet.
+- After R2 dual-write deploy: re-deploy R1 app code; the old columns are still authoritative (dual-write kept them current).
+- After R2 stop-write deploy: rolling back loses any *new* writes to the new columns that haven't been mirrored. Cap soak time to ≤24h between dual-write and stop-write deploys, or backfill on rollback.
+- After V97 (NOT NULL on new + relaxed on old): rollback requires a re-tighten of the old. Practically irreversible.
+- After V98 / V99 / V100: irreversible. Backup-restore territory.
+
+---
+
+## 5. Backend Refactor
+
+### 5.1 Package map
+
+New packages / classes (relative to `backend/src/main/java/de/greluc/krt/iri/basetool/backend/`):
+
+| Package | New artifact | Role |
+|---------|--------------|------|
+| `model` | `OrgUnit` (abstract) | shared superclass; carries id, name, shorthand, description, active, isPromotionEnabled, version |
+| `model` | `OrgUnitKind` (enum) | SQUADRON, SPECIAL_COMMAND |
+| `model` | `SpecialCommand` | subclass with `@DiscriminatorValue("SPECIAL_COMMAND")` |
+| `model` | `OrgUnitMembership` (entity) | (user, orgUnit) composite PK + flags |
+| `model` | `OrgUnitMembershipId` (embeddable) | composite PK class for `OrgUnitMembership` |
+| `model.dto` | `OrgUnitDto`, `SpecialCommandDto`, `OrgUnitMembershipDto`, `SpecialCommandRequest`, `MembershipPatchRequest` | wire shapes |
+| `repository` | `OrgUnitRepository`, `SpecialCommandRepository`, `OrgUnitMembershipRepository` | data access |
+| `service` | `OwnerScopeService` | **rename** of `SquadronScopeService`; generalized API (see §5.3) |
+| `service` | `SpecialCommandService` | SK CRUD + Lead-managed member ops |
+| `service` | `OrgUnitMembershipService` | global membership ops (admin only); used by `SpecialCommandService` and the Squadron management flows |
+| `controller` | `SpecialCommandController` | REST endpoints for SK |
+| `controller` | `OrgUnitMembershipController` | REST endpoints for membership CRUD |
+| `mapper` | `OrgUnitMapper`, `SpecialCommandMapper`, `OrgUnitMembershipMapper` | MapStruct |
+
+Existing `Squadron` entity stays (under `@DiscriminatorValue("SQUADRON")`); its public surface and its `IRIDIUM_ID` constant are preserved.
+
+### 5.2 Entity changes
+
+#### `User.java`
+- **Remove** `squadron` field (and getter/setter via Lombok).
+- **Remove** `isLogistician`, `isMissionManager` boolean fields.
+- **Add** `@OneToMany(mappedBy = "user", fetch = FetchType.LAZY) Set<OrgUnitMembership> memberships`.
+
+#### Aggregate entities (`Mission`, `Operation`, `Ship`, `InventoryItem`, `RefineryOrder`, `JobOrder`)
+- Replace `owningSquadron` field (type `Squadron`) with `owningOrgUnit` (type `OrgUnit`).
+- Replace `@JoinColumn(name = "owning_squadron_id")` with `@JoinColumn(name = "owning_org_unit_id")`.
+- JobOrder: replace `creatingSquadron` / `requestingSquadron` with `creatingOrgUnit` / `requestingOrgUnit` (same pattern).
+
+#### `PromotionTopic.java`
+- Keep `owningSquadron` (type `Squadron`). The CHECK trigger from §3.3 enforces that only Squadron rows can be referenced. Service layer enforces it again at write time.
+
+### 5.3 OwnerScopeService — generalization of SquadronScopeService
+
+Class is renamed (`SquadronScopeService` → `OwnerScopeService`). The bean name in `@PreAuthorize` SpEL changes from `@squadronScopeService` to `@ownerScopeService` — affected SpEL strings (currently ~30 across the codebase) need a synchronized rename. A short Checkstyle / grep audit during R2 must confirm no stragglers remain.
+
+#### New core methods
+
+```java
+public Scope currentScope();                                   // see §3.5
+
+public boolean canSeeOrgUnit(UUID orgUnitId);                  // replaces canSeeSquadron
+public boolean canEditOrgUnit(UUID orgUnitId);                 // replaces canEditSquadron
+
+public boolean canSeeMission(UUID missionId);                  // unchanged semantics; impl reads owningOrgUnit
+public boolean canEditMission(UUID missionId);                 // unchanged semantics
+// canSee* / canEdit* for InventoryItem, RefineryOrder, Operation, Ship → unchanged contract, new impl
+
+public boolean isPromotionFeatureEnabledForCurrentScope();
+public void assertPromotionFeatureEnabled();
+
+// New, contextual:
+public boolean hasRoleInOrgUnit(UUID orgUnitId, String roleName);
+//   roleName ∈ {"LOGISTICIAN", "MISSION_MANAGER", "LEAD"}
+//   admin → always true; otherwise check the membership row's flag for (currentUser, orgUnitId)
+
+public Set<UUID> currentMemberOrgUnitIds();                    // for IN-clause filtering
+```
+
+#### Backward-compat shim
+
+To avoid breaking every existing `@PreAuthorize("@squadronScopeService.canSeeMission(#id)")` in a single PR, R2 keeps a thin `SquadronScopeService` `@Service` bean that delegates every method to `OwnerScopeService`. The shim is deleted in a follow-up PR after all SpEL strings have been migrated. (The shim is *not* a long-term abstraction; it's purely a one-PR-can't-touch-everything safety net.)
+
+### 5.4 Repository changes
+
+Every staffel-scoped repository today carries an `…Scoped(UUID owningSquadronId, …)` overload that treats `null` as "admin = all squadrons". The signature must change:
+
+```java
+// Today:
+Page<Mission> searchMissions(…, UUID scopeSquadronId, …);
+
+// Tomorrow:
+Page<Mission> searchMissions(…, @Nullable UUID activeOrgUnitId, Set<UUID> memberOrgUnitIds, …);
+```
+
+The new JPQL/HQL predicate (Mission as the cross-staffel example):
+
+```sql
+(:activeOrgUnitId IS NOT NULL
+   AND (m.owningOrgUnit.id = :activeOrgUnitId OR m.isInternal = false))
+OR
+(:activeOrgUnitId IS NULL
+   AND (:memberOrgUnitIdsIsEmpty = true
+        OR m.owningOrgUnit.id IN (:memberOrgUnitIds)
+        OR m.isInternal = false))
+```
+
+Two new parameters per query. To keep this DRY and testable, introduce a `ScopePredicate` helper that returns the relevant JPQL fragment + parameter map per scope; repository queries `@Query` strings include the fragment via `@Query(value = "… " + ScopePredicate.MISSION_VISIBILITY + " …")` constants assembled at compile time.
+
+For strict-staffel aggregates (Ship, InventoryItem direct, RefineryOrder, Operation), the predicate simplifies to:
+
+```sql
+(:activeOrgUnitId IS NOT NULL AND owning_org_unit_id = :activeOrgUnitId)
+OR
+(:activeOrgUnitId IS NULL
+   AND (:memberOrgUnitIdsIsEmpty = true OR owning_org_unit_id IN (:memberOrgUnitIds)))
+```
+
+JobOrder repository: no filter (cross-org-unit workspace), same as today's cross-squadron behaviour. Display preference filtering by `requestingOrgUnitId` stays available as an optional query parameter.
+
+InventoryItem repository: keep the two distinct paths from today.
+- `findGlobalByFilters(…, activeOrgUnitId, memberOrgUnitIds)` — Lager-direct view, scope-filtered.
+- `findByJobOrderIdOrdered(jobOrderId)` — cross-org-unit, ungated (Job-Order-Kontext).
+
+### 5.5 Service-layer stamping rules
+
+For each aggregate's create path, decide where the owning org unit comes from. This is the most regression-sensitive part of the plan.
+
+| Aggregate | Today | Tomorrow |
+|-----------|-------|----------|
+| Ship | `ship.setOwningSquadron(user.getSquadron())` (owner-derived) | `ship.setOwningOrgUnit(resolveOwnerForUser(user, dto.owningOrgUnitId))` — see §5.5.1 |
+| InventoryItem (create) | `item.setOwningSquadron(user.getSquadron())` | `item.setOwningOrgUnit(resolveOwnerForUser(targetUser, dto.owningOrgUnitId))` — DTO carries the chosen owner (D4) |
+| InventoryItem (transfer / `bookOut TRANSFER`) | `newItem.setOwningSquadron(targetUser.getSquadron())` | `newItem.setOwningOrgUnit(resolveOwnerForUser(targetUser, dto.targetOwningOrgUnitId))` — see §5.5.2 |
+| RefineryOrder | `order.setOwningSquadron(user.getSquadron())` | `order.setOwningOrgUnit(resolveOwnerForUser(user, dto.owningOrgUnitId))` |
+| Operation | `operation.setOwningSquadron(scope.currentSquadron())` (scope-derived) | `operation.setOwningOrgUnit(resolveOwnerFromActorOrChoice(dto.owningOrgUnitId))` — Operation has no owner; choice from actor's memberships |
+| Mission | `mission.setOwningSquadron(owner.getSquadron())` fallback to scope | `mission.setOwningOrgUnit(resolveOwnerForUser(owner, dto.owningOrgUnitId))` — owner is the mission owner; choice from owner's memberships |
+| JobOrder | `creating_squadron` from active scope; `requesting_squadron` from DTO or fallback | `creating_org_unit` from active scope (or explicit override for admin); `requesting_org_unit` from DTO (any org unit) |
+
+#### 5.5.1 `resolveOwnerForUser` — central helper
+
+```java
+OrgUnit resolveOwnerForUser(User user, @Nullable UUID requestedOrgUnitId) {
+    Set<UUID> memberships = user.getMemberships().stream()
+        .map(m -> m.getOrgUnit().getId())
+        .collect(Collectors.toSet());
+
+    if (memberships.isEmpty()) {
+        // User belongs to no org unit. Cannot stamp. Reject at the boundary.
+        throw new BadRequestException("User has no org-unit membership");
+    }
+
+    if (requestedOrgUnitId == null) {
+        if (memberships.size() == 1) {
+            return orgUnitRepository.getReferenceById(memberships.iterator().next());
+        }
+        // Ambiguous: multiple memberships, no explicit choice. Reject.
+        throw new BadRequestException("User belongs to multiple org units; owningOrgUnitId is required");
+    }
+
+    if (!memberships.contains(requestedOrgUnitId)) {
+        throw new BadRequestException("User is not a member of the requested org unit");
+    }
+
+    return orgUnitRepository.getReferenceById(requestedOrgUnitId);
+}
+```
+
+This helper is the single seam where the user's intent (or its absence) becomes a stamp. Every aggregate's create path goes through it.
+
+#### 5.5.2 Transfer (`bookOut TRANSFER`) — cross-org-unit support
+
+Today's bug (see [InventoryItemService.java:676](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/InventoryItemService.java:676)): `newItem.setOwningSquadron(targetUser.getSquadron())` crashes V89 NOT NULL when `targetUser.getSquadron() == null` (SK-only user).
+
+New transfer DTO field: `targetOwningOrgUnitId UUID` (required when target user has >1 membership). The service resolves the destination owner via `resolveOwnerForUser(targetUser, dto.targetOwningOrgUnitId)`. The controller-layer Jakarta validation enforces presence when needed; the service enforces membership again as defense in depth.
+
+The actor (current user) doesn't need to be a member of the destination org unit — transfers are the explicit mechanism by which inventory can cross org-unit boundaries. The actor *does* need write permission on the source item (already enforced via `canEditInventoryItem`).
+
+#### 5.5.3 Operation create — owner choice
+
+Operation has no per-entity owner field; today it uses `SquadronScopeService.currentSquadron()` (the actor's active scope) to stamp.
+
+Tomorrow: `dto.owningOrgUnitId` is required when the actor is in >1 org unit. If the actor is in exactly one org unit (e.g. Staffel only, no SKs), the field can be omitted and the stamp falls back to that one membership (no regression for the single-Staffel users).
+
+#### 5.5.4 JobOrder create — both fields
+
+- `creatingOrgUnitId`: stamped from actor's active scope (today: `currentSquadron()`). Behaviour unchanged for actors in a single Staffel. For actors in multiple org units without an active selection, this becomes required.
+- `requestingOrgUnitId`: today already an explicit DTO field on the write path. The set of legal values widens from "any Squadron" to "any OrgUnit". The actor does not need to be a member — Job Orders are a cross-org workspace.
+
+### 5.6 Controller / DTO changes
+
+Every controller that exposes a staffel-scoped resource needs:
+
+1. Reference DTOs (`MissionDto`, `OperationDto`, `ShipDto`, `InventoryItemDto`, `RefineryOrderDto`, `JobOrderDto`) get `owningOrgUnit: OrgUnitDto` instead of `owningSquadron: SquadronDto`. The wire-shape rename is breaking — see §10 for the compatibility window.
+2. Write DTOs (`CreateMissionRequest`, `InventoryItemCreateDto`, etc.) accept `owningOrgUnitId: UUID` (optional when the actor is in exactly one org unit; required otherwise).
+3. ArchUnit rule `responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints` already covers `owningSquadronId` — extend the deny-list with `owningOrgUnitId` on response DTOs and `owningOrgUnit` (full object) anywhere on the write DTOs.
+
+#### New endpoints
+
+```
+POST   /api/v1/special-commands                  ADMIN — create SK
+GET    /api/v1/special-commands                  any auth — list (filtered to memberships for non-admin)
+GET    /api/v1/special-commands/{id}             any auth + canSeeOrgUnit
+PUT    /api/v1/special-commands/{id}             ADMIN — rename/update
+DELETE /api/v1/special-commands/{id}             ADMIN — soft delete
+POST   /api/v1/special-commands/{id}/activate    ADMIN
+
+POST   /api/v1/special-commands/{id}/members     ADMIN or Lead-of-this-SK — add member
+DELETE /api/v1/special-commands/{id}/members/{userId}   ADMIN or Lead-of-this-SK — remove member
+PATCH  /api/v1/special-commands/{id}/members/{userId}   ADMIN or Lead-of-this-SK — flip is_logistician/is_mission_manager flags
+PATCH  /api/v1/special-commands/{id}/members/{userId}/lead   ADMIN only — flip is_lead
+
+PATCH  /api/v1/squadrons/{id}/members/{userId}            ADMIN — flip is_logistician/is_mission_manager on Staffel membership
+                                                          (replaces today's flag-on-user UI)
+```
+
+The Squadron promotion-toggle endpoint `PATCH /api/v1/squadrons/{id}/promotion-enabled` stays. No equivalent endpoint exists for SK (CHECK constraint guarantees the flag is always false there).
+
+#### `@PreAuthorize` patterns
+
+| Pattern | When |
+|---------|------|
+| `@ownerScopeService.canSeeOrgUnit(#id)` | read of an OrgUnit-scoped detail |
+| `@ownerScopeService.canEditOrgUnit(#id)` | write to an OrgUnit-scoped detail (no contextual role required) |
+| `@ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')` | create paths that require a logistician role *in the target org unit* |
+| `hasRole('ADMIN')` | admin-only endpoints (SK lifecycle, role flags on Squadron memberships, system settings) |
+| `@specialCommandSecurityService.canManageMembers(#id, authentication)` | SK member-management endpoints (ADMIN or Lead of this SK) |
+
+New helper service `SpecialCommandSecurityService` mirrors `MissionSecurityService` — it encapsulates the "ADMIN or Lead of this SK" check.
+
+---
+
+## 6. Scoped Authorization (D3 detail)
+
+### 6.1 Spring Security wiring
+
+Today's Keycloak JWT claims a `realm_access.roles` array; `CustomJwtGrantedAuthoritiesConverter` maps it to `GrantedAuthority` strings (`ROLE_ADMIN`, `ROLE_OFFICER`, `ROLE_SQUADRON_MEMBER`, `ROLE_GUEST`). It additionally honours `app_user.is_logistician` / `is_mission_manager` to grant `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`.
+
+Tomorrow:
+
+- The realm-level roles (`ADMIN`, `OFFICER`, `SQUADRON_MEMBER`, `GUEST`) stay as global authorities.
+- `ROLE_LOGISTICIAN` and `ROLE_MISSION_MANAGER` are no longer flat authorities. They become **contextual** — granted in the OrgUnit where the user's membership row carries the flag.
+- The converter no longer reads `is_logistician` from `app_user`. It reads it from each membership row and produces no flat authority; instead the Spring Security authentication carries a `Set<ContextualAuthority>` (custom GrantedAuthority subtype) such as `LOGISTICIAN@<orgUnitUuid>`.
+- `RoleHierarchy` continues to apply for global roles (`ADMIN > OFFICER > LOGISTICIAN` etc.) — but only the global edges, not the contextual ones.
+
+#### Where the contextual check lands
+
+Two patterns coexist:
+
+1. **Endpoint-level authorisation** (`@PreAuthorize`) where the action's target org unit is in the request:
+
+   ```java
+   @PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')")
+   public InventoryItemDto createInventoryItem(@Valid @RequestBody InventoryItemCreateDto dto) …
+   ```
+
+2. **Service-level enforcement** for actions whose target is derived inside the service (e.g. `bookOut TRANSFER` — the target org unit is only known after the DTO has been parsed and the destination user looked up):
+
+   ```java
+   if (!ownerScopeService.hasRoleInOrgUnit(targetOrgUnit.getId(), "LOGISTICIAN")) {
+       throw new AccessDeniedException("Logistician role required in destination org unit");
+   }
+   ```
+
+### 6.2 Effective scope as a vector
+
+See §3.5. The non-admin caller's read set is the union of their memberships, narrowed by the optional `activeOrgUnitId`. The admin caller continues to read across all org units unless they actively pin one via the switcher.
+
+For the **active-org-unit switcher on non-admin users**: a member of one Staffel and two SKs sees an "active context" dropdown with options {"all my org units", Staffel name, SK A, SK B}. The selection is stored in the same Spring Session attribute as today's admin switcher; the relay header is renamed `X-Active-Org-Unit-Id` (see §7.2). The switcher is hidden for users with exactly one membership (no choice to make → no regression noise).
+
+---
+
+## 7. Frontend Refactor
+
+### 7.1 i18n
+
+New key prefixes:
+
+```
+orgUnit.kind.squadron=Staffel
+orgUnit.kind.specialCommand=Spezialkommando
+orgUnit.kind.specialCommand.short=SK
+
+specialCommand.title=Spezialkommandos
+specialCommand.list.empty=Es sind noch keine Spezialkommandos angelegt.
+specialCommand.create.title=Spezialkommando anlegen
+specialCommand.create.name=Name
+specialCommand.create.shorthand=Kürzel
+specialCommand.create.description=Beschreibung
+specialCommand.member.add=Mitglied hinzufügen
+specialCommand.member.remove=Mitglied entfernen
+specialCommand.member.role.logistician=Logistiker (in diesem SK)
+specialCommand.member.role.missionManager=Einsatzleiter (in diesem SK)
+specialCommand.member.role.lead=Leiter
+…
+
+ownerPicker.label=Zuordnen zu
+ownerPicker.placeholder=-- Bitte wählen --
+ownerPicker.required=Eine Auswahl ist erforderlich.
+ownerPicker.staffel=Staffel
+ownerPicker.specialCommand=Spezialkommando
+```
+
+Existing `squadron.*` keys (`squadron.switcher.label`, `squadron.context.badge`, etc.) get renamed under a single new prefix `orgUnit.scope.*` — the affected templates are listed in §7.3. German umlauts must use `\uXXXX` per repo convention (CLAUDE.md i18n rule); English file uses literal ASCII.
+
+### 7.2 Sidebar — active-context switcher
+
+Existing admin-only switcher form at `frontend/src/main/resources/templates/fragments/sidebar.html:82-110` becomes:
+
+- Visible to **any user with >1 org-unit membership** (not just admins). Hidden when memberships.size() ≤ 1 (no choice → no UI noise → no regression).
+- Options are the union of the user's memberships plus, for admin, every active org unit.
+- Header relayed by the frontend WebClient changes from `X-Active-Squadron-Id` to `X-Active-Org-Unit-Id`. The session attribute key `iridium.activeSquadronId` is renamed `iridium.activeOrgUnitId`. Both the filter (`ActiveSquadronContextFilter` → `ActiveOrgUnitContextFilter`) and the relay (`ActiveSquadronRelayFilter` → `ActiveOrgUnitRelayFilter`) carry the new naming. The endpoint `POST /me/active-squadron` is renamed `POST /me/active-org-unit`; the old path stays for one release as a redirect/alias to avoid breaking any open browser tabs.
+- Context chip text shows `[Staffel: IRI]` or `[SK: <shorthand>]` so the user knows which kind they're in (Styleguide colors: the chip stays orange for Staffel; SKs use a neutral chip variant so they're visually distinguishable without competing with the brand color).
+
+### 7.3 Forms that gain an owner picker
+
+| Page | Today | Tomorrow |
+|------|-------|----------|
+| Refinery order create ([refinery-orders-create.html:141](frontend/src/main/resources/templates/refinery-orders-create.html:141)) | `ownerId` (user selector); squadron implicit | Add `owningOrgUnitId` selector populated from the *chosen owner user's* memberships. Hidden when chosen owner has one membership only. Server validates again. |
+| Inventory input ([inventory-input.html:68](frontend/src/main/resources/templates/inventory-input.html:68)) | `userId` conditional on `isGlobal`; squadron from target user | Add `owningOrgUnitId` selector populated from target user's memberships. Hidden when target user has one membership only. |
+| Job order create ([orders-create.html:99](frontend/src/main/resources/templates/orders-create.html:99)) | `requestingSquadronId` (any squadron) | Rename to `requestingOrgUnitId`; widen options to any active org unit (Staffel + SKs). Add separate optional `creatingOrgUnitId` for admin override. |
+| Mission create (in `mission-detail.html`) | Implicit (owner's squadron) | Add `owningOrgUnitId` selector from owner's memberships. Hidden when owner has one membership only. |
+| Operation create (modal in `operations-index.html`) | Implicit (actor's active scope) | Add `owningOrgUnitId` selector from actor's memberships. Hidden when actor has one membership only. |
+| Inventory transfer (book-out TRANSFER modal) | Implicit (target user's squadron) | Add `targetOwningOrgUnitId` selector from target user's memberships. Hidden when target user has one membership only. Cross-org-unit transfers are allowed by design (D4). |
+| Hangar / Ship add (modal in `hangar.html`) | Implicit (owner's squadron) | Add `owningOrgUnitId` selector from owner's memberships. Hidden when owner has one membership only. |
+
+The selector is implemented as a single reusable Thymeleaf fragment `fragments/owner-picker.html` (new file). Inputs:
+
+- `targetUser` (the user whose memberships fill the dropdown — varies per form)
+- `name` (HTML form field name, e.g. `owningOrgUnitId` or `targetOwningOrgUnitId`)
+- `selected` (preselected UUID, optional)
+- `required` (boolean, default true)
+
+The fragment groups options visually under two `<optgroup>` headers (Staffel / Spezialkommandos) when the user has both kinds; collapses to a flat list when only one kind is present. Auto-submit / live validation use the same CSP-safe event delegation pattern already established by the admin switcher (no inline `onchange`).
+
+### 7.4 Member-edit UI
+
+Admin member edit ([member-edit.html:104](frontend/src/main/resources/templates/member-edit.html:104)) today shows a single squadron dropdown. Tomorrow it becomes two sections:
+
+1. **Staffel-Mitgliedschaft** — single dropdown (none / one of the active Staffeln), with per-row flags (`is_logistician`, `is_mission_manager`).
+2. **Spezialkommandos** — multi-select list with per-row flags (`is_logistician`, `is_mission_manager`, `is_lead`).
+
+Submission goes to a single POST endpoint that computes the membership delta server-side (add new, remove old, patch flags). Optimistic locking per membership row prevents concurrent admin actions from clobbering each other.
+
+### 7.5 Member-list UI
+
+[members.html:44-96](frontend/src/main/resources/templates/members.html:44-96) today shows one `squadron-badge` column. Tomorrow it shows one Staffel badge (or em-dash) plus a comma-separated list of SK shorthand badges (e.g. `IRI · ALPHA · BRAVO`). The visual treatment differs (SK badges use the neutral chip style) so the kinds remain scannable.
+
+### 7.6 SK admin page
+
+New page `/admin/special-commands` (Thymeleaf template `admin-special-commands.html`):
+
+- List view of all SKs (active + inactive toggle).
+- Inline-edit shorthand/name/description (Admin only).
+- Click-through to a per-SK detail page with the member list, add/remove member controls, role flag toggles, Lead toggle (Admin only).
+- Add the page link to the admin sidebar section.
+
+The promotion settings page (`/admin/settings`) gains a note that SKs do not participate in the promotion subsystem (CHECK constraint enforced).
+
+---
+
+## 8. ArchUnit Tests
+
+The existing whitelists in [`ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java:644) drive the rename:
+
+### 8.1 Update existing rules
+
+```java
+// Today
+Set<String> staffelScopedServiceNames = Set.of(
+    "MissionService", "InventoryItemService", "RefineryOrderService",
+    "HangarService", "OperationService");
+
+// Tomorrow — same list, just the dependency check shifts
+//   "must inject either AuthHelperService or OwnerScopeService"
+```
+
+The whitelist names stay the same; only the dependency target changes. **Add** `SpecialCommandService` and `OrgUnitMembershipService` to the whitelist (they manage scoped data).
+
+Same applies to `staffelScopedControllerSimpleNames` (add `SpecialCommandController`).
+
+### 8.2 New rule: kind-of-OrgUnit must match aggregate intent
+
+ArchUnit cannot inspect DB-level CHECKs, but it can catch wiring mistakes at the Java layer:
+
+```java
+// PromotionTopic.owningSquadron must be typed Squadron, not OrgUnit.
+classes().that().haveSimpleName("PromotionTopic")
+         .should().haveFieldOfType(Squadron.class).asWrapperOfMember("owningSquadron")
+```
+
+Hand-written via reflection on `Field.getType()` in a custom ArchCondition. Catches a careless refactor that loosens the type to `OrgUnit` and silently lets an SK become a promotion owner.
+
+### 8.3 New rule: write DTOs cannot accept `owningOrgUnit` / `owningSquadronId` / `creatingSquadronId`
+
+Today's audit-finding rule `responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints` ([line 957](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java:957)) gets its forbidden-field list extended:
+
+```java
+forbiddenWriteFieldNames = Set.of(
+    "id", "version", "owningSquadronId",
+    "owningOrgUnit", "owningOrgUnitDto",          // server-managed entity refs
+    "creatingSquadron", "creatingOrgUnit",
+    "owner", "parent"
+);
+```
+
+The allowed write fields stay `owningOrgUnitId: UUID`, `creatingOrgUnitId: UUID`, `requestingOrgUnitId: UUID` (plain UUIDs are intentionally allowed — they're inputs, not entity proxies).
+
+### 8.4 New rule: every owner-stamping create path uses the central resolver
+
+A method named `create*` on any service in the staffel-scoped service whitelist must either (a) call `resolveOwnerForUser` directly, or (b) call another method that does (Mission's hand-off to MissionService). ArchUnit `methods().that().areAnnotatedWith(MarkerAnnotation.class).should().call(…)` isn't quite right; the practical implementation is a Checkstyle/PMD custom check, not ArchUnit. Flag as a follow-up.
+
+### 8.5 New rule: no direct `@JoinColumn(name = "squadron_id")` outside the legacy migration code
+
+Catches a careless re-introduction of the old column name on a new entity. ArchUnit:
+
+```java
+fields().should().notHaveAnnotationContaining("@JoinColumn(name = \"squadron_id\")")
+```
+
+(string match against the annotation literal; ArchUnit doesn't natively support annotation-value introspection.)
+
+### 8.6 Frontend ArchUnit
+
+Unchanged. The two existing rules ("no Spring Data JPA in frontend", "no JDBC") cover the new code automatically.
+
+---
+
+## 9. Test Strategy
+
+### 9.1 Unit test coverage targets
+
+| Layer | New tests |
+|-------|-----------|
+| `OrgUnit` / `Squadron` / `SpecialCommand` entities | discriminator behaviour, IRIDIUM_ID equality, JPA Hibernate validate |
+| `OrgUnitMembership` | partial unique index enforced (insert second Staffel membership → fail), is_lead CHECK enforced (set on Staffel membership → fail) |
+| `OwnerScopeService` | every method that today has a `SquadronScopeServiceTest` case — port verbatim plus new SK-only and multi-membership cases |
+| `resolveOwnerForUser` | matrix: 0 memberships → reject; 1 membership + no choice → auto-stamp; 1 membership + choice mismatch → reject; >1 membership + no choice → reject; >1 membership + valid choice → stamp; >1 membership + foreign choice → reject |
+| `InventoryItemService.bookOutInventoryItem TRANSFER` | new cross-org-unit cases: SK-only target user, target user with 0 memberships (impossible after backfill, but defensive), Staffel-to-SK transfer, SK-to-Staffel transfer |
+| `SpecialCommandService` | CRUD path; member add/remove path; Lead toggle path; admin-vs-Lead authority matrix |
+| `MissionRepository.searchMissions` | new fixture matrix: user in Staffel A + SK X; mission owned by SK Y with isInternal=false → visible; same with isInternal=true → not visible |
+| `MeFrontendController.setActiveOrgUnit` | accept Staffel id, accept SK id, accept blank (clear), reject UUID not in user's memberships (for non-admin) |
+
+### 9.2 Integration test coverage
+
+`@SpringBootTest`-driven scenarios:
+
+1. End-to-end "create refinery order as user in 1 Staffel + 2 SKs": POST without `owningOrgUnitId` → 400; POST with valid id → 201; subsequent GET returns the order with the chosen owner. Repeat for inventory create, mission create, operation create, job order create.
+2. End-to-end transfer: actor in Staffel A; target user in SK X (no Staffel). POST `/api/v1/inventory/{id}/book-out` with `targetOwningOrgUnitId = SK X id` succeeds; new item has `owningOrgUnit = SK X`.
+3. Promotion subsystem against an SK: any read or write to a promotion endpoint scoped to an SK returns 403 (the CHECK on `org_unit` makes the topic-creation path impossible; but the read side also short-circuits via `isPromotionFeatureEnabledForCurrentScope`).
+4. Admin context switcher: admin pins SK Y; GETs return only SK Y data; switching to "all" restores cross-org reads. Same flow for a non-admin user in multiple memberships.
+5. Multi-membership listing: user in 1 Staffel + 1 SK runs `GET /api/v1/inventory` with no active selection → sees both org units' Lager. Then pins SK only → sees only SK's Lager.
+
+### 9.3 Regression / golden-path tests
+
+The single most important regression suite: every existing test in the staffel-scoped service test packages must continue to pass with `@DiscriminatorValue("SQUADRON")` rows substituting for what was a `Squadron`. The aim is to prove that **the single-Staffel-no-SK user experience is byte-identical to today**.
+
+Concrete plan: keep all existing test fixtures (`Squadron` instances created via the existing `@TestSquadronFactory` or similar) unchanged; ensure they end up as `org_unit.kind='SQUADRON'` rows post-migration; rerun the entire `:backend:test` suite as a smoke gate at each R1/R2/R3 milestone.
+
+### 9.4 Manual UI verification
+
+Per CLAUDE.md frontend rule: every responsive breakpoint (smartphone, tablet, desktop, ultra-wide) gets walked through on the new owner-picker fragment, the SK admin page, and the extended member-edit page. Run the dev stack with `.env.test`, never the production `.env` (per memory: `feedback_env_test_isolation`).
+
+### 9.5 Test data isolation reminder
+
+Test artifacts (keystore, realm export) stay isolated per the existing rule. No production credentials in any new fixture. CLAUDE.md "Testing" section applies.
+
+---
+
+## 10. Rollout Phases & Soak Windows
+
+Recommended sequence, each step is a separate PR + deploy:
+
+| Step | Migrations | Code | Rollback |
+|------|-----------|------|----------|
+| **PR-1** (R1.a) | V94 (`org_unit` create + copy) + V95 (`org_unit_membership` create + backfill) | None | Drop the two tables; `squadron` + `app_user` still authoritative |
+| **PR-2** (R1.b) | V96 (FK column adds on aggregates + JobOrder + indexes) | None | Drop new columns |
+| **soak** | — | — | 1 release cycle in prod confirms data integrity |
+| **PR-3** (R2.a) | None | New entities (`OrgUnit`, `SpecialCommand`, `OrgUnitMembership`); dual-write services that mirror writes to both old and new columns/tables; `OwnerScopeService` with shim for `@squadronScopeService` SpEL strings; ArchUnit whitelist updates | Re-deploy R1 app — old write path still works |
+| **PR-4** (R2.b) | None | New REST endpoints (`/api/v1/special-commands`, membership APIs); admin UI; new owner-picker fragment; admin switcher rename to `X-Active-Org-Unit-Id`; old `X-Active-Squadron-Id` header still honoured for one release as alias | Same as PR-3 |
+| **PR-5** (R2.c) | None | Stop-write the legacy columns (`squadron`, `app_user.squadron_id`, `is_logistician`, `is_mission_manager`, `owning_squadron_id`, `creating_squadron_id`, `requesting_squadron_id`); update all `@PreAuthorize` SpEL strings to `@ownerScopeService.*`; remove the `SquadronScopeService` shim | Re-deploy PR-4 |
+| **soak** | — | — | 1 release cycle confirms stop-write side has no functional issues |
+| **PR-6** (R3.a) | V97 (NOT NULL tighten on new, drop NOT NULL on old) | None | Re-tighten on old columns (irreversible in practice) |
+| **PR-7** (R3.b) | V98 (drop old aggregate columns) + V99 (drop `app_user.squadron_id` / flags) + V100 (drop legacy `squadron` table) | None | Irreversible — restore from backup if needed |
+
+Total: 7 PRs across 3 deployable releases with 2 soak windows. Each PR is small enough to review; each deploy is rollback-safe up to the dual-write phase.
+
+### Communication checkpoints
+
+- **Before PR-1**: announce the schema migrations to anyone running ad-hoc SQL.
+- **Before PR-5 (stop-write)**: confirm dual-write has not silently lost any rows for one release.
+- **Before PR-7 (drop)**: take a full DB backup; the operation is irreversible.
+
+---
+
+## 11. Regression Risk Register
+
+Threats this plan deliberately mitigates, with the corresponding mitigation pointer:
+
+| # | Risk | Today's symptom | Mitigation |
+|---|------|-----------------|-----------|
+| **R1** | Transfer to SK-only user breaks NOT NULL on `owning_squadron_id` | [InventoryItemService.java:676](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/InventoryItemService.java:676) stamps `targetUser.getSquadron()` which is `null` for SK-only target; V89 NOT NULL throws | §5.5.2: `resolveOwnerForUser` requires an explicit `targetOwningOrgUnitId`; service-layer validation; integration test (§9.2 case 2) |
+| **R2** | Inventory create on SK-only user crashes same way | [InventoryItemService.java:431](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/InventoryItemService.java:431) stamps `user.getSquadron()` (null) | Same as R1 |
+| **R3** | Existing `@PreAuthorize("@squadronScopeService.canSeeMission(#id)")` SpEL breaks after rename | All ~30 mentions go to broken SpEL → 403 on every mission read | §5.3 shim: `SquadronScopeService` survives PR-3, every SpEL string updated in PR-5, shim deletion in PR-5; grep gate runs as part of `:backend:test` setup |
+| **R4** | Promotion data accidentally references an SK | `promotion_topic.owning_squadron_id` could be set to an SK UUID (FK still resolves since same table) | §3.3 trigger-based CHECK; §5.2 keeps `PromotionTopic.owningSquadron` typed `Squadron` (not `OrgUnit`); §8.2 ArchUnit rule blocks the type loosening |
+| **R5** | Admin context header (`X-Active-Squadron-Id`) renamed but stale clients send old name | Admins on cached pages send old header → backend ignores → admin's "active selection" silently breaks | §7.2 keeps both header names honoured for one release; deprecation header added on the old path; tracked alias in `DeprecationInterceptor` |
+| **R6** | User with 0 memberships (admin / guest) hits a create path | Stamping fails with NPE or NOT NULL | §5.5.1 explicit `BadRequestException` at the helper; integration test |
+| **R7** | Member-edit UI's single-Staffel dropdown is replaced — admin loses ability to set is_logistician/is_mission_manager flags | Today the flags are toggled at the user level; after refactor they're per-membership | §7.4 new two-section member-edit form; the patch endpoints replace the user-level flags; CHANGELOG entry on the user-facing change |
+| **R8** | Existing `Set<UUID>` filter parameter performance: `IN` clauses with many memberships are slow | Postgres handles small IN lists fine; large memberships sets uncommon | Cap memberships per user at app layer (warning at 16 SKs, hard at 32 — high enough nobody hits it); index on `owning_org_unit_id` already present (§4 release R1) |
+| **R9** | The new owner-picker fragment becomes 500 in prod due to backend DTO returning a `null` memberships field | Templates render against a `null` collection → template engine error | DTO uses `Collections.emptyList()` defaults; integration test asserts the empty case renders; per memory `feedback_backend_frontend_dto_mirror`, the frontend mirror record must be updated in lockstep |
+| **R10** | ArchUnit `staffelScopedWriteEndpointsMustGateOnSquadronScopeService` rule pre-PR-5 still blocks merges because SpEL still references `squadronScopeService` | New endpoints could land with the new bean name and fail the rule | Extend the accepted SpEL pattern list in the rule to include both names during R2; revert to `ownerScopeService`-only in PR-5 |
+| **R11** | Mission cross-staffel visibility breaks: a user in just a Staffel was previously seeing non-internal foreign-squadron missions; after the refactor, the predicate must also fold the new memberships set | If the new repo query forgets the `is_internal = false` clause, public missions disappear from cross-org-unit view | §5.4 example query keeps the `OR isInternal = false` clause; existing tests against `MissionRepository.searchMissions` cover this; new tests for the multi-membership case |
+| **R12** | Concurrent admin actions on the same membership row (e.g. admin A flips Lead while admin B removes membership) cause a 409 storm | Optimistic locking would surface as a generic error | `OrgUnitMembership` carries `@Version`; controller catches `OptimisticLockingFailureException` and surfaces a 409 with a clear problem-detail; matches the existing pattern in `SquadronController.updateSquadron` |
+| **R13** | The CHECK constraint `kind = 'SQUADRON' OR is_promotion_enabled = FALSE` rejects a default-initialized SK row inserted by Hibernate (since the entity's default is true) | INSERT fails with constraint violation, the user can't create any SK | `SpecialCommand` constructor sets `isPromotionEnabled = false`; integration test creating an SK and reading it back asserts the flag |
+| **R14** | The MDC `squadronId` log field changes meaning silently (was Staffel id; will be any org unit id including SK) | Existing log dashboards keyed on `squadronId` start mixing Staffel and SK ids | Rename MDC field to `orgUnitId` in `CorrelationIdFilter`; update `application-prod.yml` `LogstashEncoder` patterns; CHANGELOG entry; one-release alias keeps both fields populated for log-pipeline transition |
+| **R15** | Hibernate single-table inheritance + LAZY loading: a query on `Squadron` returns only Squadron rows but the SQL Hibernate issues includes a discriminator filter that some custom JPQL might miss | Custom JPQL that selects `FROM Squadron s` won't see SK rows (correct) but `FROM OrgUnit o WHERE TYPE(o) = Squadron` mis-coded could leak | All inheritance-aware queries land via the repository abstraction (typed `SquadronRepository extends JpaRepository<Squadron, UUID>` so Spring auto-applies the discriminator); ban hand-written JPQL on the OrgUnit hierarchy unless guarded with `TYPE(o) = …` |
+| **R16** | Frontend has hardcoded squadron count, names, or admin-only assumptions that fall apart for non-admins with the new switcher | Layout glitches, broken context chip, missing labels | §7 itemizes every affected template; manual responsive verification per §9.4 |
+
+---
+
+## 12. Documentation Updates
+
+Each of the following gets a synchronous update as part of the relevant PR (not as a follow-up):
+
+- **`CLAUDE.md`** — extensive: "Multi-squadron tenancy" section becomes "Multi-org-unit tenancy"; the scoped-aggregate whitelist is expanded; the `SquadronScopeService` references become `OwnerScopeService`; the `Squadron.IRIDIUM_ID` mention is preserved; the new owner-picker contract is documented; the V94–V100 migration history is referenced. Update happens in PR-5 (the stop-write deploy) so the file reflects the post-rename world.
+- **`ROLES_AND_PERMISSIONS.md`** — add a section on contextual roles; replace "Logistician (global)" with "Logistician (per membership)"; add the SK Lead role.
+- **`MULTI_SQUADRON_PLAN.md`** — add a closing paragraph referencing this plan as the follow-up; do not rewrite history.
+- **`CHANGELOG.md`** — entries per PR, short and user-visible (per the repo style memory `feedback_changelog_one_shot`): "Spezialkommandos koennen jetzt parallel zu Staffeln angelegt werden", "Lagerbuchung erfordert explizite Auswahl des Eintraegers wenn der Nutzer in mehreren Einheiten ist", etc. German with literal umlauts (per CLAUDE.md i18n rule for Markdown).
+- **`README.md`** — env-var section unchanged; architecture section's "tenant unit = Squadron" sentence becomes "tenant unit = OrgUnit (Squadron or SpecialCommand)".
+- **`backend/src/main/resources/db/migration/README.md`** — append a note that V94–V100 implement the SK extension and document the staged rollout.
+- **OpenAPI** — every new endpoint carries `@Operation` + `@ApiResponses`; `openapi.json` is regenerated in PR-4.
+
+---
+
+## 13. Out-of-Scope Follow-ups (flagged, not done)
+
+- **Per-SK promotion variants** — should an SK ever need a promotion-style system, it would need a separate aggregate (not the existing `promotion_topic` tree). Out of scope per requirement; flagged as a possible future ticket.
+- **Hierarchies between SKs** — an SK that "belongs to" a Squadron, or an SK with sub-SKs. Not requested.
+- **Time-bounded memberships** — joined_at exists; expires_at does not. Could be added as an additional column without further refactor.
+- **Audit log of membership changes** — today member edits don't have a dedicated audit table (Squadron has lazy `@Version`-driven optimistic locking). A future ticket could land `org_unit_membership_audit`.
+- **Bulk SK creation / import** — not part of this plan; SK lifecycle is one-at-a-time via the admin UI.
+- **Discriminator widening (Workgroup, Project, …)** — the `org_unit.kind` enum could grow more values; the CHECK is open to expansion. Not pursued here.
+
+---
+
+## 14. Acceptance Checklist for the Execution Session
+
+Before declaring the SK extension done, the execution session must demonstrate:
+
+- [ ] All migrations V94–V100 apply cleanly against a snapshot of prod schema (staged through `.env.test` per memory `feedback_env_test_isolation`).
+- [ ] `./gradlew check` is clean — no Checkstyle warnings, no SpotBugs findings, no ArchUnit violations introduced.
+- [ ] Every test mentioned in §9 passes. Old `Squadron`-fixtures-only tests still pass without change.
+- [ ] Manual UI walk-through per §9.4 documented (smartphone / tablet / desktop / ultra-wide).
+- [ ] Active context switcher works for: admin without selection, admin with Staffel pinned, admin with SK pinned, non-admin with one membership (no switcher shown), non-admin with mixed memberships (switcher shown).
+- [ ] Cross-org-unit transfer succeeds and is auditable in logs (`orgUnitId` MDC field present).
+- [ ] Promotion endpoints scoped to an SK consistently return 403; promotion data on Staffeln still works.
+- [ ] No `owning_squadron_id`, `is_logistician` on `app_user`, `creating_squadron_id`, `squadron_id` on `app_user`, or `squadron` table remain in the schema after V100.
+- [ ] CLAUDE.md, ROLES_AND_PERMISSIONS.md, README.md, CHANGELOG.md, db/migration/README.md updated.
+- [ ] OpenAPI spec regenerated; Swagger UI lists every new endpoint.
+- [ ] DCO sign-off and `Co-Authored-By:` trailer present on every commit (per CLAUDE.md Git policy).
+
+---
+
+End of plan. No code changes will be made until this document is explicitly approved.
