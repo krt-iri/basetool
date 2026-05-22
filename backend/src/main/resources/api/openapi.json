@@ -31437,6 +31437,10 @@
           "operationId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "name" ]

@@ -2,13 +2,56 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, and R5.d.c (owner-picker integrated into the third + fourth pickers — Job Order create + Job Order detail — with `requestingSquadronId → requestingOrgUnitId` rename, the new active-org-units endpoint `GET /api/v1/org-units/active`, and a latent SpEL-lambda bug in the picker fragment fixed) implemented. Releases R5.d.d ff. (rolling the picker out to the remaining four create / transfer forms — mission-create-modal, operation-create-modal, hangar-add-modal, inventory-transfer-modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, and R5.d.d (owner-picker integrated into the fifth picker — mission-create form — with a new dedicated `CreateMissionRequest` frontend write DTO replacing the historical 29-field `MissionDto`-as-write-payload) implemented. Releases R5.d.e ff. (rolling the picker out to the remaining three create / transfer forms — operation-create modal, hangar add-ship modal, inventory-transfer book-out modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.d implemented (owner-picker on mission-create form + dedicated CreateMissionRequest write DTO on the frontend)
+
+**Sections delivered:** §7.3 partial — the fifth picker integration (mission-create form, which lives inside `mission-detail.html` under an `isNew` conditional rather than its own template).
+
+**One architectural side-effect:** the frontend's mission-create POST handler historically sent a full {@link de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto} (29 fields, most nullable) as the write payload, relying on Jackson's `@JsonIgnoreUnknown`-like behaviour to drop the read-only fields. Adding {@code owningOrgUnitId} to the write surface forced a choice between extending the 29-field DTO (with ~18 constructor call sites needing updates) or introducing a small dedicated write DTO. The latter is cleaner: the new {@link de.greluc.krt.iri.basetool.frontend.model.dto.CreateMissionRequest} record mirrors the backend's `CreateMissionRequest` field-for-field (10 fields), the create handler posts it directly, and the read-side {@code MissionDto} stays untouched. R5.d.f or later can do the same split for other write-only flows that still abuse `MissionDto`.
+
+**Changes:**
+
+- **Backend.**
+  - [`CreateMissionRequest`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/request/CreateMissionRequest.java) gains a trailing {@code owningOrgUnitId} {@link java.util.UUID} field. The class-level Javadoc explicitly documents that the field follows the C-3 audit boundary contract — every new field on this record is an explicit decision to expose the write surface.
+  - [`MissionService.createMission`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/MissionService.java) routes the stamping through the shared {@code OwnerScopeService.resolveSquadronForPickerOutput} when an owner is resolved (the normal authenticated path). When {@code getCurrentUser()} returns empty (admin in "all squadrons" mode, anonymous-form fallback) the historical {@code currentSquadron} fallback survives — a picker UUID supplied without an owner cannot be membership-validated, so honouring it would be a security regression. {@code addSubMission} keeps the parent-inheritance path; the picker field on the sub-mission DTO is intentionally ignored.
+- **Frontend.**
+  - New [`CreateMissionRequest`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/CreateMissionRequest.java) write DTO (10 fields, mirrors the backend). The {@code MissionDto} read DTO stays unchanged.
+  - [`MissionForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/MissionForm.java) record gains a trailing {@code owningOrgUnitId} {@link java.util.UUID} component. Both production constructor sites in {@code MissionPageController} (edit pre-seed + create-form initial-state) updated to pass {@code null} for the new field.
+  - [`MissionPageController.createMission`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/MissionPageController.java) swaps the {@code MissionDto}-as-write-payload for the new {@code CreateMissionRequest}. A new {@code fetchCallerMembershipOptions(principal)} helper resolves the caller's id via {@code GET /api/v1/users/me} and fetches their memberships from the R5.d.a endpoint; {@code createMissionForm} exposes the result as the {@code ownerOptions} model attribute.
+  - [`mission-detail.html`](frontend/src/main/resources/templates/mission-detail.html) invokes the {@code fragments/owner-picker} fragment directly below the "Intern" checkbox, guarded by {@code th:if="${isNew}"} so the fragment only shows on create — the edit path does not re-stamp ownership (consistent with R5.d.b refinery-orders update). Field name {@code owningOrgUnitId} binds to {@link MissionForm#owningOrgUnitId} via the record component.
+- **Tests.** 6 backend test sites that construct {@code CreateMissionRequest} updated for the new trailing {@code null} arg: 2 in {@code MissionServiceTest}, 1 in {@code MissionExpansionTest}, 1 in {@code MissionUnitManagementTest}, 1 in {@code MissionControllerLifecycleTest}, plus the addSubMission case. 1 new {@code MissionServiceTest} method ({@code createMission_honoursOwningOrgUnitIdFromTheRequestViaPickerResolver}) pins the delegation. Two existing C-4 stamping tests were rewritten:
+  - {@code createMission_stampsOwningSquadronFromOwnerSquadron}: now stubs {@code ownerScopeService.resolveSquadronForPickerOutput(caller, null)} explicitly because the service routes through the resolver instead of reading {@code owner.getSquadron()} directly.
+  - {@code createMission_fallsBackToCurrentSquadronScopeWhenOwnerHasNoSquadron} → renamed to {@code …WhenNoOwnerResolved} because the fallback branch now fires on {@code getCurrentUser().isEmpty()}, not on {@code owner.getSquadron() == null}. The test's mock changes accordingly. The behaviour difference is subtle but documented in the test's comment block.
+  - Backend test count: **1843** (was 1842 on R5.d.c).
+
+**Intentionally NOT in R5.d.d:** the remaining three forms (operation-create-modal, hangar-add-modal, inventory-transfer-modal). The {@code MissionDto}-as-write-payload pattern still survives elsewhere (the edit path posts section-scoped patches via {@code MissionScheduleUpdateRequest} / etc., which were already lean) — only the create path moved to a dedicated request DTO. The schema loosening that lets SKs actually own missions stays deferred per the plan.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL** after one round of test-compile fixes (forgot to update {@code MissionUnitManagementTest}'s constructor on the first iteration — quick catch from the compile failure). Backend 1843 tests pass.
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL** after one Checkstyle warning (`LineLength` on the new {@code CreateMissionRequest} Javadoc — Javadoc paragraph rewrapped). Spotless idempotent on the touched files.
+
+**Rollback plan:** revert the commit. The new {@code CreateMissionRequest} frontend DTO disappears; {@code MissionPageController.createMission} goes back to posting the {@code MissionDto}; the backend {@code CreateMissionRequest} loses its trailing field; the service routes back to direct {@code owner.getSquadron()} stamping. No DB migration to undo.
+
+**Risks mitigated in this slice:**
+
+- The {@code MissionDto}-as-write-payload pattern is now a known anti-pattern, called out in the {@code CreateMissionRequest} frontend Javadoc, and on its way out — R5.d.f or later can finish the split.
+- Plan §11 R9 (frontend mirror DTO drift): the new {@code CreateMissionRequest} frontend mirror matches the backend record field-for-field; the rename + field-addition landed atomically.
+- Plan §11 R12 (concurrent admin actions): not exercised by create flows, the version field on the form is preserved unchanged.
+
+**Next session must:** start R5.d.e — pick the next form. Candidates ordered by plan §7.3:
+* Operation-create modal in {@code operations-index.html} (or wherever the create modal lives — needs an Explore audit). Per the plan, "actor's active scope" — the picker is target-user-driven on the actor (creator). Similar to R5.d.d.
+* Hangar add-ship modal in {@code hangar.html}. Owner's memberships.
+* Inventory-transfer book-out modal — target user's memberships, cross-org-unit transfer is the canonical use case per the plan.
+
+The operation-create modal is the natural next step because it mirrors mission-create-modal closely. The inventory-transfer modal is qualitatively different (two users, one transferring to the other) and should be R5.d.g or R5.d.h.
 
 ### 2026-05-22 — Release R5.d.c implemented (owner-picker on Job Order create + detail, new active-org-units endpoint, picker-fragment latent-bug fix)
 

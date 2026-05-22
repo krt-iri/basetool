@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### Added
+- **Owner-Picker auf der Missionserstellung integriert (R5.d.d).** Auf `/missions/new` (Form lebt in `mission-detail.html` via `isNew`-Conditional) erscheint unter der "Intern"-Checkbox das Picker-Dropdown mit den OrgUnits, in denen der aufrufende User Mitglied ist. Das `CreateMissionRequest`-Record und der `MissionService.createMission` nehmen ab jetzt ein optionales `owningOrgUnitId` entgegen und routen die Stempelung uber `OwnerScopeService.resolveSquadronForPickerOutput`. Frontend-seitig schickt der Create-Flow jetzt einen kompakten `CreateMissionRequest` statt einer ueberbreiten `MissionDto` mit 28 Null-Feldern — der bessere Schnitt fuer den Write-Pfad. SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` faellt.
+
+### Added
 - **Owner-Picker auf der Job-Order-Anlage und -Detailseite integriert (R5.d.c).** Auf `/orders/create` und `/orders/{id}` wird das `requestingSquadronId`-Dropdown durch ein neues Owner-Dropdown ersetzt, das aktive Staffeln und Spezialkommandos in zwei `<optgroup>`-Sektionen anzeigt. Job Orders sind cross-staffel — die Picker-Options kommen vom neuen Endpoint `GET /api/v1/org-units/active`, nicht aus den Mitgliedschaften des Auftrag-Besitzers. Backend-DTO `CreateJobOrderDto` und Frontend `JobOrderForm` benannten ihr Feld von `requestingSquadronId` auf `requestingOrgUnitId` um; SK-Selektionen werden vom Service weiterhin mit 400 abgewiesen, bis die NOT-NULL-Spalte fällt. Latenter Lambda-Parsing-Bug im `fragments/owner-picker.html` (SpEL akzeptiert keine Java-Lambdas im `th:with`) bei dieser Gelegenheit per `?[]`-SpEL-Selection-Syntax behoben — vorher wäre er erst bei mehreren OrgUnit-Mitgliedschaften pro User aufgeschlagen.
 
 ### Added
