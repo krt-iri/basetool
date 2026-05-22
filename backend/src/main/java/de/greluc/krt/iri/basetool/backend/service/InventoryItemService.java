@@ -84,7 +84,7 @@ public class InventoryItemService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -93,7 +93,7 @@ public class InventoryItemService {
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
         .getAggregatedInventory(owningSquadronId, pageable)
         .map(
@@ -120,7 +120,7 @@ public class InventoryItemService {
         materialRepository
             .findById(materialId)
             .orElseThrow(() -> new NotFoundException("Material not found"));
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
         .findByMaterialAndPersonalFalseScoped(material, owningSquadronId, pageable)
         .map(inventoryItemMapper::toDto);
@@ -242,7 +242,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     List<InventoryItemDto> items =
         inventoryItemRepository
             .findGlobalByFilters(
@@ -346,7 +346,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return inventoryItemRepository
         .findGlobalByFilters(
             hasMaterials,
@@ -738,7 +738,7 @@ public class InventoryItemService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     log.info("Bulk delete of global inventory requested (scope={})", owningSquadronId);
     int removed = inventoryItemRepository.deleteAllNonPersonal(owningSquadronId);
     log.info(

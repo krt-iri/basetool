@@ -74,7 +74,7 @@ class InventoryItemServiceAggregateTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private InventoryItemService service;
 

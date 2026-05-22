@@ -2,7 +2,7 @@ package de.greluc.krt.iri.basetool.backend.logging;
 
 import de.greluc.krt.iri.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,7 +54,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   private final LoggingProperties loggingProperties;
   private final AuthHelperService authHelperService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   @Override
   protected void doFilterInternal(
@@ -92,7 +92,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       if (!authHelperService.isAuthenticated()) {
         return ANONYMOUS;
       }
-      return squadronScopeService
+      return ownerScopeService
           .currentSquadronId()
           .map(UUID::toString)
           .orElseGet(() -> authHelperService.isAdmin() ? "all" : "none");

@@ -29,7 +29,7 @@ class PromotionTopicServiceTest {
 
   @Mock private PromotionTopicMapper mapper;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private PromotionTopicService service;
 
@@ -42,7 +42,7 @@ class PromotionTopicServiceTest {
   @BeforeEach
   void enablePromotionFeatureFlag() {
     lenient()
-        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope())
         .thenReturn(true);
   }
 
@@ -52,7 +52,7 @@ class PromotionTopicServiceTest {
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
     when(repository.findAllScoped((UUID) null)).thenReturn(List.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
@@ -101,7 +101,7 @@ class PromotionTopicServiceTest {
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
     squadron.setShorthand("IRI");
-    when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(squadron));
     when(mapper.toEntity(request)).thenReturn(entity);
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);

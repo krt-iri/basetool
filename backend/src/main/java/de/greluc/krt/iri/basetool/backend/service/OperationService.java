@@ -108,7 +108,7 @@ public class OperationService {
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
   private final SystemSettingService systemSettingService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns paged operation list.
@@ -117,7 +117,7 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return operationRepository.findAllScoped(owningSquadronId, pageable);
   }
 
@@ -128,7 +128,7 @@ public class OperationService {
    * missions' date-range filter has no meaningful equivalent here and is deliberately omitted.
    * Falls back to the full {@link OperationStatus} enum set when {@code status} is {@code null} or
    * empty - the SQL contract requires a non-empty list. The squadron scope is resolved through
-   * {@link SquadronScopeService} (admin "all squadrons" mode resolves to {@code null}).
+   * {@link OwnerScopeService} (admin "all squadrons" mode resolves to {@code null}).
    *
    * @param query free-text name/description fragment, may be {@code null}
    * @param status status list (string names of {@link OperationStatus}); {@code null}/empty means
@@ -143,7 +143,7 @@ public class OperationService {
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
             : status;
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return operationRepository.searchOperations(query, effectiveStatus, owningSquadronId, pageable);
   }
 
@@ -158,7 +158,7 @@ public class OperationService {
   @NotNull
   public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto>
       findAllReference() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return operationRepository.findAllReferenceScoped(owningSquadronId);
   }
 
@@ -205,7 +205,7 @@ public class OperationService {
   @Transactional
   public Operation createOperation(@NotNull Operation operation) {
     if (operation.getOwningSquadron() == null) {
-      squadronScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+      ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
     }
     return operationRepository.save(operation);
   }

@@ -139,7 +139,7 @@ public class UserController {
 
   /**
    * Returns {@code true} when the caller is a non-admin and the target user belongs to a foreign
-   * squadron (or to a squadron the caller cannot see via {@code SquadronScopeService}). Used to
+   * squadron (or to a squadron the caller cannot see via {@code OwnerScopeService}). Used to
    * tighten {@link #getUserById} to "same squadron or admin" for full-PII access. Users without a
    * squadron (admins, unassigned) are treated as cross-squadron for non-admin callers — full PII on
    * an unassigned account remains admin-only.

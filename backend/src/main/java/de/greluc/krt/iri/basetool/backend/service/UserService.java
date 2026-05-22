@@ -66,7 +66,7 @@ public class UserService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
   private final AuthHelperService authHelperService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -460,12 +460,12 @@ public class UserService {
    * Returns all users sorted case-insensitively by username, scoped to the caller's squadron
    * context. Admin in "all squadrons" mode receives the cross-staffel list; everyone else only sees
    * members of their own squadron (plus unassigned admins/guests). Reads {@link
-   * SquadronScopeService#currentSquadronId()} once per call (MULTI_SQUADRON_PLAN.md section 4.4).
+   * OwnerScopeService#currentSquadronId()} once per call (MULTI_SQUADRON_PLAN.md section 4.4).
    *
    * @return scoped user list, case-insensitively sorted by username
    */
   public List<User> findAll() {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.findAllScopedList(
         scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
@@ -477,7 +477,7 @@ public class UserService {
    * @return scoped paged user list
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.findAllScoped(scope, pageable);
   }
 
@@ -495,19 +495,19 @@ public class UserService {
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.findEvaluatableMembers(scope, pageable);
   }
 
   /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
-   * Squadron-scoped via {@link SquadronScopeService#currentSquadronId()} — non-admins only see
+   * Squadron-scoped via {@link OwnerScopeService#currentSquadronId()} — non-admins only see
    * their own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
    *
    * @return lightweight reference projection used by typeaheads
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.findAllReferenceScoped(scope);
   }
 
@@ -518,7 +518,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public List<User> searchByUsername(@NotNull String query) {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.searchScopedList(query, scope);
   }
 
@@ -530,7 +530,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return userRepository.searchScoped(query, scope, pageable);
   }
 
@@ -612,7 +612,7 @@ public class UserService {
    * the same row simultaneously surface as 409 instead of one silently overwriting the other.
    *
    * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
-   * scope ({@link SquadronScopeService} reads it to decide which staffel-scoped aggregates a
+   * scope ({@link OwnerScopeService} reads it to decide which staffel-scoped aggregates a
    * non-admin sees). Until V86 tightens the column to NOT NULL, {@code null} is a valid value that
    * means "admin / unassigned" and falls back to the cross-squadron view.
    *

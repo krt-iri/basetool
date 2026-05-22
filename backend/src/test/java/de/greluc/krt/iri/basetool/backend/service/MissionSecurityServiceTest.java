@@ -38,7 +38,7 @@ class MissionSecurityServiceTest {
   private de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository
       missionFinanceEntryRepository;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   private RoleHierarchy roleHierarchy;
 
@@ -60,7 +60,7 @@ class MissionSecurityServiceTest {
             roleHierarchy,
             missionParticipantRepository,
             missionFinanceEntryRepository,
-            squadronScopeService);
+            ownerScopeService);
 
     missionId = UUID.randomUUID();
     userId = UUID.randomUUID();
@@ -80,7 +80,7 @@ class MissionSecurityServiceTest {
     // Phase-6 follow-up: elevated mission roles now need to also pass canEditMission so a
     // mission-manager from squadron A cannot edit squadron B's managers (covered by a separate
     // negative test below).
-    when(squadronScopeService.canEditMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -90,7 +90,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    when(squadronScopeService.canEditMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -100,7 +100,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("MISSION_MANAGE")));
-    when(squadronScopeService.canEditMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -326,7 +326,7 @@ class MissionSecurityServiceTest {
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
     // Phase-6 follow-up: officer needs to additionally pass canEditMission so a cross-staffel
     // officer cannot transfer ownership of another squadron's mission.
-    when(squadronScopeService.canEditMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canChangeOwner(missionId, authentication));
   }

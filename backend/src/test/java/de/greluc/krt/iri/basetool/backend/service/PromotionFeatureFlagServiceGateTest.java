@@ -44,10 +44,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Verifies the per-squadron promotion-feature gate end-to-end through {@link SquadronScopeService}
+ * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService}
  * + the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
  * pattern, so one representative is enough — every gated call site uses the same {@code
- * SquadronScopeService} primitive).
+ * OwnerScopeService} primitive).
  *
  * <p>What's pinned here: admins bypass the gate (because they own the toggle), Officers / members
  * of a flag-off squadron get empty reads and {@link AccessDeniedException} on writes, and the
@@ -67,9 +67,9 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private OperationRepository operationRepository;
   @Mock private ShipRepository shipRepository;
 
-  // R2.c: the real flag-resolution logic moved from SquadronScopeService to OwnerScopeService;
+  // R2.c: the real flag-resolution logic moved from OwnerScopeService to OwnerScopeService;
   // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
-  // tests further down still receive the SquadronScopeService shim as a plain Mockito mock — the
+  // tests further down still receive the OwnerScopeService shim as a plain Mockito mock — the
   // shim's bean shape is unchanged from the caller's perspective.
   @InjectMocks private OwnerScopeService ownerScopeService;
 
@@ -143,7 +143,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicList_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
     Pageable pageable = PageRequest.of(0, 20);
@@ -159,7 +159,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicListAll_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
 
@@ -172,7 +172,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicCreate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
@@ -187,7 +187,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicUpdate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
@@ -204,7 +204,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicDelete_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 

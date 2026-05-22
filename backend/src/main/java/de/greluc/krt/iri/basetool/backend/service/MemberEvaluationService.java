@@ -44,11 +44,11 @@ public class MemberEvaluationService {
   private final MemberEvaluationRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /** Returns all evaluations for the given user (JWT-sub filtered – data isolation). */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
     return repository.findAllByUserId(userId).stream().map(mapper::toResponse).toList();
@@ -57,7 +57,7 @@ public class MemberEvaluationService {
   /** Returns paginated evaluations for the given user. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull String userId, @NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
     return repository.findAllByUserId(userId, pageable).map(mapper::toResponse);
@@ -66,7 +66,7 @@ public class MemberEvaluationService {
   /** Returns all evaluations (admin view, all users). */
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
     return repository.findAll(pageable).map(mapper::toResponse);
@@ -82,7 +82,7 @@ public class MemberEvaluationService {
       @NotNull String userId,
       @NotNull UUID categoryId,
       @NotNull MemberEvaluationUpdateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
             .findById(categoryId)
@@ -113,7 +113,7 @@ public class MemberEvaluationService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =
         repository
             .findById(id)
@@ -129,7 +129,7 @@ public class MemberEvaluationService {
         || category.getTopic().getOwningSquadron() == null) {
       return;
     }
-    if (!squadronScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
+    if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing evaluations of this scope");
     }

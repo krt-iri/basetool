@@ -2,13 +2,39 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), and R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened to accept both bean names) implemented. Release R3 (aggregate `owningSquadron → owningOrgUnit` field switchover, dual-write services, `SquadronScopeService` shim removal, stop-write of legacy `*_squadron_id` columns, cleanup migrations) pending.
+**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened), and R3 (service-layer fully migrated to `OwnerScopeService`, shim deleted, ArchUnit rules narrowed back to the single new bean name) implemented. Releases R4 (aggregate `owningSquadron → owningOrgUnit` field switchover with dual-write services), R5 (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), and a destructive cleanup release (V98+ migrations dropping legacy `squadron` table and `*_squadron_id` columns) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R3 implemented (`SquadronScopeService` shim deleted, service-layer fully on `OwnerScopeService`)
+
+**Sections delivered:** §5.3 (shim removal + service-layer + ArchUnit cleanup — the closing slice of the R2.c plan that R2.5 set up).
+
+**Changes:**
+
+- Every `@RequiredArgsConstructor` field of type `SquadronScopeService` across the main source set ({@code AuthHelperService}, {@code CorrelationIdFilter}, {@code HangarService}, {@code InventoryItemService}, {@code JobOrderService}, {@code MeController}, {@code MemberEvaluationService}, {@code MissionSecurityService}, {@code MissionService}, {@code OperationService}, {@code PromotionCategoryService}, {@code PromotionEligibilityService}, {@code PromotionLevelContentService}, {@code PromotionTopicService}, {@code RankRequirementService}, {@code RefineryOrderService}, {@code UserService}, {@code UserController}) now resolves to `OwnerScopeService`. The {@code AuthHelperService.scope()} lazy {@code applicationContext.getBean(...)} target switches in step.
+- 20 test files updated — every `@Mock SquadronScopeService` / `mock(SquadronScopeService.class)` / `@MockitoBean SquadronScopeService` flips to `OwnerScopeService` plus the matching field/variable rename. The R2.c-era `SquadronScopeServiceTest` smoke test is deleted along with the shim.
+- ArchUnit rules cleaned up:
+  - {@code staffelScopedServicesMustWireSquadronOrAuthHelper} → renamed to {@code staffelScopedServicesMustWireOwnerScopeOrAuthHelper}, target type updated from {@code SquadronScopeService.class} to {@code OwnerScopeService.class}, error message updated.
+  - {@code staffelScopedWriteEndpointsMustGateOnSquadronScopeService} → renamed to {@code staffelScopedWriteEndpointsMustGateOnOwnerScopeService}, accepted SpEL pattern narrowed back to {@code @ownerScopeService.*} only (the R2.5 transitional acceptance of {@code @squadronScopeService.*} is dropped). Helper comments and Javadoc references rewritten in lockstep.
+- The shim files themselves: [`SquadronScopeService.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) (deleted) and [`SquadronScopeServiceTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeServiceTest.java) (deleted). The full behavioural matrix lives on [`OwnerScopeServiceTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeServiceTest.java) untouched.
+
+**Intentionally NOT in R3:** the aggregate `owningSquadron → owningOrgUnit` field migration (R4), the dual-write services that will keep both columns synchronised through R4 (R4), the frontend admin UI for Spezialkommandos (R5), the destructive V98+ migrations that drop the legacy `squadron` table and the `*_squadron_id` columns (later release). The Javadoc references to `SquadronScopeService` on the {@link OwnerScopeService} and {@link Squadron} class files are intentionally kept as historical documentation of the R2.c rename.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL**. All 1771 tests pass without the shim. Each service that used to inject {@code SquadronScopeService} now wires through {@code OwnerScopeService} directly; the compilation step is itself the strongest signal that no straggler import was forgotten.
+- {@code ./gradlew :backend:checkstyleMain :backend:spotbugsMain :backend:checkstyleTest} → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert this commit. The shim resurfaces; every service's `@RequiredArgsConstructor` field flips back to `SquadronScopeService` (which still delegates to `OwnerScopeService` via the resurrected shim); the ArchUnit rules accept both names again. Behaviour stays identical because R3 is a pure rename of injection sites — no business logic is touched.
+
+**Risks mitigated in this slice:** R3 (the largest remaining migration risk after the shim ran out of users) is closed — the SpEL surface, the injection sites, and the ArchUnit guards all agree on one bean name. The remaining R4 work can land without worrying that the resolver surface might drift.
+
+**Next session must:** start R4 — introduce the aggregate `owningOrgUnit` field on {@code Mission}, {@code Operation}, {@code Ship}, {@code InventoryItem}, {@code RefineryOrder}, {@code JobOrder} alongside the existing `owningSquadron` field (V96 already added the DB column in R1), wire dual-write so every existing `setOwningSquadron(...)` call mirrors into `setOwningOrgUnit(...)` and vice versa, then start switching the repository-layer queries onto the new column.
 
 ### 2026-05-22 — Release R2.5 implemented (controller SpEL strings migrate onto `@ownerScopeService.*` + ArchUnit rule widened)
 

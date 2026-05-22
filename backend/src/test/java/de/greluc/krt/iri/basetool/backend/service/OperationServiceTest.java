@@ -62,7 +62,7 @@ class OperationServiceTest {
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
   @Mock private SystemSettingService systemSettingService;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private OperationService operationService;
 
@@ -74,7 +74,7 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
-    when(squadronScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
+    when(ownerScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
 
     // When
     Operation result = operationService.createOperation(operation);
@@ -132,13 +132,13 @@ class OperationServiceTest {
     @Test
     void forwardsCallerSuppliedStatusList_andResolvesScopeFromSquadronService() {
       // The service must (1) honour the caller's status list verbatim and (2) read the squadron
-      // scope through SquadronScopeService, NOT bypass it - operations are a strict-staffel
+      // scope through OwnerScopeService, NOT bypass it - operations are a strict-staffel
       // aggregate and a missing scope filter would leak other squadrons' operations.
       PageRequest pageable = PageRequest.of(0, 20);
       UUID squadronId = UUID.randomUUID();
       List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
 
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(squadronId));
+      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(squadronId));
       when(operationRepository.searchOperations("alpha", requestedStatus, squadronId, pageable))
           .thenReturn(new PageImpl<>(List.of(new Operation())));
 
@@ -156,7 +156,7 @@ class OperationServiceTest {
       // the service must therefore expand `null`/empty to every OperationStatus name so callers
       // can omit the parameter to mean "all statuses".
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
@@ -175,7 +175,7 @@ class OperationServiceTest {
     void emptyStatusList_alsoFallsBackToFullEnumSet() {
       // `List.of()` is a separate code path from `null` — both must produce the same fallback.
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
@@ -187,11 +187,11 @@ class OperationServiceTest {
 
     @Test
     void adminAllSquadronsMode_passesNullScopeToRepository() {
-      // SquadronScopeService.currentSquadronId() returns Optional.empty() for admins without an
+      // OwnerScopeService.currentSquadronId() returns Optional.empty() for admins without an
       // active squadron selection ("all squadrons" mode). The service must translate that to a
       // null owningSquadronId so the JPA query disables the scope filter.
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
       when(operationRepository.searchOperations(any(), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 

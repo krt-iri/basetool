@@ -592,7 +592,7 @@ class ArchitectureTest {
   /**
    * {@code true} iff one of the method's request-mapping annotations declares a path that contains
    * the literal {@code "{id}"} placeholder. Used by {@link
-   * #staffelScopedWriteEndpointsMustGateOnSquadronScopeService()} to scope the rule to endpoints
+   * #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to scope the rule to endpoints
    * that target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
    * endpoints whose only {@code UUID} path variable is a related entity like {@code userId}).
    */
@@ -624,9 +624,11 @@ class ArchitectureTest {
 
   /**
    * Staffel-scoped aggregate services MUST consult either {@code AuthHelperService} (for raw
-   * principal / role lookups) or {@code SquadronScopeService} (for canSee/canEdit + active-context
-   * resolution) - otherwise the data they emit might leak across squadrons. Phase 3 of
-   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift.
+   * principal / role lookups) or {@code OwnerScopeService} (for canSee/canEdit + active-context
+   * resolution) - otherwise the data they emit might leak across org units. Phase 3 of
+   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift, and
+   * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted
+   * {@code SquadronScopeService} shim to its successor in R2.c.
    *
    * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
    * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
@@ -635,7 +637,7 @@ class ArchitectureTest {
    * AuthHelperService route.
    */
   @Test
-  void staffelScopedServicesMustWireSquadronOrAuthHelper() {
+  void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
     // JobOrderService AND JobOrderHandoverService are intentionally excluded — Job Orders are a
     // cross-staffel workspace by design (MULTI_SQUADRON_PLAN.md section 1 + 4.6), so the squadron
     // filter does not apply. Both services do inject AuthHelperService anyway for the owner stamp
@@ -650,7 +652,7 @@ class ArchitectureTest {
             "OperationService");
 
     String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
-    String squadronScope = "de.greluc.krt.iri.basetool.backend.service.SquadronScopeService";
+    String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";
 
     classes()
         .that(
@@ -661,21 +663,21 @@ class ArchitectureTest {
               }
             })
         .should(
-            new ArchCondition<>("depend on AuthHelperService or SquadronScopeService") {
+            new ArchCondition<>("depend on AuthHelperService or OwnerScopeService") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean hasIt =
                     javaClass.getFields().stream()
                         .map(f -> f.getRawType().getFullName())
-                        .anyMatch(t -> t.equals(authHelper) || t.equals(squadronScope));
+                        .anyMatch(t -> t.equals(authHelper) || t.equals(ownerScope));
                 if (!hasIt) {
                   events.add(
                       SimpleConditionEvent.violated(
                           javaClass,
                           javaClass.getName()
                               + " is in the staffel-scoped service whitelist but injects neither"
-                              + " AuthHelperService nor SquadronScopeService - that means it"
-                              + " cannot enforce the multi-tenant filter / squadron stamp."));
+                              + " AuthHelperService nor OwnerScopeService - that means it"
+                              + " cannot enforce the multi-tenant filter / org-unit stamp."));
                 }
               }
             })
@@ -683,9 +685,9 @@ class ArchitectureTest {
   }
 
   /**
-   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6): write endpoints on
-   * staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression that calls into the
-   * {@code SquadronScopeService} (canEdit* / canSee*). A bare
+   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md
+   * §5.3): write endpoints on staffel-scoped aggregates MUST use a {@code @PreAuthorize}
+   * expression that calls into the {@code OwnerScopeService} (canEdit* / canSee*). A bare
    * {@code @PreAuthorize("isAuthenticated()")} on POST / PUT / PATCH / DELETE for {@code
    * /api/v1/missions}, {@code /api/v1/operations}, {@code /api/v1/hangar}, {@code
    * /api/v1/inventory} or {@code /api/v1/refinery-orders} would silently allow cross-staffel writes
@@ -695,7 +697,7 @@ class ArchitectureTest {
    * only fires when the URL path carries a primary-resource id placeholder (i.e. {@code /{id}}).
    * POSTs that do not target a specific resource (top-level create, bulk operations,
    * cross-user-administrative endpoints like {@code /users/{userId}/...}) are skipped — the service
-   * layer enforces ownership there and a per-id squadron gate has nothing to bind to.
+   * layer enforces ownership there and a per-id org-unit gate has nothing to bind to.
    *
    * <ul>
    *   <li>Read endpoints stay free of the rule — list endpoints lean on service-layer filtering
@@ -704,12 +706,12 @@ class ArchitectureTest {
    *       orders are a cross-staffel workspace by design, admin endpoints already require {@code
    *       hasRole('ADMIN')} which carries no squadron component.
    *   <li>Endpoints that use a role-only check ({@code hasRole('LOGISTICIAN')} etc.) without
-   *       additionally calling the squadron-scope service still violate — the rule looks for the
-   *       literal {@code squadronScopeService} reference in the SpEL expression.
+   *       additionally calling the owner-scope service still violate — the rule looks for the
+   *       literal {@code ownerScopeService} reference in the SpEL expression.
    * </ul>
    */
   @Test
-  void staffelScopedWriteEndpointsMustGateOnSquadronScopeService() {
+  void staffelScopedWriteEndpointsMustGateOnOwnerScopeService() {
     Set<String> staffelScopedControllerSimpleNames =
         Set.of(
             "MissionController",
@@ -750,7 +752,7 @@ class ArchitectureTest {
         .areAnnotatedWith(PRE_AUTHORIZE)
         .should(
             new ArchCondition<JavaMethod>(
-                "gate on @squadronScopeService in the @PreAuthorize SpEL expression") {
+                "gate on @ownerScopeService in the @PreAuthorize SpEL expression") {
               @Override
               public void check(JavaMethod method, ConditionEvents events) {
                 // Skip endpoints that do not target a specific resource id in their path. The
@@ -777,14 +779,11 @@ class ArchitectureTest {
                 JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
                 String value =
                     ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-                // Accepted gate references:
+                // Accepted gate references (R3 narrowed the set back to one canonical name after
+                // the shim was deleted):
                 //   - @ownerScopeService.canSee*/canEdit*/canSeeOrgUnit/canEditOrgUnit — the
-                //     plan-aligned org-unit-scope check introduced in R2.c and adopted across the
-                //     controller layer in R2.5;
-                //   - @squadronScopeService.canSee*/canEdit* — the legacy bean name still served
-                //     by the thin shim from R2.c. Accepted during the soak window so a half-
-                //     migrated PR (some controllers on the new name, some still on the old)
-                //     does not trip the rule. Removed once the shim is deleted in a later PR;
+                //     plan-aligned org-unit-scope check introduced in R2.c and the only accepted
+                //     scope-resolver since the SquadronScopeService shim was deleted in R3;
                 //   - @missionSecurityService.canManage*/canAccessParticipant/canChangeOwner —
                 //     mission-aggregate gate that itself folds in canEditMission() for elevated
                 //     authorities (see MissionSecurityService — squadron-scope-aware as of the
@@ -792,25 +791,20 @@ class ArchitectureTest {
                 //   - hasRole('ADMIN') alone — admin always passes the squadron filter, no extra
                 //     scope check needed (MULTI_SQUADRON_PLAN.md section 1).
                 boolean hasOwnerScope = value.contains("ownerScopeService");
-                boolean hasSquadronScope = value.contains("squadronScopeService");
                 boolean hasMissionSecurity = value.contains("missionSecurityService");
                 boolean hasAdminOnly =
                     value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
-                if (!hasOwnerScope
-                    && !hasSquadronScope
-                    && !hasMissionSecurity
-                    && !hasAdminOnly) {
+                if (!hasOwnerScope && !hasMissionSecurity && !hasAdminOnly) {
                   events.add(
                       SimpleConditionEvent.violated(
                           method,
                           method.getFullName()
                               + " is a write endpoint on a staffel-scoped aggregate but its"
                               + " @PreAuthorize expression does not gate on @ownerScopeService"
-                              + " / @squadronScopeService (or @missionSecurityService /"
-                              + " hasRole('ADMIN')) - that means cross-staffel writes are not"
-                              + " blocked. Add `and @ownerScopeService.canEdit*(#id)` to the"
-                              + " SpEL (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md"
-                              + " §5.3)."));
+                              + " (or @missionSecurityService / hasRole('ADMIN')) - that means"
+                              + " cross-staffel writes are not blocked. Add `and"
+                              + " @ownerScopeService.canEdit*(#id)` to the SpEL"
+                              + " (SPEZIALKOMMANDO_PLAN.md §5.3)."));
                 }
               }
             })
@@ -819,7 +813,7 @@ class ArchitectureTest {
 
   /**
    * Audit finding C-1 guard (2026-05-20 security audit): mission endpoints gated only by
-   * {@code @PreAuthorize("@squadronScopeService.canSeeMission(#id)")} (without an additional {@code
+   * {@code @PreAuthorize("@ownerScopeService.canSeeMission(#id)")} (without an additional {@code
    * isAuthenticated()} / {@code hasRole(...)} / {@code hasAuthority(...)} clause) are reachable by
    * anonymous callers for non-internal missions — {@link
    * de.greluc.krt.iri.basetool.backend.config.SecurityConfig} declares the matching paths as {@code

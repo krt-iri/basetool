@@ -69,7 +69,7 @@ public class JobOrderService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final JobOrderMapper jobOrderMapper;
   private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
@@ -690,7 +690,7 @@ public class JobOrderService {
    * <ol>
    *   <li>Explicit {@code creatingSquadronIdOverride} from the create DTO — only honored when the
    *       caller is an admin (admin override path).
-   *   <li>Caller's active squadron context ({@link SquadronScopeService#currentSquadron()}).
+   *   <li>Caller's active squadron context ({@link OwnerScopeService#currentSquadron()}).
    *   <li>Anonymous caller without context — falls back to the squadron the public form picked as
    *       requesting squadron ({@code anonymousRequestingFallback}). The audit trail then credits
    *       the squadron the request was filed on behalf of rather than always crediting the
@@ -730,7 +730,7 @@ public class JobOrderService {
                       "creatingSquadronId does not resolve to a known squadron: "
                           + creatingSquadronIdOverride));
     }
-    java.util.Optional<Squadron> active = squadronScopeService.currentSquadron();
+    java.util.Optional<Squadron> active = ownerScopeService.currentSquadron();
     if (active.isPresent()) {
       return active.orElseThrow();
     }
