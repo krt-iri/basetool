@@ -529,7 +529,8 @@ public class InventoryPageController {
               form.getType(),
               form.getTerminal(),
               form.getSellAmount(),
-              form.getVersion());
+              form.getVersion(),
+              form.getTargetOwningOrgUnitId());
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
     } catch (Exception e) {

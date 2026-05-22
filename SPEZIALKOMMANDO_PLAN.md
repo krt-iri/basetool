@@ -2,13 +2,58 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, R5.d.e, and R5.d.f (owner-picker integrated into the seventh picker — hangar add-ship modal — with `HangarService.addShip` routed through the shared resolver) implemented. Releases R5.d.g (the eighth and final picker — inventory-transfer book-out modal, the qualitatively different "two-user transfer" case), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, R5.d.e, R5.d.f, and **R5.d.g** (the inventory-transfer TRANSFER-branch picker — the *last* of the seven picker integrations in plan §7.3) implemented. **R5.d as a whole is now complete.** Releases R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.g implemented (owner-picker on inventory-transfer TRANSFER branch — last of the seven R5.d pickers)
+
+**Sections delivered:** §7.3 partial — the **seventh and final** picker integration, on the inventory book-out flow's `CheckoutType.TRANSFER` branch. With R5.d.g the full R5.d picker work is done: all seven forms in plan §7.3 carry the picker fragment (or its inlined equivalent) and the shared {@code OwnerScopeService.resolveSquadronForPickerOutput} resolver gates every aggregate stamping path.
+
+**Qualitative difference from R5.d.a–f:** the TRANSFER flow has *two* users — User A books inventory out, User B receives it as a new stock row. The picker reflects **User B's** (the destination's) memberships, not User A's. The plan §D4 calls out cross-OrgUnit transfers as an explicit design goal: User A in Staffel X may legitimately book out into User B's Spezialkommando Y stock so long as B is a member of Y. The resolver enforces exactly that contract — membership-validation against the destination user.
+
+**Changes:**
+
+- **Backend.**
+  - [`InventoryItemBookOutDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/InventoryItemBookOutDto.java) gains a trailing {@code @Nullable UUID targetOwningOrgUnitId}. Only honoured for {@link CheckoutType#TRANSFER}; DISCARD and SELL terminate the row and never create a new ownership stamp.
+  - [`InventoryItemService.bookOutInventoryItem`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/InventoryItemService.java) — the TRANSFER branch's {@code newItem.setOwningSquadron(targetUser.getSquadron())} line becomes {@code ownerScopeService.resolveSquadronForPickerOutput(targetUser, dto.targetOwningOrgUnitId())}. The resolver validates the picked OrgUnit against the *destination* user's memberships (not the caller's — that's the R5.d.g novelty).
+- **Frontend.**
+  - [`InventoryItemBookOutDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/InventoryItemBookOutDto.java) mirror updated in lockstep.
+  - [`InventoryBookOutForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/InventoryBookOutForm.java) gains {@code targetOwningOrgUnitId}.
+  - [`InventoryPageController.bookOutInventoryItem`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/InventoryPageController.java) forwards {@code form.getTargetOwningOrgUnitId()} into the DTO.
+  - [`inventory-my.html`](frontend/src/main/resources/templates/inventory-my.html) — adds a hidden {@code <select id="targetOwningOrgUnitId">} block inside the existing TRANSFER fields wrapper. The new inline {@code refreshTargetOwningOrgUnitPicker()} function fires when {@code targetUserId} changes, calls {@code GET /api/v1/users/{id}/memberships} on-demand, and rebuilds the picker options. The wrapper stays hidden when the destination user has ≤1 membership (no choice → no UI noise → backend's legacy "stamp destination's home Staffel" fallback kicks in).
+  - The page controller does **not** pre-fetch every user's memberships (would be an N×membership round-trip on every page render). On-demand fetch is cheap (one request per user-pick) and always reflects live backend state.
+  - 4 new i18n keys ({@code inventory.bookout.targetOrgUnit}, {@code .placeholder}) in DE + EN.
+
+**Tests.**
+
+- **9 backend test sites** updated for the new {@code InventoryItemBookOutDto} arg: bulk regex on single-line constructors + 2 manual edits on multi-line ones ({@code InventoryItemControllerTest} ×2, {@code InventoryItemServiceBookOutTest} helper, {@code InventoryItemServiceTest} ×6 incl 1 multi-line, {@code InventoryItemServiceBookOutTest} multi-line helper).
+- 1 new {@code InventoryItemServiceBookOutTest} method ({@code bookOutInventoryItem_transferWithTargetOwningOrgUnitId_routesThroughResolver}) pins the TRANSFER-branch picker delegation, including a captor that verifies the new InventoryItem row carries the picker output.
+- Required adding {@code @Mock OwnerScopeService} to {@code InventoryItemServiceBookOutTest} — the previous tests only exercised paths that didn't touch the resolver.
+- Backend test count: **1846** (was 1845 on R5.d.f).
+- One transient {@code KeycloakHealthIndicatorTest} flake on the first run resolved on retry — pre-existing intermittent, unrelated to R5.d.g.
+
+**Intentionally NOT in R5.d.g:** the JS does an on-demand fetch when the destination user is picked. A power-user case where the modal stays open and the user toggles back to TRANSFER after picking another type will re-fire the fetch — acceptable, the endpoint is cheap. Caching results per-user across modal opens is a follow-up if it shows up in load tests.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL** (after the Keycloak flake retry). Backend 1846 tests pass.
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL**. Checkstyle + SpotBugs + Spotless clean.
+
+**Rollback plan:** revert the commit. {@code InventoryItemBookOutDto} loses the trailing field on both sides; {@code InventoryItemService.bookOutInventoryItem} TRANSFER branch returns to direct {@code targetUser.getSquadron()} stamping; the inventory-my.html modal loses the new picker wrapper + JS function.
+
+**Risks mitigated in this slice:**
+
+- The TRANSFER picker is the *only* code path in R5.d.* where the picker validates against a user other than the caller. The resolver contract (membership-validate against the supplied user) handles this natively — no new code at the resolver level. Plan §D4 cross-OrgUnit transfer is now explicitly supported by the wire shape (once the destructive cleanup release lifts NOT NULL).
+- Plan §11 R9 (frontend mirror DTO drift): the rename + new field landed on both sides of the wire in the same commit.
+
+**R5.d.* is complete.** Seven forms wired, one shared resolver, one fragment, one active-org-units endpoint, one membership-lookup endpoint, and the SpEL-lambda latent bug fixed during R5.d.c. The picker is hidden for every existing user today (single-membership case) — runtime behaviour identical to before. Once the destructive cleanup release lifts the NOT NULL on {@code owning_squadron_id} and SK memberships are seeded for real users, every picker becomes user-visible without further code change.
+
+**Next session must:** start **R5.e** — widen the active-context switcher in {@code fragments/sidebar.html} to non-admin users with >1 membership, and rename the relay header from {@code X-Active-Squadron-Id} to {@code X-Active-Org-Unit-Id} (with the old name kept as an alias for one release). The plan §7.2 has the spec. Audit the current admin-only switcher first — it lives in {@code fragments/sidebar.html:82-110} per the original audit notes. Then split: R5.e.a for the header rename + alias, R5.e.b for the non-admin widening, R5.e.c for any active-context-related session-key migrations. After R5.e the remaining macro-tasks are the Squadron-side membership migration (move {@code app_user.is_logistician} / {@code is_mission_manager} onto the membership row) and the destructive cleanup release.
 
 ### 2026-05-22 — Release R5.d.f implemented (owner-picker on hangar add-ship modal)
 
