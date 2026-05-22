@@ -2,13 +2,43 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation) implemented. Releases R2 (code switchover) and R3 (cleanup) pending.
+**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96) and R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories, no service-layer change) implemented. Releases R2.b (Squadron joins the hierarchy, aggregate FK switchover, `OwnerScopeService` rename with shim), R2.c (stop-write of legacy columns, SpEL string updates), and R3 (cleanup migrations) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R2.a implemented (JPA entity foundation, no service-layer change)
+
+**Sections delivered:** §5.1 (new packages — model side), §5.2 (the `OrgUnit` / `SpecialCommand` / `OrgUnitMembership` entities). Service-layer items in §5.3, §5.4, §5.5, §5.6, the ArchUnit updates in §8, and the frontend in §7 are explicitly out of scope here — they belong to R2.b.
+
+**New entities + repositories (zero application-service change):**
+
+- [`OrgUnitKind`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/OrgUnitKind.java) — discriminator enum with `SQUADRON` and `SPECIAL_COMMAND` values.
+- [`OrgUnit`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/OrgUnit.java) — abstract `@Entity` mapped to `org_unit` via `@Inheritance(SINGLE_TABLE)` + `@DiscriminatorColumn("kind")`. Carries the shared columns (id, name, shorthand, description, active, isPromotionEnabled) plus the `AbstractEntity` audit fields. `getKind()` is `abstract` so every concrete subclass commits to its discriminator.
+- [`SpecialCommand`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/SpecialCommand.java) — concrete `@DiscriminatorValue("SPECIAL_COMMAND")` subclass. The no-arg constructor sets `isPromotionEnabled = false` before Hibernate can flush, and the `setPromotionEnabled` override refuses any `true` value with an `IllegalArgumentException` (defense in depth on top of the V94 `chk_org_unit_promotion_only_squadron` CHECK).
+- [`OrgUnitMembership`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/OrgUnitMembership.java) + [`OrgUnitMembershipId`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/OrgUnitMembershipId.java) — composite-key entity for the `org_unit_membership` table. `kind` is mapped as `insertable=false, updatable=false` because the V95 trigger manages it; `org_unit_id` is a plain UUID column (no `@ManyToOne` to `OrgUnit`) so a Squadron-discriminated membership row can be loaded without triggering `WrongClassException` while Squadron is still outside the hierarchy. First composite-key entity in the project — `equals`/`hashCode` are hand-written per the JPA contract.
+- [`SpecialCommandRepository`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/repository/SpecialCommandRepository.java) — `JpaRepository<SpecialCommand, UUID>` with the same idioms as `SquadronRepository` (find-by-shorthand, case-insensitive uniqueness checks, active-only paged listing). Hibernate auto-applies the discriminator filter.
+- [`OrgUnitMembershipRepository`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/repository/OrgUnitMembershipRepository.java) — derived finders for "list memberships of user X" / "list members of org unit Y" / "does user X have a Staffel membership".
+
+**Intentionally not changed in R2.a:** `Squadron`, `SquadronRepository`, `SquadronService`, `User`, every aggregate's `owningSquadron` mapping, `SquadronScopeService`. The legacy `squadron` table stays authoritative; the JPA inheritance hierarchy currently has exactly one concrete subclass (`SpecialCommand`). R2.b will pull Squadron into the hierarchy as `@DiscriminatorValue("SQUADRON")`, switch its mapping to `org_unit`, and migrate the aggregates' FK columns.
+
+**Decision recap:** no top-level `OrgUnitRepository<OrgUnit, UUID>` was introduced. A generic OrgUnit query would try to materialise `kind='SQUADRON'` rows that have no Java subclass yet, raising `WrongClassException`. R2.b adds it once Squadron joins the hierarchy.
+
+**Verification:**
+
+- `./gradlew :backend:test` → **BUILD SUCCESSFUL**. Hibernate `ddl-auto=validate` accepts the new mappings against the R1 schema (V94–V96); every existing test continues to pass.
+- `./gradlew :backend:checkstyleMain :backend:spotbugsMain` → **BUILD SUCCESSFUL**. Two LineLength warnings on Javadoc were fixed before the lint sweep landed.
+
+**Rollback plan:** delete the seven new files. No DB migration to undo (R2.a ships pure Java). All existing readers and writers are untouched.
+
+**Risks mitigated in this slice:** R4 (promotion data accidentally on an SK) now has two new layers on top of V94's DB CHECK — `SpecialCommand`'s constructor that initialises the flag to `false`, and the setter override that refuses `true`. R13 (default-initialised SK row tripping the CHECK) is closed by the constructor.
+
+**Risks deferred:** R3 (SpEL rename), R5 (header rename), R7 (member-edit UI), R10 (ArchUnit interim rule relaxation), R11 (mission cross-staffel visibility), R14 (MDC field rename), R15 (single-table inheritance edge cases) — all R2.b/R2.c material.
+
+**Next session must:** start R2.b — pull `Squadron` into the `OrgUnit` hierarchy (`@DiscriminatorValue("SQUADRON")`, mapping switch to `org_unit`), introduce `OwnerScopeService` as the renamed `SquadronScopeService` with the compatibility shim, migrate the six aggregates' `owningSquadron` field to `owningOrgUnit`. Defer the stop-write of legacy columns and the SpEL string updates to R2.c so the R2.b deploy stays rollback-safe.
 
 ### 2026-05-22 — Release R1 implemented (DB schema preparation, no application code)
 
