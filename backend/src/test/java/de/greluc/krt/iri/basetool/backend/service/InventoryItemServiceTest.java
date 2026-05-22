@@ -481,7 +481,7 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -503,7 +503,7 @@ class InventoryItemServiceTest {
   void bookOutInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -523,7 +523,8 @@ class InventoryItemServiceTest {
     UUID targetUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L);
+        new InventoryItemBookOutDto(
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -551,7 +552,7 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -581,7 +582,7 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -604,7 +605,7 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -627,7 +628,8 @@ class InventoryItemServiceTest {
             CheckoutType.SELL,
             "Terminal 1",
             new java.math.BigDecimal("100.50"),
-            1L);
+            1L,
+            null);
 
     Mission mission = new Mission();
     mission.setId(missionId);

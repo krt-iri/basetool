@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### Added
+- **Owner-Picker im Inventar-Buchen-Modal TRANSFER-Zweig integriert (R5.d.g) — die R5.d-Picker-Reihe ist damit komplett.** Im Buchen-Modal (`/inventory/my`, `/inventory/all`) erscheint im TRANSFER-Zweig unter dem Zielort-Dropdown ein neues "Buchen in OrgUnit"-Dropdown. Der Picker fetcht die Mitgliedschaften des Ziel-Users via `GET /api/v1/users/{id}/memberships` on-demand sobald der Empfänger gewechselt wird, und bleibt versteckt solange der Ziel-User nur eine OrgUnit hat. `InventoryItemBookOutDto` (beide Seiten der Wire) und `InventoryBookOutForm` nehmen ein neues `targetOwningOrgUnitId` entgegen; `InventoryItemService.bookOutInventoryItem` routet die Stempelung im TRANSFER-Zweig über `OwnerScopeService.resolveSquadronForPickerOutput`. Cross-OrgUnit-Transfers (Plan D4) sind damit explizit unterstützt — User A in Staffel X kann an User B in einer SK Y ausbuchen sobald die NOT-NULL-Lockerung fällt.
+
+### Added
 - **Owner-Picker im Hangar-Schiff-Add-Modal integriert (R5.d.f).** Im Add-Schiff-Modal auf `/hangar` erscheint unter der "Fitted"-Checkbox das Picker-Dropdown mit den OrgUnits, in denen der Aufrufer Mitglied ist. `ShipRequestDto` (backend + frontend Mirror) und `ShipForm` nehmen ab jetzt ein optionales `owningOrgUnitId` entgegen; `HangarService.addShip` routet die Stempelung über `OwnerScopeService.resolveSquadronForPickerOutput` statt direktem `user.getSquadron()`. Update-Pfad bleibt unverändert (existierender Stempel überlebt). SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` fällt.
 
 ### Added

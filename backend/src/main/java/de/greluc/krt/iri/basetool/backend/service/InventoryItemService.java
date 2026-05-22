@@ -674,7 +674,9 @@ public class InventoryItemService {
 
       InventoryItem newItem = new InventoryItem();
       newItem.setUser(targetUser);
-      newItem.setOwningSquadron(targetUser.getSquadron());
+      newItem.setOwningSquadron(
+          ownerScopeService.resolveSquadronForPickerOutput(
+              targetUser, dto.targetOwningOrgUnitId()));
       newItem.setMaterial(item.getMaterial());
       newItem.setLocation(targetLocation);
       newItem.setQuality(item.getQuality());

@@ -33,4 +33,12 @@ public class InventoryBookOutForm {
   private Boolean isGlobal;
 
   private Long version;
+
+  /**
+   * R5.d.g owner-picker output: the {@code OrgUnit} the destination's new inventory row should be
+   * stamped on. Only honoured for {@link CheckoutType#TRANSFER}. {@code null} preserves the legacy
+   * "stamp target user's home Staffel" behaviour on the backend (covers the single-membership case
+   * 100 % of users hit today).
+   */
+  private UUID targetOwningOrgUnitId;
 }
