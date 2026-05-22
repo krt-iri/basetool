@@ -2,13 +2,42 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened), R3 (service-layer fully migrated to `OwnerScopeService`, shim deleted, ArchUnit rules narrowed), and R4 (aggregate entities carry an `owningOrgUnit` mirror field next to the legacy `owningSquadron`, kept in lockstep by a `@PrePersist`/`@PreUpdate`/`@PostLoad` lifecycle hook — pure dual-write at the entity layer, no service-layer change required) implemented. Releases R5 (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins) and a destructive cleanup release (NOT NULL tightening on the new FK columns + V98+ migrations dropping legacy `squadron` table and `*_squadron_id` columns + corresponding entity-field removal) pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, and R5.a (REST CRUD API for SpecialCommand under `/api/v1/special-commands`: SpecialCommandService + SpecialCommandController + SpecialCommandDto + SpecialCommandMapper + 25 unit tests) implemented. Releases R5.b (membership endpoints under `/api/v1/special-commands/{id}/members`, OrgUnitMembershipService + Controller + DTOs, SpecialCommandSecurityService for the "ADMIN or Lead-of-this-SK" gate), R5.c (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), and a destructive cleanup release (NOT NULL tightening + V98+ drop migrations + entity-field removal) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.a implemented (REST CRUD API for SpecialCommand)
+
+**Sections delivered:** §5.6 (controller surface — the {@code SpecialCommandController} half), §5.1 (new service package — the {@code SpecialCommandService} entry). Membership endpoints and frontend UI are deferred to R5.b / R5.c.
+
+**Changes:**
+
+- {@link de.greluc.krt.iri.basetool.backend.model.dto.SpecialCommandDto} — wire-shape record mirroring {@code SquadronDto} field-for-field, intentionally omitting {@code isPromotionEnabled} (always false on SK rows, no path to mutate). Jakarta validation annotations on {@code name} and {@code shorthand} surface as 400 before the case-insensitive uniqueness lookup.
+- {@link de.greluc.krt.iri.basetool.backend.mapper.SpecialCommandMapper} — MapStruct {@code @Mapper(componentModel = "spring")} interface with {@code toDto} and {@code toEntity} methods. Audit timestamps ignored on the entity build path.
+- {@link de.greluc.krt.iri.basetool.backend.service.SpecialCommandService} — CRUD service with create, list (paged + unpaged), get, update, soft-delete, activate. Same case-insensitive uniqueness + optimistic-lock semantics as {@code SquadronService}, no Spring Cache (SK lifecycle events are rare; the admin SK list is not a hot path).
+- {@link de.greluc.krt.iri.basetool.backend.controller.SpecialCommandController} — REST endpoints under {@code /api/v1/special-commands}. List endpoint is open to any authenticated caller so the owner-picker fragment can populate its dropdown; everything else is ADMIN-gated. Full SpringDoc annotations + {@code @PreAuthorize}.
+
+**Test coverage (25 new test methods):**
+
+- {@code SpecialCommandServiceTest} (16 tests, Mockito): {@code findAllByActiveTrue} vs {@code findAll} dispatch on {@code includeInactive}, paged variants, get-by-id present/absent, create happy path + duplicate name + the {@code SpecialCommand} constructor's enforcement of {@code isPromotionEnabled = false}, update happy path + duplicate + stale version + missing id, delete + activate + their NotFound variants.
+- {@code SpecialCommandControllerTest} (9 tests, Mockito): page wrapping, includeInactive admin gate (admin path + non-admin {@code AccessDeniedException} path), pagination parameter forwarding, get-by-id delegation, create/update DTO round-trip through the mapper, delete + activate delegation.
+
+**Intentionally NOT in R5.a:** R5.b adds the membership endpoints ({@code POST /api/v1/special-commands/{id}/members}, {@code PATCH /api/v1/special-commands/{id}/members/{userId}}, the {@code SpecialCommandSecurityService.canManageMembers} gate). R5.c brings the frontend (owner-picker fragment, admin SK list/detail pages, active-context switcher widened to non-admins).
+
+**Verification:**
+
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL**. All previous tests pass; 25 new test methods pin the R5.a contract.
+- {@code ./gradlew :backend:checkstyleMain :backend:spotbugsMain :backend:checkstyleTest} → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert this commit. The five new files come out cleanly; no DB migration to undo. The {@code SpecialCommand} entity from R2.a stays in place but stops having a service / controller — no operational regression because today's UI does not reach into the surface yet (R5.c is what wires it up).
+
+**Risks mitigated in this slice:** the admin UI from R5.c now has a complete REST surface to call. The membership-management UI in R5.b can use the SK-by-id endpoint to resolve a roster page's header.
+
+**Next session must:** start R5.b — introduce {@code OrgUnitMembershipDto}, {@code OrgUnitMembershipService}, {@code OrgUnitMembershipMapper}, the membership endpoints under {@code /api/v1/special-commands/{id}/members} and {@code /api/v1/squadrons/{id}/members/{userId}}, and {@code SpecialCommandSecurityService.canManageMembers(scId, authentication)} for the "ADMIN or Lead-of-this-SK" gate.
 
 ### 2026-05-22 — Release R4 implemented (aggregate `owningOrgUnit` mirror field added next to `owningSquadron`, kept in lockstep by lifecycle hooks)
 
