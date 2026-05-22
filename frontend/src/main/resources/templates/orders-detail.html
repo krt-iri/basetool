@@ -233,10 +233,26 @@
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
-                <label for="requestingSquadronId" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
-                <select id="requestingSquadronId" th:field="*{requestingSquadronId}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="requestingOrgUnitId" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
+                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
                     <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
-                    <option th:each="s : ${squadrons}" th:value="${s.id}" th:text="${s.name}"></option>
+                    <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
+                        <option th:each="o : ${ownerOptions}"
+                                th:if="${o.kind() == 'SQUADRON'}"
+                                th:value="${o.orgUnitId()}"
+                                th:text="${o.orgUnitName()}">Staffel</option>
+                    </optgroup>
+                    <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
+                        <option th:each="o : ${ownerOptions}"
+                                th:if="${o.kind() == 'SPECIAL_COMMAND'}"
+                                th:value="${o.orgUnitId()}"
+                                th:text="${o.orgUnitName()}">Spezialkommando</option>
+                    </optgroup>
+                    <th:block th:unless="${ownerOptionsHasSpecialCommand}">
+                        <option th:each="o : ${ownerOptions}"
+                                th:value="${o.orgUnitId()}"
+                                th:text="${o.orgUnitName()}">Org Unit</option>
+                    </th:block>
                 </select>
             </div>
 

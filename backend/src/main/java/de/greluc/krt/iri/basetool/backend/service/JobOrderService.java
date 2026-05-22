@@ -91,9 +91,9 @@ public class JobOrderService {
 
     Squadron creatingSquadron =
         resolveCreatingSquadronForCreate(
-            createDto.creatingSquadronId(), createDto.requestingSquadronId());
+            createDto.creatingSquadronId(), createDto.requestingOrgUnitId());
     Squadron requestingSquadron =
-        resolveRequestingSquadron(createDto.requestingSquadronId(), creatingSquadron);
+        resolveRequestingSquadron(createDto.requestingOrgUnitId(), creatingSquadron);
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -422,9 +422,9 @@ public class JobOrderService {
     Squadron creatingFallback =
         existingCreator != null
             ? existingCreator
-            : resolveCreatingSquadronForCreate(null, updateDto.requestingSquadronId());
+            : resolveCreatingSquadronForCreate(null, updateDto.requestingOrgUnitId());
     Squadron newRequesting =
-        resolveRequestingSquadron(updateDto.requestingSquadronId(), creatingFallback);
+        resolveRequestingSquadron(updateDto.requestingOrgUnitId(), creatingFallback);
     jobOrder.setRequestingSquadron(newRequesting);
     jobOrder.setHandle(updateDto.handle());
 
@@ -760,36 +760,39 @@ public class JobOrderService {
   }
 
   /**
-   * Resolves the {@code requesting_squadron_id} for create / update.
+   * Resolves the {@code requesting_squadron_id} stamp for create / update from the picker output.
    *
-   * <p>Preference order (post Phase 7 part 3 / V90):
+   * <p>Preference order:
    *
    * <ol>
-   *   <li>Typed {@code requestingSquadronId} UUID from the DTO. Required value path for any client
+   *   <li>Typed {@code requestingOrgUnitId} UUID from the DTO. Required value path for any client
    *       that has migrated to the structured contract.
    *   <li>Fallback to {@code creatingFallback} (the creating squadron) so the requesting field
-   *       stays populated even on minimal payloads — mirrors the V83 backfill rule.
+   *       stays populated even on minimal payloads — mirrors the legacy backfill rule.
    * </ol>
    *
-   * <p>The legacy shorthand-string path (Phase 6 / Phase 7 part 1) was removed together with the
-   * {@code squadron} field on {@code CreateJobOrderDto} and the V90 DROP COLUMN migration.
+   * <p>When the picker output references a Spezialkommando, {@link SquadronRepository#findById}
+   * returns empty (the JPA single-table discriminator filter limits the repository to {@code
+   * kind='SQUADRON'} rows). The resulting 400 surfaces as a clean error in the picker UX until the
+   * destructive cleanup release lowers NOT NULL on the legacy column and unlocks SK stamping.
    *
-   * @param requestingSquadronId typed UUID from the DTO; preferred when present.
+   * @param requestingOrgUnitId typed UUID from the DTO (R5.d.c picker output); preferred when
+   *     present.
    * @param creatingFallback the creating squadron used as the fallback when the UUID is absent.
    * @return the resolved squadron; never {@code null}.
    */
   @org.jetbrains.annotations.NotNull
   private Squadron resolveRequestingSquadron(
-      @org.jetbrains.annotations.Nullable UUID requestingSquadronId,
+      @org.jetbrains.annotations.Nullable UUID requestingOrgUnitId,
       @org.jetbrains.annotations.NotNull Squadron creatingFallback) {
-    if (requestingSquadronId != null) {
+    if (requestingOrgUnitId != null) {
       return squadronRepository
-          .findById(requestingSquadronId)
+          .findById(requestingOrgUnitId)
           .orElseThrow(
               () ->
                   new BadRequestException(
-                      "requestingSquadronId does not resolve to a known squadron: "
-                          + requestingSquadronId));
+                      "requestingOrgUnitId does not resolve to a known active Staffel: "
+                          + requestingOrgUnitId));
     }
     return creatingFallback;
   }

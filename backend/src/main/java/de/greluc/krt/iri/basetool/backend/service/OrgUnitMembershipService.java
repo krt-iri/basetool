@@ -57,6 +57,40 @@ public class OrgUnitMembershipService {
   private final SpecialCommandRepository specialCommandRepository;
 
   /**
+   * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
+   * caller / target-user memberships. Backs the {@code GET /api/v1/org-units/active} endpoint that
+   * the R5.d.c Job Order create form consumes — Job Orders are cross-staffel workspaces, so the
+   * picker for {@code requestingOrgUnitId} is sourced from the full active-org-unit list rather
+   * than the order owner's memberships.
+   *
+   * <p>The result is sorted Staffel-first then Spezialkommandos alphabetical, mirroring {@link
+   * #listOptionsForUser}'s order so the two endpoints render identically in the picker.
+   *
+   * @return active Squadron + SpecialCommand options; never {@code null}, possibly empty when the
+   *     system has zero active org units.
+   */
+  public List<OrgUnitMembershipOptionDto> listAllActiveOptions() {
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>();
+    for (Squadron s : squadronRepository.findAllByActiveTrue()) {
+      options.add(
+          new OrgUnitMembershipOptionDto(
+              s.getId(), s.getName(), s.getShorthand(), OrgUnitKind.SQUADRON));
+    }
+    for (SpecialCommand sc : specialCommandRepository.findAllByActiveTrue()) {
+      options.add(
+          new OrgUnitMembershipOptionDto(
+              sc.getId(), sc.getName(), sc.getShorthand(), OrgUnitKind.SPECIAL_COMMAND));
+    }
+    options.sort(
+        Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(
+                o -> o.kind() == OrgUnitKind.SQUADRON ? 0 : 1)
+            .thenComparing(
+                o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
+                String.CASE_INSENSITIVE_ORDER));
+    return options;
+  }
+
+  /**
    * Lists every org unit the given user is a member of, materialised as the picker-optimised {@link
    * OrgUnitMembershipOptionDto} wire shape. Backs the {@code GET
    * /api/v1/users/{userId}/memberships} endpoint that the R5.d owner-picker fragment consumes.
