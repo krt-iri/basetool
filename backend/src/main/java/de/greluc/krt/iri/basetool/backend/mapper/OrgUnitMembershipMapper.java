@@ -8,27 +8,27 @@ import org.mapstruct.Mapping;
 /**
  * MapStruct mapper from {@link OrgUnitMembership} entities to their wire shape. Unpacks the
  * embedded {@link de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId} composite key into
- * two flat UUID fields and reads {@code user.displayName} through the LAZY association so the
- * admin roster page can render member chips without a per-row join.
+ * two flat UUID fields and reads {@code user.displayName} through the LAZY association so the admin
+ * roster page can render member chips without a per-row join.
  *
  * <p>Inverse mapping (DTO → entity) is intentionally absent — memberships are created through the
  * service's {@code addMember(orgUnitId, userId)} helper which constructs the embedded id from the
  * two URL path variables, and updated through the {@link
  * de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest} / {@link
- * de.greluc.krt.iri.basetool.backend.model.dto.MembershipLeadToggleRequest} payloads which apply
- * to an already-loaded entity. There is no inbound DTO → entity flow that needs a mapper.
+ * de.greluc.krt.iri.basetool.backend.model.dto.MembershipLeadToggleRequest} payloads which apply to
+ * an already-loaded entity. There is no inbound DTO → entity flow that needs a mapper.
  */
 @Mapper(componentModel = "spring")
 public interface OrgUnitMembershipMapper {
 
   /**
-   * Maps a persisted {@link OrgUnitMembership} to its wire shape. The {@code userId} /
-   * {@code orgUnitId} fields come from the embedded {@link
-   * OrgUnitMembership#getId()}; the discriminator and timestamps come straight from the entity.
-   * {@code userDisplayName} reads {@code user.displayName} through the LAZY association — callers
-   * that already hold a Hibernate session see it materialised, callers that hold a detached
-   * entity will get the value if the entity's display name was eagerly accessed before detach
-   * (the admin roster code path always reads it during the same transaction).
+   * Maps a persisted {@link OrgUnitMembership} to its wire shape. The {@code userId} / {@code
+   * orgUnitId} fields come from the embedded {@link OrgUnitMembership#getId()}; the discriminator
+   * and timestamps come straight from the entity. {@code userDisplayName} reads {@code
+   * user.displayName} through the LAZY association — callers that already hold a Hibernate session
+   * see it materialised, callers that hold a detached entity will get the value if the entity's
+   * display name was eagerly accessed before detach (the admin roster code path always reads it
+   * during the same transaction).
    *
    * @param entity the membership row; never {@code null}.
    * @return the wire-shape DTO, never {@code null}.

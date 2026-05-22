@@ -592,8 +592,8 @@ class ArchitectureTest {
   /**
    * {@code true} iff one of the method's request-mapping annotations declares a path that contains
    * the literal {@code "{id}"} placeholder. Used by {@link
-   * #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to scope the rule to endpoints
-   * that target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
+   * #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to scope the rule to endpoints that
+   * target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
    * endpoints whose only {@code UUID} path variable is a related entity like {@code userId}).
    */
   private static boolean mappingPathContainsIdPlaceholder(JavaMethod method) {
@@ -627,8 +627,8 @@ class ArchitectureTest {
    * principal / role lookups) or {@code OwnerScopeService} (for canSee/canEdit + active-context
    * resolution) - otherwise the data they emit might leak across org units. Phase 3 of
    * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift, and
-   * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted
-   * {@code SquadronScopeService} shim to its successor in R2.c.
+   * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted {@code
+   * SquadronScopeService} shim to its successor in R2.c.
    *
    * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
    * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
@@ -686,8 +686,8 @@ class ArchitectureTest {
 
   /**
    * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md
-   * §5.3): write endpoints on staffel-scoped aggregates MUST use a {@code @PreAuthorize}
-   * expression that calls into the {@code OwnerScopeService} (canEdit* / canSee*). A bare
+   * §5.3): write endpoints on staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression
+   * that calls into the {@code OwnerScopeService} (canEdit* / canSee*). A bare
    * {@code @PreAuthorize("isAuthenticated()")} on POST / PUT / PATCH / DELETE for {@code
    * /api/v1/missions}, {@code /api/v1/operations}, {@code /api/v1/hangar}, {@code
    * /api/v1/inventory} or {@code /api/v1/refinery-orders} would silently allow cross-staffel writes

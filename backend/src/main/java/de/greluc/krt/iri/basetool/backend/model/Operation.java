@@ -54,20 +54,20 @@ public class Operation extends AbstractEntity<UUID> {
 
   /**
    * Squadron that owns this operation. Legacy field — kept authoritative during the R4 dual-write
-   * soak. The plan-aligned {@link #owningOrgUnit} mirror field is kept in sync by
-   * {@link #syncOwnerFields()} on every lifecycle event. A later release will drop this field
-   * along with the matching DB column once {@code owning_org_unit_id} has soaked one full release
-   * cycle in production.
+   * soak. The plan-aligned {@link #owningOrgUnit} mirror field is kept in sync by {@link
+   * #syncOwnerFields()} on every lifecycle event. A later release will drop this field along with
+   * the matching DB column once {@code owning_org_unit_id} has soaked one full release cycle in
+   * production.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id", nullable = false)
   private Squadron owningSquadron;
 
   /**
-   * Org-unit owner of this operation — the R4 dual-write mirror of {@link #owningSquadron}.
-   * Pointed at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1,
-   * kept synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the
-   * R4 soak window so a missed sync does not break inserts.
+   * Org-unit owner of this operation — the R4 dual-write mirror of {@link #owningSquadron}. Pointed
+   * at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
+   * window so a missed sync does not break inserts.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
@@ -75,9 +75,9 @@ public class Operation extends AbstractEntity<UUID> {
 
   /**
    * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
-   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()}
-   * for the rule (legacy field wins; reverse copy only when the legacy field is {@code null} and
-   * the org-unit reference happens to point at a Squadron).
+   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()} for
+   * the rule (legacy field wins; reverse copy only when the legacy field is {@code null} and the
+   * org-unit reference happens to point at a Squadron).
    */
   @PrePersist
   @PreUpdate

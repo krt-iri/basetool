@@ -34,11 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
  * SquadronController} CRUD surface except for the per-row promotion toggle, which has no
  * counterpart on Spezialkommandos by data-layer constraint.
  *
- * <p>All write paths are ADMIN-gated, matching the SK-administration decision recorded in
- * {@code SPEZIALKOMMANDO_PLAN.md} §2 (D2): SK lifecycle is admin-only; per-SK Lead capabilities
- * for membership management are a separate authorisation surface that lives on the membership
- * endpoints (R5.b). The list endpoint is open to any authenticated caller so the owner picker
- * fragment can populate its dropdown without elevated rights.
+ * <p>All write paths are ADMIN-gated, matching the SK-administration decision recorded in {@code
+ * SPEZIALKOMMANDO_PLAN.md} §2 (D2): SK lifecycle is admin-only; per-SK Lead capabilities for
+ * membership management are a separate authorisation surface that lives on the membership endpoints
+ * (R5.b). The list endpoint is open to any authenticated caller so the owner picker fragment can
+ * populate its dropdown without elevated rights.
  */
 @RestController
 @RequestMapping("/api/v1/special-commands")
@@ -52,9 +52,9 @@ public class SpecialCommandController {
   private final SpecialCommandMapper specialCommandMapper;
 
   /**
-   * Paged list of Spezialkommandos for the admin overview and the owner-picker dropdown. The
-   * {@code includeInactive=true} flavour requires ADMIN — soft-deleted SK descriptions can carry
-   * internal context, mirroring the {@link SquadronController#getAllSquadrons} guard.
+   * Paged list of Spezialkommandos for the admin overview and the owner-picker dropdown. The {@code
+   * includeInactive=true} flavour requires ADMIN — soft-deleted SK descriptions can carry internal
+   * context, mirroring the {@link SquadronController#getAllSquadrons} guard.
    *
    * @param page page number, defaults to 0.
    * @param size page size, defaults to the platform default.
@@ -62,8 +62,8 @@ public class SpecialCommandController {
    * @param includeInactive include soft-deleted rows; ADMIN-only.
    * @param authentication Spring Security authentication, injected for the inactive-flag gate.
    * @return paged Spezialkommando DTOs.
-   * @throws org.springframework.security.access.AccessDeniedException if {@code includeInactive}
-   *     is requested without ROLE_ADMIN.
+   * @throws org.springframework.security.access.AccessDeniedException if {@code includeInactive} is
+   *     requested without ROLE_ADMIN.
    */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
@@ -108,9 +108,9 @@ public class SpecialCommandController {
 
   /**
    * Returns a single Spezialkommando by id. Used by the admin detail page and the membership
-   * management UI to resolve a chip click. ADMIN-only because the inactive-row visibility rules
-   * on {@link #getAllSpecialCommands} cannot be enforced on a single-row endpoint without
-   * complicating the surface.
+   * management UI to resolve a chip click. ADMIN-only because the inactive-row visibility rules on
+   * {@link #getAllSpecialCommands} cannot be enforced on a single-row endpoint without complicating
+   * the surface.
    *
    * @param id Spezialkommando id.
    * @return the matching DTO.

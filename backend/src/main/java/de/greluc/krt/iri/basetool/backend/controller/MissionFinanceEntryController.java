@@ -93,8 +93,8 @@ public class MissionFinanceEntryController {
 
   /**
    * Creates a finance entry. Open to anonymous callers (guests recording their own payout line),
-   * but gated by {@code @ownerScopeService.canSeeMission(dto.missionId)} so internal missions
-   * are not writable without authentication, and the response is redacted via {@link
+   * but gated by {@code @ownerScopeService.canSeeMission(dto.missionId)} so internal missions are
+   * not writable without authentication, and the response is redacted via {@link
    * #cleanupParticipantForGuest} when the caller is anonymous to avoid leaking the linked
    * participant's email / real name / roles (audit finding C-2).
    *

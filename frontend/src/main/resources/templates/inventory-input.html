@@ -72,7 +72,9 @@
                         <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
                     </select>
                 </div>
-                
+
+                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+
                 <div class="form-group">
                     <label for="materialId">Material</label>
                     <select id="materialId" th:field="*{materialId}" required>

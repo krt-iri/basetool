@@ -99,9 +99,9 @@ public class PromotionTopicService {
 
   /**
    * Persists a new {@link PromotionTopic}. Auto-stamps the owning squadron from the caller's active
-   * context ({@link OwnerScopeService#currentSquadron()}) so Officers always tag their own
-   * squadron and Admins must focus the switcher before creating (Admin in "all squadrons" mode is
-   * rejected with HTTP 400, mirroring the JobOrder create contract).
+   * context ({@link OwnerScopeService#currentSquadron()}) so Officers always tag their own squadron
+   * and Admins must focus the switcher before creating (Admin in "all squadrons" mode is rejected
+   * with HTTP 400, mirroring the JobOrder create contract).
    *
    * @param request validated payload describing the new topic
    * @return the persisted topic in response form

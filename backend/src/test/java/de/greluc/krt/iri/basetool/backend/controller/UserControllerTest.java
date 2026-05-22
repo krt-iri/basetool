@@ -6,10 +6,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import java.time.LocalDate;
 import java.util.List;
@@ -43,6 +46,7 @@ class UserControllerTest {
   @Mock private UserService userService;
   @Mock private UserMapper userMapper;
   @Mock private de.greluc.krt.iri.basetool.backend.service.AuthHelperService authHelperService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private Jwt jwt;
 
   @InjectMocks private UserController controller;
@@ -426,6 +430,32 @@ class UserControllerTest {
 
     verify(userService).deleteUser(id);
     verifyNoMoreInteractions(userService, userMapper);
+  }
+
+  // ── GET /{id}/memberships ───────────────────────────────────────────────
+
+  @Test
+  void getUserMemberships_delegatesToService() {
+    UUID userId = UUID.randomUUID();
+    OrgUnitMembershipOptionDto option =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON);
+    when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of(option));
+
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId);
+
+    assertEquals(1, result.size());
+    assertSame(option, result.getFirst());
+    verify(orgUnitMembershipService).listOptionsForUser(userId);
+  }
+
+  @Test
+  void getUserMemberships_emptyResult_returnsEmptyList() {
+    UUID userId = UUID.randomUUID();
+    when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of());
+
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId);
+
+    assertTrue(result.isEmpty());
   }
 
   // ── helpers ─────────────────────────────────────────────────────────────

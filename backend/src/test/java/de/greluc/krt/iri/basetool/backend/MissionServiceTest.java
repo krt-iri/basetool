@@ -44,8 +44,7 @@ class MissionServiceTest {
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
-  @Mock
-  private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
+  @Mock private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
 
   @Mock private de.greluc.krt.iri.basetool.backend.service.UserService userService;
 

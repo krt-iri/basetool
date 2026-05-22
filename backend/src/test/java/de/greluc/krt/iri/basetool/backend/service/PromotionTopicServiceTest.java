@@ -41,9 +41,7 @@ class PromotionTopicServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient()
-        .when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope())
-        .thenReturn(true);
+    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
   }
 
   @Test

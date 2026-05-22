@@ -26,8 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Pure-method unit tests for {@link SpecialCommandMembershipController}. The Spring-MVC binding
- * ({@code @PreAuthorize} SpEL on the security service, JSON marshalling) is covered by
- * integration tests; here we pin the controller's delegation to the service + mapper.
+ * ({@code @PreAuthorize} SpEL on the security service, JSON marshalling) is covered by integration
+ * tests; here we pin the controller's delegation to the service + mapper.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandMembershipControllerTest {
@@ -39,15 +39,7 @@ class SpecialCommandMembershipControllerTest {
 
   private static OrgUnitMembershipDto sampleDto(UUID userId, UUID scId) {
     return new OrgUnitMembershipDto(
-        userId,
-        "Alice",
-        scId,
-        OrgUnitKind.SPECIAL_COMMAND,
-        false,
-        false,
-        false,
-        Instant.now(),
-        0L);
+        userId, "Alice", scId, OrgUnitKind.SPECIAL_COMMAND, false, false, false, Instant.now(), 0L);
   }
 
   @Test

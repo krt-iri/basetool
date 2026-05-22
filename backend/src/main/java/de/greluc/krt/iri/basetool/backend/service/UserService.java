@@ -501,8 +501,8 @@ public class UserService {
 
   /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
-   * Squadron-scoped via {@link OwnerScopeService#currentSquadronId()} — non-admins only see
-   * their own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
+   * Squadron-scoped via {@link OwnerScopeService#currentSquadronId()} — non-admins only see their
+   * own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
    *
    * @return lightweight reference projection used by typeaheads
    */
@@ -612,9 +612,9 @@ public class UserService {
    * the same row simultaneously surface as 409 instead of one silently overwriting the other.
    *
    * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
-   * scope ({@link OwnerScopeService} reads it to decide which staffel-scoped aggregates a
-   * non-admin sees). Until V86 tightens the column to NOT NULL, {@code null} is a valid value that
-   * means "admin / unassigned" and falls back to the cross-squadron view.
+   * scope ({@link OwnerScopeService} reads it to decide which staffel-scoped aggregates a non-admin
+   * sees). Until V86 tightens the column to NOT NULL, {@code null} is a valid value that means
+   * "admin / unassigned" and falls back to the cross-squadron view.
    *
    * @param userId user primary key; must exist
    * @param squadronId target squadron id; {@code null} clears the assignment

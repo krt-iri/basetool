@@ -7,9 +7,9 @@ import org.mapstruct.Mapping;
 
 /**
  * MapStruct mapper between {@link SpecialCommand} entities and {@link SpecialCommandDto} wire
- * shapes. Mirrors the {@link SquadronMapper} contract — fields are 1:1 except for the absent
- * {@code isPromotionEnabled} field on the wire shape (permanently disabled for SK rows by the V94
- * CHECK constraint and the {@link SpecialCommand} setter override, so exposing the flag would only
+ * shapes. Mirrors the {@link SquadronMapper} contract — fields are 1:1 except for the absent {@code
+ * isPromotionEnabled} field on the wire shape (permanently disabled for SK rows by the V94 CHECK
+ * constraint and the {@link SpecialCommand} setter override, so exposing the flag would only
  * confuse callers).
  */
 @Mapper(componentModel = "spring")

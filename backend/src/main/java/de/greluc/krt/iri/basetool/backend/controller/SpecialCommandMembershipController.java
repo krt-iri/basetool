@@ -25,10 +25,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for membership management on a single Spezialkommando. Endpoints live under
- * {@code /api/v1/special-commands/{id}/members} so the URL itself documents the parent SK; the
- * controller code stays focused on member-list mutations and never has to reach into SK-lifecycle
- * concerns.
+ * REST surface for membership management on a single Spezialkommando. Endpoints live under {@code
+ * /api/v1/special-commands/{id}/members} so the URL itself documents the parent SK; the controller
+ * code stays focused on member-list mutations and never has to reach into SK-lifecycle concerns.
  *
  * <p>Authorisation: every member-list mutation goes through
  * {@code @specialCommandSecurityService.canManageMembers(#id, authentication)} which combines
@@ -121,8 +120,7 @@ public class SpecialCommandMembershipController {
         description =
             "No Spezialkommando matches the given id, or the user is not a member of this SK.")
   })
-  public void removeMember(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+  public void removeMember(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     membershipService.removeMember(id, userId);
   }
 

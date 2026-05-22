@@ -44,8 +44,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService}
- * + the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
+ * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
+ * the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
  * pattern, so one representative is enough — every gated call site uses the same {@code
  * OwnerScopeService} primitive).
  *
@@ -126,8 +126,7 @@ class PromotionFeatureFlagServiceGateTest {
     assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     AccessDeniedException ex =
         assertThrows(
-            AccessDeniedException.class,
-            () -> ownerScopeService.assertPromotionFeatureEnabled());
+            AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
     assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
   }
 

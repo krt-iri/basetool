@@ -17,10 +17,10 @@ package de.greluc.krt.iri.basetool.backend.model;
  *   <li>{@link #SQUADRON} — the original "Staffel" tenant boundary that has driven the
  *       multi-tenancy work since Phase 1 (see {@code MULTI_SQUADRON_PLAN.md}). A user belongs to at
  *       most one Squadron. Squadrons may run the promotion subsystem.
- *   <li>{@link #SPECIAL_COMMAND} — added by the Spezialkommando extension (R2.a, see
- *       {@code SPEZIALKOMMANDO_PLAN.md}). A user may belong to any number of Special Commands in
- *       addition to (or instead of) a Squadron. Special Commands never carry the promotion
- *       subsystem; this invariant is enforced at the database layer via the {@code
+ *   <li>{@link #SPECIAL_COMMAND} — added by the Spezialkommando extension (R2.a, see {@code
+ *       SPEZIALKOMMANDO_PLAN.md}). A user may belong to any number of Special Commands in addition
+ *       to (or instead of) a Squadron. Special Commands never carry the promotion subsystem; this
+ *       invariant is enforced at the database layer via the {@code
  *       chk_org_unit_promotion_only_squadron} CHECK constraint and additionally in the {@link
  *       SpecialCommand} entity defaults.
  * </ul>
