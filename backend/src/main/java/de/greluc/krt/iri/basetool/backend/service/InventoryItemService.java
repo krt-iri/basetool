@@ -13,6 +13,7 @@ import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BulkCheckoutRequest;
@@ -30,6 +31,8 @@ import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,6 +88,8 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final SquadronRepository squadronRepository;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -428,7 +433,7 @@ public class InventoryItemService {
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
-    item.setOwningSquadron(user.getSquadron());
+    item.setOwningSquadron(resolveOwningSquadron(user, dto.owningOrgUnitId()));
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
@@ -438,6 +443,56 @@ public class InventoryItemService {
     item.setJobOrder(jobOrder);
 
     return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+  }
+
+  /**
+   * Resolves the {@link Squadron} that should own a newly-created inventory row. The R5.d picker
+   * output {@code owningOrgUnitId} is honoured when present (subject to validation); otherwise the
+   * service falls back to the target user's home Staffel — preserving today's behaviour for the
+   * single-membership case.
+   *
+   * <p>When the caller supplies an explicit {@code owningOrgUnitId}, the resolver checks two
+   * invariants before accepting it:
+   *
+   * <ol>
+   *   <li>The target user actually carries a membership row for the picked org unit. This blocks a
+   *       malicious admin (or a confused frontend) from stamping a row onto an org unit the target
+   *       user does not belong to, which would silently leak the row into a foreign unit's Lager
+   *       view.
+   *   <li>The picked org unit resolves to a Squadron (not a Spezialkommando). The {@code
+   *       owning_squadron_id} column is still {@code NOT NULL} on the {@code inventory_item} table
+   *       — the destructive cleanup release that lowers this constraint (and lets SKs own
+   *       inventory) ships separately. Until then, an SK selection is rejected with a clear {@link
+   *       BadRequestException}; the picker UI in R5.d.a is filtered to Staffel-only so this path
+   *       triggers only when someone bypasses the UI by hand-crafting a request.
+   * </ol>
+   *
+   * @param targetUser the user the inventory row belongs to; never {@code null}.
+   * @param owningOrgUnitId the picker output, or {@code null} for legacy behaviour.
+   * @return the Squadron whose stock the row joins; never {@code null}.
+   * @throws BadRequestException when the picker output references an org unit the target user does
+   *     not belong to, or a Spezialkommando (which the schema cannot yet own inventory items).
+   * @throws NotFoundException when the picker output references an org unit id that no longer
+   *     resolves to a Squadron row (orphaned reference).
+   */
+  private Squadron resolveOwningSquadron(User targetUser, UUID owningOrgUnitId) {
+    if (owningOrgUnitId == null) {
+      return targetUser.getSquadron();
+    }
+    if (!orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(
+        targetUser.getId(), owningOrgUnitId)) {
+      throw new BadRequestException(
+          "Selected owner org unit is not a membership of the target user");
+    }
+    // A successful membership lookup against an OrgUnit id whose discriminator is SPECIAL_COMMAND
+    // will not return a matching Squadron row (SpecialCommand and Squadron share the org_unit
+    // table but only Squadron is mapped by SquadronRepository thanks to the JPA discriminator).
+    return squadronRepository
+        .findById(owningOrgUnitId)
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "Spezialkommando ownership of inventory items is not yet supported"));
   }
 
   /**

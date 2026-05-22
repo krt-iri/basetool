@@ -94,9 +94,9 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   /**
    * Org-unit owner of this inventory item — the R4 dual-write mirror of {@link #owningSquadron}.
-   * Pointed at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1,
-   * kept synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the
-   * R4 soak window so a missed sync does not break inserts.
+   * Pointed at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
+   * window so a missed sync does not break inserts.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
@@ -105,8 +105,8 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   /**
    * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
-   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()}
-   * for the rule.
+   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()} for
+   * the rule.
    */
   @PrePersist
   @PreUpdate

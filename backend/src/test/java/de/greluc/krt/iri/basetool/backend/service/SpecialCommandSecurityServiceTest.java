@@ -24,8 +24,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 /**
  * Mockito unit tests for {@link SpecialCommandSecurityService#canManageMembers(UUID,
  * Authentication)}. Pins the three accepted paths (admin always passes, anonymous always denied,
- * lead-of-this-SK passes for that SK only) plus the relevant negative cases (non-lead member,
- * lead of a different SK, no membership row).
+ * lead-of-this-SK passes for that SK only) plus the relevant negative cases (non-lead member, lead
+ * of a different SK, no membership row).
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandSecurityServiceTest {
@@ -45,16 +45,15 @@ class SpecialCommandSecurityServiceTest {
   void setUp() {
     authenticatedMember =
         new UsernamePasswordAuthenticationToken(
-            "member",
-            null,
-            java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
   }
 
   @Test
   void anonymousAuth_returnsFalse() {
     Authentication anon =
         new AnonymousAuthenticationToken(
-            "anonymous", "anonymousUser",
+            "anonymous",
+            "anonymousUser",
             java.util.List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))) {
           @Override
           public boolean isAuthenticated() {

@@ -17,8 +17,8 @@ import org.springframework.stereotype.Repository;
  *
  * <p>Uses the {@link OrgUnitMembershipId} composite key — Spring Data resolves the embeddable on
  * its own as long as the type parameter matches. The {@code findById(OrgUnitMembershipId)} method
- * inherited from {@link JpaRepository} is the canonical lookup for "does user X currently belong
- * to org unit Y?".
+ * inherited from {@link JpaRepository} is the canonical lookup for "does user X currently belong to
+ * org unit Y?".
  */
 @Repository
 public interface OrgUnitMembershipRepository
@@ -27,21 +27,21 @@ public interface OrgUnitMembershipRepository
   /**
    * Returns every membership row belonging to the given user. Used by the active-context switcher
    * (to populate the dropdown of org units the user may pin) and by the owner-picker fragment on
-   * create forms (to enumerate the legal {@code owningOrgUnitId} values). Result order is
-   * insertion order — callers that need a stable display order (Staffel first, SKs alphabetical,
-   * etc.) sort in the service layer.
+   * create forms (to enumerate the legal {@code owningOrgUnitId} values). Result order is insertion
+   * order — callers that need a stable display order (Staffel first, SKs alphabetical, etc.) sort
+   * in the service layer.
    *
    * @param userId the user whose memberships to list; never {@code null}.
-   * @return every membership of this user; never {@code null}, possibly empty when the user has
-   *     no org-unit membership at all (admin or guest).
+   * @return every membership of this user; never {@code null}, possibly empty when the user has no
+   *     org-unit membership at all (admin or guest).
    */
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
   /**
    * Returns every membership row of the given user filtered by kind. Handy for "what Staffel does
-   * this user belong to" (returns at most one row because of the V95 partial unique index) and
-   * for "what Spezialkommandos has this user joined" — without forcing the caller to filter the
-   * full result client-side.
+   * this user belong to" (returns at most one row because of the V95 partial unique index) and for
+   * "what Spezialkommandos has this user joined" — without forcing the caller to filter the full
+   * result client-side.
    *
    * @param userId the user whose memberships to list; never {@code null}.
    * @param kind the discriminator value to match; never {@code null}.
@@ -51,13 +51,13 @@ public interface OrgUnitMembershipRepository
 
   /**
    * Returns the single Squadron membership of the given user, if any. Convenience wrapper around
-   * {@link #findAllByIdUserIdAndKind} that takes advantage of the V95 partial unique index
-   * "{@code uq_org_unit_membership_one_squadron}" — a user has at most one Staffel membership, so
-   * the result is always at most one row. The implementation calls {@code
-   * findOneByIdUserIdAndKind} (Spring Data derives the query); if data corruption ever produces a
-   * second Staffel membership for the same user, Spring Data will surface it as an
-   * {@code IncorrectResultSizeDataAccessException} which the service layer translates into a
-   * 500-level problem detail.
+   * {@link #findAllByIdUserIdAndKind} that takes advantage of the V95 partial unique index "{@code
+   * uq_org_unit_membership_one_squadron}" — a user has at most one Staffel membership, so the
+   * result is always at most one row. The implementation calls {@code findOneByIdUserIdAndKind}
+   * (Spring Data derives the query); if data corruption ever produces a second Staffel membership
+   * for the same user, Spring Data will surface it as an {@code
+   * IncorrectResultSizeDataAccessException} which the service layer translates into a 500-level
+   * problem detail.
    *
    * @param userId the user whose Staffel membership to fetch; never {@code null}.
    * @return the user's single Staffel membership if present, empty otherwise.

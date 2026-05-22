@@ -41,8 +41,8 @@ import lombok.ToString;
  * {@code OrgUnit} (and any of its subclasses other than {@link SpecialCommand}) must avoid trying
  * to materialise them: {@link SpecialCommand}'s repository filters on the discriminator
  * automatically, and {@code OrgUnitMembership} stores {@code org_unit_id} as a plain UUID instead
- * of a JPA relation to {@code OrgUnit} so Hibernate cannot raise a {@code WrongClassException} on
- * a {@code SQUADRON}-discriminated row that has no Java subclass.
+ * of a JPA relation to {@code OrgUnit} so Hibernate cannot raise a {@code WrongClassException} on a
+ * {@code SQUADRON}-discriminated row that has no Java subclass.
  *
  * <p>Promotion-feature invariant: {@link #isPromotionEnabled} stays on this superclass so the
  * existing {@code SquadronScopeService.isPromotionFeatureEnabledForCurrentScope} contract carries

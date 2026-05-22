@@ -14,15 +14,15 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Authorization helper for Spezialkommando-administration {@code @PreAuthorize} expressions.
  * Mirrors the {@link MissionSecurityService} pattern — methods on this bean are referenced from
- * SpEL ({@code @specialCommandSecurityService.canManageMembers(#id, authentication)}) and
- * translate the "can the caller manage members of this SK" question into a boolean by combining
- * the caller's authorities with the membership row on the target SK.
+ * SpEL ({@code @specialCommandSecurityService.canManageMembers(#id, authentication)}) and translate
+ * the "can the caller manage members of this SK" question into a boolean by combining the caller's
+ * authorities with the membership row on the target SK.
  *
  * <p>The rule, recorded in {@code SPEZIALKOMMANDO_PLAN.md} §2 (D2): an admin may manage any SK's
- * member list; a non-admin caller may manage a specific SK's members iff they hold an
- * {@code is_lead = true} membership on that exact SK. The {@code is_lead} flag itself is
- * ADMIN-only (toggled via a dedicated endpoint with a hard {@code hasRole('ADMIN')} guard) so a
- * Lead cannot promote themselves or someone else to Lead.
+ * member list; a non-admin caller may manage a specific SK's members iff they hold an {@code
+ * is_lead = true} membership on that exact SK. The {@code is_lead} flag itself is ADMIN-only
+ * (toggled via a dedicated endpoint with a hard {@code hasRole('ADMIN')} guard) so a Lead cannot
+ * promote themselves or someone else to Lead.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,32 +34,31 @@ public class SpecialCommandSecurityService {
   private final OrgUnitMembershipRepository membershipRepository;
 
   /**
-   * Answers the SpEL-level question whether the calling principal may manage members of the
-   * given Spezialkommando.
+   * Answers the SpEL-level question whether the calling principal may manage members of the given
+   * Spezialkommando.
    *
    * <ul>
-   *   <li>ADMIN — always {@code true}; SK lifecycle and per-SK admin actions are part of the
-   *       global admin surface.
-   *   <li>Anonymous / unauthenticated — always {@code false}; the endpoints under
-   *       {@code /api/v1/special-commands/{id}/members/**} are not part of the public surface.
+   *   <li>ADMIN — always {@code true}; SK lifecycle and per-SK admin actions are part of the global
+   *       admin surface.
+   *   <li>Anonymous / unauthenticated — always {@code false}; the endpoints under {@code
+   *       /api/v1/special-commands/{id}/members/**} are not part of the public surface.
    *   <li>Authenticated non-admin — {@code true} iff the caller has an {@code is_lead = true}
-   *       membership on the exact SK referenced by {@code specialCommandId}. A Lead may NOT
-   *       manage members of any other SK they are merely a regular member of.
+   *       membership on the exact SK referenced by {@code specialCommandId}. A Lead may NOT manage
+   *       members of any other SK they are merely a regular member of.
    * </ul>
    *
    * <p>A non-existent SK id is treated as denied (no special-case 404 surface from the
    * authorisation layer) — the controller layer will surface the 404 separately when the service
    * call hits {@link SpecialCommandService#getSpecialCommandById} with the same id.
    *
-   * @param specialCommandId the SK whose member list the caller wants to manage; never
-   *     {@code null}.
-   * @param authentication current Spring Security authentication; may be {@code null} for
-   *     anonymous calls (the framework hands SpEL a non-null but anonymous principal in that
-   *     case, so the null check below is defensive).
+   * @param specialCommandId the SK whose member list the caller wants to manage; never {@code
+   *     null}.
+   * @param authentication current Spring Security authentication; may be {@code null} for anonymous
+   *     calls (the framework hands SpEL a non-null but anonymous principal in that case, so the
+   *     null check below is defensive).
    * @return {@code true} iff the caller may manage members of {@code specialCommandId}.
    */
-  public boolean canManageMembers(
-      @NotNull UUID specialCommandId, Authentication authentication) {
+  public boolean canManageMembers(@NotNull UUID specialCommandId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;
     }
@@ -70,8 +69,7 @@ public class SpecialCommandSecurityService {
         .currentUserId()
         .flatMap(
             userId ->
-                membershipRepository.findById(
-                    new OrgUnitMembershipId(userId, specialCommandId)))
+                membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
         .map(OrgUnitMembership::isLead)
         .orElse(false);
   }

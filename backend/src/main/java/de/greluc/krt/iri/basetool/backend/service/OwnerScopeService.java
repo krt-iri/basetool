@@ -26,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * scoped aggregates (mission, hangar, inventory, refinery, operation).
  *
  * <p>This bean is the R2.c generalisation of the original {@code SquadronScopeService}. The
- * implementation logic is identical — single-table inheritance means an org unit with
- * {@code kind = 'SQUADRON'} loads as a {@link Squadron} instance and is reachable through the same
- * {@link SquadronRepository#findById(Object)} call path. What changes is the *naming surface*: the
- * service exposes both the historical {@code …Squadron(…)} method names (so the existing
+ * implementation logic is identical — single-table inheritance means an org unit with {@code kind =
+ * 'SQUADRON'} loads as a {@link Squadron} instance and is reachable through the same {@link
+ * SquadronRepository#findById(Object)} call path. What changes is the *naming surface*: the service
+ * exposes both the historical {@code …Squadron(…)} method names (so the existing
  * {@code @PreAuthorize("@squadronScopeService.canSeeSquadron(#id)")} SpEL strings keep resolving
  * via the compatibility shim) and the plan-aligned {@code …OrgUnit(…)} aliases that R2.d will
  * migrate the SpEL strings onto.
@@ -67,10 +67,10 @@ public class OwnerScopeService {
    * MeFrontendController}); the backend treats the header as untrusted-but-bounded input — only
    * honoured for principals that already carry {@code ROLE_ADMIN}.
    *
-   * <p>Header name is preserved verbatim from the {@code SquadronScopeService} era — R2.d /
-   * R3 may rename it to {@code X-Active-Org-Unit-Id} once the frontend's relay filter and the
-   * admin's existing cached browser tabs have been migrated. Keeping the legacy name in R2.c
-   * avoids breaking any admin session that is open when the deploy lands.
+   * <p>Header name is preserved verbatim from the {@code SquadronScopeService} era — R2.d / R3 may
+   * rename it to {@code X-Active-Org-Unit-Id} once the frontend's relay filter and the admin's
+   * existing cached browser tabs have been migrated. Keeping the legacy name in R2.c avoids
+   * breaking any admin session that is open when the deploy lands.
    */
   public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
 
@@ -101,16 +101,16 @@ public class OwnerScopeService {
   private final HttpServletRequest request;
 
   /**
-   * Returns the org-unit context that filters the current request. For admins this reads the
-   * {@code X-Active-Squadron-Id} request header (the frontend's switcher pushed there via the
-   * relay filter); for everyone else this loads the user's persistent home squadron. Empty result
-   * means "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
+   * Returns the org-unit context that filters the current request. For admins this reads the {@code
+   * X-Active-Squadron-Id} request header (the frontend's switcher pushed there via the relay
+   * filter); for everyone else this loads the user's persistent home squadron. Empty result means
+   * "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
    * unauthenticated / anonymous).
    *
-   * <p>The non-admin branch's {@code userRepository.findById} round-trip is memoised on the
-   * {@link HttpServletRequest} via {@link #readPersistentSquadronFromUser()}, so repeated calls
-   * within the same request collapse to a single DB hit. The admin branch reads the request
-   * header (in-memory) and is not cached separately — it is already constant-time.
+   * <p>The non-admin branch's {@code userRepository.findById} round-trip is memoised on the {@link
+   * HttpServletRequest} via {@link #readPersistentSquadronFromUser()}, so repeated calls within the
+   * same request collapse to a single DB hit. The admin branch reads the request header (in-memory)
+   * and is not cached separately — it is already constant-time.
    *
    * @return the active org-unit id, or empty when no filter applies.
    */
@@ -136,12 +136,12 @@ public class OwnerScopeService {
 
   /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
-   * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller
-   * has no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services
-   * use this to stamp {@code owningSquadron} on newly-created aggregates that have no owner field
-   * of their own (e.g. {@code Operation}) — aggregates that DO carry an owner ({@code Ship},
-   * {@code Mission}, …) prefer to derive the squadron from the owner so a future user-squadron
-   * move does not silently retag history.
+   * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
+   * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use
+   * this to stamp {@code owningSquadron} on newly-created aggregates that have no owner field of
+   * their own (e.g. {@code Operation}) — aggregates that DO carry an owner ({@code Ship}, {@code
+   * Mission}, …) prefer to derive the squadron from the owner so a future user-squadron move does
+   * not silently retag history.
    *
    * <p>Result is memoised per {@link HttpServletRequest} so repeated calls in one request collapse
    * to a single {@code squadronRepository.findById} round-trip.
@@ -197,11 +197,11 @@ public class OwnerScopeService {
   }
 
   /**
-   * Plan-aligned alias for {@link #canSeeSquadron(UUID)} — same semantics, generalised name so
-   * R2.d can migrate the SpEL strings onto an org-unit-shaped vocabulary without changing
-   * behaviour. Once Spezialkommando ids start flowing through the admin switcher, this method's
-   * implementation will move ahead of the legacy {@code canSeeSquadron} and the latter will start
-   * delegating in the opposite direction.
+   * Plan-aligned alias for {@link #canSeeSquadron(UUID)} — same semantics, generalised name so R2.d
+   * can migrate the SpEL strings onto an org-unit-shaped vocabulary without changing behaviour.
+   * Once Spezialkommando ids start flowing through the admin switcher, this method's implementation
+   * will move ahead of the legacy {@code canSeeSquadron} and the latter will start delegating in
+   * the opposite direction.
    *
    * @param orgUnitId the org-unit id whose data the caller wants to read; never {@code null}.
    * @return {@code true} iff the caller may see the given org unit's data.
@@ -211,10 +211,10 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may write to data owned by {@code squadronId}.
-   * Identical rule to {@link #canSeeSquadron(UUID)} — write access tracks read access for the
-   * staffel-scoped aggregates. Kept as a separate method so future read/write divergence (e.g. a
-   * read-only viewer role) can land here without breaking existing call sites.
+   * {@code true} iff the current principal may write to data owned by {@code squadronId}. Identical
+   * rule to {@link #canSeeSquadron(UUID)} — write access tracks read access for the staffel-scoped
+   * aggregates. Kept as a separate method so future read/write divergence (e.g. a read-only viewer
+   * role) can land here without breaking existing call sites.
    *
    * @param squadronId the squadron whose data the caller wants to write; never {@code null}.
    * @return {@code true} iff the caller may write to the given squadron's data.
@@ -235,11 +235,11 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may read mission {@code missionId}. Combines the
-   * generic {@link #canSeeSquadron(UUID)} check with Mission's cross-staffel-visibility rule
+   * {@code true} iff the current principal may read mission {@code missionId}. Combines the generic
+   * {@link #canSeeSquadron(UUID)} check with Mission's cross-staffel-visibility rule
    * (MULTI_SQUADRON_PLAN.md section 1): non-internal missions are visible from any squadron,
-   * internal missions only from the owning squadron and admins. Non-existent ids return
-   * {@code false}.
+   * internal missions only from the owning squadron and admins. Non-existent ids return {@code
+   * false}.
    *
    * <p>Audit hardenings on top of the cross-staffel rule:
    *
@@ -248,8 +248,8 @@ public class OwnerScopeService {
    *       at all. The mission archive is restricted to authenticated members so a guest cannot
    *       (re-)write the participant list / finance ledger of an already-archived mission.
    *   <li><b>M-3</b>: walks the {@code parent} chain — a sub-mission with {@code isInternal=false}
-   *       below an {@code isInternal=true} parent does not leak the parent's existence to
-   *       anonymous callers. If ANY ancestor is internal-and-foreign, access is denied.
+   *       below an {@code isInternal=true} parent does not leak the parent's existence to anonymous
+   *       callers. If ANY ancestor is internal-and-foreign, access is denied.
    * </ul>
    *
    * @param missionId mission to inspect; never {@code null}.
@@ -322,9 +322,9 @@ public class OwnerScopeService {
 
   /**
    * {@code true} iff the current principal may edit inventory item {@code itemId} directly. Strict
-   * owning-squadron check — Job-Order-Kontext handover writes are gated separately by
-   * {@code JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard.
-   * Non-existent ids return {@code false}.
+   * owning-squadron check — Job-Order-Kontext handover writes are gated separately by {@code
+   * JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard. Non-existent ids
+   * return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the item.
@@ -425,11 +425,11 @@ public class OwnerScopeService {
    * Reports whether the per-squadron promotion-system feature flag is on for the caller's scope.
    *
    * <ul>
-   *   <li>Admin — always {@code true}; admins must retain access regardless of the flag so they
-   *       can re-enable a squadron that locked itself out and pick up exactly where it left off.
+   *   <li>Admin — always {@code true}; admins must retain access regardless of the flag so they can
+   *       re-enable a squadron that locked itself out and pick up exactly where it left off.
    *   <li>Caller has an effective squadron — returns the flag stored on that squadron's row.
-   *   <li>Caller has no effective squadron (unauthenticated / member without squadron) —
-   *       {@code true}, since the squadron-scope filter already returns empty lists for them.
+   *   <li>Caller has no effective squadron (unauthenticated / member without squadron) — {@code
+   *       true}, since the squadron-scope filter already returns empty lists for them.
    * </ul>
    *
    * @return {@code true} when the promotion menu may be exposed for the caller.
@@ -442,10 +442,10 @@ public class OwnerScopeService {
   }
 
   /**
-   * Throws {@link AccessDeniedException} when the per-squadron promotion-system feature flag is
-   * off for the caller's scope. Admins bypass the check (see
-   * {@link #isPromotionFeatureEnabledForCurrentScope()} for the resolution rules). Used at the top
-   * of every promotion write-service method to short-circuit the request with HTTP 403 before any
+   * Throws {@link AccessDeniedException} when the per-squadron promotion-system feature flag is off
+   * for the caller's scope. Admins bypass the check (see {@link
+   * #isPromotionFeatureEnabledForCurrentScope()} for the resolution rules). Used at the top of
+   * every promotion write-service method to short-circuit the request with HTTP 403 before any
    * mutation runs.
    *
    * @throws AccessDeniedException if a non-admin caller's home squadron has the flag disabled.

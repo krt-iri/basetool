@@ -21,11 +21,11 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * Join entity linking a {@link User} to an {@link OrgUnit} they belong to. Persisted in the
- * {@code org_unit_membership} table created by Flyway migration V95.
+ * Join entity linking a {@link User} to an {@link OrgUnit} they belong to. Persisted in the {@code
+ * org_unit_membership} table created by Flyway migration V95.
  *
- * <p>Why a dedicated entity rather than a plain {@code @ManyToMany} on {@link User}: the
- * membership carries its own per-link state (the role flags {@code is_logistician}, {@code
+ * <p>Why a dedicated entity rather than a plain {@code @ManyToMany} on {@link User}: the membership
+ * carries its own per-link state (the role flags {@code is_logistician}, {@code
  * is_mission_manager}, {@code is_lead}, plus the {@code joined_at} timestamp and an optimistic-
  * lock {@code @Version} counter) that a pure join table cannot express. Once R2.b switches the
  * scoped-role authorisation onto these flags, the membership row becomes the source of truth for
@@ -33,15 +33,15 @@ import org.hibernate.annotations.UpdateTimestamp;
  *
  * <p>Composite-key pattern: the primary key is the {@code (user_id, org_unit_id)} pair, expressed
  * via the {@link OrgUnitMembershipId} embeddable. The {@code @ManyToOne user} reference uses
- * {@code @MapsId("userId")} so Hibernate derives the {@code user_id} value from the related
- * entity, sparing the service layer from having to mirror the id into the embedded key by hand.
- * The {@code org_unit_id} half of the key is intentionally NOT a JPA relation — it is a plain UUID
- * column — because the {@code org_unit} table currently holds {@code kind = 'SQUADRON'} rows that
- * have no Java subclass in the inheritance hierarchy yet (Squadron still maps to the legacy
- * {@code squadron} table during the R2.a soak window). Resolving a SQUADRON-discriminated org-unit
- * id through Hibernate's polymorphic load would raise {@code WrongClassException}; treating it as
- * an opaque UUID keeps the membership row readable regardless of which kind it references. R2.b
- * will promote this to a proper {@code @ManyToOne OrgUnit} once Squadron joins the hierarchy.
+ * {@code @MapsId("userId")} so Hibernate derives the {@code user_id} value from the related entity,
+ * sparing the service layer from having to mirror the id into the embedded key by hand. The {@code
+ * org_unit_id} half of the key is intentionally NOT a JPA relation — it is a plain UUID column —
+ * because the {@code org_unit} table currently holds {@code kind = 'SQUADRON'} rows that have no
+ * Java subclass in the inheritance hierarchy yet (Squadron still maps to the legacy {@code
+ * squadron} table during the R2.a soak window). Resolving a SQUADRON-discriminated org-unit id
+ * through Hibernate's polymorphic load would raise {@code WrongClassException}; treating it as an
+ * opaque UUID keeps the membership row readable regardless of which kind it references. R2.b will
+ * promote this to a proper {@code @ManyToOne OrgUnit} once Squadron joins the hierarchy.
  *
  * <p>The denormalised {@link #kind} column mirrors {@code org_unit.kind} so the partial unique
  * index "at most one Staffel membership per user" (V95: {@code uq_org_unit_membership_one_squadron}
@@ -49,15 +49,15 @@ import org.hibernate.annotations.UpdateTimestamp;
  * SK memberships" (V95: {@code chk_org_unit_membership_lead_only_on_special_command}) can be
  * expressed without crossing tables. The BEFORE INSERT/UPDATE trigger {@code
  * sync_org_unit_membership_kind} keeps the value aligned with the referenced {@code org_unit.kind}
- * — application code MUST NOT write to this column directly, so it is mapped as {@code
- * insertable = false, updatable = false}. Hibernate reads it back from the trigger output via the
- * RETURNING clause Spring Data emits on insert.
+ * — application code MUST NOT write to this column directly, so it is mapped as {@code insertable =
+ * false, updatable = false}. Hibernate reads it back from the trigger output via the RETURNING
+ * clause Spring Data emits on insert.
  *
- * <p>This entity does not extend {@link AbstractEntity} because it owns a composite key rather
- * than a single UUID surrogate: {@link AbstractEntity}'s {@code @Id} contract is fundamentally
+ * <p>This entity does not extend {@link AbstractEntity} because it owns a composite key rather than
+ * a single UUID surrogate: {@link AbstractEntity}'s {@code @Id} contract is fundamentally
  * single-column. The audit columns ({@link #version}, {@link #createdAt}, {@link #updatedAt}) are
- * reproduced on this class directly. The Spring Data {@code Persistable#isNew} contract is left
- * at the JPA default (Hibernate determines persisted-vs-transient by checking whether the
+ * reproduced on this class directly. The Spring Data {@code Persistable#isNew} contract is left at
+ * the JPA default (Hibernate determines persisted-vs-transient by checking whether the
  * {@code @Version} field is {@code null}).
  */
 @Entity
@@ -70,19 +70,19 @@ import org.hibernate.annotations.UpdateTimestamp;
 public class OrgUnitMembership {
 
   /**
-   * Composite primary key combining {@link OrgUnitMembershipId#getUserId()} and
-   * {@link OrgUnitMembershipId#getOrgUnitId()}. Created on insert (the service layer constructs
-   * the embeddable with both UUIDs filled in); the {@code @ManyToOne user} reference's {@code
-   * @MapsId("userId")} synchronises the {@code userId} half from the {@link User} entity, so
+   * Composite primary key combining {@link OrgUnitMembershipId#getUserId()} and {@link
+   * OrgUnitMembershipId#getOrgUnitId()}. Created on insert (the service layer constructs the
+   * embeddable with both UUIDs filled in); the {@code @ManyToOne user} reference's
+   * {@code @MapsId("userId")} synchronises the {@code userId} half from the {@link User} entity, so
    * service code only has to set {@link #user} and the {@link #id}'s {@code orgUnitId} half.
    */
   @EmbeddedId private OrgUnitMembershipId id;
 
   /**
    * The user holding this membership. {@code @MapsId("userId")} ties the {@code user_id} column to
-   * the {@link OrgUnitMembershipId#getUserId()} half of the composite key — Hibernate writes
-   * {@code user_id} from {@link User#getId()} on insert and the embedded key picks it up
-   * automatically. Lazy-fetched so listing memberships does not eagerly hydrate every user row.
+   * the {@link OrgUnitMembershipId#getUserId()} half of the composite key — Hibernate writes {@code
+   * user_id} from {@link User#getId()} on insert and the embedded key picks it up automatically.
+   * Lazy-fetched so listing memberships does not eagerly hydrate every user row.
    */
   @MapsId("userId")
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -92,11 +92,11 @@ public class OrgUnitMembership {
 
   /**
    * Denormalised discriminator of the referenced {@code org_unit} row, kept in sync by the V95
-   * {@code sync_org_unit_membership_kind} trigger. Read-only at the JPA layer ({@code
-   * insertable = false, updatable = false}) so application code cannot drift it out of sync with
-   * {@code org_unit.kind}. Stored as a string ({@link EnumType#STRING}) so the column value reads
-   * the same as the matching {@link OrgUnit#getKind()} discriminator across Flyway scripts, JPA,
-   * and the CHECK constraints.
+   * {@code sync_org_unit_membership_kind} trigger. Read-only at the JPA layer ({@code insertable =
+   * false, updatable = false}) so application code cannot drift it out of sync with {@code
+   * org_unit.kind}. Stored as a string ({@link EnumType#STRING}) so the column value reads the same
+   * as the matching {@link OrgUnit#getKind()} discriminator across Flyway scripts, JPA, and the
+   * CHECK constraints.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "kind", nullable = false, length = 32, insertable = false, updatable = false)
@@ -115,15 +115,15 @@ public class OrgUnitMembership {
   /**
    * {@code true} when the membership grants the Mission Manager role within the referenced org
    * unit. Same dual-write semantics as {@link #isLogistician}: copied from the global {@code
-   * app_user.is_mission_manager} flag at V95 backfill time, but the global flag stays the source
-   * of truth until R2.b.
+   * app_user.is_mission_manager} flag at V95 backfill time, but the global flag stays the source of
+   * truth until R2.b.
    */
   @Column(name = "is_mission_manager", nullable = false)
   private boolean isMissionManager = false;
 
   /**
-   * {@code true} when the membership grants the Spezialkommando Lead capability (managing the
-   * SK's member list without requiring global ADMIN). The V95 CHECK constraint {@code
+   * {@code true} when the membership grants the Spezialkommando Lead capability (managing the SK's
+   * member list without requiring global ADMIN). The V95 CHECK constraint {@code
    * chk_org_unit_membership_lead_only_on_special_command} forbids this flag on a Squadron
    * membership — Staffeln already use the global {@code OFFICER} / {@code ADMIN} roles for member
    * administration, so a separate per-Staffel Lead would be redundant. Always {@code false} for
@@ -144,8 +144,8 @@ public class OrgUnitMembership {
   /**
    * Optimistic-lock counter so two admins concurrently editing the same membership row (e.g. one
    * flipping {@code is_logistician}, another flipping {@code is_mission_manager}) surface a 409
-   * Conflict at flush time rather than silently losing one of the writes. Initialised to
-   * {@code 0L} by the V95 backfill; Hibernate bumps it on every UPDATE.
+   * Conflict at flush time rather than silently losing one of the writes. Initialised to {@code 0L}
+   * by the V95 backfill; Hibernate bumps it on every UPDATE.
    */
   @Version private Long version;
 

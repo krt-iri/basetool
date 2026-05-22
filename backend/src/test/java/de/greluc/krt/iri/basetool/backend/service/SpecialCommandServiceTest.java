@@ -32,10 +32,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link SpecialCommandService}. Pins the CRUD contract that the admin SK
- * UI relies on: case-insensitive uniqueness on create/update, optimistic-lock failures, soft-
- * delete + activate semantics, NotFoundException propagation, and the {@link SpecialCommand}
- * constructor's enforcement of {@code isPromotionEnabled = false}.
+ * Mockito unit tests for {@link SpecialCommandService}. Pins the CRUD contract that the admin SK UI
+ * relies on: case-insensitive uniqueness on create/update, optimistic-lock failures, soft- delete +
+ * activate semantics, NotFoundException propagation, and the {@link SpecialCommand} constructor's
+ * enforcement of {@code isPromotionEnabled = false}.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandServiceTest {
@@ -182,8 +182,7 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_duplicateName_throwsDuplicate() {
-    SpecialCommandDto dto =
-        new SpecialCommandDto(alphaId, "Existing Name", "EXN", null, true, 0L);
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Existing Name", "EXN", null, true, 0L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Existing Name", alphaId))
         .thenReturn(true);
 
@@ -201,7 +200,8 @@ class SpecialCommandServiceTest {
     SpecialCommandDto dto =
         new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, 0L /* stale */);
     alpha.setVersion(5L); // current DB version
-    when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId)).thenReturn(false);
+    when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId))
+        .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.of(alpha));
 
     assertThrows(
@@ -212,9 +212,9 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_missingId_throwsNotFound() {
-    SpecialCommandDto dto =
-        new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, 0L);
-    when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId)).thenReturn(false);
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, 0L);
+    when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId))
+        .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.empty());
 
     assertThrows(

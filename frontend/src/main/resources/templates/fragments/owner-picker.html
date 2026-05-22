@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Reusable owner-picker fragment (R5.d). Renders a `<select>` populated from a target user's
+  OrgUnit memberships. Hidden automatically when the option list has 0 or 1 entries — at most
+  one membership means there is no choice to offer, so the form falls back to the legacy
+  implicit-stamp behaviour without UI noise.
+
+  Inputs:
+    - options   : List<OrgUnitMembershipOptionDto> (orgUnitId, orgUnitName, orgUnitShorthand, kind)
+    - name      : HTML form-field name (e.g. "owningOrgUnitId", "targetOwningOrgUnitId")
+    - selected  : preselected UUID or null
+    - required  : whether the picker is mandatory (boolean)
+
+  The fragment groups options under `<optgroup>` headers when the user belongs to both kinds;
+  it collapses to a flat list when only one kind is present. No inline event handlers — keeps
+  the CSP-safe rendering invariant of the rest of the templates.
+-->
+<div th:fragment="ownerPicker(options, name, selected, required)"
+     th:if="${options != null and options.size() > 1}"
+     class="form-group owner-picker">
+    <label th:for="${name}" th:text="#{ownerPicker.label}">Zuordnen zu</label>
+    <select th:id="${name}" th:name="${name}" th:required="${required}">
+        <option value="" th:text="#{ownerPicker.placeholder}">-- Bitte wählen --</option>
+        <!--
+          When the user has BOTH kinds, render two <optgroup>s. We detect both-kinds by counting
+          the discriminator values present in the options list.
+        -->
+        <th:block th:with="hasStaffel=${options.stream().anyMatch(o -> o.kind() == 'SQUADRON')},
+                            hasSpecialCommand=${options.stream().anyMatch(o -> o.kind() == 'SPECIAL_COMMAND')}">
+            <th:block th:if="${hasStaffel and hasSpecialCommand}">
+                <optgroup th:label="#{ownerPicker.staffel}">
+                    <option th:each="o : ${options}"
+                            th:if="${o.kind() == 'SQUADRON'}"
+                            th:value="${o.orgUnitId()}"
+                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:text="${o.orgUnitName()}">Staffel</option>
+                </optgroup>
+                <optgroup th:label="#{ownerPicker.specialCommand}">
+                    <option th:each="o : ${options}"
+                            th:if="${o.kind() == 'SPECIAL_COMMAND'}"
+                            th:value="${o.orgUnitId()}"
+                            th:selected="${selected != null and selected == o.orgUnitId()}"
+                            th:text="${o.orgUnitName()}">Spezialkommando</option>
+                </optgroup>
+            </th:block>
+            <th:block th:unless="${hasStaffel and hasSpecialCommand}">
+                <option th:each="o : ${options}"
+                        th:value="${o.orgUnitId()}"
+                        th:selected="${selected != null and selected == o.orgUnitId()}"
+                        th:text="${o.orgUnitName()}">Org Unit</option>
+            </th:block>
+        </th:block>
+    </select>
+</div>
+</body>
+</html>

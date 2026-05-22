@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.form.MembershipFlagsForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
@@ -35,10 +36,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Spring MVC controller for the admin Spezialkommando-management page ({@code
- * /admin/special-commands}). Mirrors the Squadron section of {@link
- * AdminMissionDataPageController} field-for-field: list + create + update + soft-delete +
- * re-activate, with the same BindingResult-inline-rerender / 409-distinct-toast / generic-error-
- * redirect pattern.
+ * /admin/special-commands}). Mirrors the Squadron section of {@link AdminMissionDataPageController}
+ * field-for-field: list + create + update + soft-delete + re-activate, with the same
+ * BindingResult-inline-rerender / 409-distinct-toast / generic-error- redirect pattern.
  *
  * <p>SK-specific differences from Squadron:
  *
@@ -64,9 +64,9 @@ public class AdminSpecialCommandsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the SK overview list. Re-seeds an empty form when the model does not already carry
-   * one (which would be the case after a validation re-render). {@code includeInactive=true}
-   * surfaces soft-deleted SKs so the admin can reactivate them.
+   * Renders the SK overview list. Re-seeds an empty form when the model does not already carry one
+   * (which would be the case after a validation re-render). {@code includeInactive=true} surfaces
+   * soft-deleted SKs so the admin can reactivate them.
    *
    * @param includeInactive show soft-deleted SKs.
    * @param model Thymeleaf model populated with the SK list, the form and the toggle.
@@ -93,8 +93,8 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Fetches the SK catalog from the backend and transforms the raw payload into a sorted list of
-   * {@link SpecialCommandDto} records. Mirrors {@link
-   * AdminMissionDataPageController}'s {@code fetchSquadrons} parsing path.
+   * {@link SpecialCommandDto} records. Mirrors {@link AdminMissionDataPageController}'s {@code
+   * fetchSquadrons} parsing path.
    *
    * @param includeInactive forward to the backend's {@code includeInactive} query param.
    * @return list of SKs sorted case-insensitively by name; never {@code null}.
@@ -126,8 +126,8 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Creates a new Spezialkommando. Validation failure re-renders the list inline with the create
-   * modal re-opened; a 409 from the backend's duplicate-name check surfaces as the dedicated
-   * toast; all other failures redirect with an error query param.
+   * modal re-opened; a 409 from the backend's duplicate-name check surfaces as the dedicated toast;
+   * all other failures redirect with an error query param.
    *
    * @param form SK form payload.
    * @param bindingResult validation errors carrier.
@@ -168,8 +168,7 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Updates an existing Spezialkommando. Distinguishes optimistic-locking conflict ({@code
-   * concurrency-conflict} problem type) from a duplicate-name 409 so the user gets the right
-   * toast.
+   * concurrency-conflict} problem type) from a duplicate-name 409 so the user gets the right toast.
    *
    * @param id SK id.
    * @param form SK form (carries the version).
@@ -216,8 +215,8 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Soft-deletes a Spezialkommando (flips {@code active = false}). A 409 from the backend (would
-   * indicate a future referential-integrity guard once aggregates can be owned by SKs) surfaces
-   * as the dedicated "in use" toast.
+   * indicate a future referential-integrity guard once aggregates can be owned by SKs) surfaces as
+   * the dedicated "in use" toast.
    *
    * @param id SK id.
    * @param redirectAttributes flash-attribute carrier.
@@ -272,8 +271,8 @@ public class AdminSpecialCommandsPageController {
   /**
    * Renders the per-SK detail page with the member roster. Loads the SK + its members in two
    * sequential backend calls (the roster is small and serial latency is dominated by render time,
-   * not by the round-trips). The add-member modal preloads the user-lookup list so the picker
-   * has a starting set without an AJAX fetch.
+   * not by the round-trips). The add-member modal preloads the user-lookup list so the picker has a
+   * starting set without an AJAX fetch.
    *
    * @param id Spezialkommando id.
    * @param model Thymeleaf model populated with the SK, the member roster + every known user for
@@ -298,8 +297,8 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Adds a user to the Spezialkommando. ADMIN-only at the class level. A 409 indicates the user
-   * is already a member; surfaces as the dedicated toast.
+   * Adds a user to the Spezialkommando. ADMIN-only at the class level. A 409 indicates the user is
+   * already a member; surfaces as the dedicated toast.
    *
    * @param id Spezialkommando id.
    * @param userId user to add.
@@ -353,15 +352,21 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Flips the per-membership Logistician + Mission Manager flags. The form posts the new state of
-   * both checkboxes plus the current version for optimistic-lock detection. Either flag may be
-   * {@code null} (checkbox not in the form), which the backend interprets as "no change".
+   * Flips the per-membership Logistician + Mission Manager flags. Bound via {@code @ModelAttribute}
+   * on a {@link MembershipFlagsForm} so Spring's data binder honours the {@code _<field>} hidden
+   * marker that the form template emits before each checkbox: an unchecked box surfaces as {@code
+   * false} instead of being missing from the payload, which is what the {@code @RequestParam
+   * Boolean} signature used to do — and which silently broke the demote-via-uncheck path because
+   * the backend interpreted the missing field as "no change".
+   *
+   * <p>Both flag values are forwarded as concrete {@code true} / {@code false} to the backend. The
+   * backend DTO still accepts boxed Booleans with null-means-no-change semantics for direct API
+   * callers, but the admin UI never partial-updates — every form submission carries both
+   * checkboxes, so the explicit value is the right signal.
    *
    * @param id Spezialkommando id.
    * @param userId user whose flags to patch.
-   * @param isLogistician new Logistician state; {@code null} means "no change".
-   * @param isMissionManager new Mission Manager state; {@code null} means "no change".
-   * @param version current optimistic-lock version held by the form.
+   * @param form bound form carrying both flag values and the optimistic-lock version.
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands/{id}}.
    */
@@ -369,15 +374,13 @@ public class AdminSpecialCommandsPageController {
   public String patchMemberFlags(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
-      @RequestParam(required = false) Boolean isLogistician,
-      @RequestParam(required = false) Boolean isMissionManager,
-      @RequestParam @NotNull Long version,
+      @ModelAttribute MembershipFlagsForm form,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
-      body.put("isLogistician", isLogistician);
-      body.put("isMissionManager", isMissionManager);
-      body.put("version", version);
+      body.put("isLogistician", form.isLogistician());
+      body.put("isMissionManager", form.isMissionManager());
+      body.put("version", form.version());
       backendApiClient.patch(
           "/api/v1/special-commands/" + id + "/members/" + userId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -487,8 +490,7 @@ public class AdminSpecialCommandsPageController {
   private List<UserReferenceDto> fetchUserLookup() {
     List<Map<String, Object>> raw =
         backendApiClient.get(
-            "/api/v1/users/lookup",
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            "/api/v1/users/lookup", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
     if (raw == null) {
       return List.of();
     }
@@ -571,10 +573,10 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Parses an ISO-8601 instant (or one of the alternative forms Jackson emits — long epoch
-   * millis as a fallback) into {@link Instant}. The membership wire shape carries
-   * {@code joinedAt} as ISO-8601; the conservative branching makes the helper resilient to a
-   * future format change without crashing the detail page.
+   * Parses an ISO-8601 instant (or one of the alternative forms Jackson emits — long epoch millis
+   * as a fallback) into {@link Instant}. The membership wire shape carries {@code joinedAt} as
+   * ISO-8601; the conservative branching makes the helper resilient to a future format change
+   * without crashing the detail page.
    */
   private static Instant parseInstant(Object o) {
     if (o == null) {

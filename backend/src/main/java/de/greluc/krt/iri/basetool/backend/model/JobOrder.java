@@ -60,19 +60,19 @@ public class JobOrder extends AbstractEntity<UUID> {
   /**
    * Org-unit author of this order — the R4 dual-write mirror of {@link #creatingSquadron}. Pointed
    * at the {@code creating_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4
-   * soak window.
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
+   * window.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "creating_org_unit_id")
   private OrgUnit creatingOrgUnit;
 
   /**
-   * Squadron the order is being executed for. Legacy field — may differ from
-   * {@link #creatingSquadron} when one squadron creates orders on behalf of another. Editable by
-   * any Logistician+ regardless of their own squadron. Kept authoritative during the R4
-   * dual-write soak; the plan-aligned {@link #requestingOrgUnit} mirror field is kept in sync by
-   * {@link #syncOwnerFields()}. Informational only, not access-controlling.
+   * Squadron the order is being executed for. Legacy field — may differ from {@link
+   * #creatingSquadron} when one squadron creates orders on behalf of another. Editable by any
+   * Logistician+ regardless of their own squadron. Kept authoritative during the R4 dual-write
+   * soak; the plan-aligned {@link #requestingOrgUnit} mirror field is kept in sync by {@link
+   * #syncOwnerFields()}. Informational only, not access-controlling.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_squadron_id", nullable = false)
@@ -80,9 +80,9 @@ public class JobOrder extends AbstractEntity<UUID> {
 
   /**
    * Org-unit recipient of this order — the R4 dual-write mirror of {@link #requestingSquadron}.
-   * Pointed at the {@code requesting_org_unit_id} FK column that Flyway migration V96 added in
-   * R1, kept synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for
-   * the R4 soak window.
+   * Pointed at the {@code requesting_org_unit_id} FK column that Flyway migration V96 added in R1,
+   * kept synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4
+   * soak window.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id")
@@ -128,12 +128,12 @@ public class JobOrder extends AbstractEntity<UUID> {
   }
 
   /**
-   * Lifecycle hook that keeps the two legacy squadron fields aligned with their R4 mirrors on
-   * every INSERT / UPDATE / SELECT path. The legacy fields {@link #creatingSquadron} and
-   * {@link #requestingSquadron} are authoritative during the R4 soak — they win when both halves
-   * of a pair are set on the in-memory entity. The reverse copy runs only when the legacy field
-   * is {@code null} and the org-unit reference happens to point at a Squadron, which covers the
-   * future case where an R5 caller writes only the new field on a Squadron-owned order.
+   * Lifecycle hook that keeps the two legacy squadron fields aligned with their R4 mirrors on every
+   * INSERT / UPDATE / SELECT path. The legacy fields {@link #creatingSquadron} and {@link
+   * #requestingSquadron} are authoritative during the R4 soak — they win when both halves of a pair
+   * are set on the in-memory entity. The reverse copy runs only when the legacy field is {@code
+   * null} and the org-unit reference happens to point at a Squadron, which covers the future case
+   * where an R5 caller writes only the new field on a Squadron-owned order.
    */
   @PrePersist
   @PreUpdate

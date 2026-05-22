@@ -6,8 +6,8 @@ import lombok.ToString;
 
 /**
  * Spezialkommando tenant — a cross-cutting organisational unit that a user may join in addition to
- * (or instead of) their Squadron. Concrete {@link OrgUnit} subclass discriminated by {@code
- * kind = 'SPECIAL_COMMAND'} on the {@code org_unit} table.
+ * (or instead of) their Squadron. Concrete {@link OrgUnit} subclass discriminated by {@code kind =
+ * 'SPECIAL_COMMAND'} on the {@code org_unit} table.
  *
  * <p>Why this exists: the original tenant model allowed only one Staffel per user. The
  * Spezialkommando R2.a slice (see {@code SPEZIALKOMMANDO_PLAN.md} §3) introduces a second tenant
@@ -25,10 +25,9 @@ import lombok.ToString;
  * Postgres to reject the row with a constraint violation at flush time.
  *
  * <p>The entity intentionally adds no fields beyond what {@link OrgUnit} already carries; the
- * subclass exists for type-safe references (e.g. {@code CreateSpecialCommandRequest},
- * {@code SpecialCommandRepository}) and for Hibernate's discriminator dispatch on read. Subclass-
- * specific columns can be added later via a joined-strategy migration without breaking the current
- * shape.
+ * subclass exists for type-safe references (e.g. {@code CreateSpecialCommandRequest}, {@code
+ * SpecialCommandRepository}) and for Hibernate's discriminator dispatch on read. Subclass- specific
+ * columns can be added later via a joined-strategy migration without breaking the current shape.
  */
 @Entity
 @DiscriminatorValue("SPECIAL_COMMAND")
@@ -39,9 +38,9 @@ public class SpecialCommand extends OrgUnit {
    * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}
    * flag to {@code false} before Hibernate has a chance to flush the row — the {@link OrgUnit}
    * default of {@code true} would otherwise round-trip through the V94 CHECK constraint as a
-   * violation. The bypass through {@link #setPromotionEnabled} avoids the override's
-   * {@link IllegalArgumentException} guard (which only blocks {@code true} values) and writes
-   * directly via the inherited Lombok setter.
+   * violation. The bypass through {@link #setPromotionEnabled} avoids the override's {@link
+   * IllegalArgumentException} guard (which only blocks {@code true} values) and writes directly via
+   * the inherited Lombok setter.
    */
   public SpecialCommand() {
     super.setPromotionEnabled(false);
@@ -77,11 +76,11 @@ public class SpecialCommand extends OrgUnit {
 
   /**
    * Refuses to set {@link OrgUnit#isPromotionEnabled} to anything other than {@code false}.
-   * Application code that ports the existing {@code setPromotionEnabled(true)} path from the
-   * {@code SquadronService} flow onto a {@link SpecialCommand} instance is buggy; this guard
-   * surfaces the bug as an {@link IllegalArgumentException} at the call site rather than waiting
-   * for the V94 CHECK constraint to reject the UPDATE at flush time (which would be a much harder
-   * stack trace to read).
+   * Application code that ports the existing {@code setPromotionEnabled(true)} path from the {@code
+   * SquadronService} flow onto a {@link SpecialCommand} instance is buggy; this guard surfaces the
+   * bug as an {@link IllegalArgumentException} at the call site rather than waiting for the V94
+   * CHECK constraint to reject the UPDATE at flush time (which would be a much harder stack trace
+   * to read).
    *
    * @param value the requested flag value; must be {@code false}.
    * @throws IllegalArgumentException when {@code value} is {@code true} — Spezialkommandos must

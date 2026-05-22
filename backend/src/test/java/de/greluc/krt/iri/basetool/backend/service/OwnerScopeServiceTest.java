@@ -397,8 +397,8 @@ class OwnerScopeServiceTest {
   /**
    * Verifies the request-scoped memoisation on {@link OwnerScopeService#currentSquadronId()} and
    * {@link OwnerScopeService#currentSquadron()}. Without this, every controller call chain on a
-   * non-admin request would re-hit {@code userRepository.findById} and
-   * {@code squadronRepository.findById} once per scope query.
+   * non-admin request would re-hit {@code userRepository.findById} and {@code
+   * squadronRepository.findById} once per scope query.
    */
   @Nested
   class RequestScopedCacheTests {

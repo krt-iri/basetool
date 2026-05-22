@@ -17,10 +17,14 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.MembershipLeadToggleRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +49,8 @@ class OrgUnitMembershipServiceTest {
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private SpecialCommandService specialCommandService;
   @Mock private UserRepository userRepository;
+  @Mock private SquadronRepository squadronRepository;
+  @Mock private SpecialCommandRepository specialCommandRepository;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -120,8 +126,7 @@ class OrgUnitMembershipServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(true);
 
-    assertThrows(
-        DuplicateEntityException.class, () -> membershipService.addMember(scId, userId));
+    assertThrows(DuplicateEntityException.class, () -> membershipService.addMember(scId, userId));
     verify(membershipRepository, never()).save(any());
   }
 
@@ -268,5 +273,104 @@ class OrgUnitMembershipServiceTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> membershipService.toggleLead(scId, userId, request));
+  }
+
+  // --- listOptionsForUser ---------------------------------------------------
+
+  @Test
+  void listOptionsForUser_noMemberships_returnsEmptyListWithoutOrgUnitLookup() {
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+
+    List<OrgUnitMembershipOptionDto> options = membershipService.listOptionsForUser(userId);
+
+    assertTrue(options.isEmpty(), "no memberships → empty option list");
+    verify(squadronRepository, never()).findById(any());
+    verify(specialCommandRepository, never()).findById(any());
+  }
+
+  @Test
+  void listOptionsForUser_singleStaffel_returnsOneOption() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership row = new OrgUnitMembership();
+    row.setId(new OrgUnitMembershipId(userId, squadronId));
+    row.setKind(OrgUnitKind.SQUADRON);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
+    Squadron staffel = new Squadron();
+    staffel.setId(squadronId);
+    staffel.setName("IRIDIUM");
+    staffel.setShorthand("IRI");
+    when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(staffel));
+
+    List<OrgUnitMembershipOptionDto> options = membershipService.listOptionsForUser(userId);
+
+    assertEquals(1, options.size());
+    OrgUnitMembershipOptionDto only = options.getFirst();
+    assertEquals(squadronId, only.orgUnitId());
+    assertEquals("IRIDIUM", only.orgUnitName());
+    assertEquals("IRI", only.orgUnitShorthand());
+    assertEquals(OrgUnitKind.SQUADRON, only.kind());
+  }
+
+  @Test
+  void listOptionsForUser_mixedKinds_sortsStaffelFirstThenSkAlphabetical() {
+    UUID staffelId = UUID.randomUUID();
+    UUID skBravoId = UUID.randomUUID();
+    UUID skAlphaId = UUID.randomUUID();
+
+    OrgUnitMembership rowSkBravo = new OrgUnitMembership();
+    rowSkBravo.setId(new OrgUnitMembershipId(userId, skBravoId));
+    rowSkBravo.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    OrgUnitMembership rowStaffel = new OrgUnitMembership();
+    rowStaffel.setId(new OrgUnitMembershipId(userId, staffelId));
+    rowStaffel.setKind(OrgUnitKind.SQUADRON);
+    OrgUnitMembership rowSkAlpha = new OrgUnitMembership();
+    rowSkAlpha.setId(new OrgUnitMembershipId(userId, skAlphaId));
+    rowSkAlpha.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    when(membershipRepository.findAllByIdUserId(userId))
+        .thenReturn(List.of(rowSkBravo, rowStaffel, rowSkAlpha));
+
+    Squadron staffel = new Squadron();
+    staffel.setId(staffelId);
+    staffel.setName("IRIDIUM");
+    staffel.setShorthand("IRI");
+    when(squadronRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
+
+    SpecialCommand skBravo = new SpecialCommand();
+    skBravo.setId(skBravoId);
+    skBravo.setName("Bravo");
+    skBravo.setShorthand("BRV");
+    when(specialCommandRepository.findById(skBravoId)).thenReturn(Optional.of(skBravo));
+
+    SpecialCommand skAlpha = new SpecialCommand();
+    skAlpha.setId(skAlphaId);
+    skAlpha.setName("Alpha");
+    skAlpha.setShorthand("ALF");
+    when(specialCommandRepository.findById(skAlphaId)).thenReturn(Optional.of(skAlpha));
+
+    List<OrgUnitMembershipOptionDto> options = membershipService.listOptionsForUser(userId);
+
+    assertEquals(3, options.size());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(0).kind());
+    assertEquals("IRIDIUM", options.get(0).orgUnitName());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(1).kind());
+    assertEquals("Alpha", options.get(1).orgUnitName());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(2).kind());
+    assertEquals("Bravo", options.get(2).orgUnitName());
+  }
+
+  @Test
+  void listOptionsForUser_orphanedRow_silentlyDropsTheMembership() {
+    UUID orgUnitId = UUID.randomUUID();
+    OrgUnitMembership row = new OrgUnitMembership();
+    row.setId(new OrgUnitMembershipId(userId, orgUnitId));
+    row.setKind(OrgUnitKind.SQUADRON);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
+    when(squadronRepository.findById(orgUnitId)).thenReturn(Optional.empty());
+
+    List<OrgUnitMembershipOptionDto> options = membershipService.listOptionsForUser(userId);
+
+    assertTrue(
+        options.isEmpty(),
+        "membership row pointing at a deleted Squadron must not crash the picker");
   }
 }

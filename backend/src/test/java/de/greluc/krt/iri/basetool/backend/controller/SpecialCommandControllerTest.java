@@ -33,9 +33,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Pure-method unit tests for {@link SpecialCommandController}. Mirrors the {@link
- * SquadronControllerTest} contract — verifies the controller's delegation, pagination wrapping,
- * and the includeInactive admin gate. Spring-MVC binding ({@code @PreAuthorize}, JSON) is covered
- * by integration tests elsewhere.
+ * SquadronControllerTest} contract — verifies the controller's delegation, pagination wrapping, and
+ * the includeInactive admin gate. Spring-MVC binding ({@code @PreAuthorize}, JSON) is covered by
+ * integration tests elsewhere.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandControllerTest {
@@ -54,7 +54,8 @@ class SpecialCommandControllerTest {
     when(service.getAllSpecialCommands(any(Pageable.class), eq(false))).thenReturn(servicePage);
     when(mapper.toDto(entity)).thenReturn(dto);
 
-    PageResponse<SpecialCommandDto> resp = controller.getAllSpecialCommands(0, 20, null, false, null);
+    PageResponse<SpecialCommandDto> resp =
+        controller.getAllSpecialCommands(0, 20, null, false, null);
 
     assertEquals(1, resp.totalElements());
     assertEquals(1, resp.content().size());
@@ -79,9 +80,7 @@ class SpecialCommandControllerTest {
   void getAll_includeInactive_withoutAdminAuth_throwsAccessDenied() {
     Authentication memberAuth =
         new UsernamePasswordAuthenticationToken(
-            "member",
-            null,
-            java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
 
     assertThrows(
         AccessDeniedException.class,

@@ -7,7 +7,9 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
@@ -358,7 +360,54 @@ public class InventoryPageController {
     model.addAttribute("locations", fetchLocations());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("jobOrders", fetchActiveJobOrders());
+    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(form));
     return "inventory-input";
+  }
+
+  /**
+   * Resolves the {@link OrgUnitMembershipOptionDto} list that drives the R5.d owner-picker fragment
+   * on the inventory-input form. The target user is:
+   *
+   * <ul>
+   *   <li>The form's {@code userId} when the admin is creating a global entry for another user (the
+   *       picker reflects the chosen user's memberships).
+   *   <li>The calling user otherwise (a self-entry — picker reflects the caller's own memberships).
+   * </ul>
+   *
+   * <p>Falling back to an empty list when the lookup fails keeps the page renderable: the fragment
+   * collapses to a hidden state when its option list is empty, so a transient backend hiccup does
+   * not break the rest of the form.
+   *
+   * @param form the inbound inventory form (may be {@code null} on first GET before binding).
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
+    UUID targetUserId = null;
+    if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
+      targetUserId = form.getUserId();
+    } else {
+      try {
+        UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+        if (me != null && me.id() != null) {
+          targetUserId = me.id();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to fetch current user for owner-picker", e);
+      }
+    }
+    if (targetUserId == null) {
+      return List.of();
+    }
+    try {
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/" + targetUserId + "/memberships",
+              new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch memberships for owner-picker", e);
+      return List.of();
+    }
   }
 
   /**
@@ -404,7 +453,8 @@ public class InventoryPageController {
               form.getAmount(),
               form.getPersonal(),
               form.getMissionId(),
-              form.getJobOrderId());
+              form.getJobOrderId(),
+              form.getOwningOrgUnitId());
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (Exception e) {

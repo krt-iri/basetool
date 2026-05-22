@@ -20,13 +20,13 @@ import java.util.UUID;
  *     fresh UUID then), required on update-request payloads, always populated on responses.
  * @param name display name; case-insensitive unique across {@link
  *     de.greluc.krt.iri.basetool.backend.model.OrgUnitKind#SPECIAL_COMMAND} AND {@link
- *     de.greluc.krt.iri.basetool.backend.model.OrgUnitKind#SQUADRON} rows (the underlying
- *     {@code org_unit.name} UNIQUE constraint spans both kinds). Required, max 255 chars.
+ *     de.greluc.krt.iri.basetool.backend.model.OrgUnitKind#SQUADRON} rows (the underlying {@code
+ *     org_unit.name} UNIQUE constraint spans both kinds). Required, max 255 chars.
  * @param shorthand short tag used on chips / badges; case-insensitive unique across both kinds for
  *     the same reason as {@link #name}. Required, max 255 chars.
  * @param description free-form text; nullable.
- * @param active soft-delete flag; {@code true} for active rows. Populated by the server;
- *     {@code null} on requests means "no change".
+ * @param active soft-delete flag; {@code true} for active rows. Populated by the server; {@code
+ *     null} on requests means "no change".
  * @param version optimistic-lock counter; required on update so the persistence layer can detect
  *     concurrent edits, server-populated on create + read.
  */

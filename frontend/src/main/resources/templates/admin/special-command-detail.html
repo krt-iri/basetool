@@ -108,6 +108,11 @@
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="flags-form">
                                 <input type="hidden" name="version" th:value="${m.version()}">
+                                <!-- Spring _field markers: an unchecked checkbox sends nothing,
+                                     so without these the binder would skip the field entirely
+                                     and the demote-via-uncheck path would silently no-op. -->
+                                <input type="hidden" name="_isLogistician">
+                                <input type="hidden" name="_isMissionManager">
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; margin-right: 0.5rem;">
                                     <input type="checkbox" class="role-checkbox" name="isLogistician" value="true" th:checked="${m.isLogistician()}">
                                     <span th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>

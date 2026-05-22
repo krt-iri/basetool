@@ -117,11 +117,11 @@ public class MissionService {
   /**
    * Returns lightweight reference projection of active missions (id + display name + status +
    * planned start) used by typeaheads. Squadron-scoped via {@link
-   * OwnerScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's
-   * missions PLUS any non-internal mission of any squadron, mirroring {@link
-   * #searchMissions(String, Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all
-   * squadrons" mode get the unfiltered cross-staffel list. Audit finding H-4: the previous
-   * implementation leaked the names of foreign squadrons' internal missions through this dropdown.
+   * OwnerScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's missions
+   * PLUS any non-internal mission of any squadron, mirroring {@link #searchMissions(String,
+   * Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all squadrons" mode get the
+   * unfiltered cross-staffel list. Audit finding H-4: the previous implementation leaked the names
+   * of foreign squadrons' internal missions through this dropdown.
    *
    * @return lightweight reference projection of active missions visible to the caller
    */

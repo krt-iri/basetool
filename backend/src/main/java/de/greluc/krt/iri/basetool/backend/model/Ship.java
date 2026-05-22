@@ -56,10 +56,10 @@ public class Ship extends AbstractEntity<UUID> {
   private User owner;
 
   /**
-   * Squadron that owns this ship. Legacy field — kept authoritative during the R4 dual-write
-   * soak. The plan-aligned {@link #owningOrgUnit} mirror field is kept in sync by
-   * {@link #syncOwnerFields()} on every lifecycle event. A later release will drop this field
-   * along with the matching DB column.
+   * Squadron that owns this ship. Legacy field — kept authoritative during the R4 dual-write soak.
+   * The plan-aligned {@link #owningOrgUnit} mirror field is kept in sync by {@link
+   * #syncOwnerFields()} on every lifecycle event. A later release will drop this field along with
+   * the matching DB column.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id", nullable = false)
@@ -68,8 +68,8 @@ public class Ship extends AbstractEntity<UUID> {
   /**
    * Org-unit owner of this ship — the R4 dual-write mirror of {@link #owningSquadron}. Pointed at
    * the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4
-   * soak window so a missed sync does not break inserts.
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
+   * window so a missed sync does not break inserts.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
@@ -77,8 +77,8 @@ public class Ship extends AbstractEntity<UUID> {
 
   /**
    * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
-   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()}
-   * for the rule.
+   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()} for
+   * the rule.
    */
   @PrePersist
   @PreUpdate

@@ -34,4 +34,11 @@ public class InventoryForm {
   private String source;
 
   private Long version;
+
+  /**
+   * R5.d owner-picker output: the {@code OrgUnit} the new inventory row should land on. {@code
+   * null} when the target user has at most one org-unit membership (in that case the fragment stays
+   * hidden and the backend stamps the user's home Staffel via the legacy path).
+   */
+  private UUID owningOrgUnitId;
 }

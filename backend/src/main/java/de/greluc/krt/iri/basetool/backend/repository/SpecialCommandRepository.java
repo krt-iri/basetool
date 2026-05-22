@@ -16,8 +16,8 @@ import org.springframework.stereotype.Repository;
  * idioms.
  *
  * <p>Hibernate's single-table inheritance filter automatically narrows every query to {@code WHERE
- * kind = 'SPECIAL_COMMAND'} based on the {@link SpecialCommand} {@code @DiscriminatorValue}, so
- * the SQUADRON-discriminated rows that V94 copied into {@code org_unit} are invisible to this
+ * kind = 'SPECIAL_COMMAND'} based on the {@link SpecialCommand} {@code @DiscriminatorValue}, so the
+ * SQUADRON-discriminated rows that V94 copied into {@code org_unit} are invisible to this
  * repository. No explicit predicate or {@code @Query} override is needed.
  */
 @Repository
@@ -35,9 +35,9 @@ public interface SpecialCommandRepository extends JpaRepository<SpecialCommand, 
 
   /**
    * Case-insensitive existence check on the name column. Used by {@code
-   * SpecialCommandService.create} (R2.b) to surface a 409 Conflict before the SQL UNIQUE
-   * constraint trips, so the error reaches the admin UI as a structured validation error rather
-   * than a generic optimistic-lock failure.
+   * SpecialCommandService.create} (R2.b) to surface a 409 Conflict before the SQL UNIQUE constraint
+   * trips, so the error reaches the admin UI as a structured validation error rather than a generic
+   * optimistic-lock failure.
    *
    * @param name the proposed name; never {@code null}.
    * @return {@code true} iff at least one SK already carries this name (case-insensitive).
@@ -45,10 +45,9 @@ public interface SpecialCommandRepository extends JpaRepository<SpecialCommand, 
   boolean existsByNameIgnoreCase(String name);
 
   /**
-   * Case-insensitive existence check on the name column, excluding the row with the given id.
-   * Used by the rename path: the admin may keep the existing name unchanged (a no-op uniqueness
-   * collision should not block the save), but cannot rename one SK onto another existing SK's
-   * name.
+   * Case-insensitive existence check on the name column, excluding the row with the given id. Used
+   * by the rename path: the admin may keep the existing name unchanged (a no-op uniqueness
+   * collision should not block the save), but cannot rename one SK onto another existing SK's name.
    *
    * @param name the proposed name; never {@code null}.
    * @param id the id of the SK currently being renamed; never {@code null}.
@@ -66,8 +65,8 @@ public interface SpecialCommandRepository extends JpaRepository<SpecialCommand, 
 
   /**
    * Paged version of {@link #findAllByActiveTrue()} for the admin list view, which may grow large
-   * enough to warrant pagination. The {@link Pageable} carries the sort instructions (defaulting
-   * to {@code name ASC} when the controller omits a sort).
+   * enough to warrant pagination. The {@link Pageable} carries the sort instructions (defaulting to
+   * {@code name ASC} when the controller omits a sort).
    *
    * @param pageable the page request (size, offset, sort); never {@code null}.
    * @return page of active SKs in the requested order.
