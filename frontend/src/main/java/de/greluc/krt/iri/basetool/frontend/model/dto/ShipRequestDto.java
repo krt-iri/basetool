@@ -5,7 +5,15 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
 
-/** Data transfer record carrying Ship Request payload. */
+/**
+ * Frontend mirror of the backend {@code ShipRequestDto} wire shape (per the {@code
+ * feedback_backend_frontend_dto_mirror} memory: backend + frontend records must stay aligned
+ * field-for-field, or a render-time 500 surfaces in prod).
+ *
+ * <p>R5.d.f added the trailing {@code owningOrgUnitId} picker output. {@code null} preserves the
+ * legacy "stamp from {@code user.getSquadron()}" path; non-null routes through the shared resolver
+ * on the backend.
+ */
 public record ShipRequestDto(
     String name,
     @NotNull(message = "{ship.validation.shiptype.required}") UUID shipTypeId,
@@ -16,4 +24,5 @@ public record ShipRequestDto(
         String insurance,
     UUID locationId,
     boolean fitted,
-    Long version) {}
+    Long version,
+    UUID owningOrgUnitId) {}

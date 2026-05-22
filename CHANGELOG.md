@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### Added
+- **Owner-Picker im Hangar-Schiff-Add-Modal integriert (R5.d.f).** Im Add-Schiff-Modal auf `/hangar` erscheint unter der "Fitted"-Checkbox das Picker-Dropdown mit den OrgUnits, in denen der Aufrufer Mitglied ist. `ShipRequestDto` (backend + frontend Mirror) und `ShipForm` nehmen ab jetzt ein optionales `owningOrgUnitId` entgegen; `HangarService.addShip` routet die Stempelung über `OwnerScopeService.resolveSquadronForPickerOutput` statt direktem `user.getSquadron()`. Update-Pfad bleibt unverändert (existierender Stempel überlebt). SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` fällt.
+
+### Added
 - **Owner-Picker auf der Operation-Anlage integriert (R5.d.e).** Im Create-Modal auf `/operations` erscheint unter dem Status-Dropdown das Owner-Picker-Fragment mit den OrgUnits, in denen der Aufrufer Mitglied ist. `OperationCreateDto` und `OperationService.createOperation` akzeptieren ab jetzt ein optionales `owningOrgUnitId` und routen die Stempelung über `OwnerScopeService.resolveSquadronForPickerOutput`. Der historische Fallback "stempel aus aktivem Scope" bleibt für den Fall ohne authentifizierten Aufrufer (admin in "alle Staffeln"-Modus, anonymer Form-Submit) erhalten. SK-Selektionen werden weiterhin mit 400 abgewiesen, bis die NOT-NULL-Lockerung auf `owning_squadron_id` fällt.
 
 ### Added
