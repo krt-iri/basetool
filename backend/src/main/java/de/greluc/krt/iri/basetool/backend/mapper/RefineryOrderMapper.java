@@ -63,7 +63,8 @@ public interface RefineryOrderMapper {
         base.status(),
         enriched,
         base.owningSquadron(),
-        base.version());
+        base.version(),
+        base.owningOrgUnitId());
   }
 
   /** Slim list-row DTO of a {@link RefineryOrder}; reuses the same profit computation. */

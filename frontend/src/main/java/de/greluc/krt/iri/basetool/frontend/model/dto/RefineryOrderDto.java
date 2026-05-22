@@ -5,7 +5,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Refinery Order payload. */
+/**
+ * Frontend mirror of the backend {@code RefineryOrderDto} wire shape (per the {@code
+ * feedback_backend_frontend_dto_mirror} memory: backend + frontend records must stay aligned
+ * field-for-field, or a render-time 500 surfaces in prod).
+ *
+ * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output sent to the backend on
+ * create; {@code null} preserves the legacy "owner's home Staffel" stamping path.
+ */
 public record RefineryOrderDto(
     UUID id,
     UserReferenceDto owner,
@@ -21,7 +28,8 @@ public record RefineryOrderDto(
     List<RefineryGoodDto> goods,
     RefineryOrderStatus status,
     SquadronReferenceDto owningSquadron,
-    Long version) {
+    Long version,
+    UUID owningOrgUnitId) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */

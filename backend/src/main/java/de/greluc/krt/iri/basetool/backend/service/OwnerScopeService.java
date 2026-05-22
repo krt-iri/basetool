@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
@@ -7,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
@@ -98,6 +100,7 @@ public class OwnerScopeService {
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationRepository operationRepository;
   private final ShipRepository shipRepository;
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final HttpServletRequest request;
 
   /**
@@ -174,6 +177,55 @@ public class OwnerScopeService {
     // currently be the active context. R2.d will replace this with a polymorphic OrgUnitRepository
     // lookup once Squadron + SpecialCommand are both selectable in the admin switcher.
     return currentSquadron().map(s -> (OrgUnit) s);
+  }
+
+  /**
+   * Resolves the {@link Squadron} that a newly-created aggregate should be stamped on, honouring an
+   * optional R5.d owner-picker output. Centralises the validation that every aggregate-stamping
+   * service path (inventory create, refinery-order create, mission create, …) would otherwise have
+   * to duplicate.
+   *
+   * <p>Three cases:
+   *
+   * <ol>
+   *   <li>{@code owningOrgUnitId == null} — picker not used; falls back to the target user's home
+   *       Staffel via {@link User#getSquadron()}. Preserves today's stamping behaviour for the
+   *       single-membership case that covers 100 % of users at the time of R5.d.b.
+   *   <li>{@code owningOrgUnitId} references an OrgUnit the target user is a member of AND that org
+   *       unit resolves to a {@link Squadron} — picker output honoured; the picked Staffel is
+   *       returned and the lifecycle hook on the aggregate (see {@code syncOwnerFields()} on each
+   *       aggregate, R4) mirrors it into the new {@code owningOrgUnit} mirror column.
+   *   <li>{@code owningOrgUnitId} references an OrgUnit the target user is NOT a member of, or the
+   *       resolved row is a {@link de.greluc.krt.iri.basetool.backend.model.SpecialCommand} —
+   *       rejected with {@link BadRequestException}. The SK rejection is a soft block: the {@code
+   *       owning_squadron_id} column is still NOT NULL on every aggregate table, so an SK-owned row
+   *       cannot be persisted today even if the picker offered one. The destructive cleanup release
+   *       lowers the constraint; until then the soft block keeps the picker contract honest.
+   * </ol>
+   *
+   * @param targetUser the user the new aggregate belongs to (e.g. the inventory item's owner, the
+   *     refinery order's owner); never {@code null}.
+   * @param owningOrgUnitId the picker output from the form, or {@code null} when the picker was not
+   *     used.
+   * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
+   * @throws BadRequestException when the picker output references an org unit the target user does
+   *     not belong to, or a Spezialkommando.
+   */
+  public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+    if (owningOrgUnitId == null) {
+      return targetUser.getSquadron();
+    }
+    if (!orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(
+        targetUser.getId(), owningOrgUnitId)) {
+      throw new BadRequestException(
+          "Selected owner org unit is not a membership of the target user");
+    }
+    return squadronRepository
+        .findById(owningOrgUnitId)
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "Spezialkommando ownership of this aggregate is not yet supported"));
   }
 
   /**

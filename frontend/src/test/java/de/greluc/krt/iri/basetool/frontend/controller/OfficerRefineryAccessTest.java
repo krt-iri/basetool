@@ -179,7 +179,8 @@ class OfficerRefineryAccessTest {
             Collections.emptyList(),
             RefineryOrderStatus.OPEN,
             null,
-            1L);
+            1L,
+            null);
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(orderDto);
 

@@ -87,6 +87,7 @@ class RefineryOrderServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private RefineryYieldRepository refineryYieldRepository;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private RefineryOrderService refineryOrderService;
 
@@ -966,6 +967,50 @@ class RefineryOrderServiceTest {
       Map<UUID, Integer> result = refineryOrderService.getYieldBonusByMaterialForLocation(loc);
 
       assertTrue(result.isEmpty());
+    }
+  }
+
+  // --- R5.d.b createRefineryOrder picker delegation -------------------------
+  // The membership-validation + Squadron-resolution logic itself is pinned by
+  // OwnerScopeServiceTest. These tests verify that createRefineryOrder routes the picker output
+  // through the shared resolver instead of stamping the order owner's home Staffel directly.
+
+  @Nested
+  class CreateOrderPickerDelegationTests {
+
+    @Test
+    void createRefineryOrder_delegatesPickerResolutionToOwnerScopeService() {
+      UUID userId = UUID.randomUUID();
+      UUID pickedOrgUnitId = UUID.randomUUID();
+
+      User user = new User();
+      user.setId(userId);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      de.greluc.krt.iri.basetool.backend.model.Squadron resolved =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      resolved.setId(pickedOrgUnitId);
+      when(ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+          .thenReturn(resolved);
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      SpaceStation station = new SpaceStation();
+      station.setHasRefinery(true);
+      loc.setSpaceStation(station);
+      RefineryOrder transientOrder = new RefineryOrder();
+      transientOrder.setLocation(loc);
+      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
+      when(refineryOrderRepository.save(any(RefineryOrder.class)))
+          .thenAnswer(i -> i.getArgument(0));
+
+      RefineryOrder saved =
+          refineryOrderService.createRefineryOrder(userId, transientOrder, pickedOrgUnitId);
+
+      assertSame(
+          resolved,
+          saved.getOwningSquadron(),
+          "the picker output must be honoured verbatim, not user.getSquadron()");
     }
   }
 }

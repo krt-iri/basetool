@@ -65,7 +65,8 @@ class OfficerRefineryButtonsTest {
             java.util.Collections.emptyList(),
             de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
             null,
-            1L);
+            1L,
+            null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);

@@ -65,7 +65,8 @@ class RefineryOrderHierarchyVisibilityTest {
             List.of(),
             RefineryOrderStatus.OPEN,
             null,
-            1L);
+            1L,
+            null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
@@ -128,7 +129,8 @@ class RefineryOrderHierarchyVisibilityTest {
             List.of(),
             RefineryOrderStatus.COMPLETED,
             null,
-            1L);
+            1L,
+            null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
@@ -200,7 +202,8 @@ class RefineryOrderHierarchyVisibilityTest {
             List.of(),
             RefineryOrderStatus.CANCELED,
             null,
-            1L);
+            1L,
+            null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);

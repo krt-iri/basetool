@@ -220,13 +220,13 @@ class RefineryOrderControllerTest {
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
       RefineryOrder mapped = new RefineryOrder();
       when(mapper.toEntity(incoming)).thenReturn(mapped);
-      when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), eq(mapped));
+      verify(service).createRefineryOrder(userIdCaptor.capture(), eq(mapped), any());
       assertEquals(
           OTHER_USER_ID,
           userIdCaptor.getValue(),
@@ -241,13 +241,13 @@ class RefineryOrderControllerTest {
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID); // spoof attempt
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), any());
+      verify(service).createRefineryOrder(userIdCaptor.capture(), any(), any());
       assertEquals(
           CALLER_ID,
           userIdCaptor.getValue(),
@@ -261,13 +261,13 @@ class RefineryOrderControllerTest {
       // when there's no owner to substitute.)
       RefineryOrderDto incoming = dtoWithOwner(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createMyRefineryOrder(jwt, incoming);
 
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), any());
+      verify(service).createRefineryOrder(userIdCaptor.capture(), any(), any());
       assertEquals(CALLER_ID, userIdCaptor.getValue());
     }
   }
@@ -334,12 +334,12 @@ class RefineryOrderControllerTest {
     void createUserRefineryOrder_admin_alwaysAttributesToPathUserId() {
       RefineryOrderDto incoming = dtoWithOwner(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any())).thenReturn(new RefineryOrder());
+      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(incoming);
 
       controller.createUserRefineryOrder(OTHER_USER_ID, incoming);
 
-      verify(service).createRefineryOrder(eq(OTHER_USER_ID), any());
+      verify(service).createRefineryOrder(eq(OTHER_USER_ID), any(), any());
     }
 
     @Test
@@ -430,6 +430,7 @@ class RefineryOrderControllerTest {
         "OPEN",
         java.util.List.of(),
         null,
-        1L);
+        1L,
+        null); // owningOrgUnitId (R5.d picker output) — not exercised by these tests
   }
 }

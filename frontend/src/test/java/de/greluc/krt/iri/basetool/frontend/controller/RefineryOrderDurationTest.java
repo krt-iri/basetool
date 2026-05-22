@@ -100,7 +100,8 @@ class RefineryOrderDurationTest {
             Collections.emptyList(),
             null,
             null,
-            1L);
+            1L,
+            null);
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
 
@@ -172,7 +173,8 @@ class RefineryOrderDurationTest {
             Collections.emptyList(),
             null,
             null,
-            1L);
+            1L,
+            null);
 
     java.time.Instant expectedEnd = startedAt.plus(125, java.time.temporal.ChronoUnit.MINUTES);
     assertEquals(expectedEnd, order.getEndsAt());

@@ -29389,6 +29389,10 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "goods", "location" ]
