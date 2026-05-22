@@ -2,13 +2,39 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a (SK CRUD API), and R5.b (SK membership-management endpoints under `/api/v1/special-commands/{id}/members`: OrgUnitMembershipService + SpecialCommandSecurityService + SpecialCommandMembershipController + DTOs + mapper + 32 unit tests) implemented. Releases R5.c (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), Squadron-side membership migration (move `app_user.is_logistician` / `is_mission_manager` to the membership row), and a destructive cleanup release (NOT NULL tightening + V98+ drop migrations + entity-field removal) pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, and R5.c (admin SK list page at `/admin/special-commands` with full lifecycle CRUD: AdminSpecialCommandsPageController + Thymeleaf template + sidebar nav link + 16 new i18n keys in DE/EN) implemented. Releases R5.c.b (per-SK detail page with member roster + add/remove/flag-toggle modals), R5.d (owner-picker fragment integrated into the seven create forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.c implemented (admin SK list page at /admin/special-commands)
+
+**Sections delivered:** §7.6 (admin SK page — list-level CRUD only; the per-SK detail page with the member roster defers to R5.c.b), §7.1 partial (the new i18n keys for the SK admin surface).
+
+**Changes (5 new main files, 4 modified i18n / sidebar files):**
+
+- [`SpecialCommandDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/SpecialCommandDto.java) — frontend mirror of the backend wire shape. {@code isPromotionEnabled} intentionally absent (always {@code false} on SK rows by V94 CHECK).
+- [`SpecialCommandForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/SpecialCommandForm.java) — inbound form binding with Jakarta validation (name + shorthand required, max-size annotations).
+- [`AdminSpecialCommandsPageController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/AdminSpecialCommandsPageController.java) — {@code @Controller @RequestMapping("/admin/special-commands") @PreAuthorize("hasRole('ADMIN')")}. Five endpoints: {@code GET /} (list), {@code POST /} (create), {@code POST /{id}/update}, {@code POST /{id}/delete} (soft), {@code POST /{id}/activate}. Same {@code BindingResult}-inline-rerender / 409-distinct-toast / generic-error-redirect pattern as the squadron section of {@code AdminMissionDataPageController}.
+- [`admin/special-commands.html`](frontend/src/main/resources/templates/admin/special-commands.html) — Thymeleaf list view with table (name / shorthand / description / actions), {@code includeInactive} toggle, create / edit modal that flips between modes via {@code data-*} attributes on the Edit button. CSP-safe inline JS (uses the existing {@code cspNonce} pattern) wires the modal open / close.
+- Sidebar nav link "Spezialkommandos" added in {@code fragments/sidebar.html} between the existing "Missionsdaten" and "Orte" admin entries; admin-only via {@code sec:authorize}.
+- 16 new i18n keys in {@code messages_de.properties} (umlauts correctly escaped as {@code \\uXXXX} per CLAUDE.md rule) + the matching English keys, plus error messages for duplicate-name (409) and delete-in-use (409) on SK.
+
+**Intentionally NOT in R5.c:** R5.c.b will add the per-SK detail page ({@code /admin/special-commands/{id}}) with the member roster + add/remove/role-flag-toggle modals + the Lead toggle (using the R5.b backend endpoints). R5.d adds the owner-picker fragment to the seven create forms (refinery-orders-create, inventory-input, orders-create, mission-create modal, operation-create modal, hangar-add modal, inventory-transfer modal). R5.e widens the active-context switcher to non-admin users with >1 membership and renames the relay header from {@code X-Active-Squadron-Id} to {@code X-Active-Org-Unit-Id}.
+
+**Verification:**
+
+- {@code ./gradlew :frontend:test :frontend:checkstyleMain :frontend:spotbugsMain} → **BUILD SUCCESSFUL**. Existing frontend tests continue to pass; the new controller wires through {@code BackendApiClient} without surfacing any new lint warning.
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL** (re-verified — R5.c is frontend-only and does not touch backend tests, but the smoke gate confirms no incidental regression on the chain).
+
+**Rollback plan:** revert this commit. Five new frontend files come out cleanly; the sidebar regains the missing nav link slot; the i18n keys disappear. No backend change to undo; the {@code /api/v1/special-commands} endpoints from R5.a stay functional and reachable by any external API client.
+
+**Risks mitigated in this slice:** the SK-CRUD now has an end-to-end admin path — an administrator can create / rename / soft-delete / reactivate Spezialkommandos through the UI, calling into the R5.a backend. Member management (R5.c.b) and the per-SK detail surface are the next steps.
+
+**Next session must:** start R5.c.b — introduce the per-SK detail page at {@code /admin/special-commands/{id}} that lists the membership roster (calling {@code GET /api/v1/special-commands/{id}/members} from R5.b), with modals for add member / remove member / flip role flags + the ADMIN-only Lead toggle. Will need a user-search helper to populate the add-member picker.
 
 ### 2026-05-22 — Release R5.b implemented (SK membership-management endpoints + canManageMembers gate)
 
