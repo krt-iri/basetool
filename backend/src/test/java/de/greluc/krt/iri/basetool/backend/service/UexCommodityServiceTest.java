@@ -16,8 +16,10 @@ import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +71,7 @@ class UexCommodityServiceTest {
     when(materialPriceRepository.findByMaterialIdAndTerminalId(
             savedMaterial.getId(), mockTerminal.getId()))
         .thenReturn(Optional.empty());
+    stubPriceSaveAssignsId();
 
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -326,6 +329,8 @@ class UexCommodityServiceTest {
     when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
     when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
         .thenReturn(Optional.of(existing));
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -404,6 +409,7 @@ class UexCommodityServiceTest {
             });
     when(materialPriceRepository.findByMaterialIdAndTerminalId(any(), any()))
         .thenReturn(Optional.empty());
+    stubPriceSaveAssignsId();
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -459,7 +465,96 @@ class UexCommodityServiceTest {
     verify(materialPriceRepository, times(2)).save(any());
   }
 
-  // ─── helper ─────────────────────────────────────────────────────────────
+  // ─── Stale-row cleanup (price-sync postlude) ────────────────────────────
+
+  @Test
+  void priceSync_clearsStaleRows_passingExactlyTheSeenIdsToTheRepository() {
+    // Given — one DTO that we know will be upserted successfully
+    UUID materialId = UUID.randomUUID();
+    UUID terminalId = UUID.randomUUID();
+    UUID assignedPriceId = UUID.randomUUID();
+    Material material = new Material();
+    material.setId(materialId);
+    material.setIdCommodity(1);
+    Terminal terminal = new Terminal();
+    terminal.setId(terminalId);
+    terminal.setIdTerminal(1);
+
+    UexCommodityPriceDto dto =
+        new UexCommodityPriceDto(
+            1, "Gold", 1, "T1", new BigDecimal("10"), new BigDecimal("20"), 1, 1, 1, 1, 1, 1L);
+
+    when(uexClient.getCommodities()).thenReturn(List.of());
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(dto));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
+    when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(terminal));
+    when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
+        .thenReturn(Optional.empty());
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(
+            invocation -> {
+              MaterialPrice mp = invocation.getArgument(0);
+              mp.setId(assignedPriceId);
+              return mp;
+            });
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — the cleanup must run with exactly the set of ids we just upserted, so any
+    // pre-existing (material, terminal) row that UEX dropped from this run gets its prices
+    // nulled. This is the Quantanium regression: terminals that stop listing a commodity used to
+    // keep stale priceBuy values forever.
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.forClass(Collection.class);
+    verify(materialPriceRepository).clearStalePrices(idsCap.capture());
+    assertEquals(Set.of(assignedPriceId), Set.copyOf(idsCap.getValue()));
+  }
+
+  @Test
+  void priceSync_skipsStaleCleanup_whenEveryRowFailsAndSeenSetIsEmpty() {
+    // Given — every DTO triggers an exception during upsert (here: unknown terminal, which
+    // returns null from processSingleDto, AND unknown commodity that resolveOrCreateMaterial
+    // would create — but we make terminal resolution fail to drive savedId = null without
+    // raising). The seen-id set ends up empty.
+    UexCommodityPriceDto orphan =
+        new UexCommodityPriceDto(
+            1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+    Material material = new Material();
+    material.setId(UUID.randomUUID());
+    material.setIdCommodity(1);
+
+    when(uexClient.getCommodities()).thenReturn(List.of());
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(orphan));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
+    when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — refusing to clear-everything when the sync produced nothing is the whole point:
+    // a transient burst of failures must not wipe the entire price matrix.
+    verify(materialPriceRepository, never()).clearStalePrices(any());
+  }
+
+  // ─── helpers ────────────────────────────────────────────────────────────
+
+  /**
+   * Stubs {@link MaterialPriceRepository#save} so it assigns a fresh UUID to any transient {@link
+   * MaterialPrice}. The service now reads {@code save(...).getId()} to feed the stale-row sweep, so
+   * tests that exercise the price upsert path need a non-null saved entity.
+   */
+  private void stubPriceSaveAssignsId() {
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(
+            invocation -> {
+              MaterialPrice mp = invocation.getArgument(0);
+              if (mp.getId() == null) {
+                mp.setId(UUID.randomUUID());
+              }
+              return mp;
+            });
+  }
 
   private static UexCommodityDto commodity(
       Integer id, String name, Integer isRefined, Integer isRefinable) {
