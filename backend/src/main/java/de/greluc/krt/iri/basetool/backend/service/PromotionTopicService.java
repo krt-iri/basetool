@@ -45,7 +45,7 @@ public class PromotionTopicService {
 
   private final PromotionTopicRepository repository;
   private final PromotionTopicMapper mapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns a paginated slice of every {@link PromotionTopicResponse} visible to the caller. The
@@ -58,10 +58,10 @@ public class PromotionTopicService {
    * @return a page of promotion topics
    */
   public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
 
@@ -73,10 +73,10 @@ public class PromotionTopicService {
    * @return visible topics in display order
    */
   public List<PromotionTopicResponse> listAll() {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    UUID scope = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     return repository.findAllScoped(scope).stream().map(mapper::toResponse).toList();
   }
 
@@ -93,13 +93,13 @@ public class PromotionTopicService {
   public PromotionTopicResponse get(@NotNull UUID id) {
     PromotionTopic entity = load(id);
     assertCallerMayAccess(entity);
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(entity);
   }
 
   /**
    * Persists a new {@link PromotionTopic}. Auto-stamps the owning squadron from the caller's active
-   * context ({@link SquadronScopeService#currentSquadron()}) so Officers always tag their own
+   * context ({@link OwnerScopeService#currentSquadron()}) so Officers always tag their own
    * squadron and Admins must focus the switcher before creating (Admin in "all squadrons" mode is
    * rejected with HTTP 400, mirroring the JobOrder create contract).
    *
@@ -110,9 +110,9 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     Squadron squadron =
-        squadronScopeService
+        ownerScopeService
             .currentSquadron()
             .orElseThrow(
                 () ->
@@ -151,7 +151,7 @@ public class PromotionTopicService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     if (!entity.getVersion().equals(request.version())) {
@@ -174,7 +174,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     repository.delete(entity);
@@ -192,7 +192,7 @@ public class PromotionTopicService {
     if (topic.getOwningSquadron() == null) {
       return;
     }
-    if (!squadronScopeService.canSeeSquadron(topic.getOwningSquadron().getId())) {
+    if (!ownerScopeService.canSeeSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not match the topic's owning squadron");
     }
@@ -202,7 +202,7 @@ public class PromotionTopicService {
     if (topic.getOwningSquadron() == null) {
       return;
     }
-    if (!squadronScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
+    if (!ownerScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing the topic's owning squadron");
     }

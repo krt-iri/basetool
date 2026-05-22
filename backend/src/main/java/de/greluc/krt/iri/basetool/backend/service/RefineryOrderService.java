@@ -56,7 +56,7 @@ public class RefineryOrderService {
   private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
   private final RefineryYieldRepository refineryYieldRepository;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Owner-scoped paged list with optional status filter.
@@ -120,7 +120,7 @@ public class RefineryOrderService {
   public Page<RefineryOrder> getAllRefineryOrders(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       @NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     if (statuses != null && !statuses.isEmpty()) {
       return refineryOrderRepository.findByStatusInScoped(statuses, owningSquadronId, pageable);
     }
@@ -134,7 +134,7 @@ public class RefineryOrderService {
    * @return paged orders across all users
    */
   public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return refineryOrderRepository.findAllScoped(owningSquadronId, pageable);
   }
 

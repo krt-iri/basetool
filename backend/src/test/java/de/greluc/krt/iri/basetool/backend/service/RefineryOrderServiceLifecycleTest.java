@@ -85,7 +85,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private RefineryOrderService service;
 

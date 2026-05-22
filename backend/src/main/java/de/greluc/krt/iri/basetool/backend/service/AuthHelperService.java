@@ -120,10 +120,10 @@ public class AuthHelperService {
 
   /**
    * Plan-compliant convenience accessor for the caller's squadron context — delegates to {@link
-   * de.greluc.krt.iri.basetool.backend.service.SquadronScopeService#currentSquadronId()}
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#currentSquadronId()}
    * (MULTI_SQUADRON_PLAN.md section 4.1 expects this on {@code AuthHelperService}). The injection
    * is lazy via the {@link org.springframework.context.ApplicationContext} so that the bean wiring
-   * does not introduce a circular {@code AuthHelperService -> SquadronScopeService -> ... ->
+   * does not introduce a circular {@code AuthHelperService -> OwnerScopeService -> ... ->
    * AuthHelperService} dependency at startup. Callers in hot paths should resolve the context once
    * per request rather than per filtered row.
    *
@@ -138,7 +138,7 @@ public class AuthHelperService {
 
   /**
    * Plan-compliant convenience accessor for the squadron read-side check — delegates to {@link
-   * de.greluc.krt.iri.basetool.backend.service.SquadronScopeService#canSeeSquadron(UUID)}. See the
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#canSeeSquadron(UUID)}. See the
    * delegate for the exact rule (admin without selection always passes; everyone else is compared
    * against the active squadron).
    */
@@ -148,15 +148,15 @@ public class AuthHelperService {
 
   /**
    * Plan-compliant convenience accessor for the squadron write-side check — delegates to {@link
-   * de.greluc.krt.iri.basetool.backend.service.SquadronScopeService#canEditSquadron(UUID)}.
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#canEditSquadron(UUID)}.
    */
   public boolean canEditSquadron(@NotNull UUID squadronId) {
     return scope().canEditSquadron(squadronId);
   }
 
-  private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService scope() {
+  private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService scope() {
     return applicationContext.getBean(
-        de.greluc.krt.iri.basetool.backend.service.SquadronScopeService.class);
+        de.greluc.krt.iri.basetool.backend.service.OwnerScopeService.class);
   }
 
   private static Optional<UUID> tryParseUuid(@NotNull String value) {

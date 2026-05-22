@@ -44,7 +44,7 @@ public class MissionSecurityService {
   private final RoleHierarchy roleHierarchy;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Authorizes access to a single participant of a mission.
@@ -188,7 +188,7 @@ public class MissionSecurityService {
                         || a.getAuthority().equals("MISSION_MANAGER")
                         || a.getAuthority().equals("MISSION_MANAGE")
                         || a.getAuthority().equals("ROLE_OFFICER"));
-    if (hasElevatedMissionAuthority && squadronScopeService.canEditMission(missionId)) {
+    if (hasElevatedMissionAuthority && ownerScopeService.canEditMission(missionId)) {
       return true;
     }
 
@@ -241,7 +241,7 @@ public class MissionSecurityService {
                         || a.getAuthority().equals("MISSION_MANAGE")
                         || a.getAuthority().equals("ROLE_OFFICER"));
 
-    if (hasElevatedAuthority && squadronScopeService.canEditMission(missionId)) {
+    if (hasElevatedAuthority && ownerScopeService.canEditMission(missionId)) {
       log.debug(
           "Access granted for user {} via elevated authority + squadron scope for mission {}",
           authentication.getName(),
@@ -293,7 +293,7 @@ public class MissionSecurityService {
     // Officer: same squadron-scope gate as canManageMission. Without it an officer from
     // squadron A could transfer ownership of squadron B's missions.
     boolean isOfficer = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_OFFICER"));
-    if (isOfficer && squadronScopeService.canEditMission(missionId)) {
+    if (isOfficer && ownerScopeService.canEditMission(missionId)) {
       return true;
     }
 

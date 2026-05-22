@@ -72,7 +72,7 @@ class MissionServiceLifecycleTest {
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private UserService userService;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private MissionService service;
 
@@ -440,7 +440,7 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.empty());
+    when(ownerScopeService.currentSquadronId()).thenReturn(java.util.Optional.empty());
     when(missionRepository.findAllActiveReference(null)).thenReturn(java.util.List.of());
 
     assertNotNull(service.findAllActiveReference());
@@ -450,7 +450,7 @@ class MissionServiceLifecycleTest {
   @Test
   void findAllActiveReference_passesCurrentSquadronIdToRepository() {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
-    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.of(squadronId));
+    when(ownerScopeService.currentSquadronId()).thenReturn(java.util.Optional.of(squadronId));
     when(missionRepository.findAllActiveReference(squadronId)).thenReturn(java.util.List.of());
 
     service.findAllActiveReference();

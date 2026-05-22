@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -38,15 +38,15 @@ class CorrelationIdFilterTest {
 
   private final LoggingProperties props = new LoggingProperties();
   private final AuthHelperService authHelperService = mock(AuthHelperService.class);
-  private final SquadronScopeService squadronScopeService = mock(SquadronScopeService.class);
+  private final OwnerScopeService ownerScopeService = mock(OwnerScopeService.class);
   private final CorrelationIdFilter filter =
-      new CorrelationIdFilter(props, authHelperService, squadronScopeService);
+      new CorrelationIdFilter(props, authHelperService, ownerScopeService);
 
   {
     // Default behaviour: anonymous traffic returns "none" through the filter's defensive
     // fallback. Tests that assert squadronId behaviour can stub these mocks per-case.
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
   }
 
   @AfterEach

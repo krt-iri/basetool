@@ -88,7 +88,7 @@ public class MissionService {
   private final MissionOwnershipRepository missionOwnershipRepository;
   private final OperationRepository operationRepository;
   private final UserService userService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
 
   /**
@@ -117,7 +117,7 @@ public class MissionService {
   /**
    * Returns lightweight reference projection of active missions (id + display name + status +
    * planned start) used by typeaheads. Squadron-scoped via {@link
-   * SquadronScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's
+   * OwnerScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's
    * missions PLUS any non-internal mission of any squadron, mirroring {@link
    * #searchMissions(String, Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all
    * squadrons" mode get the unfiltered cross-staffel list. Audit finding H-4: the previous
@@ -127,7 +127,7 @@ public class MissionService {
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
-    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scopeSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return missionRepository.findAllActiveReference(scopeSquadronId);
   }
 
@@ -155,7 +155,7 @@ public class MissionService {
     if (!authHelperService.isAuthenticated()) {
       effectiveIsInternal = Boolean.FALSE;
     }
-    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID scopeSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return missionRepository.searchMissions(
         query, start, end, status, effectiveIsInternal, operationId, scopeSquadronId, pageable);
   }
@@ -209,7 +209,7 @@ public class MissionService {
     Mission mission = new Mission();
     applyCreatePayload(mission, request);
 
-    // Fail-fast on the time-window validation BEFORE the userService / squadronScopeService
+    // Fail-fast on the time-window validation BEFORE the userService / ownerScopeService
     // round-trips so a malformed payload does not waste a DB / security-context lookup.
     validateMissionTimes(mission);
 
@@ -218,7 +218,7 @@ public class MissionService {
     if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
       mission.setOwningSquadron(mission.getOwner().getSquadron());
     } else {
-      squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
+      ownerScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
     }
 
     return missionRepository.save(mission);

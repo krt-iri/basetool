@@ -33,7 +33,7 @@ class MemberEvaluationServiceTest {
 
   @Mock private MemberEvaluationMapper mapper;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -43,7 +43,7 @@ class MemberEvaluationServiceTest {
   @BeforeEach
   void enablePromotionFeatureFlag() {
     lenient()
-        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
+        .when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope())
         .thenReturn(true);
   }
 

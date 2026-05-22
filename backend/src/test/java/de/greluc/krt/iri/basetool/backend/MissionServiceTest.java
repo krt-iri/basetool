@@ -45,7 +45,7 @@ class MissionServiceTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock
-  private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService squadronScopeService;
+  private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
 
   @Mock private de.greluc.krt.iri.basetool.backend.service.UserService userService;
 
@@ -258,7 +258,7 @@ class MissionServiceTest {
     scopeSquadron.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(callerWithoutHome));
-    when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =

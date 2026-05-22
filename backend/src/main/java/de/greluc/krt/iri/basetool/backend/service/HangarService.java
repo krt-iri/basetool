@@ -48,7 +48,7 @@ public class HangarService {
   private final MissionUnitRepository missionUnitRepository;
   private final ShipMapper shipMapper;
   private final EntityManager entityManager;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns the paged ship list scoped to the caller's squadron context: admin without an active
@@ -59,7 +59,7 @@ public class HangarService {
    * @return paged list of ships in the caller's squadron context
    */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     return shipRepository.findAllScoped(owningSquadronId, pageable);
   }
 
@@ -120,7 +120,7 @@ public class HangarService {
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     Page<Object[]> p = shipRepository.countShipsByType(owningSquadronId, pageable);
 
     List<de.greluc.krt.iri.basetool.backend.model.ShipType> types =
@@ -283,7 +283,7 @@ public class HangarService {
    */
   @Transactional
   public void resetAllFittedStatus() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
     shipRepository.resetAllFittedScoped(owningSquadronId);
   }
 }

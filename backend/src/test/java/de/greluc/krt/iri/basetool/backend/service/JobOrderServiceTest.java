@@ -50,7 +50,7 @@ class JobOrderServiceTest {
 
   @Mock private SquadronRepository squadronRepository;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuthHelperService authHelperService;
 
@@ -78,7 +78,7 @@ class JobOrderServiceTest {
     Squadron currentSquadron = new Squadron();
     currentSquadron.setShorthand("Alpha");
     org.mockito.Mockito.lenient()
-        .when(squadronScopeService.currentSquadron())
+        .when(ownerScopeService.currentSquadron())
         .thenReturn(java.util.Optional.of(currentSquadron));
 
     material = new Material();
@@ -230,7 +230,7 @@ class JobOrderServiceTest {
     requestingSquadron.setId(requestingSquadronId);
     requestingSquadron.setShorthand("BRAVO");
 
-    when(squadronScopeService.currentSquadron()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.empty());
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(squadronRepository.findById(requestingSquadronId))
         .thenReturn(Optional.of(requestingSquadron));
@@ -274,7 +274,7 @@ class JobOrderServiceTest {
     iridium.setId(Squadron.IRIDIUM_ID);
     iridium.setShorthand("IRI");
 
-    when(squadronScopeService.currentSquadron()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.empty());
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(squadronRepository.findById(Squadron.IRIDIUM_ID)).thenReturn(Optional.of(iridium));
 
