@@ -238,7 +238,7 @@ public class MissionController {
    */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
-  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
+  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id, Principal principal) {
     var mission = missionService.getMissionById(id);
@@ -575,7 +575,7 @@ public class MissionController {
   // — anonymous reaches the handler with a null JWT and would NPE in `getUserIdFromJwt`.
   // `canSeeMission` enforces MULTI_SQUADRON_PLAN.md §1: members of another squadron may join
   // only non-internal missions, own-squadron members + admins may join anything.
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
   public MissionDto joinMission(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     return missionMapper.toDto(
         missionService.addParticipant(id, userService.getUserIdFromJwt(jwt)));
@@ -1034,7 +1034,7 @@ public class MissionController {
   // `canSeeMission` returns true for own-squadron, admin, and non-internal-anywhere — exactly
   // the matrix we need. Without this gate, an anonymous user could create a guest participant
   // on an internal mission of any squadron (the URL is `permitAll` in SecurityConfig).
-  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
+  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
@@ -1687,7 +1687,7 @@ public class MissionController {
   // MULTI_SQUADRON_PLAN.md §1: same gate as the legacy `/participants/add` endpoint — only
   // non-internal missions accept cross-staffel / anonymous sign-ups. Internal missions are
   // gated even though the URL is `permitAll` in SecurityConfig.
-  @PreAuthorize("@squadronScopeService.canSeeMission(#id)")
+  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
@@ -1752,7 +1752,7 @@ public class MissionController {
     // displayName, rank); only Officer / Admin (moderation) and {@code /users/me} (the caller's
     // own row) need full PII. The ArchUnit rule
     // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
-    // future endpoint added with the same {@code @squadronScopeService.canSeeMission(#id)} gate.
+    // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
     if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
       participants = participants.map(this::cleanupParticipantForGuest);
     }

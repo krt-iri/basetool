@@ -2,13 +2,36 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), and R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim) implemented. Releases R2.d (SpEL string migration onto `@ownerScopeService.*`, aggregate `owningSquadron → owningOrgUnit` field switchover, dual-write services, ArchUnit whitelist updates, shim removal) and R3 (cleanup migrations) pending.
+**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), and R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened to accept both bean names) implemented. Release R3 (aggregate `owningSquadron → owningOrgUnit` field switchover, dual-write services, `SquadronScopeService` shim removal, stop-write of legacy `*_squadron_id` columns, cleanup migrations) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R2.5 implemented (controller SpEL strings migrate onto `@ownerScopeService.*` + ArchUnit rule widened)
+
+**Sections delivered:** §5.6 (controller `@PreAuthorize` patterns table — migration of every `@squadronScopeService.*` SpEL string onto the plan-aligned `@ownerScopeService.*` name). Aggregate FK switchover and shim removal stay deferred to R3.
+
+**Changes:**
+
+- 26 SpEL strings across the six staffel-scoped controllers — [`HangarController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/HangarController.java), [`InventoryItemController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/InventoryItemController.java), [`MissionController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MissionController.java), [`MissionFinanceEntryController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MissionFinanceEntryController.java), [`OperationController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/OperationController.java), [`RefineryOrderController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/RefineryOrderController.java) — now point at the {@code @ownerScopeService} bean directly instead of going through the {@code @squadronScopeService} shim. Pure rename; the resolver logic is the same since R2.c.
+- ArchUnit rule {@code staffelScopedWriteEndpointsMustGateOnSquadronScopeService} now accepts {@code @ownerScopeService.*} alongside {@code @squadronScopeService.*}. Both names are honoured during the soak window so a half-migrated branch does not trip the guard; the error message points new code at {@code @ownerScopeService.canEdit*(#id)} as the migration target. The legacy bean acceptance is removed in the same PR that finally drops the shim.
+- Three MockMvc-driven security tests ({@code MissionControllerSlimEndpointsTest}, {@code MissionFinanceEntryControllerSecurityTest}, {@code OperationPayoutPaidOutSecurityTest}) flip their {@code @MockitoBean} target from {@code SquadronScopeService} to {@code OwnerScopeService} — without that, the controllers' new SpEL strings would resolve to a fresh non-mock {@code OwnerScopeService} bean and the {@code when(...).thenReturn(true)} stubs would silently miss, returning 403 from canSeeMission gates.
+
+**Intentionally NOT in R2.5:** the {@code SquadronScopeService} shim stays in place. Existing third-party or pre-merge branches that still carry the legacy SpEL string keep resolving cleanly. Aggregate {@code owningSquadron → owningOrgUnit} field migration, dual-write services, and shim removal are all R3 material.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL**. Initial run failed three security tests (the {@code @MockitoBean} target needed updating); after the test-side fix all 1771 tests pass.
+- {@code ./gradlew :backend:checkstyleMain :backend:spotbugsMain :backend:checkstyleTest} → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert this commit. Controllers go back to {@code @squadronScopeService.*}; the ArchUnit rule narrows back to {@code @squadronScopeService} only; the three MockMvc tests' {@code @MockitoBean} target reverts to {@code SquadronScopeService}. Behaviour unchanged either way — the shim still forwards every call.
+
+**Risks mitigated in this slice:** R3 (the largest remaining migration — aggregate FK refactor) can now proceed without worrying about the SpEL surface drifting: every controller uses the new name, the ArchUnit rule already enforces it, and R3 can focus on the entity / service / DTO mechanics.
+
+**Next session must:** start R3 — migrate the six aggregates ({@code Mission}, {@code Operation}, {@code Ship}, {@code InventoryItem}, {@code RefineryOrder}, {@code JobOrder}) from {@code owningSquadron} to {@code owningOrgUnit} with dual-write logic, write the corresponding {@code @PostLoad} / setter wiring that keeps the legacy field in sync during the soak window, then finally drop the {@code SquadronScopeService} shim once no SpEL string references it.
 
 ### 2026-05-22 — Release R2.c implemented (`OwnerScopeService` rename with thin `SquadronScopeService` shim)
 
