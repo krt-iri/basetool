@@ -1,13 +1,18 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -258,6 +263,253 @@ public class AdminSpecialCommandsPageController {
     return "redirect:/admin/special-commands";
   }
 
+  // ============================================================================
+  // R5.c.b — per-SK detail page with the member roster + add / remove / patch /
+  // Lead-toggle modals. Calls the R5.b backend endpoints under
+  // /api/v1/special-commands/{id}/members.
+  // ============================================================================
+
+  /**
+   * Renders the per-SK detail page with the member roster. Loads the SK + its members in two
+   * sequential backend calls (the roster is small and serial latency is dominated by render time,
+   * not by the round-trips). The add-member modal preloads the user-lookup list so the picker
+   * has a starting set without an AJAX fetch.
+   *
+   * @param id Spezialkommando id.
+   * @param model Thymeleaf model populated with the SK, the member roster + every known user for
+   *     the add-member picker.
+   * @return the {@code admin/special-command-detail} view name.
+   */
+  @GetMapping("/{id}")
+  public String detail(@PathVariable @NotNull UUID id, Model model) {
+    try {
+      SpecialCommandDto sc = fetchSpecialCommand(id);
+      if (sc == null) {
+        return "redirect:/admin/special-commands?error=SpecialCommandNotFound";
+      }
+      model.addAttribute("specialCommand", sc);
+      model.addAttribute("members", fetchMembers(id));
+      model.addAttribute("allUsers", fetchUserLookup());
+    } catch (Exception e) {
+      log.error("Load SpecialCommand detail failed", e);
+      return "redirect:/admin/special-commands?error=LoadSpecialCommandDetailFailed";
+    }
+    return "admin/special-command-detail";
+  }
+
+  /**
+   * Adds a user to the Spezialkommando. ADMIN-only at the class level. A 409 indicates the user
+   * is already a member; surfaces as the dedicated toast.
+   *
+   * @param id Spezialkommando id.
+   * @param userId user to add.
+   * @param redirectAttributes flash-attribute carrier.
+   * @return redirect to {@code /admin/special-commands/{id}}.
+   */
+  @PostMapping("/{id}/members")
+  public String addMember(
+      @PathVariable @NotNull UUID id,
+      @RequestParam @NotNull UUID userId,
+      RedirectAttributes redirectAttributes) {
+    try {
+      backendApiClient.post(
+          "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.error("Add SpecialCommand member failed", e);
+      if (e.getStatusCode() == 409) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.specialcommand.member.duplicate");
+        return "redirect:/admin/special-commands/" + id;
+      }
+      return "redirect:/admin/special-commands/" + id + "?error=AddMemberFailed";
+    } catch (Exception e) {
+      log.error("Add SpecialCommand member failed", e);
+      return "redirect:/admin/special-commands/" + id + "?error=AddMemberFailed";
+    }
+    return "redirect:/admin/special-commands/" + id;
+  }
+
+  /**
+   * Removes a user from the Spezialkommando.
+   *
+   * @param id Spezialkommando id.
+   * @param userId user to remove.
+   * @param redirectAttributes flash-attribute carrier.
+   * @return redirect to {@code /admin/special-commands/{id}}.
+   */
+  @PostMapping("/{id}/members/{userId}/delete")
+  public String removeMember(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      RedirectAttributes redirectAttributes) {
+    try {
+      backendApiClient.delete("/api/v1/special-commands/" + id + "/members/" + userId, Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
+    } catch (Exception e) {
+      log.error("Remove SpecialCommand member failed", e);
+      return "redirect:/admin/special-commands/" + id + "?error=RemoveMemberFailed";
+    }
+    return "redirect:/admin/special-commands/" + id;
+  }
+
+  /**
+   * Flips the per-membership Logistician + Mission Manager flags. The form posts the new state of
+   * both checkboxes plus the current version for optimistic-lock detection. Either flag may be
+   * {@code null} (checkbox not in the form), which the backend interprets as "no change".
+   *
+   * @param id Spezialkommando id.
+   * @param userId user whose flags to patch.
+   * @param isLogistician new Logistician state; {@code null} means "no change".
+   * @param isMissionManager new Mission Manager state; {@code null} means "no change".
+   * @param version current optimistic-lock version held by the form.
+   * @param redirectAttributes flash-attribute carrier.
+   * @return redirect to {@code /admin/special-commands/{id}}.
+   */
+  @PostMapping("/{id}/members/{userId}/flags")
+  public String patchMemberFlags(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestParam(required = false) Boolean isLogistician,
+      @RequestParam(required = false) Boolean isMissionManager,
+      @RequestParam @NotNull Long version,
+      RedirectAttributes redirectAttributes) {
+    try {
+      Map<String, Object> body = new HashMap<>();
+      body.put("isLogistician", isLogistician);
+      body.put("isMissionManager", isMissionManager);
+      body.put("version", version);
+      backendApiClient.patch(
+          "/api/v1/special-commands/" + id + "/members/" + userId, body, Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.error("Patch SpecialCommand member flags failed", e);
+      if (e.getStatusCode() == 409) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+        return "redirect:/admin/special-commands/" + id;
+      }
+      return "redirect:/admin/special-commands/" + id + "?error=PatchMemberFailed";
+    } catch (Exception e) {
+      log.error("Patch SpecialCommand member flags failed", e);
+      return "redirect:/admin/special-commands/" + id + "?error=PatchMemberFailed";
+    }
+    return "redirect:/admin/special-commands/" + id;
+  }
+
+  /**
+   * Toggles the Spezialkommando-Lead flag on a member's membership row. ADMIN-only at the
+   * controller level — a Lead cannot promote themselves or another member (backend additionally
+   * hard-gates the endpoint to {@code hasRole('ADMIN')}).
+   *
+   * @param id Spezialkommando id.
+   * @param userId user whose membership to update.
+   * @param isLead new Lead state.
+   * @param version current optimistic-lock version held by the form.
+   * @param redirectAttributes flash-attribute carrier.
+   * @return redirect to {@code /admin/special-commands/{id}}.
+   */
+  @PostMapping("/{id}/members/{userId}/lead")
+  public String toggleMemberLead(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestParam @NotNull Boolean isLead,
+      @RequestParam @NotNull Long version,
+      RedirectAttributes redirectAttributes) {
+    try {
+      Map<String, Object> body = new HashMap<>();
+      body.put("isLead", isLead);
+      body.put("version", version);
+      backendApiClient.patch(
+          "/api/v1/special-commands/" + id + "/members/" + userId + "/lead", body, Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.error("Toggle SpecialCommand member lead failed", e);
+      if (e.getStatusCode() == 409) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+        return "redirect:/admin/special-commands/" + id;
+      }
+      return "redirect:/admin/special-commands/" + id + "?error=ToggleLeadFailed";
+    } catch (Exception e) {
+      log.error("Toggle SpecialCommand member lead failed", e);
+      return "redirect:/admin/special-commands/" + id + "?error=ToggleLeadFailed";
+    }
+    return "redirect:/admin/special-commands/" + id;
+  }
+
+  // ---------- helper fetchers for the detail page ---------------------------------
+
+  private SpecialCommandDto fetchSpecialCommand(UUID id) {
+    Map<String, Object> map =
+        backendApiClient.get(
+            "/api/v1/special-commands/" + id,
+            new ParameterizedTypeReference<Map<String, Object>>() {});
+    if (map == null) {
+      return null;
+    }
+    return new SpecialCommandDto(
+        parseUuid(map.get("id")),
+        parseString(map.get("name")),
+        parseString(map.get("shorthand")),
+        parseString(map.get("description")),
+        parseBoolean(map.get("active")),
+        parseLong(map.get("version")));
+  }
+
+  private List<OrgUnitMembershipDto> fetchMembers(UUID specialCommandId) {
+    List<Map<String, Object>> raw =
+        backendApiClient.get(
+            "/api/v1/special-commands/" + specialCommandId + "/members",
+            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    if (raw == null) {
+      return List.of();
+    }
+    List<OrgUnitMembershipDto> members =
+        raw.stream()
+            .map(
+                m ->
+                    new OrgUnitMembershipDto(
+                        parseUuid(m.get("userId")),
+                        parseString(m.get("userDisplayName")),
+                        parseUuid(m.get("orgUnitId")),
+                        parseKind(m.get("kind")),
+                        parseBoolean(m.get("isLogistician")),
+                        parseBoolean(m.get("isMissionManager")),
+                        parseBoolean(m.get("isLead")),
+                        parseInstant(m.get("joinedAt")),
+                        parseLong(m.get("version"))))
+            .collect(Collectors.toCollection(ArrayList::new));
+    members.sort(
+        Comparator.comparing(
+            m -> m.userDisplayName() == null ? "" : m.userDisplayName(),
+            String.CASE_INSENSITIVE_ORDER));
+    return members;
+  }
+
+  private List<UserReferenceDto> fetchUserLookup() {
+    List<Map<String, Object>> raw =
+        backendApiClient.get(
+            "/api/v1/users/lookup",
+            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    if (raw == null) {
+      return List.of();
+    }
+    List<UserReferenceDto> users =
+        raw.stream()
+            .map(
+                m ->
+                    new UserReferenceDto(
+                        parseUuid(m.get("id")),
+                        parseString(m.get("username")),
+                        parseString(m.get("displayName")),
+                        parseString(m.get("effectiveName")),
+                        parseInt(m.get("rank"))))
+            .collect(Collectors.toCollection(ArrayList::new));
+    users.sort(
+        Comparator.comparing(
+            u -> u.effectiveName() == null ? "" : u.effectiveName(),
+            String.CASE_INSENSITIVE_ORDER));
+    return users;
+  }
+
   // ---------- payload-parsing helpers (mirror AdminMissionDataPageController) -----------
 
   private static String parseString(Object o) {
@@ -296,6 +548,66 @@ public class AdminSpecialCommandsPageController {
       return Long.parseLong(String.valueOf(o));
     } catch (Exception ignored) {
       return 0L;
+    }
+  }
+
+  /**
+   * Parses a {@link Number} or string-encoded integer into {@link Integer}. Used for the user's
+   * {@code rank} field on the member-picker dropdown — Jackson decodes JSON integers as either
+   * {@link Integer} or {@link Long} depending on size, so the helper accepts both.
+   */
+  private static Integer parseInt(Object o) {
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof Number n) {
+      return n.intValue();
+    }
+    try {
+      return Integer.parseInt(String.valueOf(o));
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  /**
+   * Parses an ISO-8601 instant (or one of the alternative forms Jackson emits — long epoch
+   * millis as a fallback) into {@link Instant}. The membership wire shape carries
+   * {@code joinedAt} as ISO-8601; the conservative branching makes the helper resilient to a
+   * future format change without crashing the detail page.
+   */
+  private static Instant parseInstant(Object o) {
+    if (o == null) {
+      return null;
+    }
+    if (o instanceof Instant i) {
+      return i;
+    }
+    try {
+      return Instant.parse(String.valueOf(o));
+    } catch (Exception ignored) {
+      try {
+        return Instant.ofEpochMilli(Long.parseLong(String.valueOf(o)));
+      } catch (Exception ignoredToo) {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Parses the {@code kind} string into the typed {@link OrgUnitKind} enum. Defaults to {@link
+   * OrgUnitKind#SPECIAL_COMMAND} on unknown values — the detail page only ever renders SK
+   * memberships (the parent SK existence gate in the backend filters anything else out), so a
+   * malformed payload from a future schema change still lands as the most plausible value.
+   */
+  private static OrgUnitKind parseKind(Object o) {
+    if (o == null) {
+      return OrgUnitKind.SPECIAL_COMMAND;
+    }
+    try {
+      return OrgUnitKind.valueOf(String.valueOf(o));
+    } catch (Exception ignored) {
+      return OrgUnitKind.SPECIAL_COMMAND;
     }
   }
 }
