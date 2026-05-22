@@ -83,6 +83,7 @@ class AdminMaterialsPageControllerMvcTest {
             false,
             false,
             false,
+            false,
             0L);
     PageResponse<MaterialDto> materialsPage =
         new PageResponse<>(List.of(material), 0, 1000, 1, 1, Collections.emptyList());

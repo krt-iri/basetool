@@ -1,8 +1,13 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.config.CacheConfig;
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialType;
+import de.greluc.krt.iri.basetool.backend.model.QuantityType;
+import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto;
@@ -144,14 +149,78 @@ public class MaterialService {
   }
 
   /**
-   * Persists a manually-created material (rare — admins normally rely on the UEX import).
+   * Persists a manually-entered material from the admin UI. Used when UEX has not (yet) published a
+   * commodity that the squadron needs — e.g. a refinery raw input that exists in-game but is
+   * missing from {@code get_commodities_prices_all/}. The server unconditionally stamps {@code
+   * isManualEntry=true} on the persisted row (Audit + UI badge); the next UEX sync clears the flag
+   * automatically once UEX picks the commodity up (see {@code UexCommodityService}).
    *
-   * @param material transient entity
+   * <p>UEX-imported columns ({@code idCommodity}, {@code code}, {@code slug}, {@code priceBuy} …)
+   * are left {@code null} — they get populated by the sync's name-match fallback once UEX exposes
+   * the commodity. {@code refinedMaterialId} is only honoured when the entity is classified as a
+   * raw material (either {@code type=RAW} or {@code isManualRawMaterial=true}); otherwise the
+   * request is rejected so a non-raw material cannot accidentally point at a refined output.
+   *
+   * @param dto validated create payload
    * @return the persisted material
+   * @throws BadRequestException when {@code type}/{@code quantityType} cannot be parsed, or when
+   *     {@code refinedMaterialId} is set on a non-raw material
+   * @throws NotFoundException when {@code refinedMaterialId} or {@code categoryId} reference a row
+   *     that does not exist
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true)
-  public Material createMaterial(@NotNull Material material) {
+  public Material createMaterial(@NotNull MaterialCreateDto dto) {
+    MaterialType type;
+    try {
+      type = MaterialType.valueOf(dto.type());
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException("Unknown material type: " + dto.type(), e);
+    }
+    QuantityType quantityType;
+    try {
+      quantityType = QuantityType.valueOf(dto.quantityType());
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException("Unknown quantity type: " + dto.quantityType(), e);
+    }
+
+    boolean isManualRaw = Boolean.TRUE.equals(dto.isManualRawMaterial());
+    boolean isRefineryInput = MaterialType.RAW.equals(type) || isManualRaw;
+
+    if (dto.refinedMaterialId() != null && !isRefineryInput) {
+      throw new BadRequestException(
+          "refinedMaterialId may only be set on raw materials (type=RAW or"
+              + " isManualRawMaterial=true)");
+    }
+
+    Material material = new Material();
+    material.setName(dto.name());
+    material.setType(type);
+    material.setQuantityType(quantityType);
+    material.setDescription(dto.description());
+    material.setIsManualRawMaterial(isManualRaw);
+    material.setIsJobOrder(Boolean.TRUE.equals(dto.isJobOrder()));
+    material.setIsIllegal(Boolean.TRUE.equals(dto.isIllegal()) ? 1 : 0);
+    material.setIsVolatileQt(Boolean.TRUE.equals(dto.isVolatileQt()) ? 1 : 0);
+    material.setIsVolatileTime(Boolean.TRUE.equals(dto.isVolatileTime()) ? 1 : 0);
+    material.setIsManualEntry(true);
+
+    if (dto.refinedMaterialId() != null) {
+      Material refined =
+          materialRepository
+              .findById(dto.refinedMaterialId())
+              .orElseThrow(() -> new NotFoundException("Refined material not found"));
+      material.setRefinedMaterial(refined);
+    }
+
+    if (dto.categoryId() != null) {
+      MaterialCategory category =
+          materialCategoryRepository
+              .findById(dto.categoryId())
+              .orElseThrow(() -> new NotFoundException("Material category not found"));
+      material.setCategory(category);
+    }
+
     return materialRepository.save(material);
   }
 

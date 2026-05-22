@@ -99,6 +99,7 @@ class JobOrderServiceTest {
             false,
             false,
             false,
+            false,
             0L);
 
     jobOrder = new JobOrder();

@@ -16,8 +16,10 @@ import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +71,7 @@ class UexCommodityServiceTest {
     when(materialPriceRepository.findByMaterialIdAndTerminalId(
             savedMaterial.getId(), mockTerminal.getId()))
         .thenReturn(Optional.empty());
+    stubPriceSaveAssignsId();
 
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -182,6 +185,62 @@ class UexCommodityServiceTest {
   }
 
   @Test
+  void commoditySync_clearsIsManualEntry_whenNameMatchAdoptsManualMaterial() {
+    // Given a manually-entered material with isManualEntry=true and no id_commodity yet
+    Material manual = new Material();
+    manual.setName("Raw Ouratite");
+    manual.setIdCommodity(null);
+    manual.setIsManualEntry(true);
+    manual.setIsManualRawMaterial(true);
+
+    UexCommodityDto upstream = commodity(42, "Raw Ouratite", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(42)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Raw Ouratite")).thenReturn(Optional.of(manual));
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — id_commodity backfilled AND the audit flag is cleared so the manual badge
+    // disappears on the next render. The admin-set isManualRawMaterial override stays
+    // intact (UEX may not classify the commodity as a raw input).
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertSame(manual, cap.getValue());
+    assertEquals(42, cap.getValue().getIdCommodity());
+    assertEquals(
+        Boolean.FALSE,
+        cap.getValue().getIsManualEntry(),
+        "Manual-entry flag must clear once UEX adopts the commodity");
+    assertEquals(
+        Boolean.TRUE,
+        cap.getValue().getIsManualRawMaterial(),
+        "Admin-set isManualRawMaterial override must remain untouched");
+  }
+
+  @Test
+  void commoditySync_leavesIsManualEntryFalse_whenAdoptedByNameMatchOnNonManualRow() {
+    // Existing row matched by name but never marked manual → flag stays false (no-op).
+    Material existing = new Material();
+    existing.setName("Bexalite");
+    existing.setIdCommodity(null);
+    existing.setIsManualEntry(false);
+
+    UexCommodityDto fresh = commodity(77, "Bexalite", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(fresh));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(77)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Bexalite")).thenReturn(Optional.of(existing));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertEquals(Boolean.FALSE, cap.getValue().getIsManualEntry());
+  }
+
+  @Test
   void commoditySync_skipsDtoWithoutIdOrName() {
     UexCommodityDto noId = commodity(null, "Has Name", 0, 0);
     UexCommodityDto noName = commodity(99, null, 0, 0);
@@ -270,6 +329,8 @@ class UexCommodityServiceTest {
     when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
     when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
         .thenReturn(Optional.of(existing));
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -348,6 +409,7 @@ class UexCommodityServiceTest {
             });
     when(materialPriceRepository.findByMaterialIdAndTerminalId(any(), any()))
         .thenReturn(Optional.empty());
+    stubPriceSaveAssignsId();
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -403,7 +465,96 @@ class UexCommodityServiceTest {
     verify(materialPriceRepository, times(2)).save(any());
   }
 
-  // ─── helper ─────────────────────────────────────────────────────────────
+  // ─── Stale-row cleanup (price-sync postlude) ────────────────────────────
+
+  @Test
+  void priceSync_clearsStaleRows_passingExactlyTheSeenIdsToTheRepository() {
+    // Given — one DTO that we know will be upserted successfully
+    UUID materialId = UUID.randomUUID();
+    UUID terminalId = UUID.randomUUID();
+    UUID assignedPriceId = UUID.randomUUID();
+    Material material = new Material();
+    material.setId(materialId);
+    material.setIdCommodity(1);
+    Terminal terminal = new Terminal();
+    terminal.setId(terminalId);
+    terminal.setIdTerminal(1);
+
+    UexCommodityPriceDto dto =
+        new UexCommodityPriceDto(
+            1, "Gold", 1, "T1", new BigDecimal("10"), new BigDecimal("20"), 1, 1, 1, 1, 1, 1L);
+
+    when(uexClient.getCommodities()).thenReturn(List.of());
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(dto));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
+    when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(terminal));
+    when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
+        .thenReturn(Optional.empty());
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(
+            invocation -> {
+              MaterialPrice mp = invocation.getArgument(0);
+              mp.setId(assignedPriceId);
+              return mp;
+            });
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — the cleanup must run with exactly the set of ids we just upserted, so any
+    // pre-existing (material, terminal) row that UEX dropped from this run gets its prices
+    // nulled. This is the Quantanium regression: terminals that stop listing a commodity used to
+    // keep stale priceBuy values forever.
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.forClass(Collection.class);
+    verify(materialPriceRepository).clearStalePrices(idsCap.capture());
+    assertEquals(Set.of(assignedPriceId), Set.copyOf(idsCap.getValue()));
+  }
+
+  @Test
+  void priceSync_skipsStaleCleanup_whenEveryRowFailsAndSeenSetIsEmpty() {
+    // Given — every DTO triggers an exception during upsert (here: unknown terminal, which
+    // returns null from processSingleDto, AND unknown commodity that resolveOrCreateMaterial
+    // would create — but we make terminal resolution fail to drive savedId = null without
+    // raising). The seen-id set ends up empty.
+    UexCommodityPriceDto orphan =
+        new UexCommodityPriceDto(
+            1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
+    Material material = new Material();
+    material.setId(UUID.randomUUID());
+    material.setIdCommodity(1);
+
+    when(uexClient.getCommodities()).thenReturn(List.of());
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(orphan));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
+    when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
+
+    // When
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    // Then — refusing to clear-everything when the sync produced nothing is the whole point:
+    // a transient burst of failures must not wipe the entire price matrix.
+    verify(materialPriceRepository, never()).clearStalePrices(any());
+  }
+
+  // ─── helpers ────────────────────────────────────────────────────────────
+
+  /**
+   * Stubs {@link MaterialPriceRepository#save} so it assigns a fresh UUID to any transient {@link
+   * MaterialPrice}. The service now reads {@code save(...).getId()} to feed the stale-row sweep, so
+   * tests that exercise the price upsert path need a non-null saved entity.
+   */
+  private void stubPriceSaveAssignsId() {
+    when(materialPriceRepository.save(any(MaterialPrice.class)))
+        .thenAnswer(
+            invocation -> {
+              MaterialPrice mp = invocation.getArgument(0);
+              if (mp.getId() == null) {
+                mp.setId(UUID.randomUUID());
+              }
+              return mp;
+            });
+  }
 
   private static UexCommodityDto commodity(
       Integer id, String name, Integer isRefined, Integer isRefinable) {

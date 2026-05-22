@@ -10,8 +10,11 @@ import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,13 @@ import org.springframework.transaction.annotation.Transactional;
  * terminal) pair. Unknown terminals are silently skipped (the universe sync owns the terminal
  * table); unknown materials get auto-created with a fallback name so the price-matrix sync stays
  * self-healing if UEX adds a commodity between two of our runs.
+ *
+ * <p>The price-matrix phase additionally records the ids of every row touched and, once the loop
+ * completes, nulls out the price / SCU / status columns on every other {@code material_price} row
+ * via {@link MaterialPriceRepository#clearStalePrices}. UEX does not signal removals - a terminal
+ * that stops listing a commodity simply disappears from the matrix - so without this sweep a stale
+ * {@code priceBuy} would survive every subsequent sync. The sweep is gated on a non-empty
+ * touched-set so a sync that fails on every single row never wipes the entire table.
  *
  * <p>An empty response on either call short-circuits without wiping local data — the sync is
  * idempotent and resilient to transient UEX outages.
@@ -67,6 +77,19 @@ public class UexCommodityService {
                                 .map(
                                     m -> {
                                       m.setIdCommodity(dto.id());
+                                      // A manual entry has just been adopted by UEX. Clear the
+                                      // audit flag so the admin badge disappears and the
+                                      // "manual" filter only lists materials that UEX has not yet
+                                      // picked up; the link to UEX is recorded via the INFO log
+                                      // and the now-populated idCommodity column.
+                                      if (Boolean.TRUE.equals(m.getIsManualEntry())) {
+                                        log.info(
+                                            "Manual material '{}' is now linked to UEX commodity"
+                                                + " id={}",
+                                            m.getName(),
+                                            dto.id());
+                                        m.setIsManualEntry(false);
+                                      }
                                       return m;
                                     })
                                 .orElseGet(
@@ -124,30 +147,46 @@ public class UexCommodityService {
       return;
     }
 
+    Set<UUID> seenPriceIds = new HashSet<>();
     int processed = 0;
     for (UexCommodityPriceDto dto : dtos) {
       try {
-        processSingleDto(dto);
+        UUID savedId = processSingleDto(dto);
+        if (savedId != null) {
+          seenPriceIds.add(savedId);
+        }
         processed++;
       } catch (Exception e) {
         log.error("Failed to process commodity dto: {}", dto, e);
       }
     }
 
+    if (seenPriceIds.isEmpty()) {
+      log.warn(
+          "Skipping stale-row cleanup because no commodity-price row could be processed "
+              + "({} dto(s) received, all failed). Refusing to wipe the entire price matrix.",
+          dtos.size());
+    } else {
+      int cleared = materialPriceRepository.clearStalePrices(seenPriceIds);
+      if (cleared > 0) {
+        log.info("Cleared prices on {} material_price row(s) no longer returned by UEX.", cleared);
+      }
+    }
+
     log.info("Finished synchronization. Processed {} items.", processed);
   }
 
-  private void processSingleDto(UexCommodityPriceDto dto) {
+  private UUID processSingleDto(UexCommodityPriceDto dto) {
     if (dto.idCommodity() == null || dto.idTerminal() == null) {
       log.warn("Missing commodity or terminal ID in DTO: {}", dto);
-      return;
+      return null;
     }
 
     Material material = resolveOrCreateMaterial(dto);
     Optional<Terminal> terminalOpt = terminalRepository.findByIdTerminal(dto.idTerminal());
 
     if (terminalOpt.isEmpty()) {
-      return;
+      return null;
     }
     Terminal terminal = terminalOpt.orElseThrow();
 
@@ -171,7 +210,7 @@ public class UexCommodityService {
     price.setStatusSell(dto.isStatusSell());
     price.setDateModified(dto.getParsedDateModified());
 
-    materialPriceRepository.save(price);
+    return materialPriceRepository.save(price).getId();
   }
 
   private Material resolveOrCreateMaterial(UexCommodityPriceDto dto) {
