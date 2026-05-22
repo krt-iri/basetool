@@ -2,13 +2,40 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened), and R3 (service-layer fully migrated to `OwnerScopeService`, shim deleted, ArchUnit rules narrowed back to the single new bean name) implemented. Releases R4 (aggregate `owningSquadron → owningOrgUnit` field switchover with dual-write services), R5 (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins), and a destructive cleanup release (V98+ migrations dropping legacy `squadron` table and `*_squadron_id` columns) pending.
+**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger), R2.c (`OwnerScopeService` rename with thin `SquadronScopeService` shim), R2.5 (controller `@PreAuthorize` SpEL strings migrated onto `@ownerScopeService.*` + ArchUnit rule widened), R3 (service-layer fully migrated to `OwnerScopeService`, shim deleted, ArchUnit rules narrowed), and R4 (aggregate entities carry an `owningOrgUnit` mirror field next to the legacy `owningSquadron`, kept in lockstep by a `@PrePersist`/`@PreUpdate`/`@PostLoad` lifecycle hook — pure dual-write at the entity layer, no service-layer change required) implemented. Releases R5 (frontend admin UI for Spezialkommandos + owner-picker fragment + active-context switcher widened to non-admins) and a destructive cleanup release (NOT NULL tightening on the new FK columns + V98+ migrations dropping legacy `squadron` table and `*_squadron_id` columns + corresponding entity-field removal) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R4 implemented (aggregate `owningOrgUnit` mirror field added next to `owningSquadron`, kept in lockstep by lifecycle hooks)
+
+**Sections delivered:** §3.3 (aggregate FK columns — added on the JPA-entity layer; V96 had already added the DB-side columns in R1), §5.5 (service-layer stamping — covered indirectly: every existing `setOwningSquadron(...)` call now also writes the new column via the lifecycle hook, without a service-layer rewrite).
+
+**Changes:**
+
+- The five strict-staffel aggregates {@link Mission}, {@link Operation}, {@link Ship}, {@link InventoryItem}, {@link RefineryOrder} each gain a second {@code @ManyToOne OrgUnit owningOrgUnit} field next to the existing {@code Squadron owningSquadron} field. The new field maps to the {@code owning_org_unit_id} column that V96 added in R1, kept JPA-nullable for the R4 soak.
+- {@link JobOrder} gains two mirror fields: {@code creatingOrgUnit} (mapped to {@code creating_org_unit_id}) and {@code requestingOrgUnit} (mapped to {@code requesting_org_unit_id}). Both nullable for the soak.
+- A {@code @PrePersist} / {@code @PreUpdate} / {@code @PostLoad} lifecycle method {@code syncOwnerFields()} lives on each of the six aggregates. The hook reads the legacy field as authoritative and mirrors it onto the new field on every persist / update / select. Defensive reverse copy: if only the new field is set and it happens to point at a {@link Squadron}, the legacy field is filled too — that covers the R5 case where an Owner-picker UI writes only the new column on a Squadron-owned aggregate.
+- The new fields are typed at {@link OrgUnit}, so Hibernate's single-table inheritance dispatcher resolves {@code kind='SQUADRON'} rows to {@code Squadron} instances and {@code kind='SPECIAL_COMMAND'} rows to {@link SpecialCommand} instances. Today every reachable row is Squadron-discriminated; the new field's polymorphic type is the wiring R5 needs to start stamping {@code SpecialCommand} as an aggregate owner.
+
+**Intentionally NOT in R4:** no service-layer change. The lifecycle hook lets every existing {@code setOwningSquadron(squadron)} call carry the dual-write transparently; rewriting the service layer to call {@code setOwningOrgUnit(orgUnit)} explicitly is R5 work once the new wire shapes land. No DTO / mapper rewrite (still on {@code SquadronReferenceDto owningSquadron}) — R5 introduces the org-unit-typed wire shape. No NOT NULL tightening on the new columns — a destructive release after R4 soaks for one full release cycle in prod. No frontend change.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test} → **BUILD SUCCESSFUL**. All 1771 tests pass. Hibernate {@code ddl-auto=validate} accepts both columns; the lifecycle hooks keep {@code owningSquadron} and {@code owningOrgUnit} in lockstep on every read/write path; existing aggregates persisted via the old setters now write both columns transparently.
+- {@code ./gradlew :backend:checkstyleMain :backend:spotbugsMain :backend:checkstyleTest} → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert this commit. The {@code owningOrgUnit} (and {@code creatingOrgUnit} / {@code requestingOrgUnit}) fields disappear from the JPA layer; the DB columns from V96 stay in place but stop receiving writes. Existing rows that R4 has been populating with both columns continue to read fine through the legacy {@code owningSquadron} field — no data loss, no schema migration to undo.
+
+**Risks mitigated in this slice:**
+
+- The R5 owner-picker UI can already stamp {@link SpecialCommand} instances on the new field and trust that the lifecycle hook will leave the legacy field {@code null} for SK-owned aggregates (which is the eventual end state: the legacy column gets dropped, the new column carries the discriminator-polymorphic FK).
+- A future destructive release that drops {@code owningSquadron} from the entity and {@code owning_squadron_id} from the schema can do so confidently: every existing row already has {@code owning_org_unit_id} populated thanks to the R4 dual-write soak.
+
+**Next session must:** start R5 — introduce the owner-picker fragment in the Thymeleaf templates ({@code refinery-orders-create.html}, {@code inventory-input.html}, {@code orders-create.html}, mission-create modal, operation-create modal, hangar-add modal, inventory-transfer modal), widen the active-context switcher in {@code fragments/sidebar.html} to non-admin users with >1 membership, introduce the new {@code SpecialCommandService} / {@code OrgUnitMembershipService} + REST endpoints under {@code /api/v1/special-commands}, build the admin SK list and detail pages.
 
 ### 2026-05-22 — Release R3 implemented (`SquadronScopeService` shim deleted, service-layer fully on `OwnerScopeService`)
 
