@@ -16,6 +16,9 @@
     "name" : "Personal Inventory",
     "description" : "Per-user personal inventory entries."
   }, {
+    "name" : "org-unit-controller",
+    "description" : "Read-only org-unit hierarchy endpoints"
+  }, {
     "name" : "System",
     "description" : "System and API versioning endpoints"
   }, {
@@ -23353,6 +23356,106 @@
         }
       }
     },
+    "/api/v1/org-units/active" : {
+      "get" : {
+        "tags" : [ "org-unit-controller" ],
+        "summary" : "List every active org unit",
+        "description" : "Returns the full active Staffel + Spezialkommando catalog as picker options. Drives the R5.d.c Job Order create form's owner-picker — Job Orders are cross-staffel workspaces and the picker must offer the full active list, not the caller's memberships.",
+        "operationId" : "listActiveOrgUnits",
+        "responses" : {
+          "200" : {
+            "description" : "Active org-unit options",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrgUnitMembershipOptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{jobOrderId}/material-collection" : {
       "get" : {
         "tags" : [ "material-collection-controller" ],
@@ -29838,7 +29941,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "requestingSquadronId" : {
+          "requestingOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
           },

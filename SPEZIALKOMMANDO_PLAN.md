@@ -2,13 +2,62 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, and R5.d.b (owner-picker integrated into the second create form — refinery-order create — and the resolver logic extracted into a shared `OwnerScopeService.resolveSquadronForPickerOutput` helper) implemented. Releases R5.d.c ff. (rolling the picker out to the remaining five create / transfer forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, and R5.d.c (owner-picker integrated into the third + fourth pickers — Job Order create + Job Order detail — with `requestingSquadronId → requestingOrgUnitId` rename, the new active-org-units endpoint `GET /api/v1/org-units/active`, and a latent SpEL-lambda bug in the picker fragment fixed) implemented. Releases R5.d.d ff. (rolling the picker out to the remaining four create / transfer forms — mission-create-modal, operation-create-modal, hangar-add-modal, inventory-transfer-modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.c implemented (owner-picker on Job Order create + detail, new active-org-units endpoint, picker-fragment latent-bug fix)
+
+**Sections delivered:** §7.3 partial — the third + fourth picker integrations (`orders-create.html` Job Order create form *and* the corresponding edit form in `orders-detail.html`). Plus a new shared backend endpoint and a fix for a latent bug in the R5.d.a picker fragment.
+
+**Why Job Order is different from R5.d.a / R5.d.b:** Job Orders are cross-staffel workspaces (CLAUDE.md "Cross-staffel workspace"); the picker for {@code requestingOrgUnitId} offers **every active org unit**, not the order owner's memberships. So R5.d.c could not reuse the {@code GET /api/v1/users/{id}/memberships} endpoint — it needed a new active-org-units catalog endpoint.
+
+**Changes (~25 files):**
+
+- **Backend, active-org-units endpoint.**
+  - [`OrgUnitMembershipService.listAllActiveOptions`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OrgUnitMembershipService.java) — new method that returns the full active Staffel + SpecialCommand catalog as {@link OrgUnitMembershipOptionDto}, sorted Staffel-first then SK alphabetical (mirroring the {@code listOptionsForUser} sort order so the two endpoints render identically).
+  - [`OrgUnitController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/OrgUnitController.java) — new {@code @RestController} at {@code /api/v1/org-units}. Single endpoint {@code GET /active}, open to authenticated members (same access surface as {@code /users/lookup}).
+- **Backend, Job Order rename + picker.**
+  - [`CreateJobOrderDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/CreateJobOrderDto.java): {@code requestingSquadronId} → {@code requestingOrgUnitId} (plan §7.3 hard-rename). {@code creatingSquadronId} kept as-is — its admin-override rename to {@code creatingOrgUnitId} ships in a follow-up release per the plan.
+  - [`JobOrderService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/JobOrderService.java) — both create and update call sites consume {@code dto.requestingOrgUnitId()}; the private {@code resolveRequestingSquadron} kept the same behaviour (look up the picked id via {@code SquadronRepository}, throw {@link BadRequestException} on miss). The SK-rejection path is implicit: an SK id passes the discriminator filter in {@code SquadronRepository.findById} as empty, so the existing 400-on-empty branch handles it. The Javadoc on the resolver explains the new error message phrasing.
+- **Frontend, mirror DTO + form + page controllers.**
+  - [`CreateJobOrderDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/CreateJobOrderDto.java) frontend mirror gets the rename (per {@code feedback_backend_frontend_dto_mirror}).
+  - [`JobOrderForm.requestingSquadronId`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/JobOrderForm.java) → {@code requestingOrgUnitId}.
+  - [`JobOrderPageController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/JobOrderPageController.java) — new {@code fetchActiveOrgUnitOptions()} helper hits the new {@code /api/v1/org-units/active} endpoint, plus the {@code viewCreateForm} and {@code viewOrderDetail} handlers expose two model attributes: {@code ownerOptions} (the picker list) and {@code ownerOptionsHasSpecialCommand} (a pre-computed Boolean — see below). The POST handlers forward {@code form.getRequestingOrgUnitId()} to the backend DTO; the edit pre-seed uses {@code form.setRequestingOrgUnitId(...)}.
+  - [`orders-create.html`](frontend/src/main/resources/templates/orders-create.html) and [`orders-detail.html`](frontend/src/main/resources/templates/orders-detail.html) — the {@code requestingSquadronId} dropdowns become {@code requestingOrgUnitId} dropdowns; the option list is split into {@code <optgroup>Staffel</optgroup>} and {@code <optgroup>Spezialkommandos</optgroup>} via the pre-computed {@code ownerOptionsHasSpecialCommand} flag, collapsing to a flat list when no SK exists.
+- **Picker fragment latent bug fix.**
+  - [`fragments/owner-picker.html`](frontend/src/main/resources/templates/fragments/owner-picker.html) — the R5.d.a fragment used Java lambda syntax inside {@code th:with} ({@code options.stream().anyMatch(o -> o.kind() == 'SQUADRON')}). Thymeleaf's SpEL backend cannot parse Java lambdas (EL1042E) but the bug stayed latent because every existing fragment caller (R5.d.a inventory-input, R5.d.b refinery-orders-create) renders with ≤1 option today and the fragment is guarded by {@code th:if="${options != null and options.size() > 1}"}. The fix swaps the lambda for SpEL's collection-selection {@code .?[expr]}: {@code !options.?[kind == 'SQUADRON'].isEmpty()} works without lambdas and renders identically. Discovered while testing the R5.d.c Job Order picker, which exercises the lambda branch because the Squadron catalog is non-trivial.
+- **Tests (+4 net new methods).**
+  - 2 new {@code OrgUnitMembershipServiceTest} cases pin {@code listAllActiveOptions} (empty catalog → empty list; mixed kinds → Staffel-first-then-SK sort).
+  - New [`OrgUnitControllerTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/controller/OrgUnitControllerTest.java) with 2 thin delegation tests for the new endpoint.
+  - Backend test count: **1842** (was 1838 on R5.d.b).
+
+**Intentionally NOT in R5.d.c:** the four remaining create / transfer forms (mission-create-modal, operation-create-modal, hangar-add-modal, inventory-transfer-modal). The {@code creatingSquadronId → creatingOrgUnitId} admin-override rename on Job Order also stays deferred — the field has no UI surface (admin-only override, set via the JSON body) so the rename adds churn without unlocking new functionality. The schema loosening that lets SKs actually own Job Orders waits for the destructive cleanup release.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL**. Backend 1842 tests pass; frontend 691 (no count change — the new flow is template + thin controller passthrough, the substantive logic is on the backend). Three rounds of test-compile fixes during the session: the first run uncovered the SpEL lambda parse error on three frontend MVC tests (template-parsing failure on {@code orders-create.html}); the second exposed the same error on {@code orders-detail.html}; the third was clean.
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL** after fixing two Checkstyle warnings on {@code OrgUnitMembershipService.java} caused by an Edit that inserted the new method between an existing Javadoc and its method (orphaned the Javadoc + left the existing method without a Javadoc). Spotless idempotent on the touched files.
+
+**Rollback plan:** revert the commit. The orders-create + orders-detail forms regain the {@code requestingSquadronId} dropdown; the form / DTO / service rename reverts; the {@code /api/v1/org-units/active} endpoint disappears. The fragment fix is independent of R5.d.c — keeping it on revert is acceptable (R5.d.a + R5.d.b still work because their fragment usage is guarded), but for a clean revert the fragment also goes back to the lambda form.
+
+**Risks mitigated in this slice:**
+
+- The latent SpEL-lambda bug in the R5.d.a fragment would have shipped silently and broken R5.d.a's inventory-input picker the moment any user gained a second membership. Now fixed proactively.
+- Plan §11 R9 (frontend mirror DTO drift): the rename landed on both sides of the wire in the same commit; every test fixture and template references the new field name.
+- Plan §11 R16 (frontend hardcoded squadron assumptions): the {@code orders-create.html} dropdown explicitly handles the two-kinds case via {@code <optgroup>} when the catalog contains SKs; today it collapses to a flat Staffel-only list, but the SK widening is a single backend flag flip away.
+
+**Next session must:** start R5.d.d — pick the next form. Candidates ordered by plan §7.3:
+* Mission-create modal in {@code mission-detail.html} (or wherever the create form lives — needs an Explore audit). The picker is target-user-driven (owner's memberships) — uses the R5.d.a/b pattern, not the R5.d.c active-org-units pattern.
+* Operation-create modal in {@code operations-index.html}. Similar — actor's memberships.
+* Hangar add-ship modal in {@code hangar.html}. Owner's memberships.
+* Inventory-transfer book-out modal — target user's memberships, cross-org-unit transfer is the canonical use case per the plan.
+
+The mission-create-modal is probably the smallest delta. Operation-create + hangar-add follow the same pattern. The inventory-transfer is qualitatively different (cross-org-unit transfer between two users) and should be R5.d.g or similar.
 
 ### 2026-05-22 — Release R5.d.b implemented (owner-picker integrated into refinery-orders-create + shared resolver extracted)
 

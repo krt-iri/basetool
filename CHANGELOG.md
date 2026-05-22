@@ -2,6 +2,9 @@
 ## [Unreleased]
 
 ### Added
+- **Owner-Picker auf der Job-Order-Anlage und -Detailseite integriert (R5.d.c).** Auf `/orders/create` und `/orders/{id}` wird das `requestingSquadronId`-Dropdown durch ein neues Owner-Dropdown ersetzt, das aktive Staffeln und Spezialkommandos in zwei `<optgroup>`-Sektionen anzeigt. Job Orders sind cross-staffel — die Picker-Options kommen vom neuen Endpoint `GET /api/v1/org-units/active`, nicht aus den Mitgliedschaften des Auftrag-Besitzers. Backend-DTO `CreateJobOrderDto` und Frontend `JobOrderForm` benannten ihr Feld von `requestingSquadronId` auf `requestingOrgUnitId` um; SK-Selektionen werden vom Service weiterhin mit 400 abgewiesen, bis die NOT-NULL-Spalte fällt. Latenter Lambda-Parsing-Bug im `fragments/owner-picker.html` (SpEL akzeptiert keine Java-Lambdas im `th:with`) bei dieser Gelegenheit per `?[]`-SpEL-Selection-Syntax behoben — vorher wäre er erst bei mehreren OrgUnit-Mitgliedschaften pro User aufgeschlagen.
+
+### Added
 - **Owner-Picker auf der Raffinerie-Auftrag-Anlage integriert (R5.d.b).** Das in R5.d.a eingeführte Fragment landet jetzt in `refinery-orders-create.html` direkt neben dem Besitzer-Dropdown — ein Logistiker, der einen Auftrag für einen anderen User anlegt, sieht das Picker-Dropdown automatisch, sobald dieser User in mehreren OrgUnits ist. Backend-DTO `RefineryOrderDto` und Service `RefineryOrderService.createRefineryOrder` akzeptieren das optionale `owningOrgUnitId`-Feld. Die Validierungs- und Stempel-Logik wurde aus `InventoryItemService` heraus auf eine gemeinsame Methode `OwnerScopeService.resolveSquadronForPickerOutput` extrahiert — alle R5.d.c-ff.-Forms teilen sich diesen Pfad. SK-Selektion wird wie bei R5.d.a mit 400 abgewiesen, bis die NOT-NULL-Auflockerung der Legacy-Spalte landet.
 
 ### Fixed

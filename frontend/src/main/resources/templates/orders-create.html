@@ -95,10 +95,26 @@
                 <input type="hidden" th:field="*{source}" />
                 
                 <div class="form-group">
-                    <label for="requestingSquadronId" th:text="#{orders.create.squadron}">Staffel</label>
-                    <select id="requestingSquadronId" th:field="*{requestingSquadronId}" required>
+                    <label for="requestingOrgUnitId" th:text="#{orders.create.squadron}">Staffel</label>
+                    <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required>
                         <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                        <option th:each="s : ${squadrons}" th:value="${s.id}" th:text="${s.name}"></option>
+                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
+                            <option th:each="o : ${ownerOptions}"
+                                    th:if="${o.kind() == 'SQUADRON'}"
+                                    th:value="${o.orgUnitId()}"
+                                    th:text="${o.orgUnitName()}">Staffel</option>
+                        </optgroup>
+                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
+                            <option th:each="o : ${ownerOptions}"
+                                    th:if="${o.kind() == 'SPECIAL_COMMAND'}"
+                                    th:value="${o.orgUnitId()}"
+                                    th:text="${o.orgUnitName()}">Spezialkommando</option>
+                        </optgroup>
+                        <th:block th:unless="${ownerOptionsHasSpecialCommand}">
+                            <option th:each="o : ${ownerOptions}"
+                                    th:value="${o.orgUnitId()}"
+                                    th:text="${o.orgUnitName()}">Org Unit</option>
+                        </th:block>
                     </select>
                 </div>
                 

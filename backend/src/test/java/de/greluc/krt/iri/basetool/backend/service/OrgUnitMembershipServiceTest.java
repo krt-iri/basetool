@@ -373,4 +373,50 @@ class OrgUnitMembershipServiceTest {
         options.isEmpty(),
         "membership row pointing at a deleted Squadron must not crash the picker");
   }
+
+  // --- listAllActiveOptions (R5.d.c Job Order picker) -----------------------
+
+  @Test
+  void listAllActiveOptions_emptyCatalog_returnsEmptyList() {
+    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of());
+    when(specialCommandRepository.findAllByActiveTrue()).thenReturn(List.of());
+
+    assertTrue(membershipService.listAllActiveOptions().isEmpty());
+  }
+
+  @Test
+  void listAllActiveOptions_mixed_sortsStaffelFirstThenSkAlphabetical() {
+    Squadron iri = new Squadron();
+    iri.setId(UUID.randomUUID());
+    iri.setName("IRIDIUM");
+    iri.setShorthand("IRI");
+    Squadron khg = new Squadron();
+    khg.setId(UUID.randomUUID());
+    khg.setName("KHG");
+    khg.setShorthand("KHG");
+    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(iri, khg));
+
+    SpecialCommand bravo = new SpecialCommand();
+    bravo.setId(UUID.randomUUID());
+    bravo.setName("Bravo");
+    bravo.setShorthand("BRV");
+    SpecialCommand alpha = new SpecialCommand();
+    alpha.setId(UUID.randomUUID());
+    alpha.setName("Alpha");
+    alpha.setShorthand("ALF");
+    when(specialCommandRepository.findAllByActiveTrue()).thenReturn(List.of(bravo, alpha));
+
+    List<OrgUnitMembershipOptionDto> result = membershipService.listAllActiveOptions();
+
+    assertEquals(4, result.size());
+    // Staffeln first (alphabetical), then SKs (alphabetical).
+    assertEquals(OrgUnitKind.SQUADRON, result.get(0).kind());
+    assertEquals("IRIDIUM", result.get(0).orgUnitName());
+    assertEquals(OrgUnitKind.SQUADRON, result.get(1).kind());
+    assertEquals("KHG", result.get(1).orgUnitName());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(2).kind());
+    assertEquals("Alpha", result.get(2).orgUnitName());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(3).kind());
+    assertEquals("Bravo", result.get(3).orgUnitName());
+  }
 }

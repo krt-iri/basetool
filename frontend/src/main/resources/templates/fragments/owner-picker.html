@@ -24,11 +24,13 @@
     <select th:id="${name}" th:name="${name}" th:required="${required}">
         <option value="" th:text="#{ownerPicker.placeholder}">-- Bitte wählen --</option>
         <!--
-          When the user has BOTH kinds, render two <optgroup>s. We detect both-kinds by counting
-          the discriminator values present in the options list.
+          When the option list contains BOTH kinds, render two <optgroup>s. SpEL's collection-
+          selection syntax `.?[expr]` filters a list by predicate without lambdas — Thymeleaf's
+          SpEL backend rejects Java lambda syntax (EL1042E) so the obvious .stream().anyMatch(o
+          -> …) form fails as soon as the fragment is actually exercised.
         -->
-        <th:block th:with="hasStaffel=${options.stream().anyMatch(o -> o.kind() == 'SQUADRON')},
-                            hasSpecialCommand=${options.stream().anyMatch(o -> o.kind() == 'SPECIAL_COMMAND')}">
+        <th:block th:with="hasStaffel=${!options.?[kind == 'SQUADRON'].isEmpty()},
+                            hasSpecialCommand=${!options.?[kind == 'SPECIAL_COMMAND'].isEmpty()}">
             <th:block th:if="${hasStaffel and hasSpecialCommand}">
                 <optgroup th:label="#{ownerPicker.staffel}">
                     <option th:each="o : ${options}"

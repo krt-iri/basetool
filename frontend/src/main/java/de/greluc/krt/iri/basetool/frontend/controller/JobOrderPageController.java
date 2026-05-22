@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
@@ -248,10 +249,14 @@ public class JobOrderPageController {
         model.addAttribute("users", fetchUsers());
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("squadrons", fetchSquadrons());
+        List<OrgUnitMembershipOptionDto> detailOrgOptions = fetchActiveOrgUnitOptions();
+        model.addAttribute("ownerOptions", detailOrgOptions);
+        model.addAttribute(
+            "ownerOptionsHasSpecialCommand", containsSpecialCommand(detailOrgOptions));
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
-          form.setRequestingSquadronId(
+          form.setRequestingOrgUnitId(
               order.requestingSquadron() != null ? order.requestingSquadron().id() : null);
           form.setHandle(order.handle());
           form.setVersion(order.version());
@@ -336,7 +341,31 @@ public class JobOrderPageController {
     }
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("squadrons", fetchSquadrons());
+    List<OrgUnitMembershipOptionDto> orgOptions = fetchActiveOrgUnitOptions();
+    model.addAttribute("ownerOptions", orgOptions);
+    model.addAttribute("ownerOptionsHasSpecialCommand", containsSpecialCommand(orgOptions));
     return "orders-create";
+  }
+
+  /**
+   * Returns {@code true} iff the option list contains at least one Spezialkommando entry. Computed
+   * server-side because Thymeleaf's SpEL backend cannot parse Java lambda syntax inside template
+   * expressions ({@code .stream().anyMatch(o -> …)} fails with EL1042E), and pre-computing the flag
+   * keeps the template free of {@code #lists.contains(list.![kind], …)}-style gymnastics.
+   *
+   * @param options the active-org-unit list, may be {@code null}.
+   * @return {@code true} when at least one row's {@code kind} is {@code SPECIAL_COMMAND}.
+   */
+  private static boolean containsSpecialCommand(List<OrgUnitMembershipOptionDto> options) {
+    if (options == null) {
+      return false;
+    }
+    for (OrgUnitMembershipOptionDto o : options) {
+      if ("SPECIAL_COMMAND".equals(o.kind())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -366,7 +395,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null, form.getRequestingSquadronId(), form.getHandle(), materials, form.getVersion());
+              null, form.getRequestingOrgUnitId(), form.getHandle(), materials, form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -469,7 +498,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null, form.getRequestingSquadronId(), form.getHandle(), materials, form.getVersion());
+              null, form.getRequestingOrgUnitId(), form.getHandle(), materials, form.getVersion());
       backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -744,6 +773,26 @@ public class JobOrderPageController {
       log.error("Failed to fetch squadrons", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Fetches the active-org-units catalog from {@code GET /api/v1/org-units/active} for the R5.d.c
+   * Job Order create form's owner-picker fragment. Job Orders are cross-staffel workspaces — the
+   * picker offers every active Staffel + Spezialkommando, not just the caller's memberships. Falls
+   * back to an empty list on backend hiccup so the picker collapses to its hidden state and the
+   * rest of the form stays renderable.
+   *
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
+    try {
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get("/api/v1/org-units/active", new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch active org units for Job Order owner-picker", e);
+      return List.of();
+    }
   }
 
   private UUID getCurrentUserId(OidcUser principal) {
