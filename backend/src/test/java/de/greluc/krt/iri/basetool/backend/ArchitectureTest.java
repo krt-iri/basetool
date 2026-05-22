@@ -778,28 +778,39 @@ class ArchitectureTest {
                 String value =
                     ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
                 // Accepted gate references:
-                //   - @squadronScopeService.canSee*/canEdit* — the direct squadron-scope check;
+                //   - @ownerScopeService.canSee*/canEdit*/canSeeOrgUnit/canEditOrgUnit — the
+                //     plan-aligned org-unit-scope check introduced in R2.c and adopted across the
+                //     controller layer in R2.5;
+                //   - @squadronScopeService.canSee*/canEdit* — the legacy bean name still served
+                //     by the thin shim from R2.c. Accepted during the soak window so a half-
+                //     migrated PR (some controllers on the new name, some still on the old)
+                //     does not trip the rule. Removed once the shim is deleted in a later PR;
                 //   - @missionSecurityService.canManage*/canAccessParticipant/canChangeOwner —
                 //     mission-aggregate gate that itself folds in canEditMission() for elevated
                 //     authorities (see MissionSecurityService — squadron-scope-aware as of the
                 //     Phase 6 follow-up);
                 //   - hasRole('ADMIN') alone — admin always passes the squadron filter, no extra
                 //     scope check needed (MULTI_SQUADRON_PLAN.md section 1).
+                boolean hasOwnerScope = value.contains("ownerScopeService");
                 boolean hasSquadronScope = value.contains("squadronScopeService");
                 boolean hasMissionSecurity = value.contains("missionSecurityService");
                 boolean hasAdminOnly =
                     value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
-                if (!hasSquadronScope && !hasMissionSecurity && !hasAdminOnly) {
+                if (!hasOwnerScope
+                    && !hasSquadronScope
+                    && !hasMissionSecurity
+                    && !hasAdminOnly) {
                   events.add(
                       SimpleConditionEvent.violated(
                           method,
                           method.getFullName()
                               + " is a write endpoint on a staffel-scoped aggregate but its"
-                              + " @PreAuthorize expression does not gate on @squadronScopeService"
-                              + " (or @missionSecurityService / hasRole('ADMIN')) - that means"
-                              + " cross-staffel writes are not blocked. Add `and"
-                              + " @squadronScopeService.canEdit*(#id)` to the SpEL"
-                              + " (MULTI_SQUADRON_PLAN.md section 4.6)."));
+                              + " @PreAuthorize expression does not gate on @ownerScopeService"
+                              + " / @squadronScopeService (or @missionSecurityService /"
+                              + " hasRole('ADMIN')) - that means cross-staffel writes are not"
+                              + " blocked. Add `and @ownerScopeService.canEdit*(#id)` to the"
+                              + " SpEL (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md"
+                              + " §5.3)."));
                 }
               }
             })
