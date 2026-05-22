@@ -1,62 +1,75 @@
 package de.greluc.krt.iri.basetool.backend.model;
 
-import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
 
-/** Squadron JPA entity. */
+/**
+ * Staffel tenant — the original organisational unit the multi-tenancy work was built around (see
+ * {@code MULTI_SQUADRON_PLAN.md}). Concrete {@link OrgUnit} subclass discriminated by {@code
+ * kind = 'SQUADRON'} on the {@code org_unit} table.
+ *
+ * <p>Before R2.b this entity stood alone and mapped to the dedicated {@code squadron} table. R2.b
+ * folds Squadron into the single-table {@link OrgUnit} hierarchy so SK and Staffel share the same
+ * shape, the same repository plumbing, and (in R2.c onward) the same scope-resolution code path.
+ * The mapping change is mechanically invisible to existing callers because:
+ *
+ * <ul>
+ *   <li>{@link SquadronRepository} still types its parameter as {@code Squadron}, and Hibernate
+ *       narrows every query to {@code WHERE kind = 'SQUADRON'} through the inherited discriminator
+ *       — Spezialkommando rows never leak into a Squadron-typed query.
+ *   <li>Every {@link OrgUnit} field is exposed through the Lombok-generated getter/setter on the
+ *       superclass; existing call sites that read or set {@code name}, {@code shorthand},
+ *       {@code description}, {@code active}, {@code isPromotionEnabled} continue to compile and
+ *       behave identically.
+ *   <li>The legacy {@code squadron} table is kept in lockstep with {@code org_unit} by the V97
+ *       trigger {@code sync_org_unit_to_squadron} so every existing foreign-key constraint
+ *       ({@code app_user.squadron_id}, {@code mission_participant.squadron_id}, every aggregate's
+ *       {@code owning_squadron_id} / {@code creating_squadron_id} / {@code requesting_squadron_id})
+ *       still resolves cleanly. Callers that touch those FKs do not need to know the application
+ *       now writes through {@code org_unit}; that abstraction lives entirely at the database
+ *       layer.
+ * </ul>
+ *
+ * <p>The {@link #IRIDIUM_ID} canonical UUID is preserved verbatim — the application code that
+ * references it (backfill paths, test fixtures, the {@code SquadronScopeService} default-tenant
+ * resolution) stays unchanged.
+ *
+ * <p>No subclass-specific columns are added in R2.b; the JPA-layer existence of {@code Squadron}
+ * is enough to give the inheritance hierarchy a complete shape. Squadron-specific behaviour
+ * (e.g. promotion-system flag handling) remains on the {@link OrgUnit} superclass because the
+ * exact same accessor surface is needed by code that holds a polymorphic {@code OrgUnit}
+ * reference, not just a typed {@code Squadron}.
+ */
 @Entity
-@Getter
-@Setter
-@ToString
+@DiscriminatorValue("SQUADRON")
+@ToString(callSuper = true)
 @NoArgsConstructor
-@AllArgsConstructor
-public class Squadron extends AbstractEntity<UUID> {
+public class Squadron extends OrgUnit {
 
   /**
-   * Canonical UUID of the IRIDIUM squadron. Seeded by Flyway migration V80 so backfills, tests, and
-   * the application code (e.g. backfilling new aggregates with the default tenant) refer to a
-   * deterministic identifier without an upfront database lookup. Do not reuse for any other
-   * squadron.
+   * Canonical UUID of the IRIDIUM Staffel — the project's reference tenant since Phase 1 of the
+   * multi-squadron rollout. Seeded by Flyway migration V80 with this exact value so application
+   * code, tests, and migration backfills can refer to it without an upfront database lookup. The
+   * Spezialkommando R2.b refactor preserves the constant on its original class so existing
+   * imports of {@code Squadron.IRIDIUM_ID} keep compiling without a rename round-trip across the
+   * codebase.
    */
   public static final UUID IRIDIUM_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-  @Getter(onMethod_ = @__(@Override))
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
-
-  @Column(unique = true, nullable = false)
-  private String name;
-
-  @Column(unique = true, nullable = false)
-  private String shorthand;
-
-  @Column(columnDefinition = "TEXT")
-  private String description;
-
-  @Column(nullable = false)
-  private boolean active = true;
-
   /**
-   * Per-squadron feature flag deciding whether the entire promotion subsystem (topics, categories,
-   * level-contents, rank-requirements, member-evaluations) is exposed to this squadron's non-admin
-   * members. Admins always retain access regardless of the flag so they can re-enable a squadron
-   * that was switched off and pick up exactly where it left off — turning the flag off does not
-   * delete any data, the records just stop being visible/editable for the squadron's officers and
-   * members until the flag is flipped back on.
+   * Returns {@link OrgUnitKind#SQUADRON} so the abstract base contract is satisfied without
+   * forcing callers to {@code instanceof}-check to identify the kind. The value is a compile-time
+   * constant that must stay in lockstep with the {@code @DiscriminatorValue("SQUADRON")} marker on
+   * this class — a mismatch would silently break the polymorphic identity contract used by
+   * {@link OrgUnit} list endpoints in R2.c.
    *
-   * <p>Default is {@code true} so an existing squadron's promotion menu keeps working after the V86
-   * migration (admins must opt out explicitly via the admin UI).
+   * @return always {@link OrgUnitKind#SQUADRON}, never {@code null}.
    */
-  @Column(nullable = false)
-  private boolean isPromotionEnabled = true;
+  @Override
+  public OrgUnitKind getKind() {
+    return OrgUnitKind.SQUADRON;
+  }
 }
