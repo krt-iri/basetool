@@ -67,6 +67,19 @@ public class UexCommodityService {
                                 .map(
                                     m -> {
                                       m.setIdCommodity(dto.id());
+                                      // A manual entry has just been adopted by UEX. Clear the
+                                      // audit flag so the admin badge disappears and the
+                                      // "manual" filter only lists materials that UEX has not yet
+                                      // picked up; the link to UEX is recorded via the INFO log
+                                      // and the now-populated idCommodity column.
+                                      if (Boolean.TRUE.equals(m.getIsManualEntry())) {
+                                        log.info(
+                                            "Manual material '{}' is now linked to UEX commodity"
+                                                + " id={}",
+                                            m.getName(),
+                                            dto.id());
+                                        m.setIsManualEntry(false);
+                                      }
                                       return m;
                                     })
                                 .orElseGet(

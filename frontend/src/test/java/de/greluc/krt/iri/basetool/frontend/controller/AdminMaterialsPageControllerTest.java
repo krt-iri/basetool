@@ -4,12 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -32,11 +35,11 @@ class AdminMaterialsPageControllerTest {
     MaterialDto currentMaterial =
         new MaterialDto(
             matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, false,
-            1L);
+            false, 1L);
     MaterialDto updatedMaterial =
         new MaterialDto(
             matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false,
-            false, 2L);
+            false, false, 2L);
 
     when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
         .thenReturn(currentMaterial)
@@ -77,6 +80,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            false,
             0L));
     materials.add(
         new MaterialDto(
@@ -88,6 +92,7 @@ class AdminMaterialsPageControllerTest {
             "Desc",
             null,
             null,
+            false,
             false,
             false,
             false,
@@ -109,6 +114,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            false,
             0L));
     materials.add(
         new MaterialDto(
@@ -125,6 +131,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            false,
             0L));
     materials.add(
         new MaterialDto(
@@ -136,6 +143,7 @@ class AdminMaterialsPageControllerTest {
             "Desc",
             null,
             null,
+            false,
             false,
             false,
             false,
@@ -169,5 +177,66 @@ class AdminMaterialsPageControllerTest {
     assertEquals("Charlie", refinedMats.get(2).name());
     assertEquals("Delta", refinedMats.get(3).name());
     assertEquals("Echo", refinedMats.get(4).name());
+  }
+
+  @Test
+  void createMaterialAjax_success_returnsBackendDto() {
+    // Arrange
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+
+    MaterialCreateAjaxRequest req =
+        new MaterialCreateAjaxRequest(
+            "Raw Ouratite", "RAW", "SCU", null, null, null, true, false, false, false, false);
+
+    MaterialDto created =
+        new MaterialDto(
+            UUID.randomUUID(),
+            null,
+            "Raw Ouratite",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            0L);
+
+    when(backendApiClient.post(eq("/api/v1/materials"), eq(req), eq(MaterialDto.class)))
+        .thenReturn(created);
+
+    // Act
+    ResponseEntity<MaterialDto> response = controller.createMaterialAjax(req);
+
+    // Assert
+    assertEquals(200, response.getStatusCode().value());
+    assertEquals(created, response.getBody());
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  void createMaterialAjax_backendValidationFailure_propagatesStatus() {
+    // Arrange — backend returns 400 (validation), client throws BackendServiceException
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+
+    MaterialCreateAjaxRequest req =
+        new MaterialCreateAjaxRequest(
+            "X", "RAW", "SCU", null, null, null, true, false, false, false, false);
+
+    when(backendApiClient.post(eq("/api/v1/materials"), eq(req), eq(MaterialDto.class)))
+        .thenThrow(new BackendServiceException("backend rejected", null, 400));
+
+    // Act
+    ResponseEntity<MaterialDto> response = controller.createMaterialAjax(req);
+
+    // Assert — 400 propagates so the JS layer can show a problem-detail toast
+    assertEquals(400, response.getStatusCode().value());
+    verify(backendApiClient, org.mockito.Mockito.never()).clearStaticDataCache();
   }
 }

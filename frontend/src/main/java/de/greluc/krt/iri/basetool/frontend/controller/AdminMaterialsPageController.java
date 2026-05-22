@@ -1,10 +1,12 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCategoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -213,6 +215,7 @@ public class AdminMaterialsPageController {
               currentMaterial.isVolatileTime(),
               isManualRawMaterial,
               isJobOrder,
+              currentMaterial.isManualEntry(),
               request.version());
 
       backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
@@ -225,6 +228,38 @@ public class AdminMaterialsPageController {
     } catch (Exception e) {
       log.error("Ajax update material failed", e);
       // In case of OptimisticLocking, backend usually returns 409 Conflict
+      return ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that creates a new material manually. Relays the validated request to {@code POST
+   * /api/v1/materials}, which stamps {@code isManualEntry=true} server-side. Propagates the
+   * backend's HTTP status so the page can distinguish 400 (validation rejected — show problem
+   * detail in toast) from 500 (server failure — generic toast). Clears the frontend static-data
+   * cache on success so downstream pages (refinery picker, lookups) immediately see the new
+   * material.
+   *
+   * @param request validated create payload
+   * @return the persisted material on 200, an empty body with the backend's status on failure
+   */
+  @ResponseBody
+  @PostMapping("/ajax")
+  public ResponseEntity<MaterialDto> createMaterialAjax(
+      @Valid @RequestBody MaterialCreateAjaxRequest request) {
+    try {
+      MaterialDto created = backendApiClient.post("/api/v1/materials", request, MaterialDto.class);
+      backendApiClient.clearStaticDataCache();
+      return ResponseEntity.ok(created);
+    } catch (BackendServiceException e) {
+      log.warn(
+          "Ajax create material rejected by backend: status={}, code={}, detail={}",
+          e.getStatusCode(),
+          e.getProblemCode(),
+          e.getReadableErrorMessage());
+      return ResponseEntity.status(e.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Ajax create material failed", e);
       return ResponseEntity.status(500).build();
     }
   }

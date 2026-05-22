@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
+import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
@@ -71,10 +72,12 @@ class MaterialTest {
 
   @Test
   void testCreateMaterial_Admin_Allowed() throws Exception {
+    // Mirrors the new MaterialCreateDto contract: name + type + quantityType are required.
     Material material = new Material();
     material.setName("New Material");
     material.setDescription("Valuable");
     material.setType(MaterialType.RAW);
+    material.setQuantityType(QuantityType.SCU);
 
     mockMvc
         .perform(
@@ -101,6 +104,7 @@ class MaterialTest {
     Material material = new Material();
     material.setName("Illegal Material");
     material.setType(MaterialType.REFINED);
+    material.setQuantityType(QuantityType.SCU);
 
     mockMvc
         .perform(
@@ -119,6 +123,7 @@ class MaterialTest {
     Material material = new Material();
     material.setName("Illegal Material");
     material.setType(MaterialType.REFINED);
+    material.setQuantityType(QuantityType.SCU);
 
     mockMvc
         .perform(
