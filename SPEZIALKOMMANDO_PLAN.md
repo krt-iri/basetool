@@ -2,13 +2,39 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96) and R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories, no service-layer change) implemented. Releases R2.b (Squadron joins the hierarchy, aggregate FK switchover, `OwnerScopeService` rename with shim), R2.c (stop-write of legacy columns, SpEL string updates), and R3 (cleanup migrations) pending.
+**Status**: Execution in progress — Release R1 (DB schema preparation, V94–V96), R2.a (JPA entity foundation: `OrgUnit` hierarchy + `OrgUnitMembership` + repositories), and R2.b (Squadron joins the hierarchy + V97 org_unit→squadron sync trigger) implemented. Releases R2.c (`OwnerScopeService` rename with shim, aggregate FK switchover, dual-write services, ArchUnit whitelist updates) and R3 (cleanup migrations) pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R2.b implemented (Squadron joins the OrgUnit hierarchy + V97 sync trigger)
+
+**Sections delivered:** §5.2 (Squadron refactor to extend OrgUnit), §4 R1.b extended with V97 (the org_unit→squadron sync trigger that keeps the legacy table populated while the application writes through `org_unit`).
+
+**Changes:**
+
+- [`Squadron`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/Squadron.java) — rewritten as `@DiscriminatorValue("SQUADRON")` subclass of {@link OrgUnit}. Mapping switches from the standalone `squadron` table to the shared `org_unit` table; the entity now inherits every column from {@link OrgUnit} (id, name, shorthand, description, active, isPromotionEnabled) plus the audit fields from {@link AbstractEntity}. The {@code IRIDIUM_ID} constant is preserved verbatim — every existing import compiles without a rename. The Lombok `@AllArgsConstructor` is dropped (nobody called it with arguments), the Lombok `@Getter`/`@Setter`/`@ToString` annotations move to the superclass.
+- [`V97__sync_org_unit_to_squadron.sql`](backend/src/main/resources/db/migration/V97__sync_org_unit_to_squadron.sql) — Postgres trigger that mirrors every INSERT/UPDATE/DELETE on `org_unit` (for `kind='SQUADRON'` rows) into the legacy `squadron` table. One-way mirror; the application now writes through `org_unit` exclusively. Preserves the foreign-key contracts that `app_user`, `mission_participant`, and every staffel-scoped aggregate still resolve against `squadron(id)` — R2.c will repoint those FKs.
+
+**Why the V97 trigger rather than just dropping the legacy table:** because `app_user.squadron_id`, `mission_participant.squadron_id`, and every aggregate's `owning_squadron_id` / `creating_squadron_id` / `requesting_squadron_id` column still constrains against `squadron(id)`. An INSERT through `org_unit` without the trigger would create the row in `org_unit` but leave `squadron` empty, and a subsequent INSERT into any of the dependent tables (e.g. creating a User with a freshly-minted Squadron) would fail the foreign-key check. The trigger keeps the legacy table current without forcing the application to dual-write — Hibernate sees only `org_unit`, the database mirror happens behind the scenes.
+
+**Intentionally NOT in R2.b:** OwnerScopeService rename + SquadronScopeService compat shim, aggregate `owningSquadron → owningOrgUnit` field migration, dual-write services for the FK fields, ArchUnit whitelist updates, SpEL string updates across the controllers. All of those land in R2.c so each PR stays reviewable.
+
+**Verification:**
+
+- `./gradlew :backend:test` → **BUILD SUCCESSFUL**. The integration-test stack applies V97 against the Postgres fixture, Hibernate `ddl-auto=validate` accepts the new Squadron mapping against the `org_unit` table, and the entire existing test suite (`SquadronServiceTest`, `SquadronControllerTest`, `MissionServiceTest`, `JobOrderServiceTest`, `MissionParticipantSquadronTest`, `PromotionTopicServiceTest`, etc.) passes unchanged — proving the refactor is transparent to existing callers.
+- `./gradlew :backend:checkstyleMain :backend:spotbugsMain` → **BUILD SUCCESSFUL**.
+
+**Rollback plan:** revert the Squadron entity to its pre-R2.b shape (single `@Entity` on the `squadron` table) and drop the V97 trigger. The `org_unit` rows remain in place from R1; the `squadron` table stays current because every R2.b write since deploy was mirrored there by V97. No data loss.
+
+**Risks mitigated in this slice:** the foreign-key contracts that landed in V81/V82/V83 stay sound — the legacy `squadron(id)` references still resolve cleanly because V97 keeps the mirror current.
+
+**Risks remaining for R2.c:** R3 (SpEL rename across `@PreAuthorize` strings), R5 (active-context header rename), aggregate FK migration in services. Squadron-side data integrity is no longer at risk after R2.b.
+
+**Next session must:** start R2.c — rename `SquadronScopeService` to `OwnerScopeService` with a backward-compat shim bean (so existing `@squadronScopeService` SpEL strings keep resolving for one release), migrate the six aggregates' `owningSquadron` field to `owningOrgUnit` with dual-write logic, update the ArchUnit whitelists. Defer the stop-write of legacy `*_squadron_id` columns and the SpEL string updates to a follow-up so R2.c stays small.
 
 ### 2026-05-22 — Release R2.a implemented (JPA entity foundation, no service-layer change)
 
