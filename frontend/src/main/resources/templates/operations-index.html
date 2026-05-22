@@ -142,6 +142,8 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
+                <!-- R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
+                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" th:text="#{general.save}">Save</button>
                     <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="create-operation-modal" th:text="#{general.cancel}">Cancel</button>

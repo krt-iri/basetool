@@ -58,7 +58,7 @@ class OperationMapperTest {
   void toEntity_fromCreateDto_shouldIgnoreIdAndTimestampsAndMissions() {
     // Given
     OperationCreateDto create =
-        new OperationCreateDto("Op Aurora", "Recon", OperationStatus.PLANNED);
+        new OperationCreateDto("Op Aurora", "Recon", OperationStatus.PLANNED, null);
 
     // When
     Operation entity = mapper.toEntity(create);

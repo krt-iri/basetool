@@ -197,15 +197,38 @@ public class OperationService {
   }
 
   /**
-   * Persists a new operation.
+   * Persists a new operation. R5.d.e routes the owning-Staffel stamp through the shared picker
+   * resolver when an authenticated caller is on the security context.
+   *
+   * <ul>
+   *   <li>Caller resolved AND {@code owningOrgUnitId} provided → resolver validates the picked org
+   *       unit against the caller's memberships and stamps the corresponding Staffel (rejecting
+   *       Spezialkommando selections with {@code BadRequestException} until the cleanup release
+   *       lifts the NOT NULL on {@code owning_squadron_id}).
+   *   <li>Caller resolved AND {@code owningOrgUnitId} is {@code null} → resolver falls back to the
+   *       caller's home Staffel via {@code User.getSquadron()}. Functionally identical to the
+   *       legacy "stamp from active scope" path for the common single-membership case.
+   *   <li>No authenticated caller (admin in "all squadrons" mode, anonymous fallback) → preserve
+   *       the historical {@code OwnerScopeService.currentSquadron()} path. The picker UUID, if
+   *       supplied, cannot be membership-validated without a user, so it is ignored.
+   * </ul>
    *
    * @param operation transient entity
+   * @param owningOrgUnitId optional picker output from {@link
+   *     de.greluc.krt.iri.basetool.backend.model.dto.OperationCreateDto#owningOrgUnitId}; {@code
+   *     null} for the legacy implicit-scope path.
    * @return the persisted operation
    */
   @Transactional
-  public Operation createOperation(@NotNull Operation operation) {
+  public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
     if (operation.getOwningSquadron() == null) {
-      ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+      User caller = userService.getCurrentUser().orElse(null);
+      if (caller != null) {
+        operation.setOwningSquadron(
+            ownerScopeService.resolveSquadronForPickerOutput(caller, owningOrgUnitId));
+      } else {
+        ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+      }
     }
     return operationRepository.save(operation);
   }

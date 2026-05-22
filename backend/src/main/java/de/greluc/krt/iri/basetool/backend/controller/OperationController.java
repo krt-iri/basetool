@@ -342,7 +342,8 @@ public class OperationController {
   public OperationDto createOperation(@Valid @RequestBody OperationCreateDto createDto) {
     de.greluc.krt.iri.basetool.backend.model.Operation operation =
         operationMapper.toEntity(createDto);
-    return operationMapper.toDto(operationService.createOperation(operation));
+    return operationMapper.toDto(
+        operationService.createOperation(operation, createDto.owningOrgUnitId()));
   }
 
   /**

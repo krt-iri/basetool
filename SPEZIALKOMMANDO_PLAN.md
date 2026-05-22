@@ -2,13 +2,54 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, and R5.d.d (owner-picker integrated into the fifth picker — mission-create form — with a new dedicated `CreateMissionRequest` frontend write DTO replacing the historical 29-field `MissionDto`-as-write-payload) implemented. Releases R5.d.e ff. (rolling the picker out to the remaining three create / transfer forms — operation-create modal, hangar add-ship modal, inventory-transfer book-out modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, and R5.d.e (owner-picker integrated into the sixth picker — operation-create modal — with the service layer routed through the shared resolver) implemented. Releases R5.d.f ff. (rolling the picker out to the remaining two forms — hangar add-ship modal, inventory-transfer book-out modal), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.e implemented (owner-picker on operation-create modal)
+
+**Sections delivered:** §7.3 partial — the sixth picker integration (operation-create modal inside `operations-index.html`). Smaller than R5.d.d because the operation surface is leaner (no embedded sub-aggregates on the create payload, just name + description + status + owningOrgUnitId).
+
+**Plan §7.3 reads "actor's active scope" for this form** — historically the service stamped from {@code OwnerScopeService.currentSquadron()}, which scope-resolves the caller's home Staffel or the admin's active-squadron header. R5.d.e widens that to also honour an explicit picker output: when the caller belongs to >1 OrgUnit, the picker offers each membership and the chosen UUID lands on the create payload. The fallback to {@code currentSquadron()} survives for the no-owner branch (admin in "all squadrons" mode, anonymous-form fallback) — a picker UUID without a resolved caller cannot be membership-validated.
+
+**Changes:**
+
+- **Backend.**
+  - [`OperationCreateDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/OperationCreateDto.java) gains a trailing {@code @Nullable UUID owningOrgUnitId} component. Existing fields ({@code name}, {@code description}, {@code status}) untouched. Class-level Javadoc rewritten to document the new picker semantics.
+  - [`OperationController.createOperation`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/OperationController.java) forwards {@code createDto.owningOrgUnitId()} to the service as a separate parameter (the mapper does not touch it — the entity's {@code owningOrgUnit} field is typed {@link OrgUnit}, not UUID, so a UUID-to-entity hydration is more naturally done at the service layer).
+  - [`OperationService.createOperation`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OperationService.java) gains a second {@code @Nullable UUID owningOrgUnitId} parameter. When the caller resolves (via {@code userService.getCurrentUser()}), the stamp is routed through {@code OwnerScopeService.resolveSquadronForPickerOutput} — exactly the R5.d.b/d pattern. When the caller does not resolve, the historical {@code currentSquadron()} fallback survives (preserves the anonymous-form / admin-no-context path).
+- **Frontend.**
+  - [`OperationForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/OperationForm.java) record gains a trailing {@code owningOrgUnitId}. The form posts directly as JSON to {@code /api/v1/operations} — Jackson on the backend side ignores the {@code version} field that {@code OperationCreateDto} doesn't carry, so the existing serialisation contract survives.
+  - [`OperationPageController.listOperations`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/OperationPageController.java) exposes the caller's memberships as {@code ownerOptions} via a new {@code fetchCallerMembershipOptions(principal)} helper. Resolves the caller's id via {@code GET /api/v1/users/me}, fetches memberships from the R5.d.a endpoint, falls back to an empty list on hiccup. Skips the fetch entirely for the AJAX results-fragment path so the picker only loads on full-page renders.
+  - [`operations-index.html`](frontend/src/main/resources/templates/operations-index.html) invokes the {@code fragments/owner-picker} fragment between the status select and the save / cancel buttons. The fragment auto-hides when {@code ownerOptions.size() <= 1}, so the modal looks identical to today for every existing user.
+- **Tests.**
+  - 3 backend test sites updated for the new {@code OperationCreateDto} / {@code OperationService.createOperation} signatures: {@code OperationControllerTest}, {@code OperationServiceTest}, {@code OperationMapperTest} (1 each).
+  - 1 new {@code OperationServiceTest} method ({@code createOperation_withResolvedCallerAndPickerOutput_delegatesToOwnerScopeResolver}) pins the picker delegation.
+  - Backend test count: **1844** (was 1843 on R5.d.d).
+
+**Intentionally NOT in R5.d.e:** the remaining two forms (hangar add-ship modal in {@code hangar.html}, inventory-transfer book-out modal). The schema loosening that lets SKs actually own operations stays deferred per the plan. The {@code OperationForm} record carries a {@code version} field that the backend {@code OperationCreateDto} doesn't accept — that mismatch predates R5.d.e and is harmless (Jackson silently drops the unknown field on the backend side), so no cleanup here.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL**. Backend 1844 tests pass; frontend 691 (no count change — the new flow is templates + thin controller passthrough).
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL**. Checkstyle + SpotBugs + Spotless clean.
+
+**Rollback plan:** revert the commit. {@code OperationCreateDto} loses its trailing field; {@code OperationService.createOperation} signature reverts; the operations-index create modal loses the picker fragment include. No DB migration to undo.
+
+**Risks mitigated in this slice:**
+
+- The {@code OperationService.createOperation} signature change is contained to four call sites (2 controllers + 2 test files); the change ripple is small enough to land safely in one PR without breaking unrelated callers.
+- Plan §11 R9 (frontend mirror DTO drift): the new field lands on both the form record and the backend DTO in the same commit.
+
+**Next session must:** start R5.d.f — pick the next form. Candidates ordered by plan §7.3:
+* Hangar add-ship modal in {@code hangar.html}. Owner's memberships. Closer to R5.d.a/b/d pattern (explicit owner selector → memberships of the chosen owner).
+* Inventory-transfer book-out modal — target user's memberships, cross-org-unit transfer is the canonical use case per the plan. Qualitatively different because the transfer happens between two users; the picker is for the destination user's memberships.
+
+The hangar add-ship form is the natural next step — it mirrors refinery-orders-create closely (target user selector + memberships of the chosen owner). The inventory-transfer modal should be R5.d.g or R5.d.h because the two-user model is genuinely different.
 
 ### 2026-05-22 — Release R5.d.d implemented (owner-picker on mission-create form + dedicated CreateMissionRequest write DTO on the frontend)
 
