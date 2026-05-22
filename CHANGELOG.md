@@ -1,6 +1,9 @@
 # Changelog
 ## [Unreleased]
 
+### Added
+- **Owner-Picker auf der Raffinerie-Auftrag-Anlage integriert (R5.d.b).** Das in R5.d.a eingeführte Fragment landet jetzt in `refinery-orders-create.html` direkt neben dem Besitzer-Dropdown — ein Logistiker, der einen Auftrag für einen anderen User anlegt, sieht das Picker-Dropdown automatisch, sobald dieser User in mehreren OrgUnits ist. Backend-DTO `RefineryOrderDto` und Service `RefineryOrderService.createRefineryOrder` akzeptieren das optionale `owningOrgUnitId`-Feld. Die Validierungs- und Stempel-Logik wurde aus `InventoryItemService` heraus auf eine gemeinsame Methode `OwnerScopeService.resolveSquadronForPickerOutput` extrahiert — alle R5.d.c-ff.-Forms teilen sich diesen Pfad. SK-Selektion wird wie bei R5.d.a mit 400 abgewiesen, bis die NOT-NULL-Auflockerung der Legacy-Spalte landet.
+
 ### Fixed
 - **Demote eines Spezialkommando-Mitglieds via Uncheck der `Logistiker`- oder `Einsatzleiter`-Checkbox schreibt jetzt tatsächlich `false` (R5.d.a-Bugfix).** Vorher hat die ungesetzte Checkbox kein Formularfeld geschickt, der Frontend-Controller hat das als "keine Änderung" durchgereicht und der Backend-Patch hat den alten `true`-Wert behalten. Fix per Spring-`_field`-Hidden-Marker pro Checkbox + Umstellung des Flags-PATCH-Endpoints auf `@ModelAttribute MembershipFlagsForm`-Record-Binding.
 

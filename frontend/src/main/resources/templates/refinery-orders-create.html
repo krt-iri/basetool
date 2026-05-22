@@ -181,6 +181,8 @@
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>
 
+                    <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
                         <input type="number" id="expenses" th:field="*{expenses}" min="0" data-trigger="rfc-update-profit">

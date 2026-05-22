@@ -7,7 +7,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Refinery Order payload. */
+/**
+ * Data transfer record carrying Refinery Order payload.
+ *
+ * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output: when present on create
+ * (POST), the service stamps the new refinery order onto the picked org unit instead of the order
+ * owner's home Staffel. {@code null} preserves the legacy stamping path. Validation against the
+ * order owner's memberships happens at the service layer via {@code
+ * OwnerScopeService.resolveSquadronForPickerOutput}.
+ */
 public record RefineryOrderDto(
     UUID id,
     UserReferenceDto owner,
@@ -23,4 +31,5 @@ public record RefineryOrderDto(
     String status,
     @NotEmpty List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
-    Long version) {}
+    Long version,
+    UUID owningOrgUnitId) {}

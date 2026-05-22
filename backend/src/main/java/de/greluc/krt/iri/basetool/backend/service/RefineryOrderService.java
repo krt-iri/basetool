@@ -162,14 +162,23 @@ public class RefineryOrderService {
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
+   * @param owningOrgUnitId optional R5.d picker output: the {@link
+   *     de.greluc.krt.iri.basetool.backend.model.OrgUnit} on whose stock the new order should land.
+   *     When {@code null}, the service stamps the order owner's home Staffel (legacy behaviour).
+   *     When non-null, must point at an org unit the order owner is a member of — {@link
+   *     OwnerScopeService#resolveSquadronForPickerOutput} performs the validation and rejects
+   *     unknown / foreign / Spezialkommando selections with {@link
+   *     de.greluc.krt.iri.basetool.backend.exception.BadRequestException}.
    * @return the persisted order
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
    *     is unknown
    * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the chosen
-   *     location does not host a refinery
+   *     location does not host a refinery, or the picker output is not a valid membership of the
+   *     order owner
    */
   @Transactional
-  public RefineryOrder createRefineryOrder(@NotNull UUID userId, @NotNull RefineryOrder order) {
+  public RefineryOrder createRefineryOrder(
+      @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
     User user =
         userRepository
             .findById(userId)
@@ -179,7 +188,8 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
-    order.setOwningSquadron(user.getSquadron());
+    order.setOwningSquadron(
+        ownerScopeService.resolveSquadronForPickerOutput(user, owningOrgUnitId));
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(

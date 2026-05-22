@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderListDto;
@@ -186,6 +187,7 @@ public class RefineryOrderPageController {
     RefineryOrderForm formForYields = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
     UUID preselectedLocationId = formForYields != null ? formForYields.getLocationId() : null;
     model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(preselectedLocationId));
+    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(formForYields, principal));
     return "refinery-orders-create";
   }
 
@@ -310,7 +312,8 @@ public class RefineryOrderPageController {
                   ? form.getStatus()
                   : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
               null,
-              form.getVersion());
+              form.getVersion(),
+              form.getOwningOrgUnitId());
 
       log.info("Sending refinery order DTO: {}", orderDto);
 
@@ -664,7 +667,9 @@ public class RefineryOrderPageController {
                   ? form.getStatus()
                   : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
               null,
-              form.getVersion());
+              form.getVersion(),
+              // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
+              null);
 
       backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
@@ -872,6 +877,41 @@ public class RefineryOrderPageController {
           .ifPresent(filtered::add);
     }
     return filtered;
+  }
+
+  /**
+   * Resolves the {@link OrgUnitMembershipOptionDto} list that drives the R5.d owner-picker fragment
+   * on the refinery-order create form. The target user is the form's {@code ownerId} when a
+   * logistician has explicitly picked another user; otherwise the calling user (a self-entry).
+   *
+   * <p>Falls back to an empty list when the lookup fails — the fragment collapses to a hidden state
+   * for an empty option list, so a transient backend hiccup does not break the form render.
+   *
+   * @param form the inbound refinery-order form (may be {@code null} on the very first GET before
+   *     binding).
+   * @param principal the OIDC principal of the calling user; used to derive the fallback target
+   *     user when the form does not carry an explicit owner.
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(
+      RefineryOrderForm form, OidcUser principal) {
+    UUID targetUserId = form != null ? form.getOwnerId() : null;
+    if (targetUserId == null) {
+      targetUserId = getCurrentUserId(principal);
+    }
+    if (targetUserId == null) {
+      return List.of();
+    }
+    try {
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/" + targetUserId + "/memberships",
+              new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch memberships for refinery-order owner-picker", e);
+      return List.of();
+    }
   }
 
   private List<UserDto> fetchUsers() {

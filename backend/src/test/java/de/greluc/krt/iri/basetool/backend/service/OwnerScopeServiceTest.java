@@ -2,14 +2,19 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
@@ -19,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
@@ -58,6 +64,7 @@ class OwnerScopeServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private HttpServletRequest request;
 
   @InjectMocks private OwnerScopeService service;
@@ -462,6 +469,70 @@ class OwnerScopeServiceTest {
 
       verify(userRepository, times(1)).findById(MEMBER_USER_ID);
     }
+  }
+
+  // --- resolveSquadronForPickerOutput (R5.d picker shared helper) -------------
+
+  @Test
+  void resolveSquadronForPickerOutput_nullOwningOrgUnitId_returnsUsersHomeSquadron() {
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, null);
+
+    assertSame(homeStaffel, result);
+    verifyNoInteractions(orgUnitMembershipRepository);
+    verifyNoInteractions(squadronRepository);
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_validMembership_returnsPickedSquadron() {
+    UUID userId = UUID.randomUUID();
+    UUID pickedId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    Squadron picked = new Squadron();
+    picked.setId(pickedId);
+
+    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, pickedId))
+        .thenReturn(true);
+    when(squadronRepository.findById(pickedId)).thenReturn(Optional.of(picked));
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, pickedId);
+
+    assertSame(picked, result, "the picked squadron must be returned verbatim");
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_notAMembership_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID foreignId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, foreignId))
+        .thenReturn(false);
+
+    assertThrows(
+        BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, foreignId));
+    verify(squadronRepository, never()).findById(foreignId);
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_pickedOrgUnitIsSpecialCommand_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, skId)).thenReturn(true);
+    // SquadronRepository.findById returns empty for an SK id — the JPA single-table discriminator
+    // filter limits SquadronRepository to kind='SQUADRON' rows, so an SK row is invisible here.
+    when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
+
+    assertThrows(
+        BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, skId));
   }
 
   // --- helpers ------------------------------------------------------------------

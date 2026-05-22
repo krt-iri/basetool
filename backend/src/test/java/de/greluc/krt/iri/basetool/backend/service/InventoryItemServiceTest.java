@@ -26,8 +26,6 @@ import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -58,8 +56,6 @@ class InventoryItemServiceTest {
 
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
-  @Mock private SquadronRepository squadronRepository;
 
   @InjectMocks private InventoryItemService inventoryItemService;
 
@@ -1123,29 +1119,37 @@ class InventoryItemServiceTest {
   }
 
   // --- R5.d picker output (owningOrgUnitId) ---------------------------------
+  // The membership-validation + Squadron-resolution logic itself is centralised on
+  // OwnerScopeService.resolveSquadronForPickerOutput and pinned by OwnerScopeServiceTest. These two
+  // tests just verify that InventoryItemService.createInventoryItem delegates to the helper and
+  // honours / propagates its outcome.
 
   @Test
-  void createInventoryItem_withOwningOrgUnitIdPointingAtStaffel_stampsTheSelectedSquadron() {
+  void createInventoryItem_delegatesPickerResolutionToOwnerScopeService() {
     UUID userId = UUID.randomUUID();
-    UUID staffelId = UUID.randomUUID();
+    UUID pickedOrgUnitId = UUID.randomUUID();
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, staffelId);
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            pickedOrgUnitId);
 
-    Squadron homeStaffel = new Squadron();
-    homeStaffel.setId(UUID.randomUUID());
     User user = new User();
     user.setId(userId);
-    user.setSquadron(homeStaffel);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
 
-    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, staffelId))
-        .thenReturn(true);
-    Squadron pickedStaffel = new Squadron();
-    pickedStaffel.setId(staffelId);
-    when(squadronRepository.findById(staffelId)).thenReturn(Optional.of(pickedStaffel));
+    Squadron resolved = new Squadron();
+    resolved.setId(pickedOrgUnitId);
+    when(ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+        .thenReturn(resolved);
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
@@ -1155,13 +1159,13 @@ class InventoryItemServiceTest {
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
     assertSame(
-        pickedStaffel,
+        resolved,
         captor.getValue().getOwningSquadron(),
-        "the picker output must be honoured, not the user's home Staffel");
+        "owner-picker resolution must be honoured verbatim");
   }
 
   @Test
-  void createInventoryItem_withOwningOrgUnitIdNotInUserMemberships_throwsBadRequest() {
+  void createInventoryItem_propagatesBadRequestFromOwnerScopeService() {
     UUID userId = UUID.randomUUID();
     UUID foreignOrgUnitId = UUID.randomUUID();
     InventoryItemCreateDto dto =
@@ -1178,72 +1182,15 @@ class InventoryItemServiceTest {
 
     User user = new User();
     user.setId(userId);
-    user.setSquadron(new Squadron());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
-    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, foreignOrgUnitId))
-        .thenReturn(false);
+    when(ownerScopeService.resolveSquadronForPickerOutput(user, foreignOrgUnitId))
+        .thenThrow(new BadRequestException("not a membership"));
 
     assertThrows(
         BadRequestException.class,
         () -> inventoryItemService.createInventoryItem(dto, userId, true));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
-  }
-
-  @Test
-  void createInventoryItem_withOwningOrgUnitIdPointingAtSk_throwsBadRequest() {
-    UUID userId = UUID.randomUUID();
-    UUID skId = UUID.randomUUID();
-    InventoryItemCreateDto dto =
-        new InventoryItemCreateDto(
-            userId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, skId);
-
-    User user = new User();
-    user.setId(userId);
-    user.setSquadron(new Squadron());
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
-    when(orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, skId)).thenReturn(true);
-    // squadronRepository.findById returns empty for an SK id (the JPA discriminator filter excludes
-    // SPECIAL_COMMAND rows from the SquadronRepository surface).
-    when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
-
-    assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, true));
-    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
-  }
-
-  @Test
-  void createInventoryItem_withoutOwningOrgUnitId_fallsBackToUsersHomeStaffel() {
-    UUID userId = UUID.randomUUID();
-    InventoryItemCreateDto dto =
-        new InventoryItemCreateDto(
-            userId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, null);
-
-    Squadron homeStaffel = new Squadron();
-    homeStaffel.setId(UUID.randomUUID());
-    User user = new User();
-    user.setId(userId);
-    user.setSquadron(homeStaffel);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
-    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
-    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
-
-    inventoryItemService.createInventoryItem(dto, userId, true);
-
-    org.mockito.ArgumentCaptor<InventoryItem> captor =
-        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
-    verify(inventoryItemRepository).save(captor.capture());
-    assertSame(
-        homeStaffel,
-        captor.getValue().getOwningSquadron(),
-        "no picker output → legacy stamp via user.getSquadron()");
-    verifyNoInteractions(orgUnitMembershipRepository);
-    verifyNoInteractions(squadronRepository);
   }
 }

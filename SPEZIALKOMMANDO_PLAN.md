@@ -2,13 +2,56 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, and R5.d.a (owner-picker fragment + `GET /api/v1/users/{id}/memberships` endpoint + inventory-input form as reference integration + R5.c.b flag-demote bugfix) implemented. Releases R5.d.b ff. (rolling the picker out to the remaining six create / transfer forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, and R5.d.b (owner-picker integrated into the second create form — refinery-order create — and the resolver logic extracted into a shared `OwnerScopeService.resolveSquadronForPickerOutput` helper) implemented. Releases R5.d.c ff. (rolling the picker out to the remaining five create / transfer forms), R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
 
 ---
 
 ## Progress Log
 
 > Most-recent entry first. Each entry records the slice of the plan that landed in one execution session, what shipped, what was verified, and the link back to the section of this plan that drove the change.
+
+### 2026-05-22 — Release R5.d.b implemented (owner-picker integrated into refinery-orders-create + shared resolver extracted)
+
+**Sections delivered:** §7.3 partial — the second of the seven create / transfer forms (`refinery-orders-create.html`) integrates the owner-picker fragment from R5.d.a. Plus a refactor that hoists the picker-resolution logic out of `InventoryItemService` and into a shared `OwnerScopeService.resolveSquadronForPickerOutput` so the upcoming R5.d.c ff. integrations can call into one well-tested helper instead of copying the validation + Squadron-lookup dance.
+
+**Changes (~20 files, no new files):**
+
+- **Backend, shared resolver.**
+  - [`OwnerScopeService.resolveSquadronForPickerOutput`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) — new method centralising the R5.d picker resolution logic (was inlined as `InventoryItemService.resolveOwningSquadron` in R5.d.a). Three cases: {@code null} picker output → user's home Staffel; valid picker membership pointing at a Squadron → return that Squadron; everything else → {@link de.greluc.krt.iri.basetool.backend.exception.BadRequestException}. The SK-rejection branch remains a soft block because {@code owning_squadron_id} is still NOT NULL on every aggregate table.
+  - [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) now injects {@link de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository} for the membership-existence check; {@link de.greluc.krt.iri.basetool.backend.repository.SquadronRepository} was already wired for the existing scope-resolution paths.
+  - [`InventoryItemService.createInventoryItem`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/InventoryItemService.java) — drops the inlined helper and delegates to {@code ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId())}. The {@code OrgUnitMembershipRepository} / {@code SquadronRepository} fields disappear from {@link InventoryItemService} along with the helper.
+- **Backend, refinery-order picker.**
+  - [`RefineryOrderDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/dto/RefineryOrderDto.java) gains a trailing {@code owningOrgUnitId} {@link java.util.UUID} field — the R5.d picker output.
+  - [`RefineryOrderMapper.toDto`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/mapper/RefineryOrderMapper.java) plumbs the new field through the yield-enrichment overload; the inbound {@code toEntity} relies on {@code unmappedTargetPolicy = IGNORE} so the new field is read out of the DTO by the controller rather than mapped onto the entity (the entity has {@code owningOrgUnit} typed as {@link de.greluc.krt.iri.basetool.backend.model.OrgUnit}, not a UUID — the lifecycle hook on R4 mirrors the picker-resolved Squadron into the new column on persist).
+  - [`RefineryOrderService.createRefineryOrder`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/RefineryOrderService.java) gains an {@code owningOrgUnitId} parameter (after the existing {@code userId} + {@code RefineryOrder} args). Calls {@code ownerScopeService.resolveSquadronForPickerOutput(user, owningOrgUnitId)} for the stamp instead of {@code user.getSquadron()}.
+  - [`RefineryOrderController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/RefineryOrderController.java) — both create endpoints ({@code POST /api/v1/refinery-orders}, {@code POST /api/v1/refinery-orders/users/{userId}}) forward {@code orderDto.owningOrgUnitId()} to the service.
+- **Frontend, refinery-order picker.**
+  - [`RefineryOrderDto`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/dto/RefineryOrderDto.java) frontend mirror gains {@code owningOrgUnitId} (per the {@code feedback_backend_frontend_dto_mirror} memory: missing the mirror = render-time 500 in prod).
+  - [`RefineryOrderForm`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/model/form/RefineryOrderForm.java) carries the form-bound {@code owningOrgUnitId}.
+  - [`RefineryOrderPageController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/RefineryOrderPageController.java) — new {@code fetchOwnerPickerOptions(form, principal)} helper mirrors the {@code InventoryPageController} pattern: resolves the target user from {@code form.ownerId} or {@code principal}, fetches their memberships from {@code /api/v1/users/{id}/memberships}, falls back to an empty list on backend hiccup. Both create-form constructors of {@code RefineryOrderDto} (POST create + PUT update) forward the form's {@code owningOrgUnitId}; the update path passes {@code null} because the picker is create-only.
+  - [`refinery-orders-create.html`](frontend/src/main/resources/templates/refinery-orders-create.html) invokes the {@code fragments/owner-picker} fragment directly under the existing {@code ownerId} dropdown.
+- **Tests:** 4 new {@code OwnerScopeServiceTest} cases pin the shared resolver (null → user's home Staffel; valid membership → picked Squadron; foreign org unit → 400; SK selection → 400). 1 new {@code RefineryOrderServiceTest} case verifies the service delegates to the resolver. The 4 R5.d.a {@code InventoryItemServiceTest} resolver-specific cases were rewritten as 2 delegation tests (the resolver logic now lives elsewhere). 30+ existing {@code RefineryOrderServiceLifecycleTest}, {@code RefineryOrderControllerTest}, and 5 frontend test files updated for the widened DTO + service signatures. Backend test count: **1838** (was 1835 at R5.d.a).
+
+**Intentionally NOT in R5.d.b:** the remaining five create / transfer forms (orders-create with the {@code requestingSquadronId → requestingOrgUnitId} rename, mission-create modal, operation-create modal, hangar add-ship modal, inventory-transfer book-out modal). The destructive cleanup release that lowers NOT NULL on {@code owning_squadron_id} so SK ownership is actually reachable stays deferred per §10. R5.e (active-context switcher widening + header rename) is its own slice.
+
+**Verification:**
+
+- {@code ./gradlew :backend:test :frontend:test} → **BUILD SUCCESSFUL**. Backend 1838 tests pass; frontend 691 (no test counts moved — the new flow lives in templates + a thin controller passthrough). Three rounds of test-compile fixes during the session (forgot to update the lifecycle test's 25 call sites on the first iteration; forgot two enum-value variants in the frontend hierarchy test on the second; clean on the third).
+- {@code ./gradlew :backend:check :frontend:check} → **BUILD SUCCESSFUL**. Checkstyle + SpotBugs + Spotless clean. {@code ./gradlew spotlessApply} idempotent on the touched files.
+
+**Rollback plan:** revert the commit. The refinery-order create form loses the new {@code <select>} block; {@code RefineryOrderDto} loses the trailing field; the service signature reverts and {@code RefineryOrderService.createRefineryOrder} goes back to {@code user.getSquadron()} stamping. {@code OwnerScopeService.resolveSquadronForPickerOutput} disappears and {@code InventoryItemService} regains its inlined helper. The R5.d.a inventory-input flow is functionally untouched by this revert because {@code InventoryItemService} would resume calling the inlined helper.
+
+**Risks mitigated in this slice:**
+
+- The picker-resolution logic now has exactly one implementation, pinned by {@code OwnerScopeServiceTest}. R5.d.c ff. integrations cannot diverge from the established behaviour by mistake.
+- Plan §11 R9 (frontend mirror DTO drift): {@link RefineryOrderDto} updated on both sides of the wire in the same commit; the 5 frontend test files that construct {@link RefineryOrderDto} were updated alongside the production code.
+- Plan §11 R12 (concurrent admin flag flips): not exercised by this slice but the version field on the DTO is preserved unchanged.
+
+**Next session must:** start R5.d.c — pick the next form in the list. Two viable candidates:
+* {@code orders-create.html} (Job Order create) — has the {@code requestingSquadronId} field that needs to be renamed to {@code requestingOrgUnitId} *and* widened to accept SKs (since Job Orders are cross-staffel workspaces per CLAUDE.md — they always could span squadrons). The picker semantics for {@code requestingOrgUnitId} differ from R5.d.a/b: there is no "membership of the order owner" — Job Orders pick *any* active org unit.
+* Mission-create modal inside {@code mission-detail.html} (or similar) — closer to the inventory-input / refinery-order pattern but the create flow is part of a larger detail page so the integration is more invasive.
+
+The orders-create form is the cleaner R5.d.c because the {@code requestingSquadronId → requestingOrgUnitId} rename is documented in the plan §7.3 and is a natural fit for the shared resolver (just with a relaxed "owner-must-be-member" check — Job Order requesting org units are user-chosen from the full active org-unit list, not restricted to the caller's memberships).
 
 ### 2026-05-22 — Release R5.d.a implemented (owner-picker fragment + inventory-input reference + R5.c.b flag-demote bugfix)
 

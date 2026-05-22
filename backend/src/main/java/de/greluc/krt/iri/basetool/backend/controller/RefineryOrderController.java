@@ -171,7 +171,8 @@ public class RefineryOrderController {
       }
     }
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
+        refineryOrderService.createRefineryOrder(
+            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -318,7 +319,8 @@ public class RefineryOrderController {
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
+        refineryOrderService.createRefineryOrder(
+            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
