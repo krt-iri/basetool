@@ -109,8 +109,8 @@ class JobOrderServiceTest {
     // requestingSquadron / creatingSquadron explicitly.
     Squadron alpha = new Squadron();
     alpha.setShorthand("Alpha");
-    jobOrder.setRequestingSquadron(alpha);
-    jobOrder.setCreatingSquadron(alpha);
+    jobOrder.setRequestingOrgUnit(alpha);
+    jobOrder.setCreatingOrgUnit(alpha);
     jobOrder.setHandle("Tester");
     jobOrder.setPriority(1);
 
@@ -261,8 +261,8 @@ class JobOrderServiceTest {
         .save(
             argThat(
                 jo ->
-                    jo.getCreatingSquadron() == requestingSquadron
-                        && jo.getRequestingSquadron() == requestingSquadron));
+                    jo.getCreatingOrgUnit() == requestingSquadron
+                        && jo.getRequestingOrgUnit() == requestingSquadron));
     verify(squadronRepository, never()).findById(Squadron.IRIDIUM_ID);
   }
 
@@ -303,8 +303,7 @@ class JobOrderServiceTest {
     verify(jobOrderRepository)
         .save(
             argThat(
-                jo ->
-                    jo.getCreatingSquadron() == iridium && jo.getRequestingSquadron() == iridium));
+                jo -> jo.getCreatingOrgUnit() == iridium && jo.getRequestingOrgUnit() == iridium));
   }
 
   @Test
@@ -514,12 +513,12 @@ class JobOrderServiceTest {
     Squadron creatingOriginal = new Squadron();
     creatingOriginal.setId(UUID.randomUUID());
     creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingSquadron(creatingOriginal);
+    jobOrder.setCreatingOrgUnit(creatingOriginal);
 
     Squadron requestingOriginal = new Squadron();
     requestingOriginal.setId(UUID.randomUUID());
     requestingOriginal.setShorthand("ALF");
-    jobOrder.setRequestingSquadron(requestingOriginal);
+    jobOrder.setRequestingOrgUnit(requestingOriginal);
 
     // The new requesting target ("Bravo") is intentionally different from creatingOriginal /
     // requestingOriginal so the assertions below distinguish creating-untouched from
@@ -544,12 +543,12 @@ class JobOrderServiceTest {
     // The creating squadron must be the SAME reference (and same id) as before the update.
     assertSame(
         creatingOriginal,
-        jobOrder.getCreatingSquadron(),
+        jobOrder.getCreatingOrgUnit(),
         "creatingSquadron is immutable per Plan §8 — update must not retag the authoring"
             + " squadron.");
     // The requesting squadron must reflect the new "Bravo" target.
-    assertNotNull(jobOrder.getRequestingSquadron());
-    assertEquals("Bravo", jobOrder.getRequestingSquadron().getShorthand());
+    assertNotNull(jobOrder.getRequestingOrgUnit());
+    assertEquals("Bravo", jobOrder.getRequestingOrgUnit().getShorthand());
   }
 
   @Test
@@ -560,7 +559,7 @@ class JobOrderServiceTest {
     Squadron creatingOriginal = new Squadron();
     creatingOriginal.setId(UUID.randomUUID());
     creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingSquadron(creatingOriginal);
+    jobOrder.setCreatingOrgUnit(creatingOriginal);
 
     UUID attemptedOverride = UUID.randomUUID();
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
@@ -587,12 +586,12 @@ class JobOrderServiceTest {
     UUID creatingId = UUID.randomUUID();
     creatingOriginal.setId(creatingId);
     creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingSquadron(creatingOriginal);
+    jobOrder.setCreatingOrgUnit(creatingOriginal);
 
     Squadron requestingOriginal = new Squadron();
     requestingOriginal.setId(UUID.randomUUID());
     requestingOriginal.setShorthand("ALF");
-    jobOrder.setRequestingSquadron(requestingOriginal);
+    jobOrder.setRequestingOrgUnit(requestingOriginal);
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
@@ -604,7 +603,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
     assertDoesNotThrow(() -> jobOrderService.updateJobOrder(orderId, updateDto));
-    assertSame(creatingOriginal, jobOrder.getCreatingSquadron());
+    assertSame(creatingOriginal, jobOrder.getCreatingOrgUnit());
   }
 
   @Test
@@ -636,8 +635,8 @@ class JobOrderServiceTest {
     jobOrderService.updateJobOrder(orderId, updateDto);
 
     // Then — requesting squadron flipped to the resolved "Beta" target.
-    assertNotNull(jobOrder.getRequestingSquadron());
-    assertEquals("Beta", jobOrder.getRequestingSquadron().getShorthand());
+    assertNotNull(jobOrder.getRequestingOrgUnit());
+    assertEquals("Beta", jobOrder.getRequestingOrgUnit().getShorthand());
     assertEquals("NewTester", jobOrder.getHandle());
 
     // Check if the old material was unlinked

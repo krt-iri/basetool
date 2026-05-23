@@ -77,7 +77,7 @@ class ConcurrencyTest {
   void missionUpdate_underRealConcurrentContention_exactlyOneThreadWins() throws Exception {
     iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     Mission seed = new Mission();
-    seed.setOwningSquadron(iridium);
+    seed.setOwningOrgUnit(iridium);
     seed.setName("Concurrency Mission " + UUID.randomUUID());
     seed.setStatus("PLANNED");
     seedMissionId = missionRepository.save(seed).getId();

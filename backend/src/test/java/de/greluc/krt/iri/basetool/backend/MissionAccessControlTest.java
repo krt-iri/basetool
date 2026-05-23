@@ -125,7 +125,7 @@ class MissionAccessControlTest {
   @Test
   void testJoinMission_Guest_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Open Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -143,7 +143,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_Self_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -180,7 +180,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_OtherGuest_Forbidden() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -225,7 +225,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_Officer_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -269,7 +269,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_AllFields() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission Full");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -323,22 +323,22 @@ class MissionAccessControlTest {
 
     Mission m1 = new Mission();
 
-    m1.setOwningSquadron(iridium);
+    m1.setOwningOrgUnit(iridium);
     m1.setName("M1");
     m1.setStatus("PLANNED");
     missionRepository.save(m1);
     Mission m2 = new Mission();
-    m2.setOwningSquadron(iridium);
+    m2.setOwningOrgUnit(iridium);
     m2.setName("M2");
     m2.setStatus("ACTIVE");
     missionRepository.save(m2);
     Mission m3 = new Mission();
-    m3.setOwningSquadron(iridium);
+    m3.setOwningOrgUnit(iridium);
     m3.setName("M3");
     m3.setStatus("COMPLETED");
     missionRepository.save(m3);
     Mission m4 = new Mission();
-    m4.setOwningSquadron(iridium);
+    m4.setOwningOrgUnit(iridium);
     m4.setName("M4");
     m4.setStatus("CANCELLED");
     missionRepository.save(m4);
@@ -355,12 +355,12 @@ class MissionAccessControlTest {
 
     Mission m1 = new Mission();
 
-    m1.setOwningSquadron(iridium);
+    m1.setOwningOrgUnit(iridium);
     m1.setName("M1");
     m1.setStatus("COMPLETED");
     missionRepository.save(m1);
     Mission m2 = new Mission();
-    m2.setOwningSquadron(iridium);
+    m2.setOwningOrgUnit(iridium);
     m2.setName("M2");
     m2.setStatus("CANCELLED");
     missionRepository.save(m2);
@@ -378,7 +378,7 @@ class MissionAccessControlTest {
   @Test
   void testGetMissionById_Guest_Planned_Allowed() throws Exception {
     Mission m = new Mission();
-    m.setOwningSquadron(iridium);
+    m.setOwningOrgUnit(iridium);
     m.setName("Public");
     m.setStatus("PLANNED");
     m = missionRepository.save(m);
@@ -389,7 +389,7 @@ class MissionAccessControlTest {
   @Test
   void testGetMissionById_Guest_Completed_Forbidden() throws Exception {
     Mission m = new Mission();
-    m.setOwningSquadron(iridium);
+    m.setOwningOrgUnit(iridium);
     m.setName("Secret");
     m.setStatus("COMPLETED");
     m = missionRepository.save(m);
@@ -400,7 +400,7 @@ class MissionAccessControlTest {
   @Test
   void testAddParticipantPublic_Anonymous_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Public Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -423,7 +423,7 @@ class MissionAccessControlTest {
   void testUpdateParticipant_AnonymousGuest_Allowed() throws Exception {
     // Given
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -449,7 +449,7 @@ class MissionAccessControlTest {
   void testUpdatePayoutPreference_AnonymousGuest_Allowed() throws Exception {
     // Given
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

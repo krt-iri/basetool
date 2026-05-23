@@ -87,7 +87,7 @@ class MissionManagerRoleTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setOwner(owner);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));

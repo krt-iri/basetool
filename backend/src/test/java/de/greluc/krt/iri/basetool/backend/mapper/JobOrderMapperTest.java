@@ -79,7 +79,7 @@ class JobOrderMapperTest {
     // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
-    jobOrder.setRequestingSquadron(iridium);
+    jobOrder.setRequestingOrgUnit(iridium);
     jobOrder.setHandle("recipient");
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
@@ -132,7 +132,7 @@ class JobOrderMapperTest {
     // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
-    jobOrder.setRequestingSquadron(iridium);
+    jobOrder.setRequestingOrgUnit(iridium);
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setMaterials(null);
     jobOrder.setAssignees(null);
@@ -157,7 +157,7 @@ class JobOrderMapperTest {
     // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
-    jobOrder.setRequestingSquadron(iridium);
+    jobOrder.setRequestingOrgUnit(iridium);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
 
     JobOrderHandover handover = new JobOrderHandover();

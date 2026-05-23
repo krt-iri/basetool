@@ -13,9 +13,6 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
-import jakarta.persistence.PostLoad;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -146,55 +143,18 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<User> managers = new HashSet<>();
 
   /**
-   * Squadron that owns this mission. Set at creation time from the caller's active squadron and
-   * immutable afterwards. Gates read/write access together with {@link #isInternal}: non-internal
-   * missions are visible across squadrons, internal ones are restricted to the owning squadron and
-   * admins.
+   * Org-unit owner of this mission. Set at creation time from the caller's active org-unit context
+   * (via {@code OwnerScopeService.resolveOrgUnitForPickerOutput}) and immutable afterwards. Gates
+   * read/write access together with {@link #isInternal}: non-internal missions are visible across
+   * org units, internal ones are restricted to the owning org unit and admins.
    *
-   * <p>Legacy field — kept authoritative during the R4 dual-write soak. The plan-aligned {@link
-   * #owningOrgUnit} mirror field is kept in sync by {@link #syncOwnerFields()} on every lifecycle
-   * event. A later release will drop this field along with the matching DB column once {@code
-   * owning_org_unit_id} has soaked one full release cycle in production.
-   */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id")
-  @OptimisticLock(excluded = true)
-  private Squadron owningSquadron;
-
-  /**
-   * Org-unit owner of this mission — the R4 dual-write mirror of {@link #owningSquadron}. Pointed
-   * at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. After R9 Step 1 the
-   * application's mission-create paths stamp this field directly (via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutput}) so it accepts {@link SpecialCommand}
-   * instances in addition to Squadron ones.
-   *
-   * <p>{@code nullable = false} reflects V99's NOT NULL tightening on the DB column — every
-   * staffel-scoped aggregate must carry a resolved owner. The legacy {@link #owningSquadron}
-   * field's {@code nullable = false} was relaxed in the same migration so SK-owned aggregates
-   * can leave the legacy column null without violating the JPA contract.
+   * <p>R9 Step 2 dropped the legacy {@code owningSquadron} mirror field together with the
+   * {@code @PrePersist} / {@code @PreUpdate} / {@code @PostLoad} {@code syncOwnerFields()}
+   * lifecycle hook; V100 drops the matching {@code owning_squadron_id} column. {@code nullable =
+   * false} reflects V99's NOT NULL tightening on the new column.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = false)
   @OptimisticLock(excluded = true)
   private OrgUnit owningOrgUnit;
-
-  /**
-   * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
-   * INSERT / UPDATE / SELECT path. {@code owningSquadron} is the authoritative source during the R4
-   * soak — the legacy field wins when both are set on the in-memory entity. The reverse copy runs
-   * only when the legacy field is {@code null} and the org-unit reference happens to point at a
-   * Squadron, which covers the future case where a Spezialkommando R5 caller writes only the new
-   * field on a Squadron-owned aggregate.
-   */
-  @PrePersist
-  @PreUpdate
-  @PostLoad
-  private void syncOwnerFields() {
-    if (owningSquadron != null) {
-      owningOrgUnit = owningSquadron;
-    } else if (owningOrgUnit instanceof Squadron s) {
-      owningSquadron = s;
-    }
-  }
 }

@@ -651,7 +651,7 @@ class InventoryItemServiceBookOutTest {
     org.mockito.Mockito.when(userRepository.findById(targetUserId))
         .thenReturn(java.util.Optional.of(targetUser));
     org.mockito.Mockito.when(
-            ownerScopeService.resolveSquadronForPickerOutput(targetUser, pickedOrgUnitId))
+            ownerScopeService.resolveOrgUnitForPickerOutput(targetUser, pickedOrgUnitId))
         .thenReturn(picked);
     org.mockito.ArgumentCaptor<de.greluc.krt.iri.basetool.backend.model.InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(
@@ -678,8 +678,8 @@ class InventoryItemServiceBookOutTest {
             .orElseThrow(() -> new AssertionError("expected a save for the new transfer row"));
     org.junit.jupiter.api.Assertions.assertSame(
         picked,
-        newRow.getOwningSquadron(),
-        "picker output must flow through resolveSquadronForPickerOutput on the new row");
+        newRow.getOwningOrgUnit(),
+        "picker output must flow through resolveOrgUnitForPickerOutput on the new row");
   }
 
   private static InventoryItemDto sentinelDto(Double amount) {

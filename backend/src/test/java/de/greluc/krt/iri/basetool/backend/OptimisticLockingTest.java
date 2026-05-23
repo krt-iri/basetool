@@ -117,7 +117,7 @@ class OptimisticLockingTest {
 
     Ship ship = new Ship();
 
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Concurrent Ship " + UUID.randomUUID());
     ship.setInsurance("LTI");
     ship.setShipType(type);
