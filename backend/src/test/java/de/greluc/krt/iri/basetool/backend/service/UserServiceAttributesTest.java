@@ -551,31 +551,29 @@ class UserServiceAttributesTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
-      when(userRepository.save(user)).thenReturn(user);
 
       User result = userService.updateUserSquadron(USER_ID, squadronId, 3L);
 
-      assertSame(squadron, result.getSquadron(), "squadron must be the looked-up entity");
-      verify(userRepository).save(user);
+      // Post-R9 D3 (V101): the squadron assignment now lives in org_unit_membership — verify
+      // the membership-service was called with the resolved squadron, not that the User entity
+      // carries it.
+      assertSame(user, result, "the returned user should be the in-memory entity");
+      verify(orgUnitMembershipService).syncStaffelMembership(user, squadron);
     }
 
     @Test
     void clearsAssignment_whenSquadronIdIsNull() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      de.greluc.krt.iri.basetool.backend.model.Squadron existing =
-          new de.greluc.krt.iri.basetool.backend.model.Squadron();
-      existing.setId(UUID.randomUUID());
-      user.setSquadron(existing);
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
 
       User result = userService.updateUserSquadron(USER_ID, null, 1L);
 
-      assertNull(result.getSquadron(), "passing null must clear the assignment");
+      // Post-R9 D3 (V101): passing null clears the membership row.
+      assertSame(user, result);
       verify(squadronRepository, never()).findById(any());
-      verify(userRepository).save(user);
+      verify(orgUnitMembershipService).syncStaffelMembership(user, null);
     }
 
     @Test
@@ -587,7 +585,9 @@ class UserServiceAttributesTest {
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
           () -> userService.updateUserSquadron(USER_ID, UUID.randomUUID(), 2L));
-      verify(userRepository, never()).save(any());
+      // Post-R9 D3 (V101): the User entity is no longer touched on the squadron path — only
+      // the membership service is.
+      verify(orgUnitMembershipService, never()).syncStaffelMembership(any(), any());
     }
 
     @Test
@@ -601,7 +601,7 @@ class UserServiceAttributesTest {
       assertThrows(
           java.util.NoSuchElementException.class,
           () -> userService.updateUserSquadron(USER_ID, squadronId, 1L));
-      verify(userRepository, never()).save(any());
+      verify(orgUnitMembershipService, never()).syncStaffelMembership(any(), any());
     }
   }
 

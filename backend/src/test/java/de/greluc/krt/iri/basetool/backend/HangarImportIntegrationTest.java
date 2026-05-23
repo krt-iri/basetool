@@ -7,16 +7,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +54,8 @@ class HangarImportIntegrationTest {
 
   @Autowired private UserRepository userRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -66,8 +72,13 @@ class HangarImportIntegrationTest {
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("importuser");
-    user1.setSquadron(iridium);
     userRepository.save(user1);
+    // Post-R9 D3 (V101): home Staffel via membership row.
+    OrgUnitMembership iridiumMembership = new OrgUnitMembership();
+    iridiumMembership.setId(new OrgUnitMembershipId(user1.getId(), Squadron.IRIDIUM_ID));
+    iridiumMembership.setUser(user1);
+    iridiumMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(iridiumMembership);
 
     type135c = new ShipType();
     type135c.setName("135c");

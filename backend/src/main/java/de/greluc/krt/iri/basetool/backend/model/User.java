@@ -7,7 +7,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -58,12 +57,6 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "last_read_announcement_id")
   private UUID lastReadAnnouncementId;
 
-  @Column(name = "is_logistician")
-  private boolean isLogistician = false;
-
-  @Column(name = "is_mission_manager")
-  private boolean isMissionManager = false;
-
   @Column(name = "in_keycloak")
   private boolean inKeycloak = true;
 
@@ -86,17 +79,4 @@ public class User extends AbstractEntity<UUID> {
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   @ToString.Exclude
   private Set<Role> roles = new HashSet<>();
-
-  /**
-   * Squadron the user is a member of. Nullable: admins and guests are not constrained by a squadron
-   * — the {@code ROLE_ADMIN} check at the service layer overrides squadron filters, and guests
-   * never carried a squadron in the first place. Brand-new accounts may also land here without a
-   * squadron until an admin assigns one. Backfilled to {@link Squadron#IRIDIUM_ID} for every
-   * pre-existing user by Flyway V81.
-   */
-  @Nullable
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "squadron_id")
-  @ToString.Exclude
-  private Squadron squadron;
 }

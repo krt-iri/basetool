@@ -64,9 +64,11 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("logistician_user");
-    user.setLogistician(true);
     userRepository.save(user);
     userRepository.flush();
+    // Post-R9 D3 (V101): the Logistician flag lives on the Staffel membership row only — the
+    // legacy app_user.is_logistician column was dropped.
+    saveLogisticianMembership(userId, user, true);
 
     Jwt jwt =
         Jwt.withTokenValue("token")
@@ -82,32 +84,21 @@ class LogisticianRoleTest {
   }
 
   /**
-   * R6.d — happy path of the new membership-driven authority resolution: a user whose Staffel
-   * membership row carries {@code is_logistician = true} gets the flat {@code ROLE_LOGISTICIAN},
-   * even if the legacy {@code User.isLogistician} column is {@code false}. Before R6.d the
-   * converter looked only at the legacy column and missed the membership flag entirely.
+   * R6.d / Post-R9 D3 — happy path of the membership-driven authority resolution: a user whose
+   * Staffel membership row carries {@code is_logistician = true} gets the flat {@code
+   * ROLE_LOGISTICIAN}. The legacy {@code User.isLogistician} column was dropped in V101.
    */
   @Test
-  void converterPromotesLogistician_whenMembershipFlagSet_evenIfLegacyColumnFalse() {
+  void converterPromotesLogistician_whenMembershipFlagSet() {
     UUID userId = UUID.randomUUID();
-    Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
 
     User user = new User();
     user.setId(userId);
     user.setUsername("membership_logistician");
-    user.setLogistician(false); // Legacy column intentionally false — the test pins R6.d.
-    user.setSquadron(iridium);
     userRepository.save(user);
     userRepository.flush();
 
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(userId, Squadron.IRIDIUM_ID));
-    membership.setUser(user);
-    membership.setKind(OrgUnitKind.SQUADRON);
-    membership.setJoinedAt(java.time.Instant.now());
-    membership.setLogistician(true);
-    orgUnitMembershipRepository.save(membership);
-    orgUnitMembershipRepository.flush();
+    saveLogisticianMembership(userId, user, true);
 
     Jwt jwt =
         Jwt.withTokenValue("token")
@@ -120,53 +111,38 @@ class LogisticianRoleTest {
 
     assertTrue(
         authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
-        "Membership-level is_logistician=true must promote to ROLE_LOGISTICIAN regardless of"
-            + " the legacy User.isLogistician column.");
+        "Membership-level is_logistician=true must promote to ROLE_LOGISTICIAN.");
   }
 
   /**
-   * R6.d — inverse case: when the user HAS membership rows, the membership-level flags are the
-   * single source of truth. A user whose legacy {@code User.isLogistician = true} but whose Staffel
-   * membership carries {@code is_logistician = false} does NOT get the flat role. The membership
-   * table is authoritative because the legacy column is on the destructive-cleanup drop list —
-   * keeping the legacy column as an OR-source would re-introduce ghost authorities after admin
-   * actions revoke them through the membership UI.
+   * R6.d / Post-R9 D3 — inverse case: a user whose Staffel membership exists but carries {@code
+   * is_logistician = false} does NOT get the flat role. The membership table is the single source
+   * of truth (the legacy {@code app_user.is_logistician} column was dropped in V101).
    */
   @Test
-  void converterDoesNotPromote_whenMembershipFlagFalse_evenIfLegacyColumnTrue() {
+  void converterDoesNotPromote_whenMembershipFlagFalse() {
     UUID userId = UUID.randomUUID();
-    Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
 
     User user = new User();
     user.setId(userId);
-    user.setUsername("stale_legacy_flag");
-    user.setLogistician(true); // Legacy column stale — must NOT leak past the new authority.
-    user.setSquadron(iridium);
+    user.setUsername("not_logistician");
     userRepository.save(user);
     userRepository.flush();
 
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(userId, Squadron.IRIDIUM_ID));
-    membership.setUser(user);
-    membership.setKind(OrgUnitKind.SQUADRON);
-    membership.setJoinedAt(java.time.Instant.now());
-    membership.setLogistician(false);
-    orgUnitMembershipRepository.save(membership);
-    orgUnitMembershipRepository.flush();
+    saveLogisticianMembership(userId, user, false);
 
     Jwt jwt =
         Jwt.withTokenValue("token")
             .header("alg", "none")
             .claim("sub", userId.toString())
-            .claim("preferred_username", "stale_legacy_flag")
+            .claim("preferred_username", "not_logistician")
             .build();
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
     assertFalse(
         authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
-        "Membership-level flag is authoritative once any membership row exists — the stale"
-            + " legacy User column must not re-promote a revoked role.");
+        "Membership-level flag is the single source of truth — false must NOT promote.");
   }
 
   @Test
@@ -202,9 +178,10 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("test_logistician");
-    user.setLogistician(true);
     userRepository.save(user);
     userRepository.flush();
+    // Post-R9 D3 (V101): membership flag is the only way to grant ROLE_LOGISTICIAN.
+    saveLogisticianMembership(userId, user, true);
 
     mockMvc
         .perform(
@@ -246,5 +223,21 @@ class LogisticianRoleTest {
             get("/api/v1/inventory/all")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
         .andExpect(status().isOk());
+  }
+
+  /**
+   * Post-R9 D3 (V101): the Logistician flag lives on the Staffel membership row only — the legacy
+   * app_user.is_logistician column was dropped. This helper anchors the test user to IRIDIUM with
+   * the supplied flag value.
+   */
+  private void saveLogisticianMembership(UUID userId, User user, boolean isLogistician) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, Squadron.IRIDIUM_ID));
+    membership.setUser(user);
+    membership.setKind(OrgUnitKind.SQUADRON);
+    membership.setJoinedAt(java.time.Instant.now());
+    membership.setLogistician(isLogistician);
+    orgUnitMembershipRepository.save(membership);
+    orgUnitMembershipRepository.flush();
   }
 }

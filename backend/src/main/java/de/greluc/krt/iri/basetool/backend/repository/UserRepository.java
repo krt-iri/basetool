@@ -13,7 +13,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for User. */
+/**
+ * Spring Data repository for User.
+ *
+ * <p>Post-R9 D3 (V101): the legacy {@code app_user.squadron_id} column was dropped — every Staffel
+ * scope filter consults {@code org_unit_membership} instead. The squadron-scoped queries below use
+ * a {@code NOT EXISTS} sub-select to detect "user has no Staffel membership" (the equivalent of the
+ * pre-V101 {@code u.squadron IS NULL} branch) and an {@code EXISTS} sub-select with the {@code
+ * (kind = SQUADRON AND org_unit_id = :scopeSquadronId)} predicate for the in-scope branch.
+ */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
@@ -32,8 +40,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto(u.id, u.username,"
           + " u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN"
           + " u.displayName ELSE u.username END, u.rank) FROM User u WHERE :scopeSquadronId IS"
-          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId ORDER BY"
-          + " u.displayName")
+          + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
+          + " ms.kind = de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
+          + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId ="
+          + " :scopeSquadronId) ORDER BY u.displayName")
   List<UserReferenceDto> findAllReferenceScoped(
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);
 
@@ -49,15 +60,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   List<UserReferenceDto> findAllReference();
 
   /**
-   * Squadron-scoped paged listing. Filters the {@code findAll} variant by {@code u.squadron.id =
-   * :scopeSquadronId} (or no filter when {@code null}). Same null-handling rule as {@link
-   * #findAllReferenceScoped(UUID)} — unassigned users are always visible so the focused admin can
-   * manage them.
+   * Squadron-scoped paged listing. Filters by the user's single SQUADRON-kind membership in {@code
+   * org_unit_membership} — users without a Staffel membership (admins, guests) are always visible
+   * so the focused admin can manage them.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR u.squadron IS NULL OR"
-          + " u.squadron.id = :scopeSquadronId")
+      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR NOT EXISTS (SELECT 1 FROM"
+          + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
+          + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId ="
+          + " :scopeSquadronId)")
   Page<User> findAllScoped(
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
       Pageable pageable);
@@ -69,33 +83,37 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR u.squadron IS NULL OR"
-          + " u.squadron.id = :scopeSquadronId")
+      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR NOT EXISTS (SELECT 1 FROM"
+          + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
+          + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId ="
+          + " :scopeSquadronId)")
   List<User> findAllScopedList(
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
       org.springframework.data.domain.Sort sort);
 
   /**
    * Paged squadron-scoped listing of users eligible to be evaluated in the promotion system.
-   * Excludes admins entirely — they are squadron-less by design (admins always have {@code
-   * app_user.squadron_id = NULL} per V81 backfill) and must not appear in any Officer's
-   * Bewertungsverwaltung even when an admin has focused a squadron via the switcher. The additional
-   * explicit role-based exclusion guards against a manually mis-assigned admin row that still
-   * carries a squadron FK.
+   * Excludes admins entirely — they are squadron-less by design (admins always have no Staffel
+   * membership row) and must not appear in any Officer's Bewertungsverwaltung even when an admin
+   * has focused a squadron via the switcher. The additional explicit role-based exclusion guards
+   * against a manually mis-assigned admin row that still carries a membership.
    *
    * <p>When {@code scopeSquadronId} is {@code null} (admin "all squadrons" mode) the result spans
    * every squadron's members. A non-null id restricts to that squadron. Users without a squadron
-   * are excluded — they are not part of any squadron's evaluation list.
+   * membership are excluded — they are not part of any squadron's evaluation list.
    *
    * @param scopeSquadronId squadron filter; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
    * @return paged squadron members that an Officer / Admin may evaluate.
    */
-  @EntityGraph(attributePaths = {"roles", "squadron"})
+  @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE u.squadron IS NOT NULL AND (:scopeSquadronId IS NULL OR"
-          + " u.squadron.id = :scopeSquadronId) AND NOT EXISTS (SELECT 1 FROM u.roles r WHERE"
-          + " UPPER(r.name) = 'ADMIN')")
+      "SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id ="
+          + " u.id AND ms.kind = de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON"
+          + " AND (:scopeSquadronId IS NULL OR ms.id.orgUnitId = :scopeSquadronId)) AND NOT"
+          + " EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) = 'ADMIN')")
   Page<User> findEvaluatableMembers(
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
       Pageable pageable);
@@ -103,14 +121,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   /**
    * Squadron-scoped substring search. Mirrors {@link
    * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
-   * but adds the {@code u.squadron.id = :scopeSquadronId OR :scopeSquadronId IS NULL OR u.squadron
-   * IS NULL} clause.
+   * but adds the squadron-membership predicate.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
       "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
           + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
-          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId)")
+          + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
+          + " ms.kind = de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
+          + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId ="
+          + " :scopeSquadronId))")
   Page<User> searchScoped(
       @org.springframework.data.repository.query.Param("query") String query,
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
@@ -124,7 +145,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
           + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
-          + " NULL OR u.squadron IS NULL OR u.squadron.id = :scopeSquadronId)")
+          + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
+          + " ms.kind = de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
+          + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId ="
+          + " :scopeSquadronId))")
   List<User> searchScopedList(
       @org.springframework.data.repository.query.Param("query") String query,
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);

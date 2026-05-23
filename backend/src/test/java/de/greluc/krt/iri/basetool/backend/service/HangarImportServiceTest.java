@@ -51,6 +51,7 @@ class HangarImportServiceTest {
   @Mock private ShipRepository shipRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private UserRepository userRepository;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private HangarImportService hangarImportService;
 
@@ -62,6 +63,15 @@ class HangarImportServiceTest {
     var field = HangarImportService.class.getDeclaredField("objectMapper");
     field.setAccessible(true);
     field.set(hangarImportService, objectMapper);
+    // Post-R9 D3 (V101): the import flow stamps owning_org_unit via the shared resolver. Tests
+    // don't care which OrgUnit is returned — they only verify ship creation count + shape — so
+    // return a stub Squadron for every call. Lenient because not every test triggers ship saves.
+    de.greluc.krt.iri.basetool.backend.model.Squadron stubSquadron =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    stubSquadron.setId(UUID.randomUUID());
+    org.mockito.Mockito.lenient()
+        .when(ownerScopeService.resolveOrgUnitForPickerOutput(any(), any()))
+        .thenReturn(stubSquadron);
   }
 
   // -------------------------------------------------------------------------

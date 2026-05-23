@@ -32,15 +32,12 @@ import org.springframework.stereotype.Component;
  * {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} so an admin can grant these roles via the
  * membership-management UI without round-tripping through Keycloak.
  *
- * <p>R6.d / SPEZIALKOMMANDO_PLAN.md D3 + §6.1: the per-role flags are now sourced from {@code
- * org_unit_membership}, not from the legacy {@code app_user.is_logistician} / {@code
- * app_user.is_mission_manager} columns. The user gets the flat role iff <b>any</b> of their
- * memberships (Staffel + every SK) carries the flag — the contextual scoping ("logistician of which
- * OrgUnit") still happens at the {@code @PreAuthorize} call site through {@link
- * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService}. The legacy columns are kept as a
- * fallback: if a freshly seeded user has not had their V95 membership backfill applied yet, the
- * converter degrades to the User-level flags so the user does not lose access during a staggered
- * migration. The fallback comes out together with the columns in the destructive cleanup release.
+ * <p>SPEZIALKOMMANDO_PLAN.md D3 + §6.1: the per-role flags are sourced from {@code
+ * org_unit_membership} — the legacy {@code app_user.is_logistician} / {@code
+ * app_user.is_mission_manager} columns were dropped in V101 (R9 Step 5). The user gets the flat
+ * role iff <b>any</b> of their memberships (Staffel + every SK) carries the flag — the contextual
+ * scoping ("logistician of which OrgUnit") still happens at the {@code @PreAuthorize} call site
+ * through {@link de.greluc.krt.iri.basetool.backend.service.OwnerScopeService}.
  *
  * <p>The converter calls {@link UserService#syncUser(Jwt)} on every authentication so the local row
  * is created or updated lazily — this is where new Keycloak users acquire their {@code app_user}
@@ -123,14 +120,12 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * R6.d / Plan D3 + §6.1 — emits two parallel authority surfaces:
+   * Plan D3 + §6.1 — emits two parallel authority surfaces:
    *
    * <ol>
-   *   <li><b>Flat (R6.d, back-compat)</b> — {@code ROLE_LOGISTICIAN} / {@code
-   *       ROLE_MISSION_MANAGER} based on the OR-union of every OrgUnit membership. Lets every
-   *       existing {@code @PreAuthorize("hasRole('LOGISTICIAN')")} SpEL string keep working
-   *       unchanged. Drops with the destructive cleanup release together with the legacy
-   *       User-level columns.
+   *   <li><b>Flat (back-compat)</b> — {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}
+   *       based on the OR-union of every OrgUnit membership. Lets every existing {@code
+   *       @PreAuthorize("hasRole('LOGISTICIAN')")} SpEL string keep working unchanged.
    *   <li><b>Contextual (§6.1, long-term)</b> — one {@link OrgUnitContextualAuthority} per
    *       (membership, flag = true) pair, i.e. {@code ROLE_LOGISTICIAN@<orgUnitUuid>}. Enables
    *       per-OrgUnit scoping at the {@code @PreAuthorize} surface without a service-layer
@@ -145,12 +140,10 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')} resolve without
    * the caller having to construct the authority string by hand.
    *
-   * <p>Legacy fallback: if the membership lookup returns an empty list (e.g. the V95 backfill has
-   * not run yet for an in-flight migration), the converter reads the legacy User-level {@code
-   * is_logistician} / {@code is_mission_manager} columns and emits flat-only authorities — the
-   * contextual variant has no OrgUnit to anchor on so it is correctly suppressed for the
-   * membership-less edge case. The fallback comes out together with the columns themselves once
-   * the destructive cleanup release lands.
+   * <p>Post-R9 D3: the legacy User-level {@code is_logistician} / {@code is_mission_manager}
+   * columns have been dropped from {@code app_user} (V101). Memberless users carry no
+   * membership-derived authority — admin / guest accounts never had a Staffel link to anchor a
+   * Logistician / MissionManager flag on, so the empty-memberships branch is now a clean no-op.
    *
    * @param user the local {@link User} record produced by {@link UserService#syncUser(Jwt)}; never
    *     {@code null}.
@@ -163,17 +156,8 @@ public class CustomJwtGrantedAuthoritiesConverter
         orgUnitMembershipRepository.findAllByIdUserId(user.getId());
 
     if (memberships.isEmpty()) {
-      // Pre-V95-backfill fallback. Once the destructive cleanup release drops the legacy
-      // columns, this branch comes out and the converter emits no flat role authority for
-      // memberless users (correctly — they have no scoped authority to grant). No contextual
-      // authority is emitted here either: without a membership row there is no OrgUnit to anchor
-      // the contextual authority on.
-      if (user.isLogistician()) {
-        authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
-      }
-      if (user.isMissionManager()) {
-        authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
-      }
+      // Memberless users (admins, guests) carry no Logistician / MissionManager flag — the V101
+      // column drop made org_unit_membership the single source of truth.
       return;
     }
 

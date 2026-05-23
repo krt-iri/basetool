@@ -39,8 +39,6 @@ class EntityMappersTest {
     user.setEmail("jdoe@example.com");
     user.setRank(5);
     user.setDescription("Pilot");
-    user.setLogistician(true);
-    user.setMissionManager(false);
     user.setInKeycloak(true);
     user.setVersion(3L);
     user.setJoinDate(LocalDate.of(2024, 1, 15));
@@ -62,8 +60,13 @@ class EntityMappersTest {
     assertEquals("Pilot", dto.description());
     assertEquals(Set.of("ADMIN", "OFFICER"), dto.roles());
     assertEquals(Set.of("USER_MANAGE", "ROLE_ASSIGN", "MISSION_MANAGE"), dto.permissions());
-    assertTrue(dto.isLogistician());
+    // Post-R9 D3 (V101): the static EntityMappers helper does not read the (now-dropped)
+    // legacy columns and projects the membership-derived fields as the default empty values —
+    // see the class-level Javadoc. The Spring-managed UserMapper bean is the only path that
+    // surfaces the real membership flag values.
+    assertFalse(dto.isLogistician());
     assertFalse(dto.isMissionManager());
+    assertNull(dto.squadron());
     assertTrue(dto.inKeycloak());
     assertEquals(3L, dto.version());
     assertEquals(LocalDate.of(2024, 1, 15), dto.joinDate());

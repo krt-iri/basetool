@@ -2,16 +2,17 @@ package de.greluc.krt.iri.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.iri.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapperImpl;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
+import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class UserJoinDateMapperTest {
@@ -20,11 +21,13 @@ class UserJoinDateMapperTest {
 
   @BeforeEach
   void setUp() {
-    // UserMapperImpl @Autowires SquadronMapper for the squadron projection — wire it manually
-    // since this test does not load a Spring context.
+    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
+    // two mocked repositories since this test does not load a Spring context.
     userMapper = new UserMapperImpl();
     ReflectionTestUtils.setField(
-        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+        userMapper, "membershipRepository", Mockito.mock(OrgUnitMembershipRepository.class));
+    ReflectionTestUtils.setField(
+        userMapper, "squadronRepository", Mockito.mock(SquadronRepository.class));
   }
 
   @Test

@@ -198,10 +198,10 @@ class UserControllerTest {
     when(authHelperService.canSeeSquadron(foreignSquadronId)).thenReturn(false);
 
     User entity = new User();
-    de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
-        new de.greluc.krt.iri.basetool.backend.model.Squadron();
-    squadron.setId(foreignSquadronId);
-    entity.setSquadron(squadron);
+    entity.setId(userId);
+    // Post-R9 D3 (V101): the home Staffel comes from the membership service, not User.squadron.
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(java.util.Optional.of(foreignSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -224,7 +224,10 @@ class UserControllerTest {
     when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
     User entity = new User();
-    entity.setSquadron(null);
+    entity.setId(userId);
+    // Post-R9 D3 (V101): "no Staffel" surfaces as Optional.empty() from the membership lookup.
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(java.util.Optional.empty());
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -246,10 +249,10 @@ class UserControllerTest {
     when(authHelperService.canSeeSquadron(sharedSquadronId)).thenReturn(true);
 
     User entity = new User();
-    de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
-        new de.greluc.krt.iri.basetool.backend.model.Squadron();
-    squadron.setId(sharedSquadronId);
-    entity.setSquadron(squadron);
+    entity.setId(userId);
+    // Post-R9 D3 (V101): same-squadron lookup goes through the membership service.
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(java.util.Optional.of(sharedSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
