@@ -7,8 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +40,8 @@ class HangarUserEndpointsSecurityTest {
 
   @Autowired private ShipTypeRepository shipTypeRepository;
 
+  @Autowired private SquadronRepository squadronRepository;
+
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User user;
@@ -50,6 +54,9 @@ class HangarUserEndpointsSecurityTest {
     user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("hanger_user");
+    // R6.b: the owner resolver requires the target user to have at least one org-unit
+    // membership before stamping. Anchor to V80-seeded IRIDIUM so addShip resolves.
+    user.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     userRepository.save(user);
 
     shipType = new ShipType();

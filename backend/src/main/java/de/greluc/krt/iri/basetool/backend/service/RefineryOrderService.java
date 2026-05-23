@@ -577,7 +577,15 @@ public class RefineryOrderService {
       } else {
         InventoryItem item = new InventoryItem();
         item.setUser(assignee);
-        item.setOwningSquadron(assignee.getSquadron());
+        // R6.b: route the stamp through OwnerScopeService instead of the legacy
+        // `assignee.getSquadron()` direct read. The store form has no owner picker (refinery
+        // STORE is admin-driven and predates the R5.d picker wave), so {@code owningOrgUnitId}
+        // is passed as {@code null} — the resolver auto-stamps when the assignee has exactly
+        // one org-unit membership (today's 100% case) and surfaces a clean 400
+        // ("owningOrgUnitId is required") for multi-membership assignees. The latter case
+        // currently can't be resolved from the UI; widening the store form with a per-output
+        // picker is tracked as a follow-up to the SK §5.5 stamping wave.
+        item.setOwningSquadron(ownerScopeService.resolveSquadronForPickerOutput(assignee, null));
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);

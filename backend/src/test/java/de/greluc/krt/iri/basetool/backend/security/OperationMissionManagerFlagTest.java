@@ -10,8 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,6 +53,8 @@ class OperationMissionManagerFlagTest {
   @Autowired private UserRepository userRepository;
 
   @Autowired private OperationRepository operationRepository;
+
+  @Autowired private SquadronRepository squadronRepository;
 
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -125,6 +129,9 @@ class OperationMissionManagerFlagTest {
     u.setId(UUID.randomUUID());
     u.setUsername(username);
     u.setMissionManager(missionManager);
+    // R6.b: stamping resolver requires the user to carry at least one OrgUnit membership.
+    // Anchor to V80-seeded IRIDIUM so createOperation resolves without a picker.
+    u.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     return userRepository.save(u);
   }
 
