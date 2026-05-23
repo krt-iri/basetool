@@ -458,6 +458,38 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * SPEZIALKOMMANDO_PLAN.md §7.4 helper — returns every membership row of the given user (Staffel +
+   * every SK) in the same order {@link #listOptionsForUser} sorts the picker options (Staffel
+   * first, then SKs alphabetical). The delta-endpoint return path uses this to render the
+   * post-write state without a follow-up GET on the frontend side.
+   *
+   * @param userId the user whose memberships to enumerate; never {@code null}.
+   * @return the membership rows; never {@code null}, possibly empty.
+   */
+  public List<OrgUnitMembership> findAllMembershipsForUser(@NotNull UUID userId) {
+    List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<OrgUnitMembership> sorted = new ArrayList<>(rows);
+    sorted.sort(
+        Comparator.<OrgUnitMembership, Integer>comparing(
+                m -> m.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
+            .thenComparing(
+                m -> {
+                  UUID orgUnitId = m.getId().getOrgUnitId();
+                  return m.getKind() == OrgUnitKind.SQUADRON
+                      ? squadronRepository.findById(orgUnitId).map(Squadron::getName).orElse("")
+                      : specialCommandRepository
+                          .findById(orgUnitId)
+                          .map(SpecialCommand::getName)
+                          .orElse("");
+                },
+                String.CASE_INSENSITIVE_ORDER));
+    return sorted;
+  }
+
+  /**
    * Loads the membership row for the given (SK, user) pair, validating SK existence first so a
    * stale SK id surfaces as 404 with a clear message before the membership lookup fires.
    *

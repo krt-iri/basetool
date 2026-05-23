@@ -123,16 +123,34 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * R6.d / Plan D3 — promotes the flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}
-   * authorities based on the OR-union of every OrgUnit membership the user belongs to. A user who
-   * is a Logistician in <em>any</em> of their Staffel/SK memberships qualifies for the flat role;
-   * the per-OrgUnit scoping is enforced separately by {@code @PreAuthorize} expressions that
-   * delegate to {@link de.greluc.krt.iri.basetool.backend.service.OwnerScopeService}.
+   * R6.d / Plan D3 + §6.1 — emits two parallel authority surfaces:
+   *
+   * <ol>
+   *   <li><b>Flat (R6.d, back-compat)</b> — {@code ROLE_LOGISTICIAN} / {@code
+   *       ROLE_MISSION_MANAGER} based on the OR-union of every OrgUnit membership. Lets every
+   *       existing {@code @PreAuthorize("hasRole('LOGISTICIAN')")} SpEL string keep working
+   *       unchanged. Drops with the destructive cleanup release together with the legacy
+   *       User-level columns.
+   *   <li><b>Contextual (§6.1, long-term)</b> — one {@link OrgUnitContextualAuthority} per
+   *       (membership, flag = true) pair, i.e. {@code ROLE_LOGISTICIAN@<orgUnitUuid>}. Enables
+   *       per-OrgUnit scoping at the {@code @PreAuthorize} surface without a service-layer
+   *       round-trip. Matches the plan §6.1 design: "Spring Security authentication carries a
+   *       Set&lt;ContextualAuthority&gt;".
+   * </ol>
+   *
+   * <p>Both lists emit on every authentication so existing flat-role gates and new contextual
+   * gates coexist. The {@link
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#hasRoleInOrgUnit} helper reads
+   * the contextual authorities by value, which lets a SpEL like {@code
+   * @ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')} resolve without
+   * the caller having to construct the authority string by hand.
    *
    * <p>Legacy fallback: if the membership lookup returns an empty list (e.g. the V95 backfill has
    * not run yet for an in-flight migration), the converter reads the legacy User-level {@code
-   * is_logistician} / {@code is_mission_manager} columns instead. The fallback comes out together
-   * with the columns themselves once the destructive cleanup release lands.
+   * is_logistician} / {@code is_mission_manager} columns and emits flat-only authorities — the
+   * contextual variant has no OrgUnit to anchor on so it is correctly suppressed for the
+   * membership-less edge case. The fallback comes out together with the columns themselves once
+   * the destructive cleanup release lands.
    *
    * @param user the local {@link User} record produced by {@link UserService#syncUser(Jwt)}; never
    *     {@code null}.
@@ -147,7 +165,9 @@ public class CustomJwtGrantedAuthoritiesConverter
     if (memberships.isEmpty()) {
       // Pre-V95-backfill fallback. Once the destructive cleanup release drops the legacy
       // columns, this branch comes out and the converter emits no flat role authority for
-      // memberless users (correctly — they have no scoped authority to grant).
+      // memberless users (correctly — they have no scoped authority to grant). No contextual
+      // authority is emitted here either: without a membership row there is no OrgUnit to anchor
+      // the contextual authority on.
       if (user.isLogistician()) {
         authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
       }
@@ -165,6 +185,21 @@ public class CustomJwtGrantedAuthoritiesConverter
     }
     if (anyMissionManager) {
       authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
+    }
+
+    // §6.1 — one contextual authority per (membership, flag=true) pair. The per-row evaluation
+    // here is what differentiates this from the flat OR-union above: a user with the
+    // Logistician flag on Staffel A but not on SK B gets a contextual authority for A only,
+    // even though the flat ROLE_LOGISTICIAN was granted by either of them. That distinction is
+    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about.
+    for (OrgUnitMembership m : memberships) {
+      if (m.isLogistician()) {
+        authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", m.getId().getOrgUnitId()));
+      }
+      if (m.isMissionManager()) {
+        authorities.add(
+            new OrgUnitContextualAuthority("MISSION_MANAGER", m.getId().getOrgUnitId()));
+      }
     }
   }
 }

@@ -68,6 +68,11 @@ class OwnerScopeServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Mock
+  private de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository
+      specialCommandRepository;
+
   @Mock private HttpServletRequest request;
 
   @InjectMocks private OwnerScopeService service;
@@ -627,6 +632,170 @@ class OwnerScopeServiceTest {
             BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, skId));
     assertTrue(
         ex.getMessage().toLowerCase().contains("spezialkommando ownership"), ex.getMessage());
+  }
+
+  // --- resolveOrgUnitForPickerOutput (V99-aligned SK-unblocking successor of
+  // resolveSquadronForPickerOutput; honours SK selections once V99 lifts the legacy NOT NULL) ---
+
+  @Test
+  void resolveOrgUnitForPickerOutput_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    de.greluc.krt.iri.basetool.backend.model.OrgUnit result =
+        service.resolveOrgUnitForPickerOutput(user, null);
+
+    assertSame(homeStaffel, result);
+    // SK repo not consulted on the Staffel branch.
+    verify(specialCommandRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_pickedSpecialCommand_isHonoured() {
+    // V99 unblocks SK ownership: the new method now returns the SpecialCommand entity instead
+    // of throwing "not yet supported". The legacy resolver still rejects, which proves the
+    // dual-track is clean.
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+
+    UUID skId = UUID.randomUUID();
+    de.greluc.krt.iri.basetool.backend.model.SpecialCommand sk =
+        new de.greluc.krt.iri.basetool.backend.model.SpecialCommand();
+    sk.setId(skId);
+    sk.setName("Alpha");
+
+    OrgUnitMembership skMembership = new OrgUnitMembership();
+    skMembership.setId(new OrgUnitMembershipId(user.getId(), skId));
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of(skMembership));
+    when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
+    when(specialCommandRepository.findById(skId)).thenReturn(Optional.of(sk));
+
+    de.greluc.krt.iri.basetool.backend.model.OrgUnit result =
+        service.resolveOrgUnitForPickerOutput(user, skId);
+
+    assertSame(sk, result);
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+    UUID foreignId = UUID.randomUUID();
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.resolveOrgUnitForPickerOutput(user, foreignId));
+    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_noMembershipAtAll_throwsBadRequest() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(null);
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> service.resolveOrgUnitForPickerOutput(user, null));
+    assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
+  }
+
+  @Nested
+  class HasRoleInOrgUnitTests {
+
+    @Test
+    void admin_alwaysReturnsTrue_evenWithoutAnyAuthorities() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(true);
+      assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void anonymousAuthentication_returnsFalse() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentAuthentication()).thenReturn(Optional.empty());
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void matchingContextualAuthority_returnsTrue() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "LOGISTICIAN", orgUnit);
+      withAuthorities(java.util.List.of(granted));
+      assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void contextualAuthorityForDifferentOrgUnit_returnsFalse() {
+      UUID orgUnitA = UUID.randomUUID();
+      UUID orgUnitB = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "LOGISTICIAN", orgUnitA);
+      withAuthorities(java.util.List.of(granted));
+      assertFalse(service.hasRoleInOrgUnit(orgUnitB, "LOGISTICIAN"));
+    }
+
+    @Test
+    void contextualAuthorityForDifferentRole_returnsFalse() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "MISSION_MANAGER", orgUnit);
+      withAuthorities(java.util.List.of(granted));
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void onlyFlatAuthorityNoContextual_returnsFalse() {
+      // The flat ROLE_LOGISTICIAN authority is intentionally NOT matched — that's the
+      // back-compat surface for hasRole('LOGISTICIAN') gates. The contextual helper requires
+      // the contextual authority explicitly.
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority flat =
+          new org.springframework.security.core.authority.SimpleGrantedAuthority(
+              "ROLE_LOGISTICIAN");
+      withAuthorities(java.util.List.of(flat));
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    private void withAuthorities(
+        java.util.List<? extends org.springframework.security.core.GrantedAuthority> auths) {
+      org.springframework.security.core.Authentication authentication =
+          new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+              "user", "n/a", auths);
+      when(authHelper.currentAuthentication()).thenReturn(Optional.of(authentication));
+    }
   }
 
   // --- helpers ------------------------------------------------------------------
