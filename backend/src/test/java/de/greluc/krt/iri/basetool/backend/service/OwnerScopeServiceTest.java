@@ -101,7 +101,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithoutHeader_returnsEmpty_admin_seesAllSquadrons() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -109,7 +109,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithActiveSquadronHeader_returnsThatSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER))
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
       assertEquals(Optional.of(SQUADRON_B_ID), service.currentSquadronId());
@@ -118,7 +118,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithBlankHeader_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("");
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn("");
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -126,7 +126,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithMalformedHeader_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("not-a-uuid");
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn("not-a-uuid");
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -178,7 +178,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminInAllSquadronsMode_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadron().isEmpty());
     }
@@ -190,7 +190,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithoutSelection_canSeeAnySquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertTrue(service.canSeeSquadron(SQUADRON_B_ID));
@@ -199,7 +199,7 @@ class OwnerScopeServiceTest {
     @Test
     void adminWithSelection_seesOnlySelectedSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER))
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
@@ -397,7 +397,7 @@ class OwnerScopeServiceTest {
       order.setOwningSquadron(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeRefineryOrder(orderId));
       assertTrue(service.canEditRefineryOrder(orderId));

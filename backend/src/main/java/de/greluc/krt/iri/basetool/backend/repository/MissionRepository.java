@@ -23,17 +23,17 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * Drives mission-picker dropdowns without pulling the full {@link Mission} aggregate.
    *
    * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4 + R6.c §5.4): the lookup
-   * uses the standard org-unit scope-predicate triple — admin all-scope sees every active
-   * mission; a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the
-   * non-admin path passes the union of memberships. Cross-staffel public missions
-   * ({@code isInternal=false}) remain visible regardless of scope — so a member from one
-   * OrgUnit can still see other OrgUnits' public missions in the typeahead.
+   * uses the standard org-unit scope-predicate triple — admin all-scope sees every active mission;
+   * a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the non-admin path
+   * passes the union of memberships. Cross-staffel public missions ({@code isInternal=false})
+   * remain visible regardless of scope — so a member from one OrgUnit can still see other OrgUnits'
+   * public missions in the typeahead.
    *
-   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
-   *     selection — disables the scope filter entirely.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
+   *     — disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
-   *     for admins and anonymous callers.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous callers.
    * @return slim reference DTOs visible to the caller.
    */
   @Query(
