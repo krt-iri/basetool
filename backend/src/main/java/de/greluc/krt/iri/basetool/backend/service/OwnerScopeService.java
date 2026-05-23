@@ -82,6 +82,17 @@ public class OwnerScopeService {
   public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
 
   /**
+   * Plan §7.2 / R5.e replacement for {@link #ACTIVE_SQUADRON_HEADER}. The frontend's relay filter
+   * sends this name on every backend call once R5.e is deployed; the legacy {@link
+   * #ACTIVE_SQUADRON_HEADER} name remains accepted as an alias for one release so admin browser
+   * tabs that were open during deploy keep working. {@link #readActiveSquadronFromHeader()} reads
+   * the new name first, falls back to the legacy one if missing — once the soak window closes and
+   * the legacy header has not been seen in prod logs for a release cycle, the fallback branch and
+   * the legacy constant come out.
+   */
+  public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
+
+  /**
    * Request-attribute key under which the result of {@link #readPersistentSquadronFromUser()} is
    * cached for the duration of the current HTTP request. Stored as {@code Optional<UUID>} (never
    * {@code null}) so the cache can distinguish "resolved to empty" from "not yet resolved".
@@ -183,7 +194,17 @@ public class OwnerScopeService {
           .map(id -> new ScopePredicate(false, id, java.util.Set.of()))
           .orElseGet(() -> new ScopePredicate(true, null, java.util.Set.of()));
     }
+    // R5.e: non-admin path. Read the same active-OrgUnit header the admin switcher uses — once
+    // the frontend's R5.e switcher widening lets non-admins pick from their memberships, the
+    // header carries that selection. The pin is only honoured when it points to one of the
+    // caller's actual memberships (defence against a spoofed header from a curl call); a foreign
+    // pin silently collapses to the membership-union read so the user never sees data they did
+    // not opt into.
     java.util.Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
+      return new ScopePredicate(false, pinned.get(), java.util.Set.of());
+    }
     return new ScopePredicate(false, null, memberOrgUnitIds);
   }
 
@@ -647,16 +668,34 @@ public class OwnerScopeService {
 
   @NotNull
   private Optional<UUID> readActiveSquadronFromHeader() {
-    String raw = request.getHeader(ACTIVE_SQUADRON_HEADER);
+    // R5.e: read the plan-aligned X-Active-Org-Unit-Id first; fall back to the legacy
+    // X-Active-Squadron-Id alias so admin browser tabs cached against the old name during deploy
+    // keep working for one release. Once the legacy header stops appearing in prod logs, the
+    // fallback comes out together with the constant.
+    Optional<UUID> fromNew = parseHeaderUuid(request.getHeader(ACTIVE_ORG_UNIT_HEADER));
+    if (fromNew.isPresent()) {
+      return fromNew;
+    }
+    return parseHeaderUuid(request.getHeader(ACTIVE_SQUADRON_HEADER));
+  }
+
+  /**
+   * Parses a single header value into a UUID. Returns {@link Optional#empty()} on {@code null},
+   * blank, or malformed input. Malformed input is debug-logged inside the caller rather than thrown
+   * so a stray client cannot spam the WARN channel.
+   *
+   * @param raw raw header value from {@link HttpServletRequest#getHeader(String)}; may be {@code
+   *     null}.
+   * @return parsed UUID or empty.
+   */
+  @NotNull
+  private static Optional<UUID> parseHeaderUuid(String raw) {
     if (raw == null || raw.isBlank()) {
       return Optional.empty();
     }
     try {
       return Optional.of(UUID.fromString(raw.trim()));
     } catch (IllegalArgumentException ex) {
-      // Malformed header → treat as "no selection". Logging at debug so a stray client cannot
-      // spam the WARN channel; the effective behaviour ("admin sees all") matches what the
-      // admin gets when they have not chosen a squadron yet.
       return Optional.empty();
     }
   }

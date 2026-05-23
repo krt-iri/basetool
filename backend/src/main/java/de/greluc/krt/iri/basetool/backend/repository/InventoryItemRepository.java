@@ -270,15 +270,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * <p>Multi-tenant: uses the standard R6.c scope predicate triple. Admin all-scope wipes every
    * non-personal item; a specific active OrgUnit limits the wipe to that OrgUnit; non-admin
-   * callers' membership union scopes the wipe to the caller's OrgUnits. Service-layer enforces
-   * the access check before reaching this method.
+   * callers' membership union scopes the wipe to the caller's OrgUnits. Service-layer enforces the
+   * access check before reaching this method.
    *
-   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
-   *     selection — wipes every non-personal item regardless of owner.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
+   *     — wipes every non-personal item regardless of owner.
    * @param activeOrgUnitId the single OrgUnit to scope the wipe to (admin pinning), or {@code
    *     null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
-   *     for admins and anonymous.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous.
    * @return number of deleted rows
    */
   @Modifying

@@ -52,11 +52,11 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * size=1000} was the previous shape and exhausted DB and serialisation budget on every mission
    * page render. Uses the same R6.c scope-predicate triple as {@link #findAllScoped}.
    *
-   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
-   *     selection — disables the scope filter entirely.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
+   *     — disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
-   *     for admins and anonymous callers.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous callers.
    * @return slim reference DTOs, sorted by name ascending
    */
   @org.springframework.data.jpa.repository.Query(

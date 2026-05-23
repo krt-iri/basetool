@@ -80,30 +80,38 @@
                 </details>
                 <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
             </div>
-            <!-- Admin-only squadron switcher. The Spring Session-backed backend store carries
-                 the active selection across page loads (Redis in dev/prod); leaving the select
-                 on the blank "All squadrons" option DELETEs the selection via the frontend
-                 proxy. Non-admins do not see this control - they always operate in their
-                 persistent home squadron. -->
-            <!-- `no-track` excludes this form from unsaved-changes.js — the switcher is a
+            <!-- R5.e — active-OrgUnit switcher. Visible to any authenticated user with >1 option
+                 in the dropdown: admins see the Squadron + SpecialCommand catalogue, non-admins
+                 see only the OrgUnits they are a member of (Staffel + every SK membership). The
+                 form posts to the new /me/active-org-unit endpoint; the legacy /me/active-squadron
+                 path stays as a one-release alias for cached browser tabs. The Spring Session-
+                 backed store (Redis in dev/prod) carries the active selection across page loads;
+                 leaving the select on the blank "All OrgUnits" option DELETEs the selection.
+                 Non-admin pins are independently re-validated on the backend against the caller's
+                 actual memberships — a spoofed POST cannot widen visibility past what the user
+                 belongs to.
+
+                 `no-track` excludes this form from unsaved-changes.js — the switcher is a
                  navigation control, not a form the user is filling out, and a change event
                  on the dropdown must not arm the beforeunload guard. The auto-submit JS calls
                  form.submit() programmatically, which (per HTML spec) does NOT fire the
                  submit event that would otherwise reset isDirty, so without `no-track` the
                  native browser "Leave site?" dialog appears every time. -->
-            <form id="squadron-switcher-form" sec:authorize="hasRole('ADMIN')"
-                  th:action="@{/me/active-squadron}" method="post" class="squadron-switcher no-track">
+            <form id="squadron-switcher-form"
+                  sec:authorize="isAuthenticated()"
+                  th:if="${availableOrgUnits != null and availableOrgUnits.size() > 1}"
+                  th:action="@{/me/active-org-unit}" method="post" class="squadron-switcher no-track">
                 <input type="hidden" name="_referer" th:value="${currentRequestUri}" />
                 <label for="squadron-switcher-select" class="squadron-switcher-label"
-                       th:text="#{squadron.switcher.label}">Active squadron</label>
-                <select id="squadron-switcher-select" name="squadronId" class="squadron-switcher-select">
+                       th:text="#{orgUnit.switcher.label}">Active OrgUnit</label>
+                <select id="squadron-switcher-select" name="orgUnitId" class="squadron-switcher-select">
                     <option value=""
                             th:selected="${activeSquadronId == null}"
-                            th:text="#{squadron.switcher.all}">All squadrons</option>
-                    <option th:each="sq : ${availableSquadrons}"
-                            th:value="${sq.id()}"
-                            th:selected="${activeSquadronId != null and activeSquadronId == sq.id()}"
-                            th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                            th:text="#{orgUnit.switcher.all}">All OrgUnits</option>
+                    <option th:each="ou : ${availableOrgUnits}"
+                            th:value="${ou.orgUnitId()}"
+                            th:selected="${activeSquadronId != null and activeSquadronId == ou.orgUnitId()}"
+                            th:text="${ou.orgUnitShorthand() != null ? ou.orgUnitShorthand() + ' — ' + ou.orgUnitName() : ou.orgUnitName()}">IRI — IRIDIUM</option>
                 </select>
                 <noscript>
                     <button type="submit" class="squadron-switcher-submit">&#x2713;</button>
