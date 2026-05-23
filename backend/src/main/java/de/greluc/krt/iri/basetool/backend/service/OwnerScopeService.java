@@ -13,6 +13,7 @@ import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -111,6 +112,7 @@ public class OwnerScopeService {
   private final AuthHelperService authHelper;
   private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
+  private final SpecialCommandRepository specialCommandRepository;
   private final MissionRepository missionRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
@@ -385,6 +387,83 @@ public class OwnerScopeService {
   }
 
   /**
+   * V99-aligned successor of {@link #resolveSquadronForPickerOutput(User, UUID)} — applies the same
+   * SPEZIALKOMMANDO_PLAN.md §5.5.1 picker-output matrix (0 / 1 / &gt;1 memberships, valid / foreign
+   * choice) but returns an {@link OrgUnit} so SK selections are honoured instead of rejected. Use
+   * with {@code entity.setOwningOrgUnit(...)}; the existing entity dual-write lifecycle hook
+   * mirrors the value onto the legacy {@code owningSquadron} field whenever the resolved OrgUnit
+   * happens to be a {@link Squadron}, so the legacy column stays populated for Staffel ownership
+   * during the V99-NOT-NULL-relaxed soak. For SpecialCommand ownership the legacy column stays null
+   * — which is now valid because V99 dropped the {@code NOT NULL} constraint.
+   *
+   * <p>If the resolver produces an SK selection (allowed post-V99 with the lifted NOT NULL on the
+   * legacy column), the caller writes only the new {@code owningOrgUnitId} via {@code
+   * entity.setOwningOrgUnit(...)}. The lifecycle hook leaves the legacy column null for that row,
+   * which is now legal.
+   *
+   * <p>Decision matrix matches {@link #resolveSquadronForPickerOutput(User, UUID)} byte-for-byte: 0
+   * memberships → 400; 1 + null picker → auto-stamp; 1 + valid → honour; 1 + mismatch → 400; &gt;1
+   * + null picker → 400 (force explicit choice); &gt;1 + valid → honour; &gt;1 + foreign → 400.
+   *
+   * @param targetUser the user whose memberships gate the picker output validation; never {@code
+   *     null}.
+   * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
+   *     path when the user has exactly one membership.
+   * @return the resolved {@link OrgUnit} — either a {@link Squadron} or a {@link
+   *     de.greluc.krt.iri.basetool.backend.model.SpecialCommand}; never {@code null}.
+   * @throws BadRequestException per the matrix above.
+   */
+  public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+    Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
+    Squadron homeStaffel = targetUser.getSquadron();
+    if (homeStaffel != null) {
+      memberOrgUnitIds.add(homeStaffel.getId());
+    }
+    List<OrgUnitMembership> skMemberships =
+        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            targetUser.getId(), OrgUnitKind.SPECIAL_COMMAND);
+    for (OrgUnitMembership m : skMemberships) {
+      memberOrgUnitIds.add(m.getId().getOrgUnitId());
+    }
+
+    if (memberOrgUnitIds.isEmpty()) {
+      throw new BadRequestException(
+          "User has no org-unit membership — cannot stamp an aggregate owner");
+    }
+
+    UUID stampedOrgUnitId;
+    if (owningOrgUnitId == null) {
+      if (memberOrgUnitIds.size() == 1) {
+        stampedOrgUnitId = memberOrgUnitIds.iterator().next();
+      } else {
+        throw new BadRequestException(
+            "User belongs to multiple org units; owningOrgUnitId is required");
+      }
+    } else {
+      if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
+        throw new BadRequestException(
+            "Selected owner org unit is not a membership of the target user");
+      }
+      stampedOrgUnitId = owningOrgUnitId;
+    }
+
+    // Resolve to the concrete subtype. Staffel-side: SquadronRepository (discriminator filter
+    // matches). SK-side: SpecialCommandRepository. Picker output was validated against the
+    // membership set above so a missing row here is a hard contract violation, surfaced as 400.
+    Optional<Squadron> sq = squadronRepository.findById(stampedOrgUnitId);
+    if (sq.isPresent()) {
+      return sq.get();
+    }
+    return specialCommandRepository
+        .findById(stampedOrgUnitId)
+        .map(s -> (OrgUnit) s)
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "Picked owner org unit no longer resolves — repository miss"));
+  }
+
+  /**
    * {@code true} iff the current principal may see data owned by {@code squadronId}.
    *
    * <ul>
@@ -440,6 +519,57 @@ public class OwnerScopeService {
    */
   public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
     return canEditSquadron(orgUnitId);
+  }
+
+  /**
+   * SPEZIALKOMMANDO_PLAN.md §6.1 contextual-authority check. Returns {@code true} iff the current
+   * authenticated principal carries an {@link
+   * de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority} matching {@code
+   * (roleName, orgUnitId)}. Admins always pass — they have implicit elevated access in every
+   * OrgUnit (mirrors the {@link #canEditSquadron} short-circuit).
+   *
+   * <p>Designed for {@code @PreAuthorize} SpEL where the OrgUnit id is only known at runtime (from
+   * a request DTO field, a path variable, etc.). Example:
+   *
+   * <pre>{@code
+   * @PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')")
+   * public InventoryItemDto createInventoryItem(@Valid @RequestBody InventoryItemCreateDto dto)
+   * }</pre>
+   *
+   * <p>The dual-track migration: the JWT converter emits both the flat {@code ROLE_LOGISTICIAN}
+   * (back-compat for existing {@code hasRole('LOGISTICIAN')} gates) and the contextual {@code
+   * ROLE_LOGISTICIAN@<uuid>}. This helper matches against the contextual surface; flat-role gates
+   * keep working through {@code hasRole(...)} unchanged.
+   *
+   * @param orgUnitId the OrgUnit the caller wants to act on; never {@code null}. {@code null}
+   *     OrgUnit id is a programming error — use {@link #canEditSquadron(UUID)} for the "any
+   *     OrgUnit" semantics, this method is exclusively contextual.
+   * @param roleName the role to check for. Standard values today: {@code "LOGISTICIAN"}, {@code
+   *     "MISSION_MANAGER"}. Never {@code null}.
+   * @return {@code true} iff the caller is an admin or holds the contextual authority.
+   */
+  public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    Optional<org.springframework.security.core.Authentication> authentication =
+        authHelper.currentAuthentication();
+    if (authentication.isEmpty()
+        || !authentication.get().isAuthenticated()
+        || authentication.get().getAuthorities() == null) {
+      return false;
+    }
+    de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority target =
+        new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+            roleName, orgUnitId);
+    for (org.springframework.security.core.GrantedAuthority a :
+        authentication.get().getAuthorities()) {
+      if (a instanceof de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority ctx
+          && ctx.equals(target)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
