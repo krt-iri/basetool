@@ -59,8 +59,9 @@ public class HangarService {
    * @return paged list of ships in the caller's squadron context
    */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return shipRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return shipRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -121,8 +122,10 @@ public class HangarService {
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails) {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    Page<Object[]> p = shipRepository.countShipsByType(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Page<Object[]> p =
+        shipRepository.countShipsByType(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
 
     List<de.greluc.krt.iri.basetool.backend.model.ShipType> types =
         includeOwnerDetails
@@ -284,7 +287,8 @@ public class HangarService {
    */
   @Transactional
   public void resetAllFittedStatus() {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    shipRepository.resetAllFittedScoped(owningSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    shipRepository.resetAllFittedScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 }

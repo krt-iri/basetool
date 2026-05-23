@@ -120,11 +120,17 @@ public class RefineryOrderService {
   public Page<RefineryOrder> getAllRefineryOrders(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       @NotNull Pageable pageable) {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     if (statuses != null && !statuses.isEmpty()) {
-      return refineryOrderRepository.findByStatusInScoped(statuses, owningSquadronId, pageable);
+      return refineryOrderRepository.findByStatusInScoped(
+          statuses,
+          scope.adminAllScope(),
+          scope.activeOrgUnitId(),
+          scope.memberOrgUnitIds(),
+          pageable);
     }
-    return refineryOrderRepository.findAllScoped(owningSquadronId, pageable);
+    return refineryOrderRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -134,8 +140,9 @@ public class RefineryOrderService {
    * @return paged orders across all users
    */
   public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return refineryOrderRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return refineryOrderRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**

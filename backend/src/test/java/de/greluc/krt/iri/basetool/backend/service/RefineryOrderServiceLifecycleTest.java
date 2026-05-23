@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -198,20 +199,26 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      // After Phase 3 the admin "all orders" list goes through the squadron-scoped
-      // variant; the test class has no squadron stub so currentSquadronId() returns
-      // Optional.empty() and the service forwards null as the scope.
-      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
+      // After Phase 3 the admin "all orders" list goes through the squadron-scoped variant; the
+      // test class has no squadron stub so currentScopePredicate() resolves to the admin-all
+      // shape and the service forwards adminAllScope=true / no IDs.
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
+          .thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(List.of(), pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByStatusInScoped(any(), any(), any());
+      verify(refineryOrderRepository, never())
+          .findByStatusInScoped(any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
     void getAllRefineryOrders_withStatuses_callsFindByStatusIn() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findByStatusInScoped(
-              List.of(RefineryOrderStatus.COMPLETED), null, pageable))
+              List.of(RefineryOrderStatus.COMPLETED), true, null, java.util.Set.of(), pageable))
           .thenReturn(page);
 
       assertEquals(
@@ -224,7 +231,10 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_secondOverload_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
+          .thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(pageable).getTotalElements());
     }

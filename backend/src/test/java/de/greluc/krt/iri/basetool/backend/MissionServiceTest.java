@@ -19,10 +19,12 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import de.greluc.krt.iri.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,14 +94,17 @@ class MissionServiceTest {
     // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
     // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
     Pageable pageable = PageRequest.of(0, 10);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, null, pageable))
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
-        .searchMissions(query, start, end, status, Boolean.FALSE, null, null, pageable);
+        .searchMissions(
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable);
   }
 
   @Test

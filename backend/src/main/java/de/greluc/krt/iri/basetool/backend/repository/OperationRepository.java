@@ -33,10 +33,16 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @EntityGraph(attributePaths = {"owningSquadron"})
   @org.springframework.data.jpa.repository.Query(
-      "SELECT o FROM Operation o WHERE (:owningSquadronId IS NULL OR o.owningSquadron.id ="
-          + " :owningSquadronId)")
+      "SELECT o FROM Operation o WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   org.springframework.data.domain.Page<Operation> findAllScoped(
-      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds,
       org.springframework.data.domain.Pageable pageable);
 
   /**
@@ -44,18 +50,27 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * {@code /lookup} endpoint that feeds the mission-detail page's operation-picker dropdown -
    * pulling the full {@code OperationDto} payload via the regular list endpoint with {@code
    * size=1000} was the previous shape and exhausted DB and serialisation budget on every mission
-   * page render. Honours the same {@code owningSquadronId IS NULL} sentinel as {@link
-   * #findAllScoped} so admins without an active squadron see all operations.
+   * page render. Uses the same R6.c scope-predicate triple as {@link #findAllScoped}.
    *
-   * @param owningSquadronId scope filter, or {@code null} for "all squadrons" (admin)
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
+   *     selection — disables the scope filter entirely.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
+   *     for admins and anonymous callers.
    * @return slim reference DTOs, sorted by name ascending
    */
   @org.springframework.data.jpa.repository.Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto(o.id, o.name)"
-          + " FROM Operation o WHERE (:owningSquadronId IS NULL OR o.owningSquadron.id ="
-          + " :owningSquadronId) ORDER BY o.name ASC")
+          + " FROM Operation o WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
-      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId);
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
    * Free-text + status + scope search across operations. Mirrors the contract of {@code
@@ -77,19 +92,26 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *
    * @param query free-text name/description fragment, may be {@code null}
    * @param status status list (string names of {@code OperationStatus}); always applied
-   * @param owningSquadronId scope filter, or {@code null} for "all squadrons" (admin)
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
+   * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
    * @param pageable page request
    * @return paged matching operations
    */
   @EntityGraph(attributePaths = {"owningSquadron"})
   @Query(
-      "SELECT o FROM Operation o WHERE (:owningSquadronId IS NULL OR o.owningSquadron.id ="
-          + " :owningSquadronId) AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%')) AND (CAST(o.status AS string) IN (:status))")
+      "SELECT o FROM Operation o WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%')) AND (CAST(o.status AS string) IN (:status))")
   Page<Operation> searchOperations(
       @Param("query") String query,
       @Param("status") List<String> status,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 }

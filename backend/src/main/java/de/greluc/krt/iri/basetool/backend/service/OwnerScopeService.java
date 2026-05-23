@@ -143,6 +143,86 @@ public class OwnerScopeService {
   }
 
   /**
+   * R6.c / SPEZIALKOMMANDO_PLAN.md §3.5 + §5.4: returns the full effective scope vector for the
+   * current request, encoded as a {@link ScopePredicate}. Repository queries combine the three
+   * fields ({@code adminAllScope}, {@code activeOrgUnitId}, {@code memberOrgUnitIds}) into a single
+   * JPQL clause that handles every caller class — admin all-scope, admin/non-admin pinned to a
+   * specific OrgUnit, non-admin with multi-membership union, and anonymous — with the same
+   * predicate shape. Before R6.c the staffel-scoped queries took a single nullable {@code
+   * scopeSquadronId} that collapsed admin-all and non-admin-with-multi-membership into the same
+   * code path, silently hiding SK data from multi-membership users.
+   *
+   * <p>Resolution flow:
+   *
+   * <ul>
+   *   <li>Admin without active header → {@code adminAllScope=true}, all other fields empty.
+   *   <li>Admin with active header → {@code activeOrgUnitId=header value}, {@code adminAllScope=
+   *       false}, memberships empty (admins do not constrain by their own memberships even when
+   *       they happen to have some).
+   *   <li>Non-admin (with or without future R5.e pinning) → {@code memberOrgUnitIds = union of
+   *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
+   *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
+   *       the same X-Active-Squadron-Id header that admins use today.
+   *   <li>Anonymous → all empty / false / null. The repository predicate falls through to "no rows
+   *       except cross-staffel public escape".
+   * </ul>
+   *
+   * <p>The membership union read is hybrid pre-D3: {@link User#getSquadron()} for the Staffel link
+   * (still authoritative on {@code app_user.squadron_id}) plus {@link
+   * OrgUnitMembershipRepository#findAllByIdUserIdAndKind} for SK rows. Once D3 drops {@code
+   * app_user.squadron_id} and migrates the legacy Staffel membership onto {@code
+   * org_unit_membership}, this method switches to a single {@code findAllByIdUserId} read.
+   *
+   * @return a never-null scope vector describing what the current request should see.
+   */
+  @NotNull
+  public ScopePredicate currentScopePredicate() {
+    if (authHelper.isAdmin()) {
+      Optional<UUID> active = readActiveSquadronFromHeader();
+      return active
+          .map(id -> new ScopePredicate(false, id, java.util.Set.of()))
+          .orElseGet(() -> new ScopePredicate(true, null, java.util.Set.of()));
+    }
+    java.util.Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
+    return new ScopePredicate(false, null, memberOrgUnitIds);
+  }
+
+  /**
+   * Helper for {@link #currentScopePredicate()}: resolves every OrgUnit id the current non-admin
+   * caller is a member of. Used by the union-of-memberships branch of the scope predicate. Returns
+   * the empty set for anonymous callers and (technically) for admins, although the latter never
+   * reaches this method through {@link #currentScopePredicate()}.
+   *
+   * <p>The result is computed fresh every call — there is no per-request memoisation yet because
+   * the resolver is invoked exactly once per request (via {@link #currentScopePredicate()}) and the
+   * additional cache key would only pay off if the resolver was called multiple times.
+   *
+   * @return the union of OrgUnit ids the caller belongs to, never {@code null}.
+   */
+  @NotNull
+  public java.util.Set<UUID> currentMemberOrgUnitIds() {
+    Optional<UUID> userIdOpt = authHelper.currentUserId();
+    if (userIdOpt.isEmpty()) {
+      return java.util.Set.of();
+    }
+    Optional<User> userOpt = userRepository.findById(userIdOpt.get());
+    if (userOpt.isEmpty()) {
+      return java.util.Set.of();
+    }
+    User user = userOpt.get();
+    java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+    if (user.getSquadron() != null) {
+      ids.add(user.getSquadron().getId());
+    }
+    for (OrgUnitMembership m :
+        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND)) {
+      ids.add(m.getId().getOrgUnitId());
+    }
+    return ids;
+  }
+
+  /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
    * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
    * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use

@@ -22,24 +22,33 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * every {@code PLANNED} / {@code ACTIVE} mission visible to the caller, sorted by planned start.
    * Drives mission-picker dropdowns without pulling the full {@link Mission} aggregate.
    *
-   * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4): the lookup mirrors the
-   * visibility predicate of {@link #searchMissions(String, java.time.Instant, java.time.Instant,
-   * List, Boolean, UUID, UUID, Pageable) searchMissions}. {@code scopeSquadronId == null} disables
-   * the squadron filter (admin "all squadrons" mode). For a non-null scope the result includes
-   * missions owned by that squadron PLUS any non-internal mission of any other squadron — so a
-   * member from squadron A no longer learns the names of squadron B's internal missions through the
-   * dropdown.
+   * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4 + R6.c §5.4): the lookup
+   * uses the standard org-unit scope-predicate triple — admin all-scope sees every active
+   * mission; a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the
+   * non-admin path passes the union of memberships. Cross-staffel public missions
+   * ({@code isInternal=false}) remain visible regardless of scope — so a member from one
+   * OrgUnit can still see other OrgUnits' public missions in the typeahead.
    *
-   * @param scopeSquadronId active squadron filter, or {@code null} for admin "all squadrons" mode.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
+   *     selection — disables the scope filter entirely.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
+   *     for admins and anonymous callers.
    * @return slim reference DTOs visible to the caller.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
           + " m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE')"
-          + " AND (:scopeSquadronId IS NULL OR m.owningSquadron.id = :scopeSquadronId OR"
-          + " m.isInternal = false) ORDER BY m.plannedStartTime ASC")
+          + " AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR m.isInternal = false"
+          + " ) ORDER BY m.plannedStartTime ASC")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
-      @Param("scopeSquadronId") UUID scopeSquadronId);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
@@ -80,14 +89,18 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE (:scopeSquadronId IS NULL OR m.owningSquadron.id ="
-          + " :scopeSquadronId OR m.isInternal = false) AND (CAST(:query AS string) IS NULL OR"
-          + " m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS"
-          + " string) ILIKE CONCAT('%', CAST(:query AS string), '%')) AND (CAST(:start AS"
-          + " timestamp) IS NULL OR m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS"
-          + " NULL OR m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS"
-          + " NULL OR m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR"
-          + " m.operation.id = :operationId) ORDER BY m.plannedStartTime ASC")
+      "SELECT m FROM Mission m WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR m.isInternal = false"
+          + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
+          + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"
+          + " (m.status IN (:status)) AND (:isInternal IS NULL OR m.isInternal = :isInternal) AND"
+          + " (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId) ORDER BY"
+          + " m.plannedStartTime ASC")
   List<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
@@ -95,7 +108,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("status") List<String> status,
       @Param("isInternal") Boolean isInternal,
       @Param("operationId") UUID operationId,
-      @Param("scopeSquadronId") UUID scopeSquadronId);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
    * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID, UUID)} -
@@ -114,16 +129,19 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * {@code @ManyToOne} associations here keeps Hibernate on SQL pagination and resolves the per-row
    * mapping in a single query.
    */
-  @EntityGraph(attributePaths = {"operation", "owningSquadron"})
+  @EntityGraph(attributePaths = {"operation", "owningOrgUnit"})
   @Query(
-      "SELECT m FROM Mission m WHERE (:scopeSquadronId IS NULL OR m.owningSquadron.id ="
-          + " :scopeSquadronId OR m.isInternal = false) AND (CAST(:query AS string) IS NULL OR"
-          + " m.name ILIKE CONCAT('%', CAST(:query AS string), '%') OR CAST(m.description AS"
-          + " string) ILIKE CONCAT('%', CAST(:query AS string), '%')) AND (CAST(:start AS"
-          + " timestamp) IS NULL OR m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS"
-          + " NULL OR m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS"
-          + " NULL OR m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR"
-          + " m.operation.id = :operationId)")
+      "SELECT m FROM Mission m WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR m.isInternal = false"
+          + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
+          + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"
+          + " (m.status IN (:status)) AND (:isInternal IS NULL OR m.isInternal = :isInternal) AND"
+          + " (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId)")
   Page<Mission> searchMissions(
       @Param("query") String query,
       @Param("start") Instant start,
@@ -131,7 +149,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("status") List<String> status,
       @Param("isInternal") Boolean isInternal,
       @Param("operationId") UUID operationId,
-      @Param("scopeSquadronId") UUID scopeSquadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
