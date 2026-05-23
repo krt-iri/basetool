@@ -117,8 +117,9 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return operationRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -143,8 +144,14 @@ public class OperationService {
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
             : status;
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return operationRepository.searchOperations(query, effectiveStatus, owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.searchOperations(
+        query,
+        effectiveStatus,
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**
@@ -158,8 +165,9 @@ public class OperationService {
   @NotNull
   public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto>
       findAllReference() {
-    UUID owningSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return operationRepository.findAllReferenceScoped(owningSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.findAllReferenceScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 
   /**

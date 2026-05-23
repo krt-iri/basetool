@@ -100,7 +100,9 @@ class InventoryItemServiceAggregateTest {
               isNull(),
               eq(false),
               isNull(),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
     }
 
@@ -119,7 +121,9 @@ class InventoryItemServiceAggregateTest {
               isNull(),
               eq(false),
               isNull(),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
     }
 
@@ -139,7 +143,9 @@ class InventoryItemServiceAggregateTest {
               isNull(),
               eq(false),
               isNull(),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
     }
 
@@ -160,7 +166,9 @@ class InventoryItemServiceAggregateTest {
               eq(List.of(jobId)),
               eq(true),
               eq(List.of(missionId)),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
     }
 
@@ -180,7 +188,9 @@ class InventoryItemServiceAggregateTest {
               any(),
               anyBoolean(),
               any(),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
       assertEquals(750, captor.getValue());
     }
@@ -203,7 +213,9 @@ class InventoryItemServiceAggregateTest {
               isNull(),
               eq(false),
               isNull(),
-              isNull(),
+              anyBoolean(),
+              any(),
+              any(),
               any(Pageable.class));
     }
   }
@@ -453,6 +465,9 @@ class InventoryItemServiceAggregateTest {
   private void stubFindGlobalReturning(List<InventoryItem> entities) {
     Page<InventoryItem> page = new PageImpl<>(entities);
     lenient()
+        .when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    lenient()
         .when(
             inventoryItemRepository.findGlobalByFilters(
                 anyBoolean(),
@@ -462,7 +477,9 @@ class InventoryItemServiceAggregateTest {
                 any(),
                 anyBoolean(),
                 any(),
-                isNull(),
+                anyBoolean(),
+                any(),
+                any(),
                 any(Pageable.class)))
         .thenReturn(page);
   }
@@ -481,6 +498,9 @@ class InventoryItemServiceAggregateTest {
       lenient().when(inventoryItemMapper.toDto(entity)).thenReturn(dto);
     }
     Page<InventoryItem> page = new PageImpl<>(entities);
+    lenient()
+        .when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             anyBoolean(),
             any(),
@@ -489,7 +509,9 @@ class InventoryItemServiceAggregateTest {
             any(),
             anyBoolean(),
             any(),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class)))
         .thenReturn(page);
   }

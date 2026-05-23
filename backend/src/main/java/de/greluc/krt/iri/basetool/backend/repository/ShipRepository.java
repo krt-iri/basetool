@@ -26,20 +26,28 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   void resetAllFitted();
 
   /**
-   * Squadron-scoped variant of {@link #resetAllFitted()}. Used by the admin/officer "reset fitted"
+   * OrgUnit-scoped variant of {@link #resetAllFitted()}. Used by the admin/officer "reset fitted"
    * action so a focused-mode caller only wipes the {@code fitted} flag on ships of their own
-   * squadron (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict eigene Staffel). {@code
-   * owningSquadronId} {@code null} signals admin "all squadrons" mode and falls back to the
-   * cross-staffel reset.
+   * OrgUnit (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict eigene Staffel). Uses the R6.c
+   * scope-predicate triple: admin all-scope resets every ship; pinned active OrgUnit resets only
+   * that one; non-admin path resets the union of memberships.
    *
-   * @param owningSquadronId squadron to scope the reset to, or {@code null} for cross-staffel wipe.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
+   * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
    */
   @Modifying(clearAutomatically = true)
   @Query(
-      "UPDATE Ship s SET s.fitted = false WHERE :owningSquadronId IS NULL OR s.owningSquadron.id ="
-          + " :owningSquadronId")
+      "UPDATE Ship s SET s.fitted = false WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   void resetAllFittedScoped(
-      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId);
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
@@ -94,10 +102,16 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @EntityGraph(attributePaths = {"shipType", "location", "owner"})
   @Query(
-      "SELECT s FROM Ship s WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id ="
-          + " :owningSquadronId)")
+      "SELECT s FROM Ship s WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   Page<Ship> findAllScoped(
-      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -109,10 +123,16 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Query(
       "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s"
-          + " WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id = :owningSquadronId) GROUP BY"
-          + " s.shipType ORDER BY s.shipType.name ASC")
+          + " WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC")
   Page<Object[]> countShipsByType(
-      @org.springframework.data.repository.query.Param("owningSquadronId") UUID owningSquadronId,
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**

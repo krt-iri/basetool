@@ -127,8 +127,9 @@ public class MissionService {
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
-    UUID scopeSquadronId = ownerScopeService.currentSquadronId().orElse(null);
-    return missionRepository.findAllActiveReference(scopeSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return missionRepository.findAllActiveReference(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 
   /**
@@ -155,9 +156,18 @@ public class MissionService {
     if (!authHelperService.isAuthenticated()) {
       effectiveIsInternal = Boolean.FALSE;
     }
-    UUID scopeSquadronId = ownerScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return missionRepository.searchMissions(
-        query, start, end, status, effectiveIsInternal, operationId, scopeSquadronId, pageable);
+        query,
+        start,
+        end,
+        status,
+        effectiveIsInternal,
+        operationId,
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**

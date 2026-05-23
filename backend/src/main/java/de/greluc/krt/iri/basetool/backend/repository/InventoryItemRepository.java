@@ -53,11 +53,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND"
-          + " (:owningSquadronId IS NULL OR i.owningSquadron.id = :owningSquadronId)")
+      "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   Page<InventoryItem> findByMaterialAndPersonalFalseScoped(
       @Param("material") Material material,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code PersonalFalse}. */
@@ -77,12 +82,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder", "mission"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
-          + " i.owningSquadron.id = :owningSquadronId) AND (:hasMaterials = false OR i.material.id"
-          + " IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality) AND"
-          + " (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN :jobOrderIds))"
-          + " AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id IN"
-          + " :missionIds))")
+      "SELECT i FROM InventoryItem i WHERE i.personal = false AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
+          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
+          + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
+          + " NOT NULL AND i.mission.id IN :missionIds))")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -91,7 +98,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("hasMissions") boolean hasMissions,
       @Param("missionIds") List<UUID> missionIds,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -129,10 +138,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       "SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS"
           + " double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount"
-          + " FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
-          + " i.owningSquadron.id = :owningSquadronId) GROUP BY i.material")
+          + " FROM InventoryItem i WHERE i.personal = false AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) GROUP BY i.material")
   Page<Object[]> getAggregatedInventory(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      Pageable pageable);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code JobOrderIdAndMaterialId}. Eagerly
@@ -248,18 +263,28 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * inventory_item} FK was removed in {@code V64} (the handover row already snapshots the relevant
    * material data), so a single bulk-delete is safe — no pre-cleanup loop is required.
    *
-   * <p>Multi-tenant: when {@code owningSquadronId} is non-null only items of that squadron are
-   * removed (focused admin mode). When {@code null} the delete is global across all squadrons
-   * (admin "all squadrons" mode). Service-layer enforces the access check before reaching this
-   * method.
+   * <p>Multi-tenant: uses the standard R6.c scope predicate triple. Admin all-scope wipes every
+   * non-personal item; a specific active OrgUnit limits the wipe to that OrgUnit; non-admin
+   * callers' membership union scopes the wipe to the caller's OrgUnits. Service-layer enforces
+   * the access check before reaching this method.
    *
-   * @param owningSquadronId squadron to scope the delete to, or {@code null} for cross-staffel
-   *     wipe.
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit
+   *     selection — wipes every non-personal item regardless of owner.
+   * @param activeOrgUnitId the single OrgUnit to scope the wipe to (admin pinning), or {@code
+   *     null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty
+   *     for admins and anonymous.
    * @return number of deleted rows
    */
   @Modifying
   @Query(
-      "DELETE FROM InventoryItem i WHERE i.personal = false AND (:owningSquadronId IS NULL OR"
-          + " i.owningSquadron.id = :owningSquadronId)")
-  int deleteAllNonPersonal(@Param("owningSquadronId") UUID owningSquadronId);
+      "DELETE FROM InventoryItem i WHERE i.personal = false AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
+  int deleteAllNonPersonal(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
 }

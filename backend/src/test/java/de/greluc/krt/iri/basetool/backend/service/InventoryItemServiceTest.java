@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
@@ -144,7 +145,10 @@ class InventoryItemServiceTest {
   void getAggregatedInventory_shouldReturnPage() {
     Object[] obj = new Object[] {new Material(), 10.0, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
-    when(inventoryItemRepository.getAggregatedInventory(isNull(), any(Pageable.class)))
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.getAggregatedInventory(
+            anyBoolean(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(materialMapper.toDto(any())).thenReturn(null);
 
@@ -163,9 +167,10 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
     // Post-fix #5: getInventoryByMaterial routes through the scoped repository variant so
     // a Lager-direct drilldown stays strictly squadron-isolated.
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
-            any(), org.mockito.ArgumentMatchers.isNull(), any()))
+            any(), anyBoolean(), any(), any(), any()))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
@@ -193,6 +198,8 @@ class InventoryItemServiceTest {
 
   @Test
   void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
@@ -201,7 +208,9 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -221,6 +230,8 @@ class InventoryItemServiceTest {
     List<UUID> jobOrderIds = List.of(jobOrderId);
     List<UUID> missionIds = List.of(missionId);
 
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
@@ -229,7 +240,9 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -251,7 +264,9 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class));
   }
 
@@ -1081,43 +1096,49 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
-    // Given: admin in "all squadrons" mode (no active scope) — null scope = cross-staffel wipe.
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(42);
+    // Given: admin in "all squadrons" mode (no active scope) — adminAllScope=true wipes across.
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
+        .thenReturn(42);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(42, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(null);
+    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
     // Given
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(0);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
+        .thenReturn(0);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(0, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(null);
+    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
     // Given: focused admin / member in squadron A — only their own stock gets wiped.
     UUID scope = UUID.randomUUID();
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
-    when(inventoryItemRepository.deleteAllNonPersonal(scope)).thenReturn(7);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(false, scope, java.util.Set.of()))
+        .thenReturn(7);
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(7, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(scope);
+    verify(inventoryItemRepository).deleteAllNonPersonal(false, scope, java.util.Set.of());
   }
 
   // --- R5.d picker output (owningOrgUnitId) ---------------------------------
