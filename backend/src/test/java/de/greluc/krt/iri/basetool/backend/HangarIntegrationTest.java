@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
@@ -17,10 +19,12 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,8 @@ class HangarIntegrationTest {
 
   @Autowired private MissionUnitRepository missionUnitRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -76,24 +82,33 @@ class HangarIntegrationTest {
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("user1");
-    user1.setSquadron(iridium);
     userRepository.save(user1);
+    saveIridiumMembership(user1);
 
     user2 = new User();
     user2.setId(UUID.randomUUID());
     user2.setUsername("user2");
-    user2.setSquadron(iridium);
     userRepository.save(user2);
+    saveIridiumMembership(user2);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
     adminUser.setUsername("admin");
-    adminUser.setSquadron(iridium);
     userRepository.save(adminUser);
+    saveIridiumMembership(adminUser);
 
     fighter = new ShipType();
     fighter.setName("Fighter");
     fighter = shipTypeRepository.save(fighter);
+  }
+
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   @Test

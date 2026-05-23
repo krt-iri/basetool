@@ -23,16 +23,19 @@ public final class EntityMappers {
   /**
    * Flattens a {@link User} entity into its full DTO, deriving the role-name set and the union of
    * every role's permission strings.
+   *
+   * <p>After R9 Steps 4+5 the {@link User} entity no longer carries the legacy {@code squadron},
+   * {@code isLogistician}, {@code isMissionManager} columns — those fields land on the DTO as
+   * {@code null} / {@code false} respectively when projected through this static utility. Callers
+   * that need the membership-derived projection must use the Spring-managed {@link UserMapper} bean
+   * instead, which loads the Staffel membership row to populate the three legacy fields. This
+   * static helper exists only for the few legacy unit-test fixtures that wire User entities by hand
+   * and never had a membership table to read from.
    */
   public static UserDto toDto(User u) {
     Set<String> roleNames = u.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
     Set<String> permissions =
         u.getRoles().stream().flatMap(r -> r.getPermissions().stream()).collect(Collectors.toSet());
-    de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto squadronRef =
-        u.getSquadron() == null
-            ? null
-            : new de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto(
-                u.getSquadron().getId(), u.getSquadron().getName(), u.getSquadron().getShorthand());
     return new UserDto(
         u.getId(),
         u.getUsername(),
@@ -46,10 +49,10 @@ public final class EntityMappers {
         roleNames,
         permissions,
         u.getLastReadAnnouncementId(),
-        u.isLogistician(),
-        u.isMissionManager(),
+        Boolean.FALSE,
+        Boolean.FALSE,
         u.isInKeycloak(),
-        squadronRef,
+        null,
         u.getVersion(),
         u.getJoinDate());
   }

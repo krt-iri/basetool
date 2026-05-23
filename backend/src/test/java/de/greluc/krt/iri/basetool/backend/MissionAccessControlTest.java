@@ -11,13 +11,17 @@ import de.greluc.krt.iri.basetool.backend.model.JobType;
 import de.greluc.krt.iri.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +58,8 @@ class MissionAccessControlTest {
 
   @Autowired private JobTypeRepository jobTypeRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -70,19 +76,28 @@ class MissionAccessControlTest {
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer1");
-    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
+    saveIridiumMembership(officerUser);
 
     guestUser = new User();
     guestUser.setId(UUID.randomUUID());
     guestUser.setUsername("guest1");
-    guestUser.setSquadron(iridium);
     userRepository.save(guestUser);
+    saveIridiumMembership(guestUser);
 
     testJobType = new JobType();
     testJobType.setName("Test Job");
     testJobType.setArchetype(JobTypeArchetype.MISSION);
     testJobType = jobTypeRepository.save(testJobType);
+  }
+
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   @Test
@@ -193,8 +208,8 @@ class MissionAccessControlTest {
     User otherGuest = new User();
     otherGuest.setId(UUID.randomUUID());
     otherGuest.setUsername("guest2");
-    otherGuest.setSquadron(iridium);
     userRepository.save(otherGuest);
+    saveIridiumMembership(otherGuest);
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();

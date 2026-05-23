@@ -52,6 +52,10 @@ class MissionServiceTest {
 
   @Mock private de.greluc.krt.iri.basetool.backend.service.AuthHelperService authHelperService;
 
+  @Mock
+  private de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService
+      orgUnitMembershipService;
+
   @InjectMocks private MissionService missionService;
 
   @Test
@@ -241,7 +245,6 @@ class MissionServiceTest {
     home.setId(UUID.randomUUID());
     User caller = new User();
     caller.setId(UUID.randomUUID());
-    caller.setSquadron(home);
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
     when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, null)).thenReturn(home);
@@ -278,11 +281,8 @@ class MissionServiceTest {
 
   @Test
   void createMission_honoursOwningOrgUnitIdFromTheRequestViaPickerResolver() {
-    Squadron home = new Squadron();
-    home.setId(UUID.randomUUID());
     User caller = new User();
     caller.setId(UUID.randomUUID());
-    caller.setSquadron(home);
     Squadron picked = new Squadron();
     picked.setId(UUID.randomUUID());
 

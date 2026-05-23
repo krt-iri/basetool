@@ -1,7 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -535,25 +534,22 @@ class UserServiceSyncTest {
     @Test
     void updateLogisticianStatus_setsTrue() {
       User user = newUser(USER_ID, "alice");
-      user.setLogistician(false);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
 
       userService.updateLogisticianStatus(USER_ID, true);
 
-      assertTrue(user.isLogistician());
+      // Post-R9 D3 (V101): the flag write lands on the membership row, not the User entity.
+      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, true, null);
     }
 
     @Test
     void updateLogisticianStatus_setsFalse() {
       User user = newUser(USER_ID, "alice");
-      user.setLogistician(true);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
 
       userService.updateLogisticianStatus(USER_ID, false);
 
-      assertFalse(user.isLogistician());
+      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, false, null);
     }
 
     @Test
@@ -568,13 +564,11 @@ class UserServiceSyncTest {
     @Test
     void updateMissionManagerStatus_setsTrue() {
       User user = newUser(USER_ID, "alice");
-      user.setMissionManager(false);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
 
       userService.updateMissionManagerStatus(USER_ID, true);
 
-      assertTrue(user.isMissionManager());
+      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, null, true);
     }
   }
 

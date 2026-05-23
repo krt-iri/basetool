@@ -185,10 +185,14 @@ public class UserController {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    if (user.getSquadron() == null) {
+    // Post-R9 D3 (V101): the user's home Staffel is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped.
+    UUID userSquadronId =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitId(user.getId()).orElse(null);
+    if (userSquadronId == null) {
       return true;
     }
-    return !authHelperService.canSeeSquadron(user.getSquadron().getId());
+    return !authHelperService.canSeeSquadron(userSquadronId);
   }
 
   /**
