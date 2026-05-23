@@ -5,10 +5,13 @@ steps still pending after the R8 follow-up sweep ships V99 (NOT NULL tighten +
 legacy NULL-allowance) and the parallel `resolveOrgUnitForPickerOutput` method
 that unblocks SK aggregate ownership.
 
-> **Status (2026-05-23):** V99 + new resolver landed. Caller migration to the
-> new resolver, V100-V102 destructive drops, and the corresponding Java
-> cleanup are *NOT YET DONE*. Each item below is the scope of its own future
-> PR — sequencing matters, see "Order" below.
+> **Status (2026-05-23):** all six steps shipped. V99 + new resolver,
+> caller migration, lifecycle-hook drop, V100/V101/V102 destructive schema
+> drops, and the corresponding Java cleanup all landed. The legacy
+> `squadron` table is gone; every reference to a Squadron now resolves via
+> `org_unit` (kind='SQUADRON').
+>
+> Historic context kept for archaeology:
 
 ## What R8 already shipped
 
@@ -125,7 +128,7 @@ introduced once Hibernate single-table inheritance is the only path).
 - [x] Step 4 PR: `git grep "user.setSquadron\|user.getSquadron"` returns
       nothing in `main` source set. JWT converter's legacy branch removed.
 - [x] Step 5 PR: V101 applied. Backup confirmed.
-- [ ] Step 6 PR: `promotion_topic` migrated. V102 applied. Backup confirmed.
+- [x] Step 6 PR: `promotion_topic` migrated. V102 applied. Backup confirmed.
 
 ## Why not all in one PR?
 
