@@ -195,8 +195,8 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
-    order.setOwningSquadron(
-        ownerScopeService.resolveSquadronForPickerOutput(user, owningOrgUnitId));
+    order.setOwningOrgUnit(
+        ownerScopeService.resolveOrgUnitForPickerOutput(user, owningOrgUnitId));
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
@@ -596,7 +596,7 @@ public class RefineryOrderService {
         // ("owningOrgUnitId is required") for multi-membership assignees. The latter case
         // currently can't be resolved from the UI; widening the store form with a per-output
         // picker is tracked as a follow-up to the SK §5.5 stamping wave.
-        item.setOwningSquadron(ownerScopeService.resolveSquadronForPickerOutput(assignee, null));
+        item.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(assignee, null));
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);

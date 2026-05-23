@@ -210,12 +210,12 @@ public class HangarImportService {
         for (int i = 0; i < toCreate; i++) {
           Ship ship = new Ship();
           ship.setOwner(user);
-          // Stamp owning squadron from the importer's home squadron — same contract as
-          // HangarService.createShip uses for the manual create path. Phase 7's V89 makes
-          // `ship.owning_squadron_id` NOT NULL, so the import path must populate it
-          // explicitly; the previous nullable column hid this missing-stamp bug for the
-          // entire Phase 6 release window.
-          ship.setOwningSquadron(user.getSquadron());
+          // Stamp owning org-unit from the importer's home Staffel — same contract as
+          // HangarService.addShip's create path. V99 makes `ship.owning_org_unit_id` NOT NULL,
+          // so the import path must populate it explicitly. The picker resolver would refuse
+          // a multi-membership importer here (no UI for it), but the import flow always runs
+          // against the caller's own home Staffel — pass it through verbatim.
+          ship.setOwningOrgUnit(user.getSquadron());
           ship.setShipType(shipType);
           ship.setInsurance(insurance);
           ship.setFitted(false);

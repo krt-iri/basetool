@@ -244,7 +244,7 @@ class MissionServiceTest {
     caller.setSquadron(home);
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveSquadronForPickerOutput(caller, null)).thenReturn(home);
+    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, null)).thenReturn(home);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -252,7 +252,7 @@ class MissionServiceTest {
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null));
 
-    assertEquals(home, saved.getOwningSquadron());
+    assertEquals(home, saved.getOwningOrgUnit());
     assertEquals(caller, saved.getOwner());
   }
 
@@ -265,7 +265,7 @@ class MissionServiceTest {
     // owner has no home Staffel. An authenticated owner without a home Staffel now flows through
     // OwnerScopeService.resolveSquadronForPickerOutput and inherits whatever that returns.
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
+    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -273,7 +273,7 @@ class MissionServiceTest {
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null));
 
-    assertEquals(scopeSquadron, saved.getOwningSquadron());
+    assertEquals(scopeSquadron, saved.getOwningOrgUnit());
   }
 
   @Test
@@ -287,7 +287,7 @@ class MissionServiceTest {
     picked.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveSquadronForPickerOutput(caller, picked.getId()))
+    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, picked.getId()))
         .thenReturn(picked);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
@@ -296,7 +296,7 @@ class MissionServiceTest {
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, picked.getId()));
 
-    assertEquals(picked, saved.getOwningSquadron(), "picker output must be honoured verbatim");
+    assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
   }
 
   @Test
@@ -306,7 +306,7 @@ class MissionServiceTest {
     UUID parentId = UUID.randomUUID();
     Mission parent = new Mission();
     parent.setId(parentId);
-    parent.setOwningSquadron(parentSquadron);
+    parent.setOwningOrgUnit(parentSquadron);
 
     when(missionRepository.findById(parentId)).thenReturn(Optional.of(parent));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -317,7 +317,7 @@ class MissionServiceTest {
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
                 "Sub", null, null, "PLANNED", null, null, null, false, null, null));
 
-    assertEquals(parentSquadron, saved.getOwningSquadron());
+    assertEquals(parentSquadron, saved.getOwningOrgUnit());
     assertEquals(parent, saved.getParent());
   }
 }
