@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserJoinDateServiceTest {
 
   @Mock private UserRepository userRepository;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 

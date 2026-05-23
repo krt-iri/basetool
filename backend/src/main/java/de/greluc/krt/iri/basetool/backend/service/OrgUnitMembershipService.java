@@ -244,6 +244,174 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * R6.e — Squadron-side counterpart of {@link #patchFlags(UUID, UUID,
+   * MembershipFlagsPatchRequest)}. Same payload contract (boxed {@code Boolean} flags, mandatory
+   * {@code version}) and same optimistic-lock semantics; only the existence check up front is
+   * different — Squadrons live in the {@link SquadronRepository}, not the {@link
+   * SpecialCommandRepository}. ADMIN-gated at the controller layer per plan §5.6 ({@code PATCH
+   * /api/v1/squadrons/{id}/members/{userId}}). Used to migrate the legacy {@code
+   * UserController.updateLogisticianStatus} / {@code updateMissionManagerStatus} writes from the
+   * {@code app_user.is_logistician} / {@code is_mission_manager} columns onto the per-membership
+   * row (R6.e write-side completion of plan D3).
+   *
+   * @param squadronId the Squadron whose membership to patch; never {@code null}.
+   * @param userId the user whose membership to patch; never {@code null}.
+   * @param request patch payload; never {@code null}.
+   * @return the persisted membership row with the bumped {@code @Version}.
+   * @throws NotFoundException if no Squadron matches the given id, or the user is not a member.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership patchSquadronMemberFlags(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipFlagsPatchRequest request) {
+    Squadron squadron =
+        squadronRepository
+            .findById(squadronId)
+            .orElseThrow(() -> new NotFoundException("Squadron not found"));
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, squadron.getId()))
+            .orElseThrow(() -> new NotFoundException("Membership not found"));
+    assertVersionMatches(m, request.version());
+    if (request.isLogistician() != null) {
+      m.setLogistician(request.isLogistician());
+    }
+    if (request.isMissionManager() != null) {
+      m.setMissionManager(request.isMissionManager());
+    }
+    return membershipRepository.save(m);
+  }
+
+  /**
+   * R6.e helper — applies the supplied flag delta to the user's existing Staffel membership row
+   * without optimistic-lock checking. Used by the legacy {@code UserController}-shaped flag-toggle
+   * endpoints that still accept a bare {@code ?isLogistician=...} query parameter (no version
+   * round-trip) so a flag toggle from the existing admin UI propagates to the membership row even
+   * before the frontend migrates to the version-aware PATCH. Idempotent — passing the same flag
+   * value the row already has is a no-op write that bumps the {@code @Version} via Hibernate dirty
+   * checking.
+   *
+   * <p>If the user has no Staffel membership row (V95 backfill gap for a post-R1 user whose
+   * squadron was assigned without the parallel membership upsert), an absent row is created on the
+   * fly using the user's current {@code User#getSquadron()} as the OrgUnit anchor. This closes the
+   * legacy invariant gap during the R6.e soak — the proper fix (creating the membership row in
+   * {@code UserService.updateUserSquadron}) lives in {@link UserService#updateUserSquadron(UUID,
+   * UUID, Long)} so the rule fires uniformly across every Staffel-assignment code path.
+   *
+   * @param userId the user whose Staffel membership to update; never {@code null}.
+   * @param isLogistician new flag value, or {@code null} to leave the existing value untouched.
+   * @param isMissionManager new flag value, or {@code null} to leave the existing value untouched.
+   * @throws NotFoundException if the user does not exist or has no assigned Squadron at all.
+   */
+  @Transactional
+  public void applyStaffelMembershipFlagDelta(
+      @NotNull UUID userId,
+      @org.jetbrains.annotations.Nullable Boolean isLogistician,
+      @org.jetbrains.annotations.Nullable Boolean isMissionManager) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    Squadron homeStaffel = user.getSquadron();
+    if (homeStaffel == null) {
+      // No Staffel to grant a per-membership flag on. Legacy endpoint shapes that toggle the
+      // user-level column for a squadron-less admin / guest user just mirror to the User row
+      // (the JWT converter's R6.d fallback branch still picks the User-level column up).
+      return;
+    }
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, homeStaffel.getId()))
+            .orElseGet(
+                () -> {
+                  // V95-backfill safety net: the user has a Staffel link but no membership row.
+                  // Synthesise the row so the legacy flag write has a place to land.
+                  OrgUnitMembership fresh = new OrgUnitMembership();
+                  fresh.setId(new OrgUnitMembershipId(userId, homeStaffel.getId()));
+                  fresh.setUser(user);
+                  fresh.setJoinedAt(java.time.Instant.now());
+                  return fresh;
+                });
+    if (isLogistician != null) {
+      m.setLogistician(isLogistician);
+    }
+    if (isMissionManager != null) {
+      m.setMissionManager(isMissionManager);
+    }
+    membershipRepository.save(m);
+  }
+
+  /**
+   * R6.e — synchronises the Staffel membership row with the user's currently-assigned {@code
+   * User.squadron}. Called by {@link UserService#updateUserSquadron(UUID, UUID, Long)} after the
+   * squadron assignment so the {@code org_unit_membership} row stays in lockstep with the legacy
+   * {@code app_user.squadron_id} column during the soak window. Closes the V95 backfill gap for
+   * post-R1 users created via Keycloak SSO without an explicit membership insert.
+   *
+   * <p>Logic:
+   *
+   * <ul>
+   *   <li>{@code newSquadron == null} → every existing Staffel membership of the user is removed.
+   *       The user falls back into "no Staffel" territory; their SK memberships (if any) stay.
+   *   <li>{@code newSquadron} matches the user's existing Staffel membership → no-op.
+   *   <li>{@code newSquadron} differs from the existing Staffel membership → the old row is deleted
+   *       and a new one is created at the new Squadron. Per-membership flags fall back to the
+   *       legacy {@code User.isLogistician} / {@code User.isMissionManager} columns so the user's
+   *       authorisation surface does not regress just because their Staffel changed.
+   *   <li>No existing Staffel membership → a fresh row is created at {@code newSquadron} with the
+   *       same legacy-flag carry-over.
+   * </ul>
+   *
+   * <p>The V95 partial unique index {@code uq_user_one_squadron_membership} guarantees at most one
+   * Staffel membership per user, which this method preserves by deleting the old row before
+   * inserting the new one.
+   *
+   * @param user the user whose Staffel membership to sync; never {@code null}.
+   * @param newSquadron the target Staffel, or {@code null} to remove the Staffel membership.
+   */
+  @Transactional
+  public void syncStaffelMembership(
+      @NotNull User user, @org.jetbrains.annotations.Nullable Squadron newSquadron) {
+    List<OrgUnitMembership> existing =
+        membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
+
+    if (newSquadron == null) {
+      if (!existing.isEmpty()) {
+        membershipRepository.deleteAll(existing);
+      }
+      return;
+    }
+
+    boolean alreadyMember =
+        existing.stream().anyMatch(m -> newSquadron.getId().equals(m.getId().getOrgUnitId()));
+    if (alreadyMember && existing.size() == 1) {
+      return;
+    }
+
+    // Delete any stale Staffel memberships at other Squadrons (V95 partial unique index allows
+    // at most one Staffel membership per user; switching squadrons removes the old one).
+    List<OrgUnitMembership> stale =
+        existing.stream()
+            .filter(m -> !newSquadron.getId().equals(m.getId().getOrgUnitId()))
+            .toList();
+    if (!stale.isEmpty()) {
+      membershipRepository.deleteAll(stale);
+      membershipRepository.flush();
+    }
+
+    if (!alreadyMember) {
+      OrgUnitMembership fresh = new OrgUnitMembership();
+      fresh.setId(new OrgUnitMembershipId(user.getId(), newSquadron.getId()));
+      fresh.setUser(user);
+      fresh.setJoinedAt(java.time.Instant.now());
+      // Carry legacy User-level flags onto the new row so authority does not regress mid-deploy.
+      fresh.setLogistician(user.isLogistician());
+      fresh.setMissionManager(user.isMissionManager());
+      membershipRepository.save(fresh);
+    }
+  }
+
+  /**
    * Flips the {@code is_lead} flag on the membership row. ADMIN-only at the controller layer — a
    * member-managing Lead cannot promote themselves or someone else to Lead. Carries an
    * optimistic-lock version like {@link #patchFlags}.
