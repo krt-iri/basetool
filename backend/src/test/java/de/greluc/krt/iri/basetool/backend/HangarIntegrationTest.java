@@ -156,7 +156,7 @@ class HangarIntegrationTest {
   void testUserCannotManageOtherHangar() throws Exception {
     // User1 creates ship
     Ship ship = new Ship();
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("User1 Ship");
     ship.setShipType(fighter);
     ship.setOwner(user1);
@@ -264,7 +264,7 @@ class HangarIntegrationTest {
   void testAdminResetAllFittedStatus() throws Exception {
     // Setup two fitted ships
     Ship ship1 = new Ship();
-    ship1.setOwningSquadron(iridium);
+    ship1.setOwningOrgUnit(iridium);
     ship1.setName("Fitted Ship 1");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -274,7 +274,7 @@ class HangarIntegrationTest {
 
     Ship ship2 = new Ship();
 
-    ship2.setOwningSquadron(iridium);
+    ship2.setOwningOrgUnit(iridium);
     ship2.setName("Fitted Ship 2");
     ship2.setShipType(fighter);
     ship2.setOwner(user2);
@@ -316,7 +316,7 @@ class HangarIntegrationTest {
   @Test
   void testSquadronOverview() throws Exception {
     Ship ship1 = new Ship();
-    ship1.setOwningSquadron(iridium);
+    ship1.setOwningOrgUnit(iridium);
     ship1.setName("Fitted Ship 1");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -326,7 +326,7 @@ class HangarIntegrationTest {
 
     Ship ship2 = new Ship();
 
-    ship2.setOwningSquadron(iridium);
+    ship2.setOwningOrgUnit(iridium);
     ship2.setName("Unfitted Ship 2");
     ship2.setShipType(fighter);
     ship2.setOwner(user2);
@@ -355,7 +355,7 @@ class HangarIntegrationTest {
   @Test
   void testSquadronOverviewAsAdmin() throws Exception {
     Ship ship1 = new Ship();
-    ship1.setOwningSquadron(iridium);
+    ship1.setOwningOrgUnit(iridium);
     ship1.setName("Admin Fitted Ship");
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
@@ -387,7 +387,7 @@ class HangarIntegrationTest {
   void testDeleteShipInMission() throws Exception {
     // Given a ship owned by user1
     Ship ship = new Ship();
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Mission Ship");
     ship.setShipType(fighter);
     ship.setOwner(user1);
@@ -396,7 +396,7 @@ class HangarIntegrationTest {
 
     // And a mission where this ship is assigned
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -432,7 +432,7 @@ class HangarIntegrationTest {
   void testDeleteAllShips_ReturnsNoContent() throws Exception {
     // Given: user1 has two ships
     Ship ship1 = new Ship();
-    ship1.setOwningSquadron(iridium);
+    ship1.setOwningOrgUnit(iridium);
     ship1.setShipType(fighter);
     ship1.setOwner(user1);
     ship1.setInsurance("LTI");
@@ -440,7 +440,7 @@ class HangarIntegrationTest {
 
     Ship ship2 = new Ship();
 
-    ship2.setOwningSquadron(iridium);
+    ship2.setOwningOrgUnit(iridium);
     ship2.setShipType(fighter);
     ship2.setOwner(user1);
     ship2.setInsurance("0");
@@ -481,7 +481,7 @@ class HangarIntegrationTest {
   void testDeleteAllShips_WithLinkedMissionUnit_UnlinksBeforeDelete() throws Exception {
     // Given: user1 has a ship assigned to a mission unit
     Ship ship = new Ship();
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setShipType(fighter);
     ship.setOwner(user1);
     ship.setInsurance("LTI");
@@ -489,7 +489,7 @@ class HangarIntegrationTest {
 
     Mission mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission for Delete All");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -517,7 +517,7 @@ class HangarIntegrationTest {
 
     // And: user2's ships are unaffected (multi-user isolation)
     Ship user2Ship = new Ship();
-    user2Ship.setOwningSquadron(iridium);
+    user2Ship.setOwningOrgUnit(iridium);
     user2Ship.setShipType(fighter);
     user2Ship.setOwner(user2);
     user2Ship.setInsurance("LTI");

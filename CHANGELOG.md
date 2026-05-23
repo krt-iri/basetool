@@ -1,6 +1,9 @@
 # Changelog
 ## [Unreleased]
 
+### Changed
+- **R9 Steps 2 + 3 — Drop der Legacy-`owningSquadron`-Mirror-Felder + V100-Spalten-Drop (Plan §10 PR-7 / R3.b).** Die sechs staffel-skopierten Aggregate (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder × creating/requesting) tragen nur noch `owningOrgUnit` / `creatingOrgUnit` / `requestingOrgUnit` als alleinige Source-of-Truth — die `Squadron`-getypten Legacy-Felder und der `syncOwnerFields()` Lifecycle-Hook sind weg, neue Migration `V100__drop_legacy_owning_squadron_columns.sql` droppt die sieben Spalten + die V91/V93-Indexe. **Voraussetzung Prod:** R9 Step 1 deployed + DB-Backup, da die Migration irreversibel ist; `promotion_topic.owning_squadron_id` bleibt unangetastet (Plan §3.3 + V98-Guard). DTO-Contract (`owningSquadron` / `creatingSquadron` / `requestingSquadron`) bleibt stabil über explizite MapStruct-`@Mapping`s plus die neue `SquadronMapper.orgUnitToReferenceDto(OrgUnit)`-Bridge — SK-Owner surfen ab jetzt als `null`. 17 Test-Files migriert.
+
 ### Added
 - **R8 — drei deferred Items aus dem R7-Audit-Backlog abgeschlossen.** Drei Plan-§-Aufträge, jeweils additiv zum R6.e-Stand:
 

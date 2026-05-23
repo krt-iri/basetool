@@ -520,9 +520,9 @@ class JobOrderHandoverServiceTest {
     squadronB.setId(UUID.randomUUID());
     squadronB.setShorthand("BRV");
 
-    order.setCreatingSquadron(squadronA);
-    order.setRequestingSquadron(squadronA);
-    inventoryItem.setOwningSquadron(squadronB);
+    order.setCreatingOrgUnit(squadronA);
+    order.setRequestingOrgUnit(squadronA);
+    inventoryItem.setOwningOrgUnit(squadronB);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 3.0);
     JobOrderHandoverCreateDto createDto =

@@ -87,7 +87,7 @@ class SquadronServiceTest {
     mission.setPlannedStartTime(Instant.now());
     // V89 made owning_squadron_id NOT NULL — stamp the test mission with the squadron
     // created above so persist does not violate the new constraint.
-    mission.setOwningSquadron(squadron);
+    mission.setOwningOrgUnit(squadron);
     mission = missionRepository.save(mission);
 
     MissionParticipant participant = new MissionParticipant();

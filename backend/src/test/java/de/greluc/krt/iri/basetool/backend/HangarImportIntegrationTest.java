@@ -192,7 +192,7 @@ class HangarImportIntegrationTest {
   void importFleetview_reImport_noNewShipCreatedWhenAlreadyPresent() throws Exception {
     // Given: 135c is already in user's hangar (1 existing)
     Ship existing = new Ship();
-    existing.setOwningSquadron(iridium);
+    existing.setOwningOrgUnit(iridium);
     existing.setShipType(type135c);
     existing.setOwner(user1);
     existing.setInsurance("LTI");
@@ -237,7 +237,7 @@ class HangarImportIntegrationTest {
   void importFleetview_partialDuplicate_createsOnlyMissingShips() throws Exception {
     // Given: 1× 135c already in hangar
     Ship existing = new Ship();
-    existing.setOwningSquadron(iridium);
+    existing.setOwningOrgUnit(iridium);
     existing.setShipType(type135c);
     existing.setOwner(user1);
     existing.setInsurance("LTI");

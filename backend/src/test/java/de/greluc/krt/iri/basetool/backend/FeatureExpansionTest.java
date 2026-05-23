@@ -201,7 +201,7 @@ class FeatureExpansionTest {
   @Test
   void testSubMission() throws Exception {
     Mission parent = new Mission();
-    parent.setOwningSquadron(iridium);
+    parent.setOwningOrgUnit(iridium);
     parent.setName("Parent Mission");
     parent = missionRepository.save(parent);
 
@@ -248,7 +248,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Finance Mission");
     mission = missionRepository.save(mission);
 
@@ -300,7 +300,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance_OtherUser_Forbidden() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Finance Mission 2");
     mission = missionRepository.save(mission);
 
