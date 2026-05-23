@@ -142,6 +142,51 @@ public class SquadronContextAdvice {
   }
 
   /**
+   * R5.e / SPEZIALKOMMANDO_PLAN.md §7.2 — resolves the active context to an {@link
+   * OrgUnitMembershipOptionDto} (carries the {@code kind} discriminator) so the context chip can
+   * render {@code [Staffel: IRI]} vs {@code [SK: ALPHA]} and apply a kind-specific style. Where
+   * {@link #activeSquadron} can only resolve {@code SQUADRON}-kind pins (its catalogue is the
+   * Squadron-only list), this attribute reads from {@link #availableOrgUnits()} which already
+   * carries the merged Squadron + SK catalogue with the discriminator inline.
+   *
+   * <p>Returns {@code null} when no pin is active (admin in all-OrgUnits mode, member with no home
+   * Staffel) or the pinned id is not present in the caller's catalogue (e.g. an admin pin that
+   * predates the destructive cleanup release and no longer resolves).
+   *
+   * @param activeOrgUnitId previously-resolved id (Spring re-injects model attributes between
+   *     {@code @ModelAttribute} methods); {@code null} when no pin applies.
+   * @param availableOrgUnits the OrgUnit catalogue the advice already loaded; reused to avoid a
+   *     dedicated per-id GET.
+   * @return matching option (kind-tagged), or {@code null}.
+   */
+  @ModelAttribute("activeOrgUnit")
+  public OrgUnitMembershipOptionDto activeOrgUnit(
+      @ModelAttribute("activeSquadronId") UUID activeOrgUnitId,
+      @ModelAttribute("availableOrgUnits") List<OrgUnitMembershipOptionDto> availableOrgUnits) {
+    if (activeOrgUnitId == null || availableOrgUnits == null) {
+      return null;
+    }
+    return availableOrgUnits.stream()
+        .filter(o -> activeOrgUnitId.equals(o.orgUnitId()))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Convenience model attribute: {@code true} when {@link #activeOrgUnit} resolves to a {@code
+   * SPECIAL_COMMAND}-kind option. Lets the sidebar chip toggle its kind label + style without
+   * duplicating the discriminator check across the two chip branches.
+   *
+   * @param activeOrgUnit previously-resolved option; may be {@code null}.
+   * @return {@code true} iff the active context is an SK pin.
+   */
+  @ModelAttribute("isActiveOrgUnitSpecialCommand")
+  public boolean isActiveOrgUnitSpecialCommand(
+      @ModelAttribute("activeOrgUnit") OrgUnitMembershipOptionDto activeOrgUnit) {
+    return activeOrgUnit != null && "SPECIAL_COMMAND".equals(activeOrgUnit.kind());
+  }
+
+  /**
    * Loads the squadron catalogue once per request. Returned to admins for the switcher dropdown and
    * reused by {@link #activeSquadron(UUID, List)} to dereference the active id without a second
    * round-trip. Empty list for anonymous callers or when the backend call fails - the dropdown
