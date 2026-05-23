@@ -3,6 +3,8 @@ package de.greluc.krt.iri.basetool.backend.service;
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -14,7 +16,10 @@ import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -185,23 +190,47 @@ public class OwnerScopeService {
    * service path (inventory create, refinery-order create, mission create, …) would otherwise have
    * to duplicate.
    *
-   * <p>Three cases:
+   * <p>R6.b tightens the contract to the plan §5.5.1 0/1/&gt;1-membership matrix:
    *
    * <ol>
-   *   <li>{@code owningOrgUnitId == null} — picker not used; falls back to the target user's home
-   *       Staffel via {@link User#getSquadron()}. Preserves today's stamping behaviour for the
-   *       single-membership case that covers 100 % of users at the time of R5.d.b.
-   *   <li>{@code owningOrgUnitId} references an OrgUnit the target user is a member of AND that org
-   *       unit resolves to a {@link Squadron} — picker output honoured; the picked Staffel is
-   *       returned and the lifecycle hook on the aggregate (see {@code syncOwnerFields()} on each
-   *       aggregate, R4) mirrors it into the new {@code owningOrgUnit} mirror column.
-   *   <li>{@code owningOrgUnitId} references an OrgUnit the target user is NOT a member of, or the
-   *       resolved row is a {@link de.greluc.krt.iri.basetool.backend.model.SpecialCommand} —
-   *       rejected with {@link BadRequestException}. The SK rejection is a soft block: the {@code
-   *       owning_squadron_id} column is still NOT NULL on every aggregate table, so an SK-owned row
-   *       cannot be persisted today even if the picker offered one. The destructive cleanup release
-   *       lowers the constraint; until then the soft block keeps the picker contract honest.
+   *   <li><b>0 memberships</b> — {@link BadRequestException}. Admin / guest principals cannot stamp
+   *       aggregates; the caller path should not reach this method with a memberless user.
+   *   <li><b>1 membership + {@code owningOrgUnitId == null}</b> — auto-stamp that single membership
+   *       (preserves today's single-Staffel default for the 100% of users still on the legacy
+   *       {@code app_user.squadron_id} link).
+   *   <li><b>1 membership + {@code owningOrgUnitId} matches</b> — auto-stamp; the explicit picker
+   *       output agrees with the only option, no-op.
+   *   <li><b>1 membership + {@code owningOrgUnitId} mismatch</b> — {@link BadRequestException}
+   *       (foreign-org-unit forgery).
+   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId == null}</b> — {@link BadRequestException}
+   *       ("owningOrgUnitId is required"). Before R6.b this path silently stamped the legacy
+   *       Staffel, hiding the SK choice from a multi-membership user — see the audit's regression
+   *       #4 against the R5.d frontend contract.
+   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId} matches one</b> — picker output honoured;
+   *       the matched OrgUnit is returned.
+   *   <li><b>&gt;1 memberships + {@code owningOrgUnitId} foreign</b> — {@link BadRequestException}
+   *       (foreign-org-unit forgery).
+   *   <li><b>Picker selects a Spezialkommando</b> — {@link BadRequestException} ("Spezialkommando
+   *       ownership not yet supported"). Soft block until the destructive-cleanup release drops the
+   *       {@code owning_squadron_id} NOT NULL constraint; until then the picker UI may offer SK
+   *       options but the backend reliably rejects them rather than persisting half-stamped rows.
    * </ol>
+   *
+   * <p>Membership sources (hybrid until the §5.2 D3 migration replaces {@code User.squadron} with
+   * an authoritative membership-table read):
+   *
+   * <ul>
+   *   <li>{@link User#getSquadron()} — the user's home Staffel; non-null today for every user. Read
+   *       first because the legacy column is still authoritative for the Staffel link.
+   *   <li>{@link OrgUnitMembershipRepository#findAllByIdUserIdAndKind} with kind {@link
+   *       OrgUnitKind#SPECIAL_COMMAND} — the SK memberships added via the R5.b endpoints. SK
+   *       memberships are never reflected on {@link User} so the repository read is the only
+   *       source. The kind=SQUADRON rows backfilled by V95 are not consulted here — the
+   *       authoritative Staffel comes from {@link User#getSquadron()}.
+   * </ul>
+   *
+   * <p>Once D3 lands and {@code User.squadron} is removed, this method switches to a single {@link
+   * OrgUnitMembershipRepository#findAllByIdUserId} read.
    *
    * @param targetUser the user the new aggregate belongs to (e.g. the inventory item's owner, the
    *     refinery order's owner); never {@code null}.
@@ -209,19 +238,45 @@ public class OwnerScopeService {
    *     used.
    * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
    * @throws BadRequestException when the picker output references an org unit the target user does
-   *     not belong to, or a Spezialkommando.
+   *     not belong to, the user has zero memberships, the user has multiple memberships and no
+   *     explicit choice was supplied, or the resolved org unit is a Spezialkommando.
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
-    if (owningOrgUnitId == null) {
-      return targetUser.getSquadron();
+    Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
+    Squadron homeStaffel = targetUser.getSquadron();
+    if (homeStaffel != null) {
+      memberOrgUnitIds.add(homeStaffel.getId());
     }
-    if (!orgUnitMembershipRepository.existsByIdUserIdAndIdOrgUnitId(
-        targetUser.getId(), owningOrgUnitId)) {
+    List<OrgUnitMembership> skMemberships =
+        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            targetUser.getId(), OrgUnitKind.SPECIAL_COMMAND);
+    for (OrgUnitMembership m : skMemberships) {
+      memberOrgUnitIds.add(m.getId().getOrgUnitId());
+    }
+
+    if (memberOrgUnitIds.isEmpty()) {
       throw new BadRequestException(
-          "Selected owner org unit is not a membership of the target user");
+          "User has no org-unit membership — cannot stamp an aggregate owner");
     }
+
+    UUID stampedOrgUnitId;
+    if (owningOrgUnitId == null) {
+      if (memberOrgUnitIds.size() == 1) {
+        stampedOrgUnitId = memberOrgUnitIds.iterator().next();
+      } else {
+        throw new BadRequestException(
+            "User belongs to multiple org units; owningOrgUnitId is required");
+      }
+    } else {
+      if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
+        throw new BadRequestException(
+            "Selected owner org unit is not a membership of the target user");
+      }
+      stampedOrgUnitId = owningOrgUnitId;
+    }
+
     return squadronRepository
-        .findById(owningOrgUnitId)
+        .findById(stampedOrgUnitId)
         .orElseThrow(
             () ->
                 new BadRequestException(
