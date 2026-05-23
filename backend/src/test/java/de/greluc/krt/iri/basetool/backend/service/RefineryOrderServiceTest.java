@@ -990,7 +990,7 @@ class RefineryOrderServiceTest {
       de.greluc.krt.iri.basetool.backend.model.Squadron resolved =
           new de.greluc.krt.iri.basetool.backend.model.Squadron();
       resolved.setId(pickedOrgUnitId);
-      when(ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+      when(ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
           .thenReturn(resolved);
 
       Location loc = new Location();
@@ -1009,7 +1009,7 @@ class RefineryOrderServiceTest {
 
       assertSame(
           resolved,
-          saved.getOwningSquadron(),
+          saved.getOwningOrgUnit(),
           "the picker output must be honoured verbatim, not user.getSquadron()");
     }
   }

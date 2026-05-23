@@ -229,13 +229,13 @@ public class OperationService {
    */
   @Transactional
   public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
-    if (operation.getOwningSquadron() == null) {
+    if (operation.getOwningOrgUnit() == null) {
       User caller = userService.getCurrentUser().orElse(null);
       if (caller != null) {
-        operation.setOwningSquadron(
-            ownerScopeService.resolveSquadronForPickerOutput(caller, owningOrgUnitId));
+        operation.setOwningOrgUnit(
+            ownerScopeService.resolveOrgUnitForPickerOutput(caller, owningOrgUnitId));
       } else {
-        ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+        ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }
     }
     return operationRepository.save(operation);

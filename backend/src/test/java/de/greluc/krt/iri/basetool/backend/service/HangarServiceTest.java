@@ -193,7 +193,7 @@ class HangarServiceTest {
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
     org.mockito.Mockito.when(
-            ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+            ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
         .thenReturn(resolved);
     org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
         .thenAnswer(i -> i.getArguments()[0]);
@@ -205,7 +205,7 @@ class HangarServiceTest {
 
     org.junit.jupiter.api.Assertions.assertSame(
         resolved,
-        saved.getOwningSquadron(),
-        "picker output must flow through OwnerScopeService.resolveSquadronForPickerOutput");
+        saved.getOwningOrgUnit(),
+        "picker output must flow through OwnerScopeService.resolveOrgUnitForPickerOutput");
   }
 }
