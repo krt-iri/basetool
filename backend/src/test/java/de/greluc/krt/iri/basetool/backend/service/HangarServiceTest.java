@@ -192,8 +192,7 @@ class HangarServiceTest {
         .thenReturn(java.util.Optional.of(user));
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
-    org.mockito.Mockito.when(
-            ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
+    org.mockito.Mockito.when(ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
         .thenReturn(resolved);
     org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
         .thenAnswer(i -> i.getArguments()[0]);

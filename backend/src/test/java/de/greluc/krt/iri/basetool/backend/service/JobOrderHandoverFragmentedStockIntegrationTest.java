@@ -97,11 +97,11 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
 
           JobOrder jobOrder =
               JobOrder.builder()
-                  .creatingSquadron(
+                  .creatingOrgUnit(
                       squadronRepository
                           .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                           .orElseThrow())
-                  .requestingSquadron(
+                  .requestingOrgUnit(
                       squadronRepository
                           .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                           .orElseThrow())
@@ -135,7 +135,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           List<UUID> aslariteIds = new ArrayList<>();
           for (double a : aslariteAmounts) {
             InventoryItem inv = new InventoryItem();
-            inv.setOwningSquadron(
+            inv.setOwningOrgUnit(
                 squadronRepository
                     .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                     .orElseThrow());
@@ -152,7 +152,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           List<UUID> ouratiteIds = new ArrayList<>();
           for (double a : ouratiteAmounts) {
             InventoryItem inv = new InventoryItem();
-            inv.setOwningSquadron(
+            inv.setOwningOrgUnit(
                 squadronRepository
                     .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                     .orElseThrow());

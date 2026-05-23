@@ -89,7 +89,7 @@ class MissionValidationTest {
 
     Ship ship = new Ship();
 
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Test Ship");
     ship.setInsurance("10");
     ship.setOwner(officerUser);
@@ -98,7 +98,7 @@ class MissionValidationTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

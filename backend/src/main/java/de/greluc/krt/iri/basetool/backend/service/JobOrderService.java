@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
@@ -99,8 +100,8 @@ public class JobOrderService {
         JobOrder.builder()
             .handle(createDto.handle())
             .priority(newPriority)
-            .creatingSquadron(creatingSquadron)
-            .requestingSquadron(requestingSquadron)
+            .creatingOrgUnit(creatingSquadron)
+            .requestingOrgUnit(requestingSquadron)
             .build();
 
     for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
@@ -412,7 +413,7 @@ public class JobOrderService {
     // legacy fallback resolution remains for pre-V83 rows that have no creator stamp yet — in
     // that case the column is filled in for the first time, which counts as initial stamping
     // rather than a mutation of an existing value.
-    Squadron existingCreator = jobOrder.getCreatingSquadron();
+    OrgUnit existingCreator = jobOrder.getCreatingOrgUnit();
     if (existingCreator != null
         && updateDto.creatingSquadronId() != null
         && !existingCreator.getId().equals(updateDto.creatingSquadronId())) {
@@ -420,12 +421,12 @@ public class JobOrderService {
           "creatingSquadronId is immutable post-create; pass null or the unchanged id.");
     }
     Squadron creatingFallback =
-        existingCreator != null
-            ? existingCreator
+        existingCreator instanceof Squadron existingSquadron
+            ? existingSquadron
             : resolveCreatingSquadronForCreate(null, updateDto.requestingOrgUnitId());
     Squadron newRequesting =
         resolveRequestingSquadron(updateDto.requestingOrgUnitId(), creatingFallback);
-    jobOrder.setRequestingSquadron(newRequesting);
+    jobOrder.setRequestingOrgUnit(newRequesting);
     jobOrder.setHandle(updateDto.handle());
 
     List<UUID> newMaterialIds =

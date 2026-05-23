@@ -38,7 +38,7 @@ class MissionParticipantSquadronTest {
   void setup() {
     iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

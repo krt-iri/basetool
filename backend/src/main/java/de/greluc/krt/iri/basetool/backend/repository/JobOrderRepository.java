@@ -73,8 +73,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
 
   /**
-   * List variant that additionally filters on the dual-squadron model (MULTI_SQUADRON_PLAN.md
-   * section 5.3): only orders whose {@code creatingSquadron} OR {@code requestingSquadron} equals
+   * List variant that additionally filters on the dual-org-unit model (MULTI_SQUADRON_PLAN.md
+   * section 5.3): only orders whose {@code creatingOrgUnit} OR {@code requestingOrgUnit} equals
    * {@code squadronId} are returned. Used by the UI's default "only my squadron" toggle on the job-
    * order list view — Job Orders themselves are a cross-staffel workspace, so this filter is a
    * display preference rather than an access-control gate (the service layer applies no implicit
@@ -102,7 +102,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       })
   @Query(
       "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND (:squadronId IS NULL OR"
-          + " o.creatingSquadron.id = :squadronId OR o.requestingSquadron.id = :squadronId)")
+          + " o.creatingOrgUnit.id = :squadronId OR o.requestingOrgUnit.id = :squadronId)")
   Page<JobOrder> findByStatusInAndSquadronInvolved(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("squadronId") UUID squadronId,
@@ -110,7 +110,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
 
   /**
    * All-status variant of {@link #findByStatusInAndSquadronInvolved(List, UUID, Pageable)}. Returns
-   * every job-order whose {@code creatingSquadron} OR {@code requestingSquadron} equals {@code
+   * every job-order whose {@code creatingOrgUnit} OR {@code requestingOrgUnit} equals {@code
    * squadronId}; {@code null} squadronId returns everything (identical to {@code findAll(pageable)}
    * but emits the squadron-aware JPQL anyway, so the service layer's branch stays predictable).
    *
@@ -128,8 +128,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingSquadron"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE :squadronId IS NULL OR o.creatingSquadron.id = :squadronId"
-          + " OR o.requestingSquadron.id = :squadronId")
+      "SELECT o FROM JobOrder o WHERE :squadronId IS NULL OR o.creatingOrgUnit.id = :squadronId"
+          + " OR o.requestingOrgUnit.id = :squadronId")
   Page<JobOrder> findBySquadronInvolved(@Param("squadronId") UUID squadronId, Pageable pageable);
 
   /**

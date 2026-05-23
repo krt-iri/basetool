@@ -195,8 +195,7 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
-    order.setOwningOrgUnit(
-        ownerScopeService.resolveOrgUnitForPickerOutput(user, owningOrgUnitId));
+    order.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(user, owningOrgUnitId));
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
