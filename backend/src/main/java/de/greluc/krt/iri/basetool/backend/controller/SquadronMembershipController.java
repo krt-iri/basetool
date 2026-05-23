@@ -1,0 +1,94 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.mapper.OrgUnitMembershipMapper;
+import de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * R6.e — REST surface for membership-row management on a single Squadron. Mounts under {@code
+ * /api/v1/squadrons/{id}/members} so the URL itself documents the parent Squadron, mirroring the
+ * R5.b layout of {@link SpecialCommandMembershipController} for SK memberships.
+ *
+ * <p>SPEZIALKOMMANDO_PLAN.md D3 + §5.6 + R6.d wrote the read side of the
+ * Logistician/Mission-Manager flag onto the {@code org_unit_membership} row (the JWT converter now
+ * consults the per-membership flag, not the legacy {@code app_user.is_logistician} / {@code
+ * app_user.is_mission_manager} columns). This controller completes the write side: the admin
+ * user-management UI can now flip the flag on the membership row directly, with optimistic-lock
+ * detection.
+ *
+ * <p>Authorisation: every write goes through {@code hasRole('ADMIN')}. Unlike the SK side there is
+ * no Squadron-Lead concept — Squadron member management has always been an ADMIN / Squadron-Officer
+ * concern, and the existing pre-R6.e legacy endpoints ({@code PATCH
+ * /api/v1/users/{id}/logistician}) also gated on ADMIN. The V95 CHECK constraint {@code
+ * chk_org_unit_membership_lead_only_on_special_command} forbids the {@code is_lead} column being
+ * set on a Squadron membership in the first place, so no {@code /lead} endpoint exists here.
+ *
+ * <p>The legacy {@code UserController} flag-toggle endpoints stay live during the R6.e soak window
+ * as a transitional alias: they dual-write the legacy column AND delegate to {@link
+ * OrgUnitMembershipService#applyStaffelMembershipFlagDelta} so a flag flip made via the old
+ * query-param URL still lands on the membership row that the R6.d converter reads. Once the
+ * frontend migrates to the version-aware PATCH below, the legacy endpoints can drop their
+ * delegation branch in the destructive cleanup release.
+ */
+@RestController
+@RequestMapping("/api/v1/squadrons/{id}/members")
+@RequiredArgsConstructor
+@Transactional
+public class SquadronMembershipController {
+
+  private final OrgUnitMembershipService membershipService;
+  private final OrgUnitMembershipMapper membershipMapper;
+
+  /**
+   * Flips the per-membership {@code is_logistician} / {@code is_mission_manager} flags on a single
+   * Squadron member's membership row. ADMIN-only. Each flag is independent; clients send only the
+   * fields they want to change. Carries the row's current {@code version} as the optimistic-lock
+   * token so two concurrent admin edits cannot silently clobber one another.
+   *
+   * @param id Squadron id; never {@code null}.
+   * @param userId user whose membership to patch; never {@code null}.
+   * @param request patch payload; carries the current version for optimistic-lock detection.
+   * @return the persisted membership DTO with the bumped version.
+   */
+  @PatchMapping("/{userId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Patch per-Squadron-membership role flags",
+      description =
+          "Flips is_logistician and / or is_mission_manager on the Staffel membership row."
+              + " ADMIN only. Replaces the legacy /api/v1/users/{id}/logistician and"
+              + " /api/v1/users/{id}/mission-manager query-param endpoints, which stay live as"
+              + " transitional aliases during the R6.e soak.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Flags patched."),
+    @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
+    @ApiResponse(responseCode = "403", description = "Caller is not ADMIN."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "No Squadron matches the given id, or the user is not a member."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Optimistic-lock conflict — the membership row has been updated since.")
+  })
+  public OrgUnitMembershipDto patchFlags(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Valid MembershipFlagsPatchRequest request) {
+    return membershipMapper.toDto(membershipService.patchSquadronMemberFlags(id, userId, request));
+  }
+}
