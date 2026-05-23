@@ -35,6 +35,7 @@ class UserServiceDeleteTest {
   // IllegalStateException. Other tests in this class never reach getCurrentUser()
   // so they do not need any stubbing on the mock.
   @Mock private AuthHelperService authHelperService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 
