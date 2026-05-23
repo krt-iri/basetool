@@ -1,18 +1,25 @@
 # Rollen- und Rechte-Matrix (IRIDIUM Basetool)
 
-> **Stand 2026-05-18 (Multi-Squadron-Umbau, Phase 6 abgeschlossen):**
+> **Stand 2026-05-23 (Spezialkommando-Erweiterung R6.e abgeschlossen):**
 > Die untenstehende Matrix wurde gegen alle `@PreAuthorize`-Annotationen
 > in den Backend-Controllern verifiziert. Mit dem Phase-4-Lockdown des
-> Multi-Squadron-Umbaus (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md)
-> und der CHANGELOG-Eintrag "Multi-Squadron-Umbau") wurde der Admin-Bereich
-> (Stammdaten, Member-Management, Announcements, UEX, System-Settings,
-> Promotion-System-Pflege) durchgaengig auf `hasRole('ADMIN')` verengt;
-> Officer haben dort keine Schreibrechte mehr. Officer behalten ihre
-> squadron-internen Funktionen — Mission-Management, Hangar-Schreibrechte
-> (inklusive `resetAllFittedStatus`), Refinery-Management,
-> Logistician-Funktionen via Rollen-Hierarchie und den
-> cross-staffel-faehigen Job-Order-Workspace. Die `USER_MANAGE`-Authority
-> bleibt aus historischen Gruenden Teil des Officer-Rollensatzes in
+> Multi-Squadron-Umbaus (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md))
+> wurde der Admin-Bereich auf `hasRole('ADMIN')` verengt; mit der
+> Spezialkommando-Erweiterung (siehe `SPEZIALKOMMANDO_PLAN.md`) sind die
+> Authority-Quellen fuer `LOGISTICIAN` und `MISSION_MANAGER` von der
+> globalen `app_user`-Spalte auf die per-OrgUnit-Membership-Spalte
+> umgezogen — der JWT-Konverter befoerdert die flache Rolle, wenn die
+> Flag auf *irgendeiner* Staffel-/SK-Mitgliedschaft `true` ist; das
+> per-OrgUnit-Scoping erfolgt separat ueber `@PreAuthorize`-Gates an den
+> `OwnerScopeService`. SK-spezifisch kommt die `Lead`-Rolle hinzu — ein
+> User mit `is_lead = true` auf einer SK-Mitgliedschaft darf in *diesem
+> einen* SK Mitglieder hinzufuegen / entfernen / Flags toggeln (ueber den
+> `SpecialCommandSecurityService.canManageMembers`-Gate), nichts mehr.
+> Officer behalten ihre squadron-internen Funktionen — Mission-Management,
+> Hangar-Schreibrechte (inklusive `resetAllFittedStatus`),
+> Refinery-Management und den cross-staffel-faehigen Job-Order-Workspace.
+> Die `USER_MANAGE`-Authority bleibt aus historischen Gruenden Teil des
+> Officer-Rollensatzes in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java),
 > wird aber von keinem Endpunkt mehr gepruft (effektiv inert). Falls die
 > Matrix von der Implementierung abweicht, zaehlen weiterhin die
@@ -38,8 +45,9 @@ Das bedeutet, dass Administratoren und Offiziere automatisch alle Rechte der Rol
 | :--- | :--- |
 | **Admin** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE`, `ROLE_LOGISTICIAN` (via Hierarchie) |
 | **Officer** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_LOGISTICIAN` (via Hierarchie) |
-| **Logistician** | *(Spezifische Berechtigung für Lager- und Auftragsverwaltung)* |
-| **Mission Manager** | *(Spezifische Berechtigung zur globalen Missionsverwaltung)* |
+| **Logistician** | *(Lager- und Auftragsverwaltung — pro OrgUnit-Mitgliedschaft via `org_unit_membership.is_logistician`; JWT-Konverter befoerdert die flache Rolle bei `true` auf irgendeiner Mitgliedschaft)* |
+| **Mission Manager** | *(Globale Missionsverwaltung — pro OrgUnit-Mitgliedschaft via `org_unit_membership.is_mission_manager`; gleiche JWT-Befoerderungslogik wie Logistician)* |
+| **SK Lead** | *(Per-SK-Mitgliederverwaltung — `org_unit_membership.is_lead = true` auf einer Spezialkommando-Zeile; gilt nur in diesem einen SK, kein cross-SK-Carry-over)* |
 | **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ` |
 | **Guest** | *(Keine spezifischen Berechtigungen)* |
 

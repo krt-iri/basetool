@@ -319,15 +319,16 @@ public class OrgUnitMembershipService {
       // (the JWT converter's R6.d fallback branch still picks the User-level column up).
       return;
     }
+    OrgUnitMembershipId pk = new OrgUnitMembershipId(userId, homeStaffel.getId());
     OrgUnitMembership m =
         membershipRepository
-            .findById(new OrgUnitMembershipId(userId, homeStaffel.getId()))
+            .findById(pk)
             .orElseGet(
                 () -> {
                   // V95-backfill safety net: the user has a Staffel link but no membership row.
                   // Synthesise the row so the legacy flag write has a place to land.
                   OrgUnitMembership fresh = new OrgUnitMembership();
-                  fresh.setId(new OrgUnitMembershipId(userId, homeStaffel.getId()));
+                  fresh.setId(pk);
                   fresh.setUser(user);
                   fresh.setJoinedAt(java.time.Instant.now());
                   return fresh;
@@ -338,7 +339,29 @@ public class OrgUnitMembershipService {
     if (isMissionManager != null) {
       m.setMissionManager(isMissionManager);
     }
-    membershipRepository.save(m);
+    try {
+      membershipRepository.saveAndFlush(m);
+    } catch (org.springframework.dao.DataIntegrityViolationException race) {
+      // Concurrent legacy flag-toggles on the same V95-backfill-gap user: two threads both saw
+      // findById miss, both synthesised a fresh row, the second flush trips the composite-PK
+      // uniqueness constraint. Re-load the row the winning thread persisted, re-apply the delta on
+      // top, and let dirty-checking flush the result through the optimistic-lock surface — the
+      // race window is now closed because the row exists.
+      OrgUnitMembership winning =
+          membershipRepository
+              .findById(pk)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Concurrent membership upsert lost — neither row resolves", race));
+      if (isLogistician != null) {
+        winning.setLogistician(isLogistician);
+      }
+      if (isMissionManager != null) {
+        winning.setMissionManager(isMissionManager);
+      }
+      membershipRepository.saveAndFlush(winning);
+    }
   }
 
   /**

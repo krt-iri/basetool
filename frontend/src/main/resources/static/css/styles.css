@@ -1444,6 +1444,18 @@ input[type="radio"]:focus {
     color: var(--color-gray-3);
 }
 
+/* Spezialkommando variant — visually distinct from the brand-orange Staffel chip.
+   Per SPEZIALKOMMANDO_PLAN.md §7.2 the SK chip uses a neutral border colour and
+   a desaturated value so SK pins do not compete with the IRIDIUM brand colour
+   that the Staffel chip claims. */
+.squadron-context-chip-sk {
+    border-color: var(--color-gray-2);
+}
+
+.squadron-context-chip-sk .squadron-context-chip-value {
+    color: var(--color-gray-1);
+}
+
 @media (max-width: 768px) {
     /* On smartphones the chip collapses to the shorthand only - the label
        takes too much room next to the hamburger and brand at 320-768 px. */
@@ -1536,6 +1548,16 @@ input[type="radio"]:focus {
 .squadron-badge-foreign {
     color: var(--color-secondary, #FFD23F);
     border-color: var(--color-secondary, #FFD23F);
+}
+
+/* Spezialkommando badge variant — neutral grey style so SK pins are visually
+   distinguishable from Staffel badges without competing with the brand-orange
+   primary colour. Used in members.html (per-user SK list column), in the
+   member-edit memberships panel, and anywhere else an SK shorthand appears. */
+.squadron-badge-sk {
+    color: var(--color-gray-1);
+    border-color: var(--color-gray-2);
+    background-color: rgba(255, 255, 255, 0.04);
 }
 
 /* Inventory rows linked to a job-order from a foreign squadron get an

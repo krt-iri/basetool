@@ -82,6 +82,36 @@ public class MemberManagementController {
       model.addAttribute("users", users);
       model.addAttribute("usersPage", pageResponse);
       model.addAttribute("search", search);
+
+      // SPEZIALKOMMANDO_PLAN.md §7.5 — per-user SK shorthand list for the new column. N+1 is
+      // bounded by the page size (default 25, max from /api/v1/users), and the admin list page is
+      // rarely refreshed, so the round-trip cost is acceptable until a bulk endpoint lands.
+      java.util.Map<
+              UUID, List<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
+          skMemberships = new java.util.HashMap<>();
+      if (users != null) {
+        for (UserDto u : users) {
+          if (u == null || u.id() == null) {
+            continue;
+          }
+          try {
+            List<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto> all =
+                backendApiClient.get(
+                    "/api/v1/users/" + u.id() + "/memberships",
+                    new org.springframework.core.ParameterizedTypeReference<>() {});
+            if (all == null) {
+              skMemberships.put(u.id(), java.util.Collections.emptyList());
+              continue;
+            }
+            skMemberships.put(
+                u.id(), all.stream().filter(m -> "SPECIAL_COMMAND".equals(m.kind())).toList());
+          } catch (Exception ex) {
+            log.debug("Failed to load SK memberships for member-list row userId={}", u.id(), ex);
+            skMemberships.put(u.id(), java.util.Collections.emptyList());
+          }
+        }
+      }
+      model.addAttribute("userSkMemberships", skMemberships);
     } catch (Exception e) {
       log.error("Could not fetch members", e);
       model.addAttribute("error", "error.members.load");
@@ -136,6 +166,33 @@ public class MemberManagementController {
       UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
       model.addAttribute("user", user);
       UUID currentSquadronId = user.squadron() != null ? user.squadron().id() : null;
+
+      // SPEZIALKOMMANDO_PLAN.md §7.4 — show the admin the full membership picture so the SK
+      // memberships are visible alongside the Staffel assignment. The lean picker-shaped DTO is
+      // enough for a read-only overview: each row links through to the corresponding SK detail
+      // page for actual flag / Lead / removal management (R5.c.b roster UI is already wired up).
+      // The Staffel section keeps the existing in-form squadron selector for assignment-changes;
+      // a follow-up release replaces both with a single membership-delta POST per plan §7.4.
+      try {
+        List<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto> memberships =
+            backendApiClient.get(
+                "/api/v1/users/" + id + "/memberships",
+                new org.springframework.core.ParameterizedTypeReference<>() {});
+        model.addAttribute(
+            "memberMemberships",
+            memberships != null
+                ? memberships
+                : java.util.Collections
+                    .<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
+                        emptyList());
+      } catch (Exception ex) {
+        log.debug("Failed to load memberships for member-edit panel", ex);
+        model.addAttribute(
+            "memberMemberships",
+            java.util.Collections
+                .<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
+                    emptyList());
+      }
       if (!model.containsAttribute("memberEditForm")) {
         model.addAttribute(
             "memberEditForm",
