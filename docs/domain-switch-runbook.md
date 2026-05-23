@@ -50,6 +50,15 @@ DNS-Propagation kann 5 Minuten bis mehrere Stunden dauern, je nach Caching-Layer
 Auf dem Prod-Host (als `deploy`-User oder via `sudo`):
 
 ```bash
+# Backup-Verzeichnis anlegen (idempotent, existiert beim allerersten Mal noch nicht)
+sudo install -d -m 0750 -o deploy -g docker /var/iri/backups
+
+# DB-Credentials aus der .env in die Shell laden — sonst sind ${POSTGRES_USER:?}
+# und ${KC_POSTGRES_USER:?} im pg_dump-Aufruf nicht gesetzt und der Dump
+# scheitert mit "unbound variable". `set -a` exportiert jede Variable
+# automatisch, `set +a` schaltet das wieder ab.
+set -a; . /var/iri/code/.env; set +a
+
 # Konfigurationsdateien
 sudo cp /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M)
 sudo cp /var/iri/code/realm-export.json /var/iri/code/realm-export.json.backup-$(date +%Y%m%d-%H%M)
@@ -66,6 +75,11 @@ sudo -u deploy docker compose --profile prod exec -T db-keycloak \
 # Aktuell deployed-version notieren (für Rollback)
 cat /var/lib/iri/last-deployed.digests > /var/iri/backups/last-deployed-$(date +%Y%m%d-%H%M).digests
 cat /var/lib/iri/current-digest-pin.yml > /var/iri/backups/current-pin-$(date +%Y%m%d-%H%M).yml
+
+# NPM-State (SQLite + Let's-Encrypt-Certs) — falls beim Anlegen der neuen
+# Proxy-Hosts in Phase 2 etwas schiefgeht, ist hier der Rollback-Anker.
+sudo tar -czf /var/iri/backups/npm-state-$(date +%Y%m%d-%H%M).tgz \
+    -C /var/iri npm
 ```
 
 ### 0.3 Aktuelle Image-Version notieren (Rollback-Anker)
@@ -85,21 +99,27 @@ Diese Phase produziert die neuen Container-Images mit dem `Profit Basetool`-Bran
 ### 1.1 PR #165 mergen
 
 PR liegt fertig: <https://github.com/krt-iri/basetool/pull/165>. Der Branch
-`claude/trusting-archimedes-c2a20e` ist bereits mehrfach gegen `main` rebased,
-alle CI-Checks (Tests, Spotless, Checkstyle, SpotBugs, DCO) grün. Über die
-GitHub-UI mergen (Squash- oder Rebase-Merge — beides funktioniert, weil der
-Branch nur einen Commit hat). Sobald auf `main`, baut `release-images.yml`
-automatisch.
+`claude/trusting-archimedes-c2a20e` ist mehrfach gegen `main` rebased,
+alle CI-Checks (Tests, Spotless, Checkstyle, SpotBugs, DCO) grün. Der PR enthält
+zwei Commits (Rebranding-Code + Runbook-Doku-Update) — **Squash-Merge** wird
+empfohlen, weil das die ganze Umstellung als einen sauberen Commit auf `main`
+landen lässt. Sobald auf `main`, baut `release-images.yml` automatisch.
 
-Optional (empfohlen für saubereren Rollback-Punkt): direkt nach dem Merge einen
-versionierten Tag setzen, damit `release-images.yml` auch mit `:1.5.0`-Tags
-versieht statt nur `:edge` / `:latest`:
+**Empfohlen — versionierten Tag direkt nach dem Merge setzen**, damit Phase 5
+einen sauberen `:1.5.0`-Rollback-Anker hat. Ohne Tag werden nur `:edge` /
+`:latest` / `:sha-<short>` als Tags produziert, und der Promote-Workflow muss
+dann mit einem dieser Tags getriggert werden — funktioniert auch, ist aber
+weniger explizit:
 
 ```bash
 git fetch origin main
 git tag -a v1.5.0 main -m "Rename to Profit Basetool + URL switch to profit-base.online"
 git push origin v1.5.0
 ```
+
+Falls kein Tag gesetzt wurde, läuft Phase 5 mit `version=latest` (Tag-Push) oder
+`version=sha-<7chars-des-merge-commits>` (Main-Push) — der konkrete Tag-Name
+steht in `release-images.yml`'s Job-Log unter "Build & push image" ganz oben.
 
 ### 1.2 Release-Pipeline durchlaufen lassen
 
@@ -304,14 +324,32 @@ sudo -u deploy docker manifest inspect ghcr.io/krt-iri/basetool-backend:1.5.0 | 
 
 ### 6.1 `docker-compose.yml` aktualisieren
 
-Die Code-Änderungen enthalten `KC_HOSTNAME: keycloak.profit-base.online` und beide `KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri`. Diese Compose-Datei lebt im Repo *und* auf dem Host — sie wird **nicht** vom Container-Image mitgebracht und muss separat synchronisiert werden:
+Die Code-Änderungen enthalten `KC_HOSTNAME: keycloak.profit-base.online` und beide `KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri`. Diese Compose-Datei lebt im Repo *und* auf dem Host — sie wird **nicht** vom Container-Image mitgebracht und muss separat synchronisiert werden. Zwei Wege, je nach Setup:
+
+**Variante A — scp vom Dev-Rechner** (wenn kein Repo-Clone auf dem Host liegt):
 
 ```bash
-# Vom Dev-Rechner aus, oder über git auf dem Host:
-sudo cp /tmp/docker-compose.yml /var/iri/code/docker-compose.yml
-sudo chown deploy:docker /var/iri/code/docker-compose.yml
+# Lokal, im Repo-Clone auf main (nach PR-Merge):
+git fetch origin main && git checkout main && git pull --ff-only
+scp docker-compose.yml deploy@<prod-host>:/tmp/docker-compose.yml
+scp -r docker/maintenance/ deploy@<prod-host>:/tmp/docker-maintenance/
 
-# Verifikation:
+# Auf dem Prod-Host:
+sudo install -m 0640 -o deploy -g docker /tmp/docker-compose.yml /var/iri/code/docker-compose.yml
+```
+
+**Variante B — git pull in einem Operator-Clone auf dem Host** (wenn `/opt/krt-iri/basetool` o.ä. existiert):
+
+```bash
+# Auf dem Prod-Host:
+cd /opt/krt-iri/basetool                      # oder wo immer der Operator-Clone liegt
+sudo -u deploy git fetch origin main && sudo -u deploy git checkout main && sudo -u deploy git pull --ff-only
+sudo install -m 0640 -o deploy -g docker docker-compose.yml /var/iri/code/docker-compose.yml
+```
+
+**Verifikation** (in beiden Varianten):
+
+```bash
 grep -n "profit-base.online" /var/iri/code/docker-compose.yml
 # Erwartet: 3 Treffer
 #   KC_HOSTNAME: keycloak.profit-base.online
@@ -330,18 +368,43 @@ sudo install -m 0640 -o deploy -g docker /tmp/realm-export-new.json /var/iri/cod
 
 > **Wichtig:** Das `realm-export.json` wird nur beim **ersten** Keycloak-Start importiert (Realm noch nicht in der `db-keycloak`-DB). Beim Restart in Phase 7 hat Keycloak die Realm-Config bereits in der DB — die Datei wird ignoriert. Sie ist nur relevant, falls die `db-keycloak`-DB jemals neu aufgesetzt werden muss.
 
-### 6.3 Maintenance-Page-Snippets prüfen
+### 6.3 Maintenance-Page-Snippets aktualisieren
 
-Die nginx-Maintenance-Hook-Files unter `/var/iri/code/docker/maintenance/` enthalten auch URL-Referenzen (`maintenance.json` `type`-URI). Auf neuesten Stand bringen:
+Die nginx-Maintenance-Hook-Files unter `/var/iri/code/docker/maintenance/` enthalten URL-Referenzen (`maintenance.json` `type`-URI), das KRT-Logo und Branding-Strings (`maintenance.html`). Die in Phase 6.1 hochgeladenen / gepullten Files reinkopieren:
 
 ```bash
-sudo cp /tmp/docker-maintenance-static-maintenance.json /var/iri/code/docker/maintenance/static/maintenance.json
-sudo cp /tmp/docker-maintenance-static-maintenance.html /var/iri/code/docker/maintenance/static/maintenance.html
+# Variante A — wenn via scp hochgeladen (Phase 6.1 Variante A):
+sudo install -m 0644 -o deploy -g docker \
+    /tmp/docker-maintenance/static/maintenance.html \
+    /var/iri/code/docker/maintenance/static/maintenance.html
+sudo install -m 0644 -o deploy -g docker \
+    /tmp/docker-maintenance/static/maintenance.json \
+    /var/iri/code/docker/maintenance/static/maintenance.json
+sudo install -m 0644 -o deploy -g docker \
+    /tmp/docker-maintenance/static/krt_logo.svg \
+    /var/iri/code/docker/maintenance/static/krt_logo.svg
+
+# Variante B — wenn via git pull (Phase 6.1 Variante B):
+cd /opt/krt-iri/basetool
+sudo install -m 0644 -o deploy -g docker docker/maintenance/static/maintenance.html /var/iri/code/docker/maintenance/static/
+sudo install -m 0644 -o deploy -g docker docker/maintenance/static/maintenance.json /var/iri/code/docker/maintenance/static/
+sudo install -m 0644 -o deploy -g docker docker/maintenance/static/krt_logo.svg /var/iri/code/docker/maintenance/static/
 
 # Verifikation:
 grep -n "profit-base.online" /var/iri/code/docker/maintenance/static/maintenance.json
 # Erwartet: "type": "https://profit-base.online/problems/maintenance"
+ls -la /var/iri/code/docker/maintenance/static/krt_logo.svg
+# Erwartet: ~110 KB SVG vorhanden
 ```
+
+**Reload des nginx-Configs im NPM-Container** — NPM lädt die Hook-Files (`http.conf`, `server_proxy.conf`) nur beim Container-Start neu, der `static/` Mount wird live gelesen. Da wir die Hook-Files in diesem Schritt NICHT anfassen (nur den static-Content), reicht es, NPM zu signalisieren, dass das nginx-Config-Tree neu durchgegangen werden soll:
+
+```bash
+sudo -u deploy docker compose --profile prod exec npm nginx -s reload
+# Erwartet: keine Ausgabe, exit code 0
+```
+
+Falls die Maintenance-Page nach Phase 8.3 trotzdem die alte Version zeigt: `sudo -u deploy docker compose --profile prod restart npm` (full restart, ~5s Down-Time auf dem NPM selbst — bedeutet kurze 502s während Phase 8.3, danach normal).
 
 ### 6.4 `.env` prüfen
 
@@ -372,13 +435,21 @@ sudo -u deploy docker compose --profile prod pull keycloak backend frontend
 sudo -u deploy docker compose --profile prod stop keycloak
 sudo -u deploy docker compose --profile prod up -d keycloak
 
-# Healthcheck abwarten:
+# Healthcheck abwarten — Compose-Definition: start_period=30s + retries=15 ×
+# interval=10s, also bis zu ~180s bevor der Status auf "unhealthy" kippt.
+# Parallel den Live-Log mitlesen (Ctrl-C zum Beenden):
+sudo -u deploy docker compose --profile prod logs -f keycloak
+
+# In einem zweiten Terminal periodisch den Status checken:
 sudo -u deploy docker compose --profile prod ps keycloak
 # Erwartet: keycloak -> running (healthy)
-# Wenn unhealthy nach 90s: Logs prüfen:
-sudo -u deploy docker compose --profile prod logs --tail=100 keycloak
-# Typischer Fehler: KC_HOSTNAME_STRICT="true" + Hostname-Mismatch → "hostname not resolvable"
-# Lösung: DNS-Propagation prüfen (Phase 0.1)
+# Wenn nach ~180s noch "starting" / "unhealthy":
+sudo -u deploy docker compose --profile prod logs --tail=200 keycloak
+# Typischer Fehler: KC_HOSTNAME_STRICT="true" + Hostname-Mismatch → "hostname
+#   not resolvable" → DNS-Propagation prüfen (Phase 0.1)
+# Anderer typischer Fehler: "Bind for 0.0.0.0:18080 failed: port is already
+#   allocated" → der alte Keycloak-Container hängt noch; `docker ps -a` + manuell
+#   `docker rm -f <id>`.
 ```
 
 **Verifikation:**
@@ -391,10 +462,20 @@ curl -s https://keycloak.profit-base.online/realms/iri/.well-known/openid-config
 
 ### 7.3 Backend und Frontend starten
 
+> **Reihenfolge-Hinweis:** Backend hat im Compose-File `depends_on: keycloak:
+> condition: service_healthy`. Wenn Keycloak in 7.2 noch nicht healthy ist,
+> hängt der Backend-Start unbestimmt lang. Phase 7.2 also wirklich grün ab-
+> warten, bevor 7.3 startet. Im Backend-Log erkennt man das im "waiting for
+> keycloak"-Block — wenn der zu lange läuft, hilft `docker compose ps keycloak`
+> zur Diagnose.
+
 ```bash
 sudo -u deploy docker compose --profile prod up -d backend frontend
 
-# Healthcheck abwarten (--wait-timeout default 180s):
+# Healthcheck abwarten — Backend hat zusätzlich Flyway-Migrations beim
+# Startup, die je nach DB-Größe einige Sekunden dauern können. Live-Log:
+sudo -u deploy docker compose --profile prod logs -f backend frontend
+# In einem zweiten Terminal:
 sudo -u deploy docker compose --profile prod ps backend frontend
 # Erwartet: beide -> running (healthy)
 ```
@@ -448,12 +529,30 @@ curl -s https://keycloak.profit-base.online/realms/iri/.well-known/openid-config
 
 ### 8.2 Login-Flow im Inkognito-Browser
 
-1. `https://profit-base.online/` aufrufen.
+> **Warum Inkognito und nicht der normale Browser?** Spring Session speichert
+> die OAuth2-Authorized-Client-Daten (inkl. dem alten Issuer-URL) in Redis,
+> referenziert über das `SESSION`-Cookie. Ein vor dem Wartungsfenster
+> eingeloggter User hat in seinem normalen Browser noch das alte Cookie und
+> der Backend-Server hat im Redis noch das alte Token mit `iss: keycloak.iri-base.org`.
+> Beim ersten Request nach dem Wechsel kommt ein HTTP 500 oder ein
+> Re-Auth-Loop. **Inkognito-Modus startet mit leerem Cookie-Jar** und triggert
+> den frischen OAuth2-Flow mit dem neuen Issuer. Alternative: vor Phase 8.2
+> die Redis-Session-DB einmal leeren:
+>
+> ```bash
+> sudo -u deploy docker compose --profile prod exec redis \
+>     sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning FLUSHDB'
+> # Wirkung: jeder eingeloggte User wird einmalig ausgeloggt und muss sich
+> # neu anmelden. Da der KC_HOSTNAME-Wechsel das ohnehin verlangt, ist das
+> # kein zusätzlicher Service-Impact.
+> ```
+
+1. `https://profit-base.online/` im Inkognito-Browser aufrufen.
 2. "Login"-Button → muss zu `https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/auth?...` umleiten.
 3. Login mit echtem Account (oder einem dedizierten Test-Admin).
 4. Nach Login: Redirect zurück zu `https://profit-base.online/...`, eingeloggt, Header zeigt "Profit Basetool".
 5. Mindestens eine geschützte Seite besuchen (Mission, Hangar).
-6. Browser-DevTools → Network → einen Backend-Call ansehen → JWT im `Authorization`-Header dekodieren → `iss`-Claim muss `https://keycloak.profit-base.online/realms/iri` sein.
+6. Browser-DevTools → Netzwerk-Tab → eine `/api/v1/...`-Request anklicken → "Headers"-Subtab → den `Authorization: Bearer <token>`-Header kopieren → den `<token>`-Teil (drei Punkt-getrennte Base64-Segmente) auf <https://jwt.io> einfügen → im decodierten Payload muss `"iss": "https://keycloak.profit-base.online/realms/iri"` stehen. Wenn dort noch der alte Issuer steht: zurück zu 7.3, prüfen ob Backend-Log auch den neuen Issuer zeigt.
 7. Logout → muss sauber zurück zur Login-Seite oder zur Home-Page.
 
 ### 8.3 Maintenance-Page-Smoke-Test
@@ -497,12 +596,21 @@ curl -sI https://iri-base.org/missions/abc 2>&1 | head -5
 
 ### 9.2 NPM-Proxy-Host für `keycloak.iri-base.org` umstellen
 
-Optional (User landen sowieso nie direkt dort, nur als OAuth2-Hop). Wenn doch:
+**Empfohlen** (nicht "optional"): Admin-Bookmarks auf `https://keycloak.iri-base.org/admin/` würden ohne Redirect ein TLS-Mismatch oder NPM-502 produzieren — Keycloak antwortet wegen `KC_HOSTNAME_STRICT=true` (siehe `docker-compose.yml` Z. 119) nur noch auf den neuen Hostname. OAuth2-User landen zwar nie direkt dort, aber jeder Admin-Direkt-Login schlägt fehl bis der Redirect existiert.
 
 ```nginx
 location / {
     return 308 https://keycloak.profit-base.online$request_uri;
 }
+```
+
+Test:
+
+```bash
+curl -sI https://keycloak.iri-base.org/admin/ 2>&1 | head -5
+# Erwartet:
+#   HTTP/1.1 308 Permanent Redirect
+#   Location: https://keycloak.profit-base.online/admin/
 ```
 
 ### 9.3 Auto-Deploy wieder anschalten
@@ -550,7 +658,7 @@ In der Keycloak-Admin (jetzt unter `https://keycloak.profit-base.online/admin/`)
 - Valid Post Logout Redirect URIs: analog.
 - Web Origins: `https://iri-base.org` entfernen.
 
-Save + neuen Partial-Export ziehen + auf den Host kopieren (Phase 6.2).
+Save + neuen Full-Export via `kc.sh export` ziehen und auf den Host kopieren (gleicher Pfad wie Phase 6.2 — `realm-export.json` ersetzen, alte Datei vorher als `.backup-cleanup` sichern).
 
 ### 10.5 Backup-Files entfernen (optional)
 
@@ -567,12 +675,20 @@ Falls in Phase 5–8 etwas schiefgeht und die neue Domain nicht startet:
 ### R.1 Schneller Rollback per Image-Pin
 
 ```bash
-# Im /var/iri/code/.env die Version auf die alte Release-Tag pinen:
-sudo sed -i 's/^IRI_BASETOOL_VERSION=.*/IRI_BASETOOL_VERSION=1.4.X/' /var/iri/code/.env
-# Wo 1.4.X die letzte funktionierende Version ist (aus Phase 0.3).
+# Im /var/iri/code/.env die Version auf den alten Release-Tag pinen. Achtung:
+# das setup.md / .env.example sagt "Leave IRI_BASETOOL_VERSION unset" — d. h.
+# die Variable existiert in der .env eines frisch bootgestrappten Hosts unter
+# Umständen GAR NICHT. `sed -i` greift dann nicht. Robuster Pattern:
+if sudo grep -q '^IRI_BASETOOL_VERSION=' /var/iri/code/.env; then
+    sudo sed -i 's/^IRI_BASETOOL_VERSION=.*/IRI_BASETOOL_VERSION=1.4.X/' /var/iri/code/.env
+else
+    echo 'IRI_BASETOOL_VERSION=1.4.X' | sudo tee -a /var/iri/code/.env >/dev/null
+fi
+# 1.4.X = die letzte funktionierende Version (aus Phase 0.3 / 0.2-Backup-Dateinamen).
 
-# docker-compose.yml zurückrollen:
-sudo cp /var/iri/code/docker-compose.yml.backup-$(date +%Y%m%d)-* /var/iri/code/docker-compose.yml
+# docker-compose.yml zurückrollen — Backup-Datei aus Phase 0.2 nutzen:
+ls -1t /var/iri/code/docker-compose.yml.backup-* | head -1   # zeigt das neueste Backup
+sudo cp "$(ls -1t /var/iri/code/docker-compose.yml.backup-* | head -1)" /var/iri/code/docker-compose.yml
 
 # Stack neu starten:
 cd /var/iri/code
@@ -582,7 +698,18 @@ sudo -u deploy docker compose --profile prod up -d --wait
 
 ### R.2 Keycloak-Client-Config rollback
 
-Falls in Phase 3 versehentlich alte Redirect-URIs entfernt wurden (Phase 3 sollte nur **ergänzen**, nicht ersetzen): in der Admin-UI die `https://iri-base.org/*`-Einträge wieder hinzufügen.
+Falls in Phase 3 versehentlich alte Redirect-URIs entfernt wurden (Phase 3 sollte nur **ergänzen**, nicht ersetzen): zwei Pfade, je nachdem wie viel kaputt ist.
+
+- **Schnellster Pfad (Browser):** in der Admin-UI die `https://iri-base.org/*`-Einträge wieder hinzufügen — Realm `iri` → Clients → `basetool-frontend` → Valid Redirect URIs / Post Logout Redirect URIs / Web Origins.
+- **Disaster-Recovery (DB komplett zerschossen):** den Realm-Export aus dem Phase-0.2-Backup zurückspielen und Keycloak die Realm-Config neu importieren lassen:
+
+  ```bash
+  # Backup-Datei finden:
+  ls -1t /var/iri/code/realm-export.json.backup-* | head -1
+  sudo cp "$(ls -1t /var/iri/code/realm-export.json.backup-* | head -1)" /var/iri/code/realm-export.json
+  # Achtung: der Import greift nur, wenn der iri-Realm in db-keycloak nicht
+  # existiert. Falls doch (häufig), Realm-Config manuell in der Admin-UI fixen.
+  ```
 
 ### R.3 DNS-Rollback
 
@@ -608,6 +735,23 @@ sudo systemctl start iri-deploy.timer
 | `iss` im JWT zeigt noch auf alte Domain | DevTools → JWT decoden | Backend hat noch alte `KEYCLOAK_ISSUER_URI`-Env-Var. Lösung: `docker compose logs backend \| grep "Keycloak issuer"` — muss `https://keycloak.profit-base.online/realms/iri` sein; sonst `docker-compose.yml`-Sync in Phase 6.1 nochmal prüfen + Backend restart. |
 | Tests in CI laufen mit alter URL durch | GitHub-Actions-Log | Test-Assertions wurden auf alte URL gepinnt aber im PR vergessen umzustellen. Aktuell sind sie auf `profit-base.online` umgestellt; falls neue Tests dazukommen, müssen sie konsistent bleiben. |
 | Maintenance-Page zeigt alte `IRIDIUM // DAS KARTELL` | NPM-Volume-Mount | `docker/maintenance/static/maintenance.html` wurde nicht in Phase 6.3 mit-aktualisiert. Lösung: Datei auf den Host syncen, dann `docker compose restart npm`. |
+| `docker compose pull` antwortet mit `401 Unauthorized` | `journalctl -u iri-deploy.service` oder direkt `docker compose pull` | GHCR-Pull-Token unter `/etc/iri/ghcr-pull-token` abgelaufen oder revoked. Lösung: neuen Fine-Grained-PAT in GitHub generieren (Scope `Packages: Read` auf `krt-iri/basetool`), `sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'ghp_neuer_token'`, dann Pull erneut. Siehe `docs/deployment.md` § Token rotation. |
+| Let's-Encrypt-Cert-Renewal schlägt in NPM fehl | `/var/iri/npm/letsencrypt/logs/letsencrypt.log` | Port 80 nicht durchgereicht (Firewall / Router), oder Rate-Limit (5 Certs / Domain / Woche bei Let's Encrypt). Lösung: bei Rate-Limit auf Staging-Endpoint warten oder Cloudflare-DNS-Challenge nutzen. Fehler kommt typisch in Phase 2.2 bei der allerersten Cert-Anforderung — DNS-Propagation in Phase 0.1 prüfen, dann erneut Save. |
+| Smoke-Test in Phase 8.2 produziert 500 / Re-Auth-Loop nur im Standard-Browser, Inkognito klappt | Browser-DevTools → Application → Cookies | Spring-Session-Cookie `SESSION` aus der Pre-Migration-Zeit referenziert einen Redis-Eintrag mit altem JWT-`iss`. Im Standard-Browser ausloggen + Cookies löschen, oder Redis-DB einmal flushen (siehe Phase 8.2-Warnblock). |
+
+---
+
+## Pre-Maintenance-Window-Check (Ende Phase 3, bevor Phase 4 startet)
+
+Diese Items sind die Vorbedingung für das Wartungsfenster — wenn einer offen ist, **nicht in Phase 4 weitergehen**:
+
+- [ ] Backup-Files aus Phase 0.2 in `/var/iri/backups/` vorhanden und nicht 0 Byte (`ls -la /var/iri/backups/ | grep "$(date +%Y%m%d)"`)
+- [ ] `dig +short profit-base.online` und `dig +short keycloak.profit-base.online` liefern beide die Prod-Host-IP (von einem externen Rechner aus geprüft)
+- [ ] NPM-Proxy-Hosts für beide neue Hostnames angelegt, beide Let's-Encrypt-Certs ausgestellt (NPM-Admin zeigt "Online" + "Valid SSL")
+- [ ] `curl -vI https://profit-base.online/ 2>&1 | grep "SSL certificate verify ok"` grünt durch
+- [ ] Keycloak-Client `basetool-frontend` enthält **sowohl** alte `iri-base.org/*`- als **auch** neue `profit-base.online/*`-Redirect-URIs (in der Admin-UI doppelt-checken: Phase 3.2 sollte nur ergänzt, nicht ersetzt haben)
+- [ ] PR #165 ist auf `main` gemerged und `release-images.yml` ist grün durchgelaufen (`ghcr.io/krt-iri/basetool-{backend,frontend}:1.5.0` existiert in GHCR)
+- [ ] Wartungsfenster wurde per Discord / E-Mail / Announcement-Banner kommuniziert
 
 ---
 
