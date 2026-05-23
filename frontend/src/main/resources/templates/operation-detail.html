@@ -313,13 +313,19 @@
             }
             /* Faint scan-at-a-glance marker for paid rows: a 3px
                profit-green inset on the Bezahlt cell + a very subtle
-               row tint. ":has()" is widely supported in modern browsers;
-               older browsers simply skip the marker, the checkbox state
-               itself remains the source of truth. */
-            .payout-table tbody tr:has(.payout-paid-checkbox:checked) {
+               row tint. Editors see a checkbox (".payout-paid-checkbox"),
+               read-only viewers see a static yes/no span
+               (".payout-paid-yes" / ".payout-paid-no") -- match both so
+               the marker shows up regardless of canEdit. ":has()" is
+               widely supported in modern browsers; older browsers simply
+               skip the marker, the checkbox/yes state itself remains the
+               source of truth. */
+            .payout-table tbody tr:has(.payout-paid-checkbox:checked),
+            .payout-table tbody tr:has(.payout-paid-yes) {
                 background-color: rgba(35, 158, 51, 0.06);
             }
-            .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell {
+            .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
+            .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell {
                 box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33);
             }
             @media (max-width: 768px) {
