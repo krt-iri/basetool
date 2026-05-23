@@ -23,8 +23,18 @@ public interface RefineryOrderMapper {
   /**
    * Maps a {@link RefineryOrder} entity to its full DTO; the {@code profit} field is derived from
    * {@link #computeProfit}.
+   *
+   * <p>After R9 Step 2 the refinery-order entity exposes {@code owningOrgUnit} (typed {@code
+   * OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for
+   * API stability. The explicit mapping routes the source through {@code
+   * SquadronMapper.orgUnitToReferenceDto} so SK-owned orders surface as {@code null} on the wire
+   * while Staffel-owned ones continue to project as before.
+   *
+   * @param entity the refinery-order entity to project; {@code null} returns {@code null}.
+   * @return the populated refinery-order DTO.
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   RefineryOrderDto toDto(RefineryOrder entity);
 
   /**

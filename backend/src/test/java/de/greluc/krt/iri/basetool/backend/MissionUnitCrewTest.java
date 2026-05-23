@@ -70,7 +70,7 @@ class MissionUnitCrewTest {
 
     ship = new Ship();
 
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Test Ship Crew");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
@@ -79,7 +79,7 @@ class MissionUnitCrewTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission Crew");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

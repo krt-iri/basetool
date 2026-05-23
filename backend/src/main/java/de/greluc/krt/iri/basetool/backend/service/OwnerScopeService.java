@@ -618,10 +618,10 @@ public class OwnerScopeService {
    * that owning squadron, or the mission is explicitly non-internal.
    */
   private boolean canSeeMissionRow(Mission m) {
-    if (m.getOwningSquadron() == null) {
+    if (m.getOwningOrgUnit() == null) {
       return true;
     }
-    if (canSeeSquadron(m.getOwningSquadron().getId())) {
+    if (canSeeSquadron(m.getOwningOrgUnit().getId())) {
       return true;
     }
     return !Boolean.TRUE.equals(m.getIsInternal());
@@ -639,7 +639,7 @@ public class OwnerScopeService {
   public boolean canEditMission(@NotNull UUID missionId) {
     return missionRepository
         .findById(missionId)
-        .map(m -> m.getOwningSquadron() == null || canEditSquadron(m.getOwningSquadron().getId()))
+        .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -654,7 +654,7 @@ public class OwnerScopeService {
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningSquadron() == null || canSeeSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningOrgUnit() == null || canSeeSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -670,7 +670,7 @@ public class OwnerScopeService {
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningSquadron() == null || canEditSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningOrgUnit() == null || canEditSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -685,7 +685,7 @@ public class OwnerScopeService {
   public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -699,7 +699,7 @@ public class OwnerScopeService {
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -713,7 +713,7 @@ public class OwnerScopeService {
   public boolean canSeeOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -727,7 +727,7 @@ public class OwnerScopeService {
   public boolean canEditOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -741,7 +741,7 @@ public class OwnerScopeService {
   public boolean canSeeShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningSquadron() == null || canSeeSquadron(s.getOwningSquadron().getId()))
+        .map(s -> s.getOwningOrgUnit() == null || canSeeSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -755,7 +755,7 @@ public class OwnerScopeService {
   public boolean canEditShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningSquadron() == null || canEditSquadron(s.getOwningSquadron().getId()))
+        .map(s -> s.getOwningOrgUnit() == null || canEditSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 

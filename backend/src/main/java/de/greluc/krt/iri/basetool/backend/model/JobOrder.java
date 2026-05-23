@@ -14,9 +14,6 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.PostLoad;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
@@ -47,42 +44,25 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Integer displayId;
 
   /**
-   * Squadron that authored this order in the system. Legacy field — kept authoritative during the
-   * R4 dual-write soak. The plan-aligned {@link #creatingOrgUnit} mirror field is kept in sync by
-   * {@link #syncOwnerFields()} on every lifecycle event. Informational only — Job Orders are a
-   * cross-squadron workspace and access is governed by the role/permission matrix, not by this
-   * field (see MULTI_SQUADRON_PLAN.md, section 1).
-   */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "creating_squadron_id")
-  private Squadron creatingSquadron;
-
-  /**
-   * Org-unit author of this order — the R4 dual-write mirror of {@link #creatingSquadron}. After
-   * R9 Step 1 callers write this field directly; the legacy {@link #creatingSquadron} is filled
-   * by the lifecycle hook only when the resolved OrgUnit is a Squadron. {@code nullable = false}
-   * reflects V99's NOT NULL tightening.
+   * Org-unit author of this order. After R9 Step 2 dropped the legacy {@code creatingSquadron}
+   * mirror field together with the {@code syncOwnerFields()} lifecycle hook, callers stamp this
+   * field directly via {@code OwnerScopeService.resolveOrgUnitForPickerOutput}; V100 drops the
+   * matching {@code creating_squadron_id} column. {@code nullable = false} reflects V99's NOT NULL
+   * tightening. Informational only — Job Orders are a cross-squadron workspace and access is
+   * governed by the role/permission matrix, not by this field (see MULTI_SQUADRON_PLAN.md, section
+   * 1).
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "creating_org_unit_id", nullable = false)
   private OrgUnit creatingOrgUnit;
 
   /**
-   * Squadron the order is being executed for. Legacy field — may differ from {@link
-   * #creatingSquadron} when one squadron creates orders on behalf of another. Editable by any
-   * Logistician+ regardless of their own squadron. The plan-aligned {@link #requestingOrgUnit}
-   * mirror field is kept in sync by {@link #syncOwnerFields()}. Informational only, not
-   * access-controlling.
-   */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "requesting_squadron_id")
-  private Squadron requestingSquadron;
-
-  /**
-   * Org-unit recipient of this order — the R4 dual-write mirror of {@link #requestingSquadron}.
-   * After R9 Step 1 callers write this field directly; the legacy field is filled by the
-   * lifecycle hook only when the resolved OrgUnit is a Squadron. {@code nullable = false}
-   * reflects V99's NOT NULL tightening.
+   * Org-unit recipient of this order — may differ from {@link #creatingOrgUnit} when one org unit
+   * creates orders on behalf of another. After R9 Step 2 dropped the legacy {@code
+   * requestingSquadron} mirror field together with the {@code syncOwnerFields()} lifecycle hook,
+   * callers stamp this field directly; V100 drops the matching {@code requesting_squadron_id}
+   * column. Editable by any Logistician+ regardless of their own org unit. Informational only, not
+   * access-controlling. {@code nullable = false} reflects V99's NOT NULL tightening.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)
@@ -121,33 +101,14 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Set<JobOrderHandover> handovers = new HashSet<>();
 
-  /** Adds a material and keeps the bidirectional back-reference in sync. */
+  /**
+   * Adds a material and keeps the bidirectional back-reference in sync.
+   *
+   * @param material the child material row to attach; mutated so its {@code jobOrder} back-link
+   *     points at this order.
+   */
   public void addMaterial(JobOrderMaterial material) {
     materials.add(material);
     material.setJobOrder(this);
-  }
-
-  /**
-   * Lifecycle hook that keeps the two legacy squadron fields aligned with their R4 mirrors on every
-   * INSERT / UPDATE / SELECT path. The legacy fields {@link #creatingSquadron} and {@link
-   * #requestingSquadron} are authoritative during the R4 soak — they win when both halves of a pair
-   * are set on the in-memory entity. The reverse copy runs only when the legacy field is {@code
-   * null} and the org-unit reference happens to point at a Squadron, which covers the future case
-   * where an R5 caller writes only the new field on a Squadron-owned order.
-   */
-  @PrePersist
-  @PreUpdate
-  @PostLoad
-  private void syncOwnerFields() {
-    if (creatingSquadron != null) {
-      creatingOrgUnit = creatingSquadron;
-    } else if (creatingOrgUnit instanceof Squadron s) {
-      creatingSquadron = s;
-    }
-    if (requestingSquadron != null) {
-      requestingOrgUnit = requestingSquadron;
-    } else if (requestingOrgUnit instanceof Squadron s) {
-      requestingSquadron = s;
-    }
   }
 }

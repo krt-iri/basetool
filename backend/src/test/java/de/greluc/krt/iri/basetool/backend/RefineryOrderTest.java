@@ -110,7 +110,7 @@ class RefineryOrderTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mining Op");
     missionRepository.save(mission);
 
@@ -136,7 +136,7 @@ class RefineryOrderTest {
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -246,7 +246,7 @@ class RefineryOrderTest {
   void testAdminManageUserRefineryOrder() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx); // Set a method
@@ -307,7 +307,7 @@ class RefineryOrderTest {
   void testAccessControl() throws Exception {
     // User1 creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     RefineryGood good = new RefineryGood();
@@ -372,7 +372,7 @@ class RefineryOrderTest {
 
     RefineryOrder order = new RefineryOrder();
 
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
 
@@ -407,7 +407,7 @@ class RefineryOrderTest {
   @Test
   void testCreateRefineryOrder_WithNullMission_ShouldSucceed() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -457,7 +457,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -503,7 +503,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithNoteAndAmountOverride() throws Exception {
     // Given: ein Raffinerieauftrag mit einem Output-Material
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -576,7 +576,7 @@ class RefineryOrderTest {
   @Test
   void testStoreRefineryOrder_RejectsNegativeAmount() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);

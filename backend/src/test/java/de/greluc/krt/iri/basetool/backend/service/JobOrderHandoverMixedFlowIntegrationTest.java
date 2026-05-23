@@ -95,11 +95,11 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           JobOrder jobOrder =
               JobOrder.builder()
-                  .creatingSquadron(
+                  .creatingOrgUnit(
                       squadronRepository
                           .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                           .orElseThrow())
-                  .requestingSquadron(
+                  .requestingOrgUnit(
                       squadronRepository
                           .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                           .orElseThrow())
@@ -117,7 +117,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           InventoryItem inv1 = new InventoryItem();
 
-          inv1.setOwningSquadron(
+          inv1.setOwningOrgUnit(
               squadronRepository
                   .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                   .orElseThrow());
@@ -131,7 +131,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           InventoryItem inv2 = new InventoryItem();
 
-          inv2.setOwningSquadron(
+          inv2.setOwningOrgUnit(
               squadronRepository
                   .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                   .orElseThrow());

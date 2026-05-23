@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.mapper;
 
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto;
@@ -13,6 +14,9 @@ public interface SquadronMapper {
    * Maps a {@link Squadron} entity to its outbound DTO. {@code isPromotionEnabled} is taken from
    * the entity's {@code isPromotionEnabled} accessor and surfaces on the wire as a Boolean so the
    * admin-settings page can render the per-squadron toggle without a second lookup.
+   *
+   * @param entity the squadron entity to project; {@code null} maps to {@code null}.
+   * @return the full squadron DTO.
    */
   @Mapping(target = "isPromotionEnabled", source = "promotionEnabled")
   SquadronDto toDto(Squadron entity);
@@ -22,8 +26,31 @@ public interface SquadronMapper {
    * detail DTOs so the squadron column / badge can be rendered without an extra round-trip. Used
    * via {@code @Mapper(uses = SquadronMapper.class)} from MissionMapper, JobOrderMapper,
    * InventoryItemMapper, RefineryOrderMapper, OperationMapper and ShipMapper.
+   *
+   * @param entity the squadron entity to project; {@code null} maps to {@code null}.
+   * @return the slim reference DTO (id + name + shorthand).
    */
   SquadronReferenceDto toReferenceDto(Squadron entity);
+
+  /**
+   * OrgUnit-typed overload of {@link #toReferenceDto(Squadron)} used by the per-aggregate mappers
+   * (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) after R9 Step 2 dropped the
+   * legacy {@code owningSquadron} / {@code creatingSquadron} / {@code requestingSquadron} fields
+   * from those aggregates. The aggregates now expose an {@code OrgUnit}-typed owner; the DTOs still
+   * publish a {@code SquadronReferenceDto} field so the API contract and the frontend templates
+   * stay stable. Squadron-owned aggregates project through {@link #toReferenceDto(Squadron)};
+   * Spezialkommando-owned ones surface as {@code null} on the wire (the DTOs have no SK slot yet —
+   * that widening lands in a follow-up release).
+   *
+   * @param orgUnit the owning org unit; may be {@code null}.
+   * @return the squadron reference DTO when {@code orgUnit} is a Squadron, {@code null} otherwise.
+   */
+  default SquadronReferenceDto orgUnitToReferenceDto(OrgUnit orgUnit) {
+    if (orgUnit instanceof Squadron squadron) {
+      return toReferenceDto(squadron);
+    }
+    return null;
+  }
 
   /**
    * Builds a new {@link Squadron} entity from the inbound DTO. Timestamps are owned by the

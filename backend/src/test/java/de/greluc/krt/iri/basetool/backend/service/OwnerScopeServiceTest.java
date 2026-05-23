@@ -324,7 +324,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       InventoryItem item = new InventoryItem();
       item.setId(itemId);
-      item.setOwningSquadron(squadronA);
+      item.setOwningOrgUnit(squadronA);
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
@@ -336,7 +336,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       InventoryItem item = new InventoryItem();
       item.setId(itemId);
-      item.setOwningSquadron(squadronB);
+      item.setOwningOrgUnit(squadronB);
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
@@ -360,7 +360,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronB);
+      order.setOwningOrgUnit(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
@@ -373,7 +373,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronA);
+      order.setOwningOrgUnit(squadronA);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
@@ -386,7 +386,7 @@ class OwnerScopeServiceTest {
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
-      op.setOwningSquadron(squadronB);
+      op.setOwningOrgUnit(squadronB);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       stubMemberInSquadronA();
 
@@ -399,7 +399,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronB);
+      order.setOwningOrgUnit(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -803,7 +803,7 @@ class OwnerScopeServiceTest {
   private Mission newMission(UUID id, Squadron owningSquadron, boolean isInternal) {
     Mission mission = new Mission();
     mission.setId(id);
-    mission.setOwningSquadron(owningSquadron);
+    mission.setOwningOrgUnit(owningSquadron);
     mission.setIsInternal(isInternal);
     return mission;
   }

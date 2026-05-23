@@ -52,6 +52,15 @@ public abstract class MissionMapper {
    * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
    * top of the default field copy so the DTO carries the caller-aware projections ({@code canEdit},
    * {@code canManageManagers}, description redaction for guests, participant counts).
+   *
+   * <p>After R9 Step 2 the mission entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
+   * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
+   * stability. The explicit mapping routes the source through {@code
+   * SquadronMapper.orgUnitToReferenceDto} so SK-owned missions surface as {@code null} on the wire
+   * while Staffel-owned ones continue to project as before.
+   *
+   * @param mission the mission entity to project; {@code null} returns {@code null}.
+   * @return the populated mission DTO.
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(mission))")
@@ -62,6 +71,7 @@ public abstract class MissionMapper {
   @Mapping(
       target = "registeredParticipants",
       expression = "java(resolveRegisteredParticipants(mission))")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   public abstract MissionDto toDto(Mission mission);
 
   /** Maps a {@link MissionParticipant} entity to its outbound DTO. */
@@ -94,8 +104,18 @@ public abstract class MissionMapper {
   /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */
   public abstract MissionReferenceDto toReferenceDto(Mission mission);
 
-  /** Slim list-row DTO of a mission; same description redaction as the full DTO. */
+  /**
+   * Slim list-row DTO of a mission; same description redaction as the full DTO. Also routes the
+   * mission's {@code owningOrgUnit} through {@code SquadronMapper.orgUnitToReferenceDto} for the
+   * {@code owningSquadron} DTO slot so the column on the missions list renders without an extra
+   * round-trip (and stays {@code null} for SK-owned missions until the DTO is widened to carry an
+   * SK reference too).
+   *
+   * @param mission the mission entity to project; {@code null} returns {@code null}.
+   * @return the slim list-row DTO.
+   */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   public abstract MissionListDto toListDto(Mission mission);
 
   // toEntity(MissionDto) has been removed (audit finding C-3, 2026-05-20): the previous mapper
