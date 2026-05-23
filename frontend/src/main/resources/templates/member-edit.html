@@ -114,6 +114,28 @@
                 </select>
             </div>
 
+            <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — per-Staffel-membership role flags inline on the
+                 member-edit form. The Save button bundles the squadron assignment + flag delta
+                 into one PATCH /api/v1/users/{id}/memberships round-trip; per-row optimistic-lock
+                 stays intact because the backend forwards each side through its own service. -->
+            <div class="form-group" sec:authorize="hasRole('ADMIN')">
+                <label th:text="#{members.staffel.flags}">Staffel-Rollen</label>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <label style="display:flex; align-items:center; gap:0.5rem;">
+                        <input type="hidden" name="_isLogistician" value="on" />
+                        <input type="checkbox" name="isLogistician"
+                               th:checked="${memberEditForm.isLogistician}" />
+                        <span th:text="#{members.is_logistician}">Logistiker</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:0.5rem;">
+                        <input type="hidden" name="_isMissionManager" value="on" />
+                        <input type="checkbox" name="isMissionManager"
+                               th:checked="${memberEditForm.isMissionManager}" />
+                        <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
                 <a th:href="@{/members}" class="btn btn-secondary" th:text="#{profile.back}">Zurück</a>

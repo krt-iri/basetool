@@ -667,6 +667,133 @@ public class UserService {
   }
 
   /**
+   * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta orchestrator. Applies the supplied
+   * Staffel + SK change set in one transaction so the admin member-edit page can persist every
+   * change with one Save button click — concurrent-admin safety stays intact because every row
+   * still passes through its individual optimistic-lock check (the {@code version} field on each
+   * change).
+   *
+   * <p>Resolution order matters and is fixed by this method:
+   *
+   * <ol>
+   *   <li>Staffel side first — a Staffel reassignment may delete + recreate the membership row, so
+   *       any explicit Staffel-flag patch on the same change must land on the new row, not the old
+   *       one. {@code updateUserSquadron} delegates to {@link
+   *       OrgUnitMembershipService#syncStaffelMembership} which creates the new row with the legacy
+   *       User-level flag values carried over; the explicit-flag patch (if any) then overrides on
+   *       top.
+   *   <li>SK side second, in the order the client sent them. ADD adopts initial flags inline (no
+   *       second {@code save}); REMOVE deletes by composite PK; PATCH validates the per-row
+   *       {@code @Version} before writing. {@code is_lead} is intentionally not part of this
+   *       payload — Lead toggles stay isolated in the SK detail page workflow per Plan D2 so the
+   *       audit trail keeps clear per-toggle attribution.
+   * </ol>
+   *
+   * <p>If any step throws (NotFoundException on a stale id, OptimisticLockingFailureException on a
+   * stale version, DuplicateEntityException on an ADD for an existing membership) the entire
+   * transaction rolls back — partial application is not exposed.
+   *
+   * @param userId the user whose memberships to mutate; never {@code null}.
+   * @param delta the delta to apply; never {@code null}, but both halves may be {@code null} /
+   *     empty (no-op delta is allowed and just returns the current state).
+   * @return the user's complete post-write membership list (Staffel + every SK), never {@code
+   *     null}.
+   * @throws java.util.NoSuchElementException when the user does not exist.
+   */
+  @Transactional
+  public java.util.List<de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership>
+      applyMembershipDelta(
+          UUID userId, de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest delta) {
+    userRepository
+        .findById(userId)
+        .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+
+    if (delta.staffel() != null) {
+      applyStaffelChange(userId, delta.staffel());
+    }
+    if (delta.specialCommands() != null) {
+      for (de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange
+          sk : delta.specialCommands()) {
+        applySpecialCommandChange(userId, sk);
+      }
+    }
+    return orgUnitMembershipService.findAllMembershipsForUser(userId);
+  }
+
+  /**
+   * Staffel-side half of {@link #applyMembershipDelta}. Routes through {@link
+   * #updateUserSquadron(UUID, UUID, Long)} for assignment changes (which in turn syncs the
+   * membership row) and through {@link OrgUnitMembershipService#applyStaffelMembershipFlagDelta}
+   * for explicit flag patches.
+   *
+   * @param userId target user id.
+   * @param change the Staffel-side delta record.
+   */
+  private void applyStaffelChange(
+      UUID userId,
+      de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.StaffelChange change) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NoSuchElementException("User not found"));
+    UUID currentSquadronId = user.getSquadron() != null ? user.getSquadron().getId() : null;
+    UUID targetSquadronId = change.squadronId();
+    if (!java.util.Objects.equals(currentSquadronId, targetSquadronId)) {
+      updateUserSquadron(userId, targetSquadronId, change.userVersion());
+    }
+    if (change.isLogistician() != null || change.isMissionManager() != null) {
+      orgUnitMembershipService.applyStaffelMembershipFlagDelta(
+          userId, change.isLogistician(), change.isMissionManager());
+    }
+  }
+
+  /**
+   * SK-side half of {@link #applyMembershipDelta}. Dispatches on the action discriminator and
+   * forwards to the existing membership-service primitives. ADD adopts initial flags via a single
+   * {@code save} on the freshly-created row (avoiding the intra-transaction double-version-bump
+   * trap from CLAUDE.md "Concurrency" section); PATCH delegates to {@link
+   * OrgUnitMembershipService#patchFlags} which does its own optimistic-lock check; REMOVE delegates
+   * to {@link OrgUnitMembershipService#removeMember}.
+   *
+   * @param userId target user id.
+   * @param change the SK-side change record.
+   */
+  private void applySpecialCommandChange(
+      UUID userId,
+      de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange
+          change) {
+    switch (change.action()) {
+      case ADD -> {
+        de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership fresh =
+            orgUnitMembershipService.addMember(change.orgUnitId(), userId);
+        if (Boolean.TRUE.equals(change.isLogistician())
+            || Boolean.TRUE.equals(change.isMissionManager())) {
+          // The freshly-created row has version 0 and is still managed in this transaction.
+          // Mutate it in place; Hibernate dirty-checking flushes the second update on commit
+          // without a second explicit save call (avoiding the intra-transaction @Version race
+          // documented in CLAUDE.md).
+          if (Boolean.TRUE.equals(change.isLogistician())) {
+            fresh.setLogistician(true);
+          }
+          if (Boolean.TRUE.equals(change.isMissionManager())) {
+            fresh.setMissionManager(true);
+          }
+        }
+      }
+      case REMOVE -> orgUnitMembershipService.removeMember(change.orgUnitId(), userId);
+      case PATCH ->
+          orgUnitMembershipService.patchFlags(
+              change.orgUnitId(),
+              userId,
+              new de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest(
+                  change.isLogistician(), change.isMissionManager(), change.version()));
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported SpecialCommandChange action: " + change.action());
+    }
+  }
+
+  /**
    * Deletes a user account along with all owned data (ships, inventory, refinery orders, mission
    * memberships). Used by admins to remove ex-members. The cascade is explicit (per-table delete
    * calls) so the order matches the FK constraints; auto-cascading would surface confusing FK

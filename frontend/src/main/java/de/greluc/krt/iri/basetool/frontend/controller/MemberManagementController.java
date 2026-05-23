@@ -193,6 +193,13 @@ public class MemberManagementController {
                 .<de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
                     emptyList());
       }
+      // §7.4 — seed the Staffel-membership flags from the loaded user so the checkboxes start
+      // in the same state the membership row has on the server. The legacy User-level flags are
+      // read by the JWT converter as a fallback for V95-backfill-gap users only; for everyone
+      // else the membership row is authoritative, but the User columns mirror it during R6.e so
+      // the value is correct either way.
+      Boolean currentLogistician = user.isLogistician();
+      Boolean currentMissionManager = user.isMissionManager();
       if (!model.containsAttribute("memberEditForm")) {
         model.addAttribute(
             "memberEditForm",
@@ -203,7 +210,9 @@ public class MemberManagementController {
                 user.version(),
                 source,
                 user.joinDate(),
-                currentSquadronId));
+                currentSquadronId,
+                currentLogistician,
+                currentMissionManager));
       } else {
         MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
         if (form != null && form.source() == null) {
@@ -216,7 +225,9 @@ public class MemberManagementController {
                   form.version(),
                   source,
                   form.joinDate(),
-                  form.squadronId()));
+                  form.squadronId(),
+                  form.isLogistician(),
+                  form.isMissionManager()));
         }
       }
       return "member-edit";
@@ -267,11 +278,39 @@ public class MemberManagementController {
               "/api/v1/users/" + id, de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
       UUID existingSquadronId =
           refreshed != null && refreshed.squadron() != null ? refreshed.squadron().id() : null;
-      if (!java.util.Objects.equals(existingSquadronId, form.squadronId())) {
-        de.greluc.krt.iri.basetool.frontend.model.dto.UserSquadronUpdateDto squadronBody =
-            new de.greluc.krt.iri.basetool.frontend.model.dto.UserSquadronUpdateDto(
-                form.squadronId(), refreshed != null ? refreshed.version() : form.version());
-        backendApiClient.patch("/api/v1/users/" + id + "/squadron", squadronBody, Void.class);
+      boolean squadronChanged = !java.util.Objects.equals(existingSquadronId, form.squadronId());
+      Boolean existingLogistician = refreshed != null ? refreshed.isLogistician() : null;
+      Boolean existingMissionManager = refreshed != null ? refreshed.isMissionManager() : null;
+      boolean logisticianChanged =
+          form.isLogistician() != null
+              && !java.util.Objects.equals(existingLogistician, form.isLogistician());
+      boolean missionManagerChanged =
+          form.isMissionManager() != null
+              && !java.util.Objects.equals(existingMissionManager, form.isMissionManager());
+
+      // SPEZIALKOMMANDO_PLAN.md §7.4 — bundle the Staffel reassignment and the Staffel-flag flips
+      // into one single-POST delta. The per-row optimistic-lock survives because the backend's
+      // delta endpoint forwards through {@code updateUserSquadron} (uses {@code userVersion}) and
+      // through {@code applyStaffelMembershipFlagDelta} (which is idempotent and now race-hardened
+      // by the R7 follow-up). When nothing on the Staffel side changed, no call fires.
+      if (squadronChanged || logisticianChanged || missionManagerChanged) {
+        de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest.StaffelChange
+            staffelChange =
+                new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest
+                    .StaffelChange(
+                    form.squadronId(),
+                    logisticianChanged ? form.isLogistician() : null,
+                    missionManagerChanged ? form.isMissionManager() : null,
+                    squadronChanged
+                        ? (refreshed != null ? refreshed.version() : form.version())
+                        : null);
+        de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest deltaBody =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest(
+                staffelChange, null);
+        backendApiClient.patch(
+            "/api/v1/users/" + id + "/memberships",
+            deltaBody,
+            de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaResponse.class);
       }
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       if ("profile".equals(form.source())) {
