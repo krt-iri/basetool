@@ -15,7 +15,6 @@ import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -110,7 +109,6 @@ public class OwnerScopeService {
       OwnerScopeService.class.getName() + ".currentSquadron";
 
   private final AuthHelperService authHelper;
-  private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
   private final MissionRepository missionRepository;
@@ -128,7 +126,7 @@ public class OwnerScopeService {
    * "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
    * unauthenticated / anonymous).
    *
-   * <p>The non-admin branch's {@code userRepository.findById} round-trip is memoised on the {@link
+   * <p>The non-admin branch's {@code org_unit_membership} lookup is memoised on the {@link
    * HttpServletRequest} via {@link #readPersistentSquadronFromUser()}, so repeated calls within the
    * same request collapse to a single DB hit. The admin branch reads the request header (in-memory)
    * and is not cached separately — it is already constant-time.
@@ -220,6 +218,10 @@ public class OwnerScopeService {
    * the resolver is invoked exactly once per request (via {@link #currentScopePredicate()}) and the
    * additional cache key would only pay off if the resolver was called multiple times.
    *
+   * <p>Post-D3: every membership row (Staffel + SK) flows through {@code
+   * OrgUnitMembershipRepository.findAllByIdUserId} — the legacy {@code User.squadron} column was
+   * dropped in R9 Step 5 / V101.
+   *
    * @return the union of OrgUnit ids the caller belongs to, never {@code null}.
    */
   @NotNull
@@ -228,18 +230,8 @@ public class OwnerScopeService {
     if (userIdOpt.isEmpty()) {
       return java.util.Set.of();
     }
-    Optional<User> userOpt = userRepository.findById(userIdOpt.get());
-    if (userOpt.isEmpty()) {
-      return java.util.Set.of();
-    }
-    User user = userOpt.get();
     java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
-    if (user.getSquadron() != null) {
-      ids.add(user.getSquadron().getId());
-    }
-    for (OrgUnitMembership m :
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND)) {
+    for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get())) {
       ids.add(m.getId().getOrgUnitId());
     }
     return ids;
@@ -346,14 +338,11 @@ public class OwnerScopeService {
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    Squadron homeStaffel = targetUser.getSquadron();
-    if (homeStaffel != null) {
-      memberOrgUnitIds.add(homeStaffel.getId());
-    }
-    List<OrgUnitMembership> skMemberships =
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            targetUser.getId(), OrgUnitKind.SPECIAL_COMMAND);
-    for (OrgUnitMembership m : skMemberships) {
+    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped in R9 Step 5 / V101.
+    List<OrgUnitMembership> allMemberships =
+        orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
+    for (OrgUnitMembership m : allMemberships) {
       memberOrgUnitIds.add(m.getId().getOrgUnitId());
     }
 
@@ -415,14 +404,11 @@ public class OwnerScopeService {
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    Squadron homeStaffel = targetUser.getSquadron();
-    if (homeStaffel != null) {
-      memberOrgUnitIds.add(homeStaffel.getId());
-    }
-    List<OrgUnitMembership> skMemberships =
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            targetUser.getId(), OrgUnitKind.SPECIAL_COMMAND);
-    for (OrgUnitMembership m : skMemberships) {
+    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped in R9 Step 5 / V101.
+    List<OrgUnitMembership> allMemberships =
+        orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
+    for (OrgUnitMembership m : allMemberships) {
       memberOrgUnitIds.add(m.getId().getOrgUnitId());
     }
 
@@ -836,12 +822,22 @@ public class OwnerScopeService {
     if (cached.isPresent()) {
       return cached.get();
     }
+    // Post-D3: the user's home Staffel lives in org_unit_membership (kind=SQUADRON). The V95
+    // partial unique index guarantees at most one row, so a List read with an in-loop pick is the
+    // right shape — Spring Data's findOneByIdUserIdAndKind would throw on the data-corruption case
+    // we tolerate elsewhere.
     Optional<UUID> resolved =
         authHelper
             .currentUserId()
-            .flatMap(userRepository::findById)
-            .map(User::getSquadron)
-            .map(Squadron::getId);
+            .flatMap(
+                userId -> {
+                  List<OrgUnitMembership> rows =
+                      orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+                          userId, OrgUnitKind.SQUADRON);
+                  return rows.isEmpty()
+                      ? Optional.empty()
+                      : Optional.of(rows.get(0).getId().getOrgUnitId());
+                });
     request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);
     return resolved;
   }

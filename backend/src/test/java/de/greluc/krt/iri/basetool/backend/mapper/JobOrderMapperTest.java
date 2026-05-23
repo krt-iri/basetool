@@ -35,8 +35,18 @@ class JobOrderMapperTest {
     mapper = Mappers.getMapper(JobOrderMapper.class);
 
     var userMapper = Mappers.getMapper(UserMapper.class);
+    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
+    // two repositories (mocked, returning empty for this fixture).
     ReflectionTestUtils.setField(
-        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+        userMapper,
+        "membershipRepository",
+        org.mockito.Mockito.mock(
+            de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository.class));
+    ReflectionTestUtils.setField(
+        userMapper,
+        "squadronRepository",
+        org.mockito.Mockito.mock(
+            de.greluc.krt.iri.basetool.backend.repository.SquadronRepository.class));
     var materialMapper = Mappers.getMapper(MaterialMapper.class);
     var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);

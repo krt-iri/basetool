@@ -1,11 +1,17 @@
 package de.greluc.krt.iri.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.Role;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,13 +22,19 @@ import org.springframework.test.util.ReflectionTestUtils;
 class UserMapperTest {
 
   private UserMapper mapper;
+  private OrgUnitMembershipRepository membershipRepository;
+  private SquadronRepository squadronRepository;
 
   @BeforeEach
   void setUp() {
-    // UserMapperImpl @Autowires SquadronMapper for the new `squadron` projection — wire it
-    // manually since we are not running inside a Spring context.
+    // Post-R9 D3 (V101): the mapper derives squadron + flag fields from the membership table. Wire
+    // the two repositories the abstract MapStruct mapper needs since we are not running inside a
+    // Spring context.
     mapper = Mappers.getMapper(UserMapper.class);
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    membershipRepository = mock(OrgUnitMembershipRepository.class);
+    squadronRepository = mock(SquadronRepository.class);
+    ReflectionTestUtils.setField(mapper, "membershipRepository", membershipRepository);
+    ReflectionTestUtils.setField(mapper, "squadronRepository", squadronRepository);
   }
 
   @Test
@@ -45,6 +57,10 @@ class UserMapperTest {
     user.setDescription("desc");
     user.getRoles().add(admin);
     user.getRoles().add(officer);
+    // No membership rows wired — the mapper projects squadron / isLogistician / isMissionManager
+    // as null / false respectively for this fixture.
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
 
     UserDto dto = mapper.toDto(user);
     assertNotNull(dto);
@@ -70,6 +86,8 @@ class UserMapperTest {
     user.setRank(null);
     user.setDescription(null);
     user.setRoles(null);
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
 
     UserDto dto = mapper.toDto(user);
     assertNotNull(dto);

@@ -30,6 +30,11 @@ subprojects {
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
       jvmArgs("--enable-native-access=ALL-UNNAMED")
+      // Bump test heap: every @SpringBootTest spins its own ApplicationContext, and the full
+      // backend suite (over 1000 tests, many context-loading) blows past the JVM 512 MiB default
+      // with a Java heap-space OOM at ~250 tests in. 1.5 GiB keeps the suite green locally and
+      // on CI without affecting the per-test memory budget materially.
+      maxHeapSize = "1536m"
       systemProperty("spring.profiles.active", "test")
       // Mockito 5+ on JDK 24+ insists on running as a Java agent. Attach it via
       // -javaagent so the inline mock-maker can self-attach; -Xshare:off avoids

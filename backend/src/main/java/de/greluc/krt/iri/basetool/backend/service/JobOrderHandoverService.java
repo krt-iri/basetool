@@ -15,6 +15,7 @@ import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -46,6 +47,8 @@ public class JobOrderHandoverService {
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
   private final UserService userService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final SquadronRepository squadronRepository;
 
   /**
    * Creates a JobOrder handover and atomically applies the resulting effects:
@@ -103,12 +106,17 @@ public class JobOrderHandoverService {
     // Cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 4.4) means the executing user may
     // belong to a different squadron than the order's owning one — without this stamp the audit
     // trail does not record who actually performed the write on a foreign squadron's items.
+    // Post-R9 D3 (V101): the user's home Staffel is read from org_unit_membership directly — the
+    // legacy User.squadron column was dropped.
     userService
         .getCurrentUser()
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
-              handover.setExecutingSquadron(current.getSquadron());
+              orgUnitMembershipService
+                  .findStaffelMembershipOrgUnitId(current.getId())
+                  .flatMap(squadronRepository::findById)
+                  .ifPresent(handover::setExecutingSquadron);
             });
 
     // Materials whose remaining open amount drops to (effectively) zero in this handover.

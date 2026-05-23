@@ -36,10 +36,11 @@ import org.springframework.transaction.annotation.Transactional;
  * endpoints therefore lands as a clean 404 before any membership row is touched, never as a
  * corrupted Staffel membership.
  *
- * <p>Staffel membership flag flips (the legacy {@code app_user.is_logistician} / {@code
- * is_mission_manager} surface) are intentionally not part of this service — they keep their
- * existing path through the {@code UserService} role-flag endpoints until a later release migrates
- * them to the {@code org_unit_membership} row.
+ * <p>Staffel membership flag flips ({@code is_logistician} / {@code is_mission_manager} on the
+ * Staffel membership row) flow through {@link #applyStaffelMembershipFlagDelta(UUID, Boolean,
+ * Boolean)} and {@link #patchSquadronMemberFlags(UUID, UUID, MembershipFlagsPatchRequest)}. The
+ * legacy {@code app_user.is_logistician} / {@code app_user.is_mission_manager} columns were dropped
+ * in V101 (R9 Step 5) — the membership row is the single source of truth.
  *
  * <p>Concurrency: every write method checks the inbound {@code version} against the membership
  * row's {@code @Version} field, throwing {@link ObjectOptimisticLockingFailureException} → 409 on
@@ -288,88 +289,48 @@ public class OrgUnitMembershipService {
    * R6.e helper — applies the supplied flag delta to the user's existing Staffel membership row
    * without optimistic-lock checking. Used by the legacy {@code UserController}-shaped flag-toggle
    * endpoints that still accept a bare {@code ?isLogistician=...} query parameter (no version
-   * round-trip) so a flag toggle from the existing admin UI propagates to the membership row even
-   * before the frontend migrates to the version-aware PATCH. Idempotent — passing the same flag
-   * value the row already has is a no-op write that bumps the {@code @Version} via Hibernate dirty
-   * checking.
+   * round-trip) so a flag toggle from the existing admin UI propagates to the membership row.
+   * Idempotent — passing the same flag value the row already has is a no-op write that bumps the
+   * {@code @Version} via Hibernate dirty checking.
    *
-   * <p>If the user has no Staffel membership row (V95 backfill gap for a post-R1 user whose
-   * squadron was assigned without the parallel membership upsert), an absent row is created on the
-   * fly using the user's current {@code User#getSquadron()} as the OrgUnit anchor. This closes the
-   * legacy invariant gap during the R6.e soak — the proper fix (creating the membership row in
-   * {@code UserService.updateUserSquadron}) lives in {@link UserService#updateUserSquadron(UUID,
-   * UUID, Long)} so the rule fires uniformly across every Staffel-assignment code path.
+   * <p>Post-R9 D3 (V101): the user's home Staffel is read from {@code org_unit_membership} directly
+   * — the legacy {@code app_user.squadron_id} column was dropped. If the user has no Staffel
+   * membership row at all (admin / guest), the call is a no-op: there is no membership to flip the
+   * flag on.
    *
    * @param userId the user whose Staffel membership to update; never {@code null}.
    * @param isLogistician new flag value, or {@code null} to leave the existing value untouched.
    * @param isMissionManager new flag value, or {@code null} to leave the existing value untouched.
-   * @throws NotFoundException if the user does not exist or has no assigned Squadron at all.
+   * @throws NotFoundException if the user does not exist.
    */
   @Transactional
   public void applyStaffelMembershipFlagDelta(
       @NotNull UUID userId,
       @org.jetbrains.annotations.Nullable Boolean isLogistician,
       @org.jetbrains.annotations.Nullable Boolean isMissionManager) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    Squadron homeStaffel = user.getSquadron();
-    if (homeStaffel == null) {
-      // No Staffel to grant a per-membership flag on. Legacy endpoint shapes that toggle the
-      // user-level column for a squadron-less admin / guest user just mirror to the User row
-      // (the JWT converter's R6.d fallback branch still picks the User-level column up).
+    userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    List<OrgUnitMembership> staffelRows =
+        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
+    if (staffelRows.isEmpty()) {
+      // No Staffel membership to flip the flag on (admin / guest user without a Staffel link).
+      // Post-R9 D3 there is no legacy User-level column to fall back to either — the toggle is a
+      // clean no-op.
       return;
     }
-    OrgUnitMembershipId pk = new OrgUnitMembershipId(userId, homeStaffel.getId());
-    OrgUnitMembership m =
-        membershipRepository
-            .findById(pk)
-            .orElseGet(
-                () -> {
-                  // V95-backfill safety net: the user has a Staffel link but no membership row.
-                  // Synthesise the row so the legacy flag write has a place to land.
-                  OrgUnitMembership fresh = new OrgUnitMembership();
-                  fresh.setId(pk);
-                  fresh.setUser(user);
-                  fresh.setJoinedAt(java.time.Instant.now());
-                  return fresh;
-                });
+    OrgUnitMembership m = staffelRows.get(0);
     if (isLogistician != null) {
       m.setLogistician(isLogistician);
     }
     if (isMissionManager != null) {
       m.setMissionManager(isMissionManager);
     }
-    try {
-      membershipRepository.saveAndFlush(m);
-    } catch (org.springframework.dao.DataIntegrityViolationException race) {
-      // Concurrent legacy flag-toggles on the same V95-backfill-gap user: two threads both saw
-      // findById miss, both synthesised a fresh row, the second flush trips the composite-PK
-      // uniqueness constraint. Re-load the row the winning thread persisted, re-apply the delta on
-      // top, and let dirty-checking flush the result through the optimistic-lock surface — the
-      // race window is now closed because the row exists.
-      OrgUnitMembership winning =
-          membershipRepository
-              .findById(pk)
-              .orElseThrow(
-                  () ->
-                      new IllegalStateException(
-                          "Concurrent membership upsert lost — neither row resolves", race));
-      if (isLogistician != null) {
-        winning.setLogistician(isLogistician);
-      }
-      if (isMissionManager != null) {
-        winning.setMissionManager(isMissionManager);
-      }
-      membershipRepository.saveAndFlush(winning);
-    }
+    membershipRepository.saveAndFlush(m);
   }
 
   /**
-   * R6.e — synchronises the Staffel membership row with the user's currently-assigned {@code
-   * User.squadron}. Called by {@link UserService#updateUserSquadron(UUID, UUID, Long)} after the
-   * squadron assignment so the {@code org_unit_membership} row stays in lockstep with the legacy
-   * {@code app_user.squadron_id} column during the soak window. Closes the V95 backfill gap for
-   * post-R1 users created via Keycloak SSO without an explicit membership insert.
+   * Synchronises the user's single Staffel membership row to the target Squadron. Called by {@link
+   * UserService#updateUserSquadron(UUID, UUID, Long)} so the {@code org_unit_membership} row
+   * reflects the admin's squadron-assignment write.
    *
    * <p>Logic:
    *
@@ -378,11 +339,11 @@ public class OrgUnitMembershipService {
    *       The user falls back into "no Staffel" territory; their SK memberships (if any) stay.
    *   <li>{@code newSquadron} matches the user's existing Staffel membership → no-op.
    *   <li>{@code newSquadron} differs from the existing Staffel membership → the old row is deleted
-   *       and a new one is created at the new Squadron. Per-membership flags fall back to the
-   *       legacy {@code User.isLogistician} / {@code User.isMissionManager} columns so the user's
-   *       authorisation surface does not regress just because their Staffel changed.
-   *   <li>No existing Staffel membership → a fresh row is created at {@code newSquadron} with the
-   *       same legacy-flag carry-over.
+   *       and a new one is created at the new Squadron. Per-membership flags reset to {@code false}
+   *       on the new row — the legacy {@code User.isLogistician} / {@code User.isMissionManager}
+   *       columns were dropped in V101 (R9 Step 5), so there is no carry-over source.
+   *   <li>No existing Staffel membership → a fresh row is created at {@code newSquadron} with flags
+   *       defaulting to {@code false}.
    * </ul>
    *
    * <p>The V95 partial unique index {@code uq_user_one_squadron_membership} guarantees at most one
@@ -427,9 +388,9 @@ public class OrgUnitMembershipService {
       fresh.setId(new OrgUnitMembershipId(user.getId(), newSquadron.getId()));
       fresh.setUser(user);
       fresh.setJoinedAt(java.time.Instant.now());
-      // Carry legacy User-level flags onto the new row so authority does not regress mid-deploy.
-      fresh.setLogistician(user.isLogistician());
-      fresh.setMissionManager(user.isMissionManager());
+      // Post-R9 D3: flags default to false on a freshly-created row — the legacy
+      // app_user.is_logistician / app_user.is_mission_manager columns are gone. Admins re-grant
+      // the flags via the membership-PATCH endpoint after the Staffel switch.
       membershipRepository.save(fresh);
     }
   }
@@ -455,6 +416,25 @@ public class OrgUnitMembershipService {
     assertVersionMatches(m, request.version());
     m.setLead(request.isLead());
     return membershipRepository.save(m);
+  }
+
+  /**
+   * Returns the OrgUnit id of the user's single Staffel membership row, if any. Convenience
+   * accessor used by callers that previously read {@code User.getSquadron().getId()} — now that the
+   * legacy column is gone, the equivalent lookup is "find the single SQUADRON-kind membership for
+   * this user".
+   *
+   * @param userId the user whose Staffel membership to resolve; never {@code null}.
+   * @return the Staffel's id when the user belongs to one, empty otherwise.
+   */
+  @NotNull
+  public Optional<UUID> findStaffelMembershipOrgUnitId(@NotNull UUID userId) {
+    List<OrgUnitMembership> rows =
+        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
+    if (rows.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(rows.get(0).getId().getOrgUnitId());
   }
 
   /**
