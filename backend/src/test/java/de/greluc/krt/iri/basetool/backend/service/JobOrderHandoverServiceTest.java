@@ -38,6 +38,8 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
 
   @InjectMocks private JobOrderHandoverService service;
 

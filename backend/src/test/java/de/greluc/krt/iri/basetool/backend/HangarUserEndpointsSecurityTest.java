@@ -6,12 +6,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +46,8 @@ class HangarUserEndpointsSecurityTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User user;
@@ -54,10 +60,16 @@ class HangarUserEndpointsSecurityTest {
     user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("hanger_user");
-    // R6.b: the owner resolver requires the target user to have at least one org-unit
-    // membership before stamping. Anchor to V80-seeded IRIDIUM so addShip resolves.
-    user.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     userRepository.save(user);
+    // R6.b: the owner resolver requires the target user to have at least one org-unit
+    // membership before stamping. Anchor to V80-seeded IRIDIUM so addShip resolves. Post-R9 D3
+    // (V101): membership is the only Staffel link — the legacy app_user.squadron_id column was
+    // dropped.
+    OrgUnitMembership iridiumMembership = new OrgUnitMembership();
+    iridiumMembership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
+    iridiumMembership.setUser(user);
+    iridiumMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(iridiumMembership);
 
     shipType = new ShipType();
     shipType.setName("Aurora");

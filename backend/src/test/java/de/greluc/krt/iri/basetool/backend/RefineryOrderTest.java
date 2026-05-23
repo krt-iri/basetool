@@ -62,6 +62,8 @@ class RefineryOrderTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -85,14 +87,14 @@ class RefineryOrderTest {
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("refineryUser");
-    user1.setSquadron(iridium);
     userRepository.save(user1);
+    saveIridiumMembership(user1);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
     adminUser.setUsername("refineryAdmin");
-    adminUser.setSquadron(iridium);
     userRepository.save(adminUser);
+    saveIridiumMembership(adminUser);
 
     StarSystem system = new StarSystem();
     system.setName("Stanton");
@@ -131,6 +133,15 @@ class RefineryOrderTest {
     gold.setName("Gold");
     gold.setType(MaterialType.RAW);
     gold = materialRepository.save(gold);
+  }
+
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   @Test
@@ -323,8 +334,8 @@ class RefineryOrderTest {
     User user2 = new User();
     user2.setId(UUID.randomUUID());
     user2.setUsername("user2");
-    user2.setSquadron(iridium);
     userRepository.save(user2);
+    saveIridiumMembership(user2);
 
     // User2 tries to update User1's order
     mockMvc

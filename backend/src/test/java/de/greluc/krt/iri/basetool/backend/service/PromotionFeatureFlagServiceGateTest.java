@@ -14,20 +14,23 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.PromotionTopicMapper;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
-import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionTopicUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,12 +63,12 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private HttpServletRequest request;
-  @Mock private UserRepository userRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private ShipRepository shipRepository;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   // R2.c: the real flag-resolution logic moved from OwnerScopeService to OwnerScopeService;
   // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
@@ -101,9 +104,9 @@ class PromotionFeatureFlagServiceGateTest {
     UUID userId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
-    User user = new User();
-    user.setSquadron(squadron(squadronId, true));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    // Post-R9 D3 (V101): home Staffel via org_unit_membership.
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelMembership(userId, squadronId)));
     when(squadronRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, true)));
 
@@ -117,9 +120,8 @@ class PromotionFeatureFlagServiceGateTest {
     UUID userId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
-    User user = new User();
-    user.setSquadron(squadron(squadronId, false));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelMembership(userId, squadronId)));
     when(squadronRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, false)));
 
@@ -128,6 +130,13 @@ class PromotionFeatureFlagServiceGateTest {
         assertThrows(
             AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
     assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
+  }
+
+  private static OrgUnitMembership staffelMembership(UUID userId, UUID squadronId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    return m;
   }
 
   @Test

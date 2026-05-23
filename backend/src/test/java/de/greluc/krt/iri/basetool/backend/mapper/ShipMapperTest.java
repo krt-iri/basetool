@@ -27,8 +27,18 @@ class ShipMapperTest {
     // manually since we are running without a Spring context.
     mapper = Mappers.getMapper(ShipMapper.class);
     UserMapper userMapper = Mappers.getMapper(UserMapper.class);
+    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
+    // two repositories (mocked, returning empty for this fixture).
     ReflectionTestUtils.setField(
-        userMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+        userMapper,
+        "membershipRepository",
+        org.mockito.Mockito.mock(
+            de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository.class));
+    ReflectionTestUtils.setField(
+        userMapper,
+        "squadronRepository",
+        org.mockito.Mockito.mock(
+            de.greluc.krt.iri.basetool.backend.repository.SquadronRepository.class));
     ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }

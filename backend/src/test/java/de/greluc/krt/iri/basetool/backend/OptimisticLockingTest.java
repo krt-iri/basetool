@@ -4,16 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import de.greluc.krt.iri.basetool.backend.service.HangarService;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +81,8 @@ class OptimisticLockingTest {
 
   @Autowired private UserRepository userRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private UUID ownerId;
@@ -89,7 +95,7 @@ class OptimisticLockingTest {
     // Without an outer @Transactional we keep the rows alive across the test;
     // siblings like ShipTypeTest assume `shipTypeRepository.findAll().get(0)`
     // returns *their* row, so we explicitly remove our seed entities in
-    // reverse FK order (Ship -> ShipType + User) to keep them isolated.
+    // reverse FK order (Ship -> ShipType + Membership + User) to keep them isolated.
     if (shipId != null) {
       shipRepository.deleteById(shipId);
     }
@@ -97,6 +103,7 @@ class OptimisticLockingTest {
       shipTypeRepository.deleteById(shipTypeId);
     }
     if (ownerId != null) {
+      orgUnitMembershipRepository.deleteById(new OrgUnitMembershipId(ownerId, Squadron.IRIDIUM_ID));
       userRepository.deleteById(ownerId);
     }
   }
@@ -107,9 +114,14 @@ class OptimisticLockingTest {
     User owner = new User();
     owner.setId(UUID.randomUUID());
     owner.setUsername("oltest-" + owner.getId());
-    owner.setSquadron(iridium);
     userRepository.save(owner);
     ownerId = owner.getId();
+    // Post-R9 D3 (V101): the user's Staffel link lives only in org_unit_membership.
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(owner.getId(), Squadron.IRIDIUM_ID));
+    membership.setUser(owner);
+    membership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(membership);
 
     ShipType type = new ShipType();
     type.setName("OL-Test Type " + UUID.randomUUID());

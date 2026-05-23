@@ -116,15 +116,15 @@ introduced once Hibernate single-table inheritance is the only path).
 
 ## Acceptance checklist per step
 
-- [ ] Step 1 PR: every staffel-scoped service test calls `.setOwningOrgUnit`,
+- [x] Step 1 PR: every staffel-scoped service test calls `.setOwningOrgUnit`,
       not `.setOwningSquadron`. `resolveSquadronForPickerOutput` deprecated.
-- [ ] Step 2 PR: `git grep "syncOwnerFields"` returns nothing. Every test that
+- [x] Step 2 PR: `git grep "syncOwnerFields"` returns nothing. Every test that
       previously asserted on `entity.getOwningSquadron()` is updated.
-- [ ] Step 3 PR: V100 applied against a `.env.test` snapshot of prod schema.
+- [x] Step 3 PR: V100 applied against a `.env.test` snapshot of prod schema.
       Backup confirmed.
-- [ ] Step 4 PR: `git grep "user.setSquadron\|user.getSquadron"` returns
+- [x] Step 4 PR: `git grep "user.setSquadron\|user.getSquadron"` returns
       nothing in `main` source set. JWT converter's legacy branch removed.
-- [ ] Step 5 PR: V101 applied. Backup confirmed.
+- [x] Step 5 PR: V101 applied. Backup confirmed.
 - [ ] Step 6 PR: `promotion_topic` migrated. V102 applied. Backup confirmed.
 
 ## Why not all in one PR?

@@ -88,7 +88,7 @@ class UserServiceMembershipDeltaTest {
   @Test
   void emptyDelta_returnsCurrentStateWithoutMutating() {
     UUID userId = UUID.randomUUID();
-    User user = newUser(userId, null);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
@@ -107,16 +107,16 @@ class UserServiceMembershipDeltaTest {
     UUID userId = UUID.randomUUID();
     UUID oldSquadronId = UUID.randomUUID();
     UUID newSquadronId = UUID.randomUUID();
-    Squadron oldSquadron = new Squadron();
-    oldSquadron.setId(oldSquadronId);
     Squadron newSquadron = new Squadron();
     newSquadron.setId(newSquadronId);
-    User user = newUser(userId, oldSquadron);
+    User user = newUser(userId);
     user.setVersion(7L);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(squadronRepository.findById(newSquadronId)).thenReturn(Optional.of(newSquadron));
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    // Post-R9 D3 (V101): the current Staffel is read from org_unit_membership.
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(Optional.of(oldSquadronId));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(new StaffelChange(newSquadronId, true, false, 7L), null);
@@ -132,11 +132,11 @@ class UserServiceMembershipDeltaTest {
   void staffelFlagOnlyDelta_bypassesUpdateUserSquadron() {
     UUID userId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
-    User user = newUser(userId, squadron);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(Optional.of(squadronId));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -152,13 +152,12 @@ class UserServiceMembershipDeltaTest {
   void staffelClear_routesThroughUpdateUserSquadronWithNull() {
     UUID userId = UUID.randomUUID();
     UUID oldSquadronId = UUID.randomUUID();
-    Squadron oldSquadron = new Squadron();
-    oldSquadron.setId(oldSquadronId);
-    User user = newUser(userId, oldSquadron);
+    User user = newUser(userId);
     user.setVersion(3L);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
+        .thenReturn(Optional.of(oldSquadronId));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(new StaffelChange(null, null, null, 3L), null);
@@ -172,7 +171,7 @@ class UserServiceMembershipDeltaTest {
   void skAdd_callsAddMember_andAdoptsInitialFlagsInline() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
-    User user = newUser(userId, null);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     OrgUnitMembership freshRow = new OrgUnitMembership();
     when(orgUnitMembershipService.addMember(skId, userId)).thenReturn(freshRow);
@@ -193,7 +192,7 @@ class UserServiceMembershipDeltaTest {
   void skAdd_withoutFlags_doesNotMutateRow() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
-    User user = newUser(userId, null);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     OrgUnitMembership freshRow = new OrgUnitMembership();
     when(orgUnitMembershipService.addMember(skId, userId)).thenReturn(freshRow);
@@ -213,7 +212,7 @@ class UserServiceMembershipDeltaTest {
   void skRemove_callsRemoveMember() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
-    User user = newUser(userId, null);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
@@ -231,7 +230,7 @@ class UserServiceMembershipDeltaTest {
   void skPatch_callsPatchFlags_withVersionFromChangeRecord() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
-    User user = newUser(userId, null);
+    User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
@@ -244,10 +243,9 @@ class UserServiceMembershipDeltaTest {
         .patchFlags(eq(skId), eq(userId), eq(new MembershipFlagsPatchRequest(true, false, 4L)));
   }
 
-  private User newUser(UUID id, Squadron squadron) {
+  private User newUser(UUID id) {
     User user = new User();
     user.setId(id);
-    user.setSquadron(squadron);
     user.setVersion(0L);
     return user;
   }

@@ -7,14 +7,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +51,8 @@ class ShipInsuranceTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -61,12 +67,15 @@ class ShipInsuranceTest {
     user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("pilot1");
-    // R6.b: the owner resolver requires the target user to have at least one org-unit
-    // membership before stamping. The legacy Squadron link is still the authoritative source
-    // for the home Staffel — use the V80-seeded IRIDIUM row so existing test paths work
-    // without pre-populating the org_unit_membership table.
-    user.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     userRepository.save(user);
+    // Post-R9 D3 (V101): the owner resolver requires the target user to have at least one org-
+    // unit membership before stamping. Anchor to V80-seeded IRIDIUM via org_unit_membership —
+    // the legacy app_user.squadron_id column was dropped.
+    OrgUnitMembership iridiumMembership = new OrgUnitMembership();
+    iridiumMembership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
+    iridiumMembership.setUser(user);
+    iridiumMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(iridiumMembership);
 
     shipType = new ShipType();
     shipType.setName("Test Ship Type");

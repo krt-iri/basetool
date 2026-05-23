@@ -90,6 +90,7 @@ public class MissionService {
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -710,9 +711,15 @@ public class MissionService {
       // differ from `mission.owning_squadron` when a non-internal mission attracts
       // cross-staffel members). Falls back to IRIDIUM only when the user has no
       // squadron assigned (admins / brand-new accounts), so finance/reporting still
-      // produces a valid bucket.
-      if (user.getSquadron() != null) {
-        participant.setSquadron(user.getSquadron());
+      // produces a valid bucket. Post-R9 D3 (V101): the user's home Staffel is sourced from
+      // org_unit_membership directly — the legacy User.squadron column was dropped.
+      Squadron homeStaffel =
+          orgUnitMembershipService
+              .findStaffelMembershipOrgUnitId(user.getId())
+              .flatMap(squadronRepository::findById)
+              .orElse(null);
+      if (homeStaffel != null) {
+        participant.setSquadron(homeStaffel);
       } else {
         squadronRepository
             .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
@@ -875,11 +882,16 @@ public class MissionService {
     if (participant.getUser() != null) {
       // Registered users carry the squadron they belong to at participate-time. Mirror the
       // logic from addParticipant — same semantics, same fallback (MULTI_SQUADRON_PLAN.md
-      // section 3.2). Re-reads `user.getSquadron()` on every update so a freshly-assigned
-      // squadron on the user record propagates into the participant row.
+      // section 3.2). Post-R9 D3 (V101): re-reads the user's Staffel membership row on every
+      // update so a freshly-assigned squadron propagates into the participant row.
       User registeredUser = participant.getUser();
-      if (registeredUser.getSquadron() != null) {
-        participant.setSquadron(registeredUser.getSquadron());
+      Squadron homeStaffel =
+          orgUnitMembershipService
+              .findStaffelMembershipOrgUnitId(registeredUser.getId())
+              .flatMap(squadronRepository::findById)
+              .orElse(null);
+      if (homeStaffel != null) {
+        participant.setSquadron(homeStaffel);
       } else {
         squadronRepository
             .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)

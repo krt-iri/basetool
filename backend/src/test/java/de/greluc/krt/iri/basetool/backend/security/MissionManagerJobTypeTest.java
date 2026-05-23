@@ -42,6 +42,10 @@ class MissionManagerJobTypeTest {
 
   @Autowired private ShipTypeRepository shipTypeRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Autowired private SquadronRepository squadronRepository;
+
   private ObjectMapper objectMapper =
       new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
@@ -59,8 +63,14 @@ class MissionManagerJobTypeTest {
     manager = new User();
     manager.setId(UUID.randomUUID());
     manager.setUsername("manager");
-    manager.setMissionManager(true);
     userRepository.save(manager);
+    // Post-R9 D3 (V101): MissionManager flag lives on the Staffel membership row only.
+    OrgUnitMembership iridiumMembership = new OrgUnitMembership();
+    iridiumMembership.setId(new OrgUnitMembershipId(manager.getId(), Squadron.IRIDIUM_ID));
+    iridiumMembership.setUser(manager);
+    iridiumMembership.setJoinedAt(Instant.now());
+    iridiumMembership.setMissionManager(true);
+    orgUnitMembershipRepository.save(iridiumMembership);
 
     missionJobType = new JobType();
     missionJobType.setName("Test Mission Job");
@@ -78,6 +88,9 @@ class MissionManagerJobTypeTest {
     mission.setName("Test Mission");
     mission.setOwner(manager);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));
+    // V99 made owning_org_unit_id NOT NULL — anchor the mission to IRIDIUM so the direct save
+    // does not trip the constraint.
+    mission.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     missionRepository.save(mission);
 
     participant = new MissionParticipant();
@@ -112,7 +125,7 @@ class MissionManagerJobTypeTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + participant.getId())
                 .with(
                     jwt()
-                        .jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
+                        .jwt(b -> b.subject(manager.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER")))
@@ -132,7 +145,7 @@ class MissionManagerJobTypeTest {
             post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
                 .with(
                     jwt()
-                        .jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
+                        .jwt(b -> b.subject(manager.getId().toString()))
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER")))
