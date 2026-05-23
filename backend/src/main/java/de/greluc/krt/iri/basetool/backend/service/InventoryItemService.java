@@ -442,8 +442,8 @@ public class InventoryItemService {
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
-    item.setOwningSquadron(
-        ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId()));
+    item.setOwningOrgUnit(
+        ownerScopeService.resolveOrgUnitForPickerOutput(user, dto.owningOrgUnitId()));
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
@@ -691,8 +691,8 @@ public class InventoryItemService {
 
       InventoryItem newItem = new InventoryItem();
       newItem.setUser(targetUser);
-      newItem.setOwningSquadron(
-          ownerScopeService.resolveSquadronForPickerOutput(
+      newItem.setOwningOrgUnit(
+          ownerScopeService.resolveOrgUnitForPickerOutput(
               targetUser, dto.targetOwningOrgUnitId()));
       newItem.setMaterial(item.getMaterial());
       newItem.setLocation(targetLocation);

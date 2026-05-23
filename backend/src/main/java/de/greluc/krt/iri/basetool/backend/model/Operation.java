@@ -60,17 +60,18 @@ public class Operation extends AbstractEntity<UUID> {
    * production.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id", nullable = false)
+  @JoinColumn(name = "owning_squadron_id")
   private Squadron owningSquadron;
 
   /**
-   * Org-unit owner of this operation — the R4 dual-write mirror of {@link #owningSquadron}. Pointed
-   * at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
-   * window so a missed sync does not break inserts.
+   * Org-unit owner of this operation — the R4 dual-write mirror of {@link #owningSquadron}. After
+   * R9 Step 1, callers write this field directly via {@code
+   * OwnerScopeService.resolveOrgUnitForPickerOutput} and the legacy {@link #owningSquadron} is
+   * filled by the lifecycle hook only when the resolved OrgUnit happens to be a Squadron. {@code
+   * nullable = false} reflects V99's NOT NULL tightening on the DB column.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_org_unit_id")
+  @JoinColumn(name = "owning_org_unit_id", nullable = false)
   private OrgUnit owningOrgUnit;
 
   /**

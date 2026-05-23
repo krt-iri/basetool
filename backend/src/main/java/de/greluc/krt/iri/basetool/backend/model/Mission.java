@@ -157,24 +157,25 @@ public class Mission extends AbstractEntity<UUID> {
    * owning_org_unit_id} has soaked one full release cycle in production.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id", nullable = false)
+  @JoinColumn(name = "owning_squadron_id")
   @OptimisticLock(excluded = true)
   private Squadron owningSquadron;
 
   /**
    * Org-unit owner of this mission — the R4 dual-write mirror of {@link #owningSquadron}. Pointed
    * at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. Currently always a {@link
-   * Squadron} subclass instance (the application's mission-create paths still stamp the legacy
-   * field first); once R5 lands the owner-picker UI this widens to hold {@link SpecialCommand}
-   * instances too.
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. After R9 Step 1 the
+   * application's mission-create paths stamp this field directly (via {@code
+   * OwnerScopeService.resolveOrgUnitForPickerOutput}) so it accepts {@link SpecialCommand}
+   * instances in addition to Squadron ones.
    *
-   * <p>JPA-nullable for the R4 soak window so a missed sync does not break inserts — the lifecycle
-   * callback should leave this set, but the column stays nullable until the next release tightens
-   * it to NOT NULL.
+   * <p>{@code nullable = false} reflects V99's NOT NULL tightening on the DB column — every
+   * staffel-scoped aggregate must carry a resolved owner. The legacy {@link #owningSquadron}
+   * field's {@code nullable = false} was relaxed in the same migration so SK-owned aggregates
+   * can leave the legacy column null without violating the JPA contract.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_org_unit_id")
+  @JoinColumn(name = "owning_org_unit_id", nullable = false)
   @OptimisticLock(excluded = true)
   private OrgUnit owningOrgUnit;
 

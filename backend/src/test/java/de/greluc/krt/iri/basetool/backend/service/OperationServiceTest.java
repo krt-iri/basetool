@@ -74,10 +74,12 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
-    // No caller resolved → service falls back to currentSquadron(), which we leave empty here
+    // No caller resolved → service falls back to currentOrgUnit(), which we leave empty here
     // because the test doesn't care about the stamp value, only that the save runs.
     when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
-    when(ownerScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
+    org.mockito.Mockito.lenient()
+        .when(ownerScopeService.currentOrgUnit())
+        .thenReturn(java.util.Optional.empty());
 
     // When
     Operation result = operationService.createOperation(operation, null);
@@ -103,13 +105,13 @@ class OperationServiceTest {
     UUID pickedOrgUnitId = picked.getId();
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveSquadronForPickerOutput(caller, pickedOrgUnitId))
+    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, pickedOrgUnitId))
         .thenReturn(picked);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
 
-    assertEquals(picked, saved.getOwningSquadron(), "picker output must be honoured verbatim");
+    assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
   }
 
   @Test
