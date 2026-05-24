@@ -162,9 +162,9 @@ class RefineryOrderStorageCalculationTest {
   /**
    * Regression test for issue #230. UEX-imported materials historically have a NULL {@code
    * quantity_type} (the UEX commodity sync never sets the field). Before the fix the store-dialog
-   * prefill treated NULL as "not SCU" and skipped the units->SCU conversion, so a 2.21 SCU
-   * refinery output got booked as 221 SCU. The controller now defaults the unknown/NULL case to
-   * SCU since refineries never produce piece-counted goods.
+   * prefill treated NULL as "not SCU" and skipped the units->SCU conversion, so a 2.21 SCU refinery
+   * output got booked as 221 SCU. The controller now defaults the unknown/NULL case to SCU since
+   * refineries never produce piece-counted goods.
    */
   @Test
   void testStoreFormCalculationForNullQuantityTypeDefaultsToScu() {
@@ -188,8 +188,14 @@ class RefineryOrderStorageCalculationTest {
             0L);
     RefineryGoodDto good =
         new RefineryGoodDto(
-            UUID.randomUUID(), nullQuantityTypeMaterial, 100, nullQuantityTypeMaterial, 221, 100,
-            null, null);
+            UUID.randomUUID(),
+            nullQuantityTypeMaterial,
+            100,
+            nullQuantityTypeMaterial,
+            221,
+            100,
+            null,
+            null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(
             orderId,

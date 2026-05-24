@@ -459,8 +459,7 @@ public class RefineryOrderPageController {
                 storeItem.setAmount(amount);
                 // Normalize the per-row quantityType the template sees so the unit label
                 // ("(SCU)" / "(Stück)") matches the converted amount above.
-                storeItem.setQuantityType(
-                    "PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
+                storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
 
                 storeItem.setQuality(good.quality() != null ? good.quality() : 0);
                 if (orderDto.location() != null) {
