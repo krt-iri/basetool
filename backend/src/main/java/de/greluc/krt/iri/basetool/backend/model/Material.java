@@ -41,8 +41,8 @@ public class Material extends AbstractEntity<UUID> {
   private MaterialType type;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "quantity_type")
-  private QuantityType quantityType;
+  @Column(name = "quantity_type", nullable = false)
+  private QuantityType quantityType = QuantityType.SCU;
 
   @Column(columnDefinition = "TEXT")
   private String description;
