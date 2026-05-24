@@ -98,6 +98,42 @@
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
+            /* Full-width "add another row" affordance below the materials list.
+               Dashed outline + transparent fill keep it visually subordinate to
+               the solid Speichern/Einlagern/Abbrechen actions further down,
+               while the primary-orange color anchors it to the same form
+               section. The button sits after #materials-container, so it
+               naturally moves down whenever a new material row is appended. */
+            .btn-add-row {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                width: 100%;
+                min-height: 44px;
+                padding: 0.75rem 1rem;
+                margin-bottom: 1rem;
+                background-color: rgba(231, 126, 35, 0.05);
+                border: 1px dashed var(--color-primary);
+                color: var(--color-primary);
+                font-family: var(--font-body);
+                font-weight: 700;
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                cursor: pointer;
+                transition: background-color 0.15s ease, border-style 0.15s ease;
+            }
+            .btn-add-row:hover {
+                background-color: rgba(231, 126, 35, 0.12);
+                border-style: solid;
+            }
+            .btn-add-row::before {
+                content: "+";
+                font-size: 1.1rem;
+                font-weight: 700;
+                line-height: 1;
+            }
         </style>
         <script th:src="@{/js/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
     </th:block>
@@ -253,11 +289,10 @@
                     </div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
                     <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
-                    <button th:if="${canEdit}" type="button" class="btn btn-secondary" data-trigger="rod-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
                 </div>
-                
+
                 <div id="materials-container">
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
                         <div class="material-entry-header">
@@ -314,6 +349,8 @@
                         </div>
                     </div>
                 </div>
+
+                <button th:if="${canEdit}" type="button" class="btn-add-row" data-trigger="rod-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
 
             </form>
 
