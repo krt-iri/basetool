@@ -56,19 +56,12 @@ class DtoMirrorConsistencyTest {
    * mirror. Keep the value list explicit so a NEW backend-only field on the same DTO still trips
    * the assertion - we want the whitelist to grow only on conscious decisions.
    *
-   * <p>The current entries reflect the audit performed in PR #229: these fields exist on the
-   * backend record but are never rendered by any Thymeleaf template, hence the deliberate
-   * frontend-side omission. Remove an entry as soon as the field starts being rendered.
+   * <p>Empty as of PR #229: the three known asymmetries that existed when the test was introduced
+   * (OperationDto createdAt/updatedAt, StarSystemDto's six backend extras, JobOrderHandoverItemDto
+   * locationName) were all fixed by mirroring the fields. Add new entries only when there is a real
+   * reason a backend field cannot/should not surface on the frontend mirror.
    */
-  private static final Map<String, Set<String>> ALLOWED_BACKEND_ONLY_FIELDS =
-      Map.of(
-          "OperationDto.java",
-          Set.of("createdAt", "updatedAt"),
-          "StarSystemDto.java",
-          Set.of(
-              "idSystem", "isAvailableLive", "wiki", "jurisdictionName", "factionName", "version"),
-          "JobOrderHandoverItemDto.java",
-          Set.of("locationName"));
+  private static final Map<String, Set<String>> ALLOWED_BACKEND_ONLY_FIELDS = Map.of();
 
   /**
    * Resolves a path that is given relative to the frontend module root. When Gradle runs the test

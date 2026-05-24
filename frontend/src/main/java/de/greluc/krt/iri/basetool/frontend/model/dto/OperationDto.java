@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -11,12 +12,20 @@ import java.util.UUID;
  * the payout table when at least one mission of the operation still lacks an actual start or end
  * time. Treat {@code null} as "unknown" and hide the banner.
  *
+ * <p>Field order intentionally matches the backend record (id, name, description, status,
+ * owningSquadron, version, createdAt, updatedAt, payoutPreliminary) so the Jackson wire-shape stays
+ * positional-positional and {@link DtoMirrorConsistencyTest} can compare component-by-component
+ * without exception.
+ *
  * @param id operation primary key
  * @param name operation name
  * @param description optional free-text description
  * @param status current operation status (string mirror of the backend enum)
  * @param owningSquadron squadron that owns the operation (multi-tenant scope marker)
  * @param version optimistic-lock version
+ * @param createdAt creation timestamp (UTC); not rendered by any template today but mirrored to
+ *     keep the wire-shape symmetric with the backend record
+ * @param updatedAt last-update timestamp (UTC); same rationale as {@code createdAt}
  * @param payoutPreliminary {@code true} when the backend reports that at least one mission has no
  *     {@code actualStartTime} or {@code actualEndTime}; {@code null} when not computed
  */
@@ -27,4 +36,6 @@ public record OperationDto(
     String status,
     SquadronReferenceDto owningSquadron,
     Long version,
+    Instant createdAt,
+    Instant updatedAt,
     Boolean payoutPreliminary) {}
