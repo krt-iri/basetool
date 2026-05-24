@@ -534,7 +534,7 @@
             <div class="col-content" id="col-participants-content">
                 <div class="hud-box">
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
-                        <button id="add-participant-btn" class="btn" th:text="#{mission.participant.add}">Hinzufügen</button>
+                        <button id="add-participant-btn" class="btn" th:text="#{mission.participant.add}">Anmelden</button>
                     </div>
         <div class="table-responsive">
         <table th:if="${!isNew and participants != null and !participants.isEmpty()}">
@@ -932,7 +932,7 @@
     <div id="participant-modal" class="modal" th:style="${openModal == 'participant-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}">
         <div class="modal-content hud-box">
             <span class="close-participant-modal close-modal">&times;</span>
-            <h2 th:text="#{mission.participant.add}">Teilnehmer hinzufügen</h2>
+            <h2 th:text="#{mission.participant.add}">Anmelden</h2>
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="form-group" sec:authorize="isAnonymous()">
                     <label th:text="#{mission.participant.name}">Name</label>
