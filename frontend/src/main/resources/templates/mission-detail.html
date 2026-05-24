@@ -626,7 +626,7 @@
                                 <span th:if="${unit.ship != null and unit.ship.owner != null}" th:text="${' (' + unit.ship.owner.effectiveName + ')'}" style="color: var(--color-gray-2); font-size: 0.9rem;">(Owner)</span>
                                 <span th:if="${unit.highValueUnit}" style="color: var(--color-accent-light); margin-left: 0.5rem;">[HVU]</span>
                             </div>
-                            <span th:if="${unit.frequency}" th:text="#{mission.unit.frequency} + ': ' + ${#strings.replace(unit.frequency, ',', '.')}" style="margin-left: 0.5rem; color: var(--color-gray-1);">Freq: 123.45</span>
+                            <span th:if="${unit.frequency}" th:text="#{mission.unit.frequency} + ': ' + ${#strings.replace(#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}" style="margin-left: 0.5rem; color: var(--color-gray-1);">Freq: 123.45</span>
                         </div>
                         <div class="flex-gap-sm">
                             <button th:if="${mission.canEdit}" class="btn assign-crew-btn"
@@ -1076,7 +1076,7 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
-                    <input type="number" step="0.01" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
@@ -1097,7 +1097,7 @@
                 <input type="hidden" name="frequencyTypeId" id="freq-type-id" value="">
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz (z.B. 123.45)</label>
-                    <input type="number" step="0.01" min="0" max="999.99" name="value" id="freq-value" required>
+                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="value" id="freq-value" required>
                 </div>
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
             </form>
@@ -1137,7 +1137,7 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
-                    <input type="number" step="0.01" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
+                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
@@ -1159,8 +1159,8 @@
                     <label th:text="#{mission.participant.name}">Teilnehmer</label>
                     <select name="participantId" required>
                         <option value="" disabled selected>-</option>
-                        <option th:each="p : ${mission?.participants}"
-                                th:value="${p?.id}" 
+                        <option th:each="p : ${unassignedParticipants}"
+                                th:value="${p?.id}"
                                 th:text="${p?.user != null ? (!#strings.isEmpty(p.user.displayName) ? p.user.displayName : p.user.username) : p?.guestName}" th:selected="${crewForm.participantId == p?.id}">User</option>
                     </select>
                     <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
@@ -1494,6 +1494,18 @@
                 });
             }
         }
+
+        // Frequenzen werden im Backend und in der Anzeige immer mit `.` als Trennzeichen
+        // gespeichert/gerendert. Beim Tippen tolerieren wir beides: ein eingegebenes `,` wird
+        // sofort zu `.` normalisiert, damit `parseFloat` in den AJAX-Submit-Handlern (und die
+        // klassischen Spring-Form-Bindings) den Wert nicht beim Komma abschneiden.
+        document.querySelectorAll('.freq-input').forEach(function (input) {
+            input.addEventListener('input', function () {
+                if (this.value.indexOf(',') !== -1) {
+                    this.value = this.value.replace(/,/g, '.');
+                }
+            });
+        });
 
         const frequencyModal = document.getElementById('frequency-modal');
         const frequencyForm = document.getElementById('frequency-form');

@@ -311,6 +311,17 @@ public class MissionPageController {
       }
       model.addAttribute("assignedUnitByParticipantId", assignedUnitByParticipantId);
 
+      // "Crew zuweisen"-Dropdown zeigt nur Teilnehmer, die noch keiner Einheit zugewiesen sind.
+      // Sortierung wird aus `participants` (oben bereits alphabetisch nach extractParticipantName)
+      // geerbt — ein assignment-Status-Filter ändert die Reihenfolge der verbleibenden Einträge
+      // nicht. Der server-seitige Filter ist authoritativ; nach einer Crew-Zuweisung lädt der
+      // AJAX-Pfad die ganze Seite neu, sodass das Dropdown auf dem aktuellen Stand bleibt.
+      List<MissionParticipantDto> unassignedParticipants =
+          participants.stream()
+              .filter(p -> p.id() != null && !assignedUnitByParticipantId.containsKey(p.id()))
+              .toList();
+      model.addAttribute("unassignedParticipants", unassignedParticipants);
+
       // Calculate participation percentages
       Map<UUID, Double> participationPercentages = new java.util.HashMap<>();
       for (MissionParticipantDto p : participants) {
