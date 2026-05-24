@@ -65,6 +65,11 @@ class DatabaseIndexMigrationTest {
     assertIndexExists(jdbc, "mission", "idx_mission_operation_id");
     // V92: FK index on inventory_item.job_order_id (powers the job order detail page)
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_job_order_id");
+    // V96: partial UNIQUE index that backs the multi-user signup race fix — keeps a registered
+    // user from being added twice to the same mission via two parallel "Anmelden" clicks. The
+    // in-memory check in MissionService.addParticipant catches the common case; this index is
+    // the DB-level backstop against the TOCTOU race.
+    assertIndexExists(jdbc, "mission_participant", "uq_mission_participant_user");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

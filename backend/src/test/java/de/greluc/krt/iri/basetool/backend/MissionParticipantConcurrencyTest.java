@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -200,5 +202,130 @@ class MissionParticipantConcurrencyTest {
         "Mission.version must not bump on participant adds (Option A: @OptimisticLock excluded on"
             + " the participants collection) — concurrent edits on other mission sections must stay"
             + " independent of signup activity");
+  }
+
+  /**
+   * {@value THREADS} threads add the <em>same</em> user to the same mission in lockstep. The
+   * in-memory duplicate check in {@link MissionService#addParticipant} uses each thread's own
+   * snapshot of {@code mission.getParticipants()} and is therefore unable to see the participant
+   * row the winning thread inserts in parallel — the check is best-effort against a stale view. The
+   * Stufe-2 DB-level backstop is the partial unique index {@code uq_mission_participant_user}
+   * (Flyway V96), which rejects the second {@code INSERT} at commit time; Spring wraps the
+   * underlying SQL {@code unique_violation} as a {@link DataIntegrityViolationException} and the
+   * {@code GlobalExceptionHandler} maps it to HTTP 409 — the same status the in-memory branch
+   * produces via {@code DuplicateEntityException}, so the frontend toast (status-code-based) is the
+   * same for both paths.
+   *
+   * <p>Thread interleaving is non-deterministic: a thread that loads the mission <em>before</em>
+   * the winner commits passes the in-memory check and ends up at the DB index ({@code
+   * DataIntegrityViolationException}); a thread that loads <em>after</em> the winner commits sees
+   * the participant in its snapshot and is rejected by the in-memory check ({@code
+   * DuplicateEntityException}). Both are correct outcomes — the test accepts either and asserts on
+   * the load-bearing invariant: exactly one signup wins, the rest are rejected, and the DB ends up
+   * with exactly one participant row for the (mission, user) pair.
+   */
+  @Test
+  void addParticipant_sameUserParallelClicks_exactlyOneWinsRestRejectedByUniqueIndex()
+      throws Exception {
+    Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    Mission seed = new Mission();
+    seed.setOwningSquadron(iridium);
+    seed.setName("Concurrency Duplicate Mission " + UUID.randomUUID());
+    seed.setStatus("PLANNED");
+    seedMissionId = missionRepository.save(seed).getId();
+    final UUID missionId = seedMissionId;
+
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("double-click-user-" + UUID.randomUUID());
+    final UUID userId = userRepository.save(user).getId();
+    seedUserIds.add(userId);
+
+    CountDownLatch ready = new CountDownLatch(THREADS);
+    CountDownLatch go = new CountDownLatch(1);
+    AtomicInteger successCount = new AtomicInteger();
+    AtomicInteger rejectedByInMemoryCheck = new AtomicInteger();
+    AtomicInteger rejectedByDbIndex = new AtomicInteger();
+    AtomicInteger otherErrorCount = new AtomicInteger();
+    List<Throwable> unexpectedErrors = new CopyOnWriteArrayList<>();
+
+    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+    List<Future<?>> futures = new ArrayList<>(THREADS);
+    try {
+      for (int i = 0; i < THREADS; i++) {
+        futures.add(
+            pool.submit(
+                () -> {
+                  try {
+                    ready.countDown();
+                    if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                      otherErrorCount.incrementAndGet();
+                      return;
+                    }
+                    missionService.addParticipant(missionId, userId);
+                    successCount.incrementAndGet();
+                  } catch (DuplicateEntityException expected) {
+                    // Thread loaded the mission AFTER the winner committed and the in-memory
+                    // check at the top of addParticipant fired.
+                    rejectedByInMemoryCheck.incrementAndGet();
+                  } catch (DataIntegrityViolationException expected) {
+                    // Thread loaded the mission BEFORE any commit, passed the in-memory check,
+                    // raced to INSERT and hit the V96 partial unique index at commit time.
+                    rejectedByDbIndex.incrementAndGet();
+                  } catch (Throwable t) {
+                    otherErrorCount.incrementAndGet();
+                    unexpectedErrors.add(t);
+                  }
+                }));
+      }
+
+      assertTrue(
+          ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+          "all worker threads should have entered the race within " + START_TIMEOUT_SECONDS + "s");
+      go.countDown();
+
+      for (Future<?> f : futures) {
+        f.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+      pool.awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    int totalRejected = rejectedByInMemoryCheck.get() + rejectedByDbIndex.get();
+    assertEquals(
+        0,
+        otherErrorCount.get(),
+        () -> "no thread should throw an unexpected exception, got: " + unexpectedErrors);
+    assertEquals(
+        1,
+        successCount.get(),
+        () ->
+            "exactly one thread should win the duplicate-signup race — got "
+                + successCount.get()
+                + " successes (in-memory rejections: "
+                + rejectedByInMemoryCheck.get()
+                + ", DB-index rejections: "
+                + rejectedByDbIndex.get()
+                + ")");
+    assertEquals(
+        THREADS - 1,
+        totalRejected,
+        () ->
+            "every losing thread must be rejected by either the in-memory check (DuplicateEntity)"
+                + " or the V96 partial unique index (DataIntegrityViolation) — got "
+                + rejectedByInMemoryCheck.get()
+                + " in-memory + "
+                + rejectedByDbIndex.get()
+                + " DB rejections, expected "
+                + (THREADS - 1)
+                + " total");
+
+    Mission persisted = missionRepository.findById(missionId).orElseThrow();
+    assertEquals(
+        1,
+        persisted.getParticipants().size(),
+        "regardless of which mechanism caught which thread, the (mission, user) pair must end up"
+            + " with exactly one participant row — that is the load-bearing invariant of Stufe 2");
   }
 }
