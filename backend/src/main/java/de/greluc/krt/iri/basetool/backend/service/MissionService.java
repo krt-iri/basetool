@@ -723,6 +723,20 @@ public class MissionService {
     // on commit persists the new participant (via cascade) without bumping the parent
     // Mission.version. This is key for the multi-user concurrency design (Option A):
     // adding a participant must NOT invalidate other users' open forms on the same mission.
+    //
+    // No `flush()` here on purpose. The in-memory `anyMatch` check above is the
+    // primary duplicate detector (returns a localized DuplicateEntityException → 409).
+    // The Stufe-2 DB-level backstop is the partial unique index `uq_mission_participant_user`
+    // (Flyway V96): a TOCTOU-raced double-signup (double-click, two tabs) slips past the
+    // in-memory check, both inserts head for the same (mission, user) key, and PostgreSQL
+    // rejects the second one at commit time as a unique-constraint violation. Spring
+    // wraps that as DataIntegrityViolationException and the GlobalExceptionHandler maps
+    // it to 409 — the same HTTP status the in-memory branch produces, so the frontend
+    // toast logic (`MissionPageController#addParticipant`, status-code-based) shows the
+    // user the same error. A service-side translation to DuplicateEntityException was
+    // attempted but required `saveAndFlush`, which forces a session-wide flush and
+    // breaks @Transactional tests that intentionally hold half-built sibling entities
+    // in the persistence context until rollback.
     return mission;
   }
 
