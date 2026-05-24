@@ -21,7 +21,7 @@ something broke once.
   - **V95** — `backfill_material_quantity_type`.
   - **V96** — `add_mission_participant_user_unique_index` (DB-backstop against
     duplicate Einsatz-Anmeldungen).
-- **V97–V101** — Spezialkommando-Erweiterung (see `SPEZIALKOMMANDO_PLAN.md`).
+- **V97–V105** — Spezialkommando-Erweiterung (see `SPEZIALKOMMANDO_PLAN.md`).
   Introduces the `org_unit` parent table with a `kind` discriminator so SKs
   can coexist with Staffel as a second tenant kind. The releases land in
   stages:
@@ -46,12 +46,21 @@ something broke once.
     that refuses any INSERT/UPDATE of `promotion_topic.owning_squadron_id`
     pointing at a non-SQUADRON org_unit. DB-level defence-in-depth on top of
     the Java-typed Squadron field and ArchUnit rule §8.2.
-- **V102+ (destructive cleanup, deferred)** — tighten `owning_org_unit_id` to
-  NOT NULL on every aggregate, drop the legacy `owning_squadron_id` / job_order
-  squadron FKs, drop `app_user.squadron_id` / `is_logistician` /
-  `is_mission_manager` (the per-membership row is authoritative since R6.d),
-  drop the legacy `squadron` table once V100's mirror is no longer needed.
-  Lands only after R6.e has soaked one full release cycle in prod.
+- **V102–V105 (destructive cleanup, ships after dual-write soaks)** — final
+  step of the SK rollout, irreversible without DB backup:
+  - **V102** — tighten `owning_org_unit_id` to NOT NULL on every aggregate,
+    drop NOT NULL on the legacy `owning_squadron_id` columns to unlock SK
+    ownership (R8).
+  - **V103** — drop the legacy `owning_squadron_id` / `creating_squadron_id` /
+    `requesting_squadron_id` columns on every staffel-scoped aggregate +
+    JobOrder (R9 step 2-3).
+  - **V104** — drop `app_user.squadron_id` / `is_logistician` /
+    `is_mission_manager` (the per-membership row is authoritative since R6.d
+    + R6.e) (R9 step 4-5).
+  - **V105** — retarget the three remaining FKs that still reference
+    `squadron(id)` (`promotion_topic`, `mission_participant`,
+    `job_order_handover`) to `org_unit(id)`, drop the V100 sync trigger and
+    drop the legacy `squadron` table (R9 step 6).
 
 ## Hard rules
 

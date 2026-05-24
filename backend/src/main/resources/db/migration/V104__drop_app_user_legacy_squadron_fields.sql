@@ -14,7 +14,7 @@
 --        SELECT 1 FROM org_unit_membership m
 --         WHERE m.user_id = u.id AND m.kind = 'SQUADRON' AND m.org_unit_id = u.squadron_id)
 -- returns 0 — every populated app_user.squadron_id has a matching membership row courtesy of
--- R6.e dual-write + V96 backfill.
+-- R6.e dual-write + V98 backfill.
 -- =============================================================================
 
 -- 1. Drop FK constraint first (V81 added it: fk_app_user_squadron).
