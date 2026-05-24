@@ -26,7 +26,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionId(UUID missionId);
 
   /**
@@ -34,7 +34,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * fetches the configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionIdAndOwnerId(UUID missionId, UUID ownerId);
 
   /**
@@ -42,7 +42,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionIdIn(List<UUID> missionIds);
 
   /**
@@ -50,7 +50,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByOwnerId(UUID ownerId);
 
   /**
@@ -58,7 +58,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
@@ -66,7 +66,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * fetches the configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findByOwnerIdAndStatusIn(
       UUID ownerId,
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
@@ -77,7 +77,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findByStatusIn(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       Pageable pageable);
@@ -88,7 +88,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @Override
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findAll(Pageable pageable);
 
   /**
@@ -98,7 +98,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * cross-squadron escape clause like Mission's {@code is_internal = false}.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE ("
           + "  :isAdminAllScope = true"
@@ -118,7 +118,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * by non-admin users to see the union of their org-unit refinery orders.
    */
   @EntityGraph(
-      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
+      attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND ("
           + "  :isAdminAllScope = true"

@@ -31,7 +31,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * any of those fields.
    */
   @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningSquadron"})
+      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query("SELECT i FROM InventoryItem i")
   List<InventoryItem> findAllWithEagerRelationships();
 
@@ -40,7 +40,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningSquadron"})
+      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   Page<InventoryItem> findByUser(User user, Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
@@ -54,7 +54,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * restricts to that squadron.
    */
   @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningSquadron"})
+      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND ("
           + "  :isAdminAllScope = true"
@@ -84,7 +84,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * lookup path served by {@link #findByJobOrderIdOrdered(UUID)}.
    */
   @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningSquadron"})
+      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.personal = false AND ("
           + "  :isAdminAllScope = true"
@@ -113,7 +113,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * data layer rather than relying on the controller alone.
    */
   @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningSquadron"})
+      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR"
           + " i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)"
@@ -158,11 +158,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * Derived Spring-Data query - returns entities matching {@code JobOrderIdAndMaterialId}. Eagerly
    * fetches the configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"user", "location", "material", "owningSquadron"})
+  @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
   List<InventoryItem> findByJobOrderIdAndMaterialId(UUID jobOrderId, UUID materialId);
 
   /** Derived Spring-Data query - returns entities matching {@code JobOrderIdOrdered}. */
-  @EntityGraph(attributePaths = {"user", "location", "material", "owningSquadron"})
+  @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username"
           + " ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC")
@@ -303,7 +303,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * pessimistic write lock for the duration of the surrounding transaction.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "jobOrder", "user", "location", "owningSquadron"})
+  @EntityGraph(attributePaths = {"material", "jobOrder", "user", "location", "owningOrgUnit"})
   @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 

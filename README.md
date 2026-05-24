@@ -46,7 +46,7 @@ single-sign-on via Keycloak and a clear role and permission model.
 - **Keycloak** — OAuth2 / OIDC identity provider, custom IRIDIUM theme.
 - **Redis** — Spring Session store; sessions survive frontend restarts.
 
-The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) carry an `owning_org_unit_id` FK that resolves to either kind. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `SPEZIALKOMMANDO_PLAN.md` for the full data model and the staged migration roadmap (V97–V101 implemented; the destructive cleanup release V102+ lands once R6.e has soaked one release cycle).
+The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) carry an `owning_org_unit_id` FK that resolves to either kind. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `SPEZIALKOMMANDO_PLAN.md` for the full data model and the staged migration roadmap (V97–V105 implemented; the staged rollout ships in three deployable releases, see `SPEZIALKOMMANDO_PLAN.md` §10).
 
 ---
 
