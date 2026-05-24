@@ -219,11 +219,16 @@ main {
     /*
      * Reserve viewport-bottom space for the fixed footer (see `.krt-footer`).
      * Without this, the last line of long pages would scroll under the
-     * always-pinned footer and be permanently hidden. The mobile media query
-     * below bumps the reservation because the footer stacks to two rows
-     * (column flex-direction) at <=768px.
+     * always-pinned footer and be permanently hidden. The `--krt-footer-height`
+     * custom property is set by sidebar.html JS after measuring the actual
+     * rendered footer (with ResizeObserver + resize listener), so the
+     * reservation tracks the real height across breakpoints, link wrap and
+     * font load. The fallback `5rem` covers the brief window before
+     * DOMContentLoaded fires and the JS publishes the measured value; the
+     * extra `1rem` is breathing room so the last line is never flush against
+     * the top edge of the footer.
      */
-    padding-bottom: 5rem;
+    padding-bottom: calc(var(--krt-footer-height, 5rem) + 1rem);
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
@@ -350,13 +355,11 @@ tr:hover {
         align-items: flex-start;
     }
     /*
-     * Footer becomes two rows (column flex) on small screens, so <main>
-     * needs more bottom padding to keep the last line of content above the
-     * fixed footer.
+     * No mobile-specific `main { padding-bottom }` override needed — the
+     * `--krt-footer-height` measurement from sidebar.html JS already
+     * reflects the larger height of the column-stacked footer, so
+     * `main { padding-bottom: calc(var(...) + 1rem) }` automatically grows.
      */
-    main {
-        padding-bottom: 7rem;
-    }
 }
 
 .datetime-split-inputs {
