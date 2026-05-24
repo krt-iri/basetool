@@ -187,6 +187,27 @@
                 document.body.appendChild(footerEl);
             }
 
+            // Publish the actual rendered footer height as a CSS custom
+            // property (--krt-footer-height) so <main> can reserve exactly
+            // that much padding-bottom — see the `main` rule in styles.css.
+            // Footer height varies with viewport width (link wrap, column
+            // stacking on <=768px, font load) and a static `padding-bottom`
+            // value either over-reserves space on wide screens or under-
+            // reserves and clips the last content line behind the fixed
+            // footer. Re-measuring on resize + ResizeObserver covers every
+            // reflow path without coupling to specific breakpoints.
+            if (footerEl) {
+                const applyFooterHeight = () => {
+                    document.documentElement.style.setProperty(
+                        '--krt-footer-height', footerEl.offsetHeight + 'px');
+                };
+                applyFooterHeight();
+                window.addEventListener('resize', applyFooterHeight);
+                if (typeof ResizeObserver !== 'undefined') {
+                    new ResizeObserver(applyFooterHeight).observe(footerEl);
+                }
+            }
+
             const sidebarEl = document.getElementById('sidebar');
             const overlayEl = document.getElementById('sidebar-overlay');
             const closeBtn = document.getElementById('close-sidebar');
