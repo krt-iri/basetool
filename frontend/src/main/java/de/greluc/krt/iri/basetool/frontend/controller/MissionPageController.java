@@ -207,6 +207,12 @@ public class MissionPageController {
     if (size != null) {
       uri.append("size=").append(size).append("&");
     }
+    // Mission overview default: newest planned start at the top (the mission furthest in the
+    // future, descending by plannedStartTime). The backend API default for /api/v1/missions/search
+    // is ASC via PaginationUtil; the missions page deliberately overrides that. PaginationUtil
+    // already appends `id` as a stable tiebreaker for equal plannedStartTime values, so this
+    // covers the deterministic ordering contract.
+    uri.append("sort=plannedStartTime,desc&");
 
     if ((status == null || status.isEmpty())) {
       if (showPast && principal != null) {
