@@ -2,7 +2,18 @@
 
 Companion document to `MULTI_SQUADRON_PLAN.md`. The squadron foundation (Phases 1–7, migrations V80–V93) is the baseline this plan builds on; the goal here is to introduce **Spezialkommando** (henceforth `SK`) as a second tenant kind that coexists with Staffel under a shared abstraction.
 
-**Status**: Execution in progress — Releases R1, R2.a, R2.b, R2.c, R2.5, R3, R4, R5.a, R5.b, R5.c, R5.c.b, R5.d.a, R5.d.b, R5.d.c, R5.d.d, R5.d.e, R5.d.f, and **R5.d.g** (the inventory-transfer TRANSFER-branch picker — the *last* of the seven picker integrations in plan §7.3) implemented. **R5.d as a whole is now complete.** Releases R5.e (active-context switcher widened to non-admins + `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename), Squadron-side membership migration, and the destructive cleanup release pending.
+**Status**: **Code-complete on `claude/spezialkommando-r9-destructive-cleanup`.** All R1 → R9 releases are implemented as commits on a single linear branch and tracked by 25 stacked PRs ([#193](https://github.com/krt-iri/basetool/pull/193) → [#225](https://github.com/krt-iri/basetool/pull/225)). Coverage:
+
+- **R1 → R4** — DB foundation (V94–V96), `OrgUnit` hierarchy + `OrgUnitMembership`, `Squadron` joins the hierarchy with sync trigger, `OwnerScopeService` extracted, `SquadronScopeService` shim dropped, `owningOrgUnit` mirror field with lifecycle dual-write on six aggregates.
+- **R5 → R5.c.b** — REST CRUD for `SpecialCommand` (`/api/v1/special-commands`), membership-management endpoints with `canManageMembers` gate, admin SK list page (`/admin/special-commands`), per-SK detail page with member roster.
+- **R5.d.a → R5.d.g** — owner-picker fragment (`fragments/owner-picker.html`) + reusable resolver, integrated on all seven §7.3 forms (inventory-input, refinery-orders-create, orders-create + orders-detail, mission-create, operation-create, hangar add-ship, inventory-transfer TRANSFER). Includes the active-org-units endpoint and the SpEL-lambda fragment bugfix.
+- **R5.e** — active-context switcher widened to any non-admin user with >1 membership; `X-Active-Squadron-Id` → `X-Active-Org-Unit-Id` header rename (old name kept as one-release alias); session key + MDC field renamed in lockstep.
+- **R6.a → R6.e** — ArchUnit gaps closed (§8), owner-resolver hardened (inventory-admin TRANSFER + refinery-store gaps plugged), scoped repository queries migrated to `Set<UUID> memberOrgUnitIds`, JWT converter reads the union of OrgUnit memberships, `is_logistician` / `is_mission_manager` writes migrated to membership rows.
+- **R7 (audit follow-up sweep)** — §3.3 promotion trigger, §6.e race fix, §7.2/§7.4/§7.5 frontend polish, §12 documentation sync.
+- **R8** — three deferred items closed (§6.1 contextual-role wiring polish, §7.4 member-edit UX, V99 cleanup draft).
+- **R9 Steps 1–6 (destructive cleanup)** — 8 callers migrated to `resolveOrgUnitForPickerOutput`; JPA `nullable` flipped; legacy `owningSquadron` / `creatingSquadron` / `requestingSquadron` lifecycle hooks + Java fields removed; `User.squadron` + flag columns removed; `UserMapper` reads membership row; V99 lifts NOT NULL on legacy, V100 drops 7 aggregate columns + V91/V93 indexes, V101 drops `app_user` legacy columns, V102 retargets three FKs (`promotion_topic`, `mission_participant`, `job_order_handover`) and drops the `squadron` table itself.
+
+**Open follow-ups (post-merge):** consolidate the 25 stacked PRs into a small number of deployable releases — current plan is **three** deploys (Foundation+UI / Identity-migration / Destructive cleanup) with a soak window between each. PRs [#193](https://github.com/krt-iri/basetool/pull/193)–[#203](https://github.com/krt-iri/basetool/pull/203) currently CONFLICT with `main` because V94 (manual-material) landed after R1; the consolidation rebase resolves the V-numbering collision.
 
 ---
 
