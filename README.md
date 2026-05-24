@@ -46,7 +46,7 @@ single-sign-on via Keycloak and a clear role and permission model.
 - **Keycloak** — OAuth2 / OIDC identity provider, custom IRIDIUM theme.
 - **Redis** — Spring Session store; sessions survive frontend restarts.
 
-The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) carry an `owning_org_unit_id` FK that resolves to either kind. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `SPEZIALKOMMANDO_PLAN.md` for the full data model and the staged migration roadmap (V94–V98 implemented; the destructive cleanup release V99+ lands once R6.e has soaked one release cycle).
+The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) carry an `owning_org_unit_id` FK that resolves to either kind. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `SPEZIALKOMMANDO_PLAN.md` for the full data model and the staged migration roadmap (V97–V101 implemented; the destructive cleanup release V102+ lands once R6.e has soaked one release cycle).
 
 ---
 
@@ -64,7 +64,7 @@ documents cover everything else:
 | [LICENSE.md](LICENSE.md) | GNU General Public License v3.0. |
 | [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role). |
 | [MULTI_SQUADRON_PLAN.md](MULTI_SQUADRON_PLAN.md) | The original multi-Staffel refactor plan (Phases 1–7, V80–V93). |
-| [SPEZIALKOMMANDO_PLAN.md](SPEZIALKOMMANDO_PLAN.md) | The Spezialkommando-as-second-tenant-kind extension on top of the multi-Squadron baseline (V94+). |
+| [SPEZIALKOMMANDO_PLAN.md](SPEZIALKOMMANDO_PLAN.md) | The Spezialkommando-as-second-tenant-kind extension on top of the multi-Squadron baseline (V95+). |
 | [Styleguide.md](Styleguide.md) | "DAS KARTELL" Corporate Design Manual — brand colors, typography (`Ethnocentric`, `Lato`), department palette, visual rules. |
 | [docs/deployment.md](docs/deployment.md) | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting. |
 | [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist. |

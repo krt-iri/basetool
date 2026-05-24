@@ -6,7 +6,7 @@
 -- (not org_unit) precisely so SKs cannot own promotion data — the application
 -- layer enforces this by typing `PromotionTopic.owningSquadron` as Squadron and
 -- ArchUnit rule §8.2 (`promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit`)
--- prevents a careless type-loosening. But once V98 made `squadron` a one-way
+-- prevents a careless type-loosening. But once V100 made `squadron` a one-way
 -- mirror of `org_unit` (R2.b) the column resolves against any org_unit row's
 -- primary key — a direct INSERT/UPDATE issued by a future ad-hoc SQL or by a
 -- mis-typed entity refactor could place an SK UUID there without tripping any
