@@ -24,7 +24,7 @@
 --
 -- Tables touched: mission, operation, ship, inventory_item, refinery_order,
 -- job_order (creating + requesting). promotion_topic is intentionally NOT
--- touched — promotion data stays Squadron-only per Plan §3.3 + the V99
+-- touched — promotion data stays Squadron-only per Plan §3.3 + the V101
 -- guard_promotion_topic_owner_kind trigger.
 -- =============================================================================
 

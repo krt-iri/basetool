@@ -1,12 +1,12 @@
 # R8 Destructive Cleanup — Roadmap
 
 Companion document to `SPEZIALKOMMANDO_PLAN.md` §10 PR-6 / PR-7. Tracks the
-steps still pending after the R8 follow-up sweep ships V99 (NOT NULL tighten +
+steps still pending after the R8 follow-up sweep ships V100 (NOT NULL tighten +
 legacy NULL-allowance) and the parallel `resolveOrgUnitForPickerOutput` method
 that unblocks SK aggregate ownership.
 
-> **Status (2026-05-23):** all six steps shipped. V99 + new resolver,
-> caller migration, lifecycle-hook drop, V100/V101/V102 destructive schema
+> **Status (2026-05-23):** all six steps shipped. V100 + new resolver,
+> caller migration, lifecycle-hook drop, V101/V102/V103 destructive schema
 > drops, and the corresponding Java cleanup all landed. The legacy
 > `squadron` table is gone; every reference to a Squadron now resolves via
 > `org_unit` (kind='SQUADRON').
@@ -15,7 +15,7 @@ that unblocks SK aggregate ownership.
 
 ## What R8 already shipped
 
-- **V99 migration**: `owning_org_unit_id` becomes NOT NULL on every staffel-
+- **V100 migration**: `owning_org_unit_id` becomes NOT NULL on every staffel-
   scoped aggregate; `owning_squadron_id` becomes nullable. SK-owned aggregates
   are now representable at the DB layer.
 - **`OwnerScopeService.resolveOrgUnitForPickerOutput`**: new method returning
@@ -25,7 +25,7 @@ that unblocks SK aggregate ownership.
 - **Lifecycle hook still in place**: every aggregate entity's `@PrePersist /
   @PreUpdate / @PostLoad` `syncOwnerFields()` keeps `owningSquadron` and
   `owningOrgUnit` in lockstep for Squadron-owned rows. SK-owned rows have a
-  null legacy column — which V99 makes legal.
+  null legacy column — which V100 makes legal.
 
 ## Still pending — order of operations
 
@@ -58,7 +58,7 @@ schema drop trivial.
 `JobOrder` has the same setup for the two creating/requesting fields; remove
 both legacy fields.
 
-### Step 3 — V100: drop legacy aggregate columns
+### Step 3 — V101: drop legacy aggregate columns
 
 ```sql
 ALTER TABLE mission        DROP COLUMN owning_squadron_id;
@@ -89,7 +89,7 @@ After the migration, drop the `User.squadron` field + every reference to
 `User.isLogistician` / `User.isMissionManager`. The JWT converter's
 "memberships.isEmpty()" fallback comes out in the same PR.
 
-### Step 5 — V101: drop `app_user` legacy columns
+### Step 5 — V102: drop `app_user` legacy columns
 
 ```sql
 ALTER TABLE app_user DROP COLUMN squadron_id;
@@ -99,11 +99,11 @@ ALTER TABLE app_user DROP COLUMN is_mission_manager;
 
 Pre-merge gate: Step 4 must be in prod. Take a full DB backup.
 
-### Step 6 — V102: drop legacy `squadron` table + V97 trigger
+### Step 6 — V103: drop legacy `squadron` table + V98 trigger
 
 Pre-condition: `promotion_topic.owning_squadron_id` must be migrated to
 `promotion_topic.owning_org_unit_id` with a CHECK / FK that resolves against
-the `org_unit` table (kind=SQUADRON). The V98 trigger already enforces the
+the `org_unit` table (kind=SQUADRON). The V99 trigger already enforces the
 SQUADRON-only contract at INSERT/UPDATE time; the column rename + FK retarget
 is the missing piece.
 
@@ -123,12 +123,12 @@ introduced once Hibernate single-table inheritance is the only path).
       not `.setOwningSquadron`. `resolveSquadronForPickerOutput` deprecated.
 - [x] Step 2 PR: `git grep "syncOwnerFields"` returns nothing. Every test that
       previously asserted on `entity.getOwningSquadron()` is updated.
-- [x] Step 3 PR: V100 applied against a `.env.test` snapshot of prod schema.
+- [x] Step 3 PR: V101 applied against a `.env.test` snapshot of prod schema.
       Backup confirmed.
 - [x] Step 4 PR: `git grep "user.setSquadron\|user.getSquadron"` returns
       nothing in `main` source set. JWT converter's legacy branch removed.
-- [x] Step 5 PR: V101 applied. Backup confirmed.
-- [x] Step 6 PR: `promotion_topic` migrated. V102 applied. Backup confirmed.
+- [x] Step 5 PR: V102 applied. Backup confirmed.
+- [x] Step 6 PR: `promotion_topic` migrated. V103 applied. Backup confirmed.
 
 ## Why not all in one PR?
 

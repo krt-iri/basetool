@@ -31,7 +31,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * {@code owningSquadronId} is {@code null} (admin "all squadrons" mode). Operations are a
    * strict-staffel aggregate.
    */
-  @EntityGraph(attributePaths = {"owningSquadron"})
+  @EntityGraph(attributePaths = {"owningOrgUnit"})
   @org.springframework.data.jpa.repository.Query(
       "SELECT o FROM Operation o WHERE ("
           + "  :isAdminAllScope = true"
@@ -98,7 +98,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @param pageable page request
    * @return paged matching operations
    */
-  @EntityGraph(attributePaths = {"owningSquadron"})
+  @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
       "SELECT o FROM Operation o WHERE ("
           + "  :isAdminAllScope = true"

@@ -3,7 +3,7 @@
 -- legacy owning_squadron_id columns + JobOrder's two creating/requesting_squadron_id columns
 -- on the staffel-scoped aggregates. After R9 Step 1 the service-layer no longer writes them
 -- directly (uses owning_org_unit_id), after Step 2 the entity dual-write lifecycle hook is
--- removed, and V100 already relaxed the NOT NULL constraint, so dropping the columns is now
+-- removed, and V102 already relaxed the NOT NULL constraint, so dropping the columns is now
 -- safe.
 --
 -- *** REQUIRES R9 STEPS 1 + 2 IN PROD + FULL DB BACKUP ***
@@ -12,7 +12,7 @@
 -- the Squadron-only rows can be restored by joining on org_unit).
 --
 -- promotion_topic.owning_squadron_id is intentionally NOT touched — promotion data stays
--- Squadron-only per Plan §3.3 + the V99 guard trigger.
+-- Squadron-only per Plan §3.3 + the V101 guard trigger.
 -- =============================================================================
 
 -- 1. Drop foreign-key constraints first to avoid ALTER COLUMN ordering issues. The names
