@@ -1141,4 +1141,154 @@ class ArchitectureTest {
       }
     };
   }
+
+  // ---------------------------------------------------------------------------------
+  // Multi-user signup concurrency guards
+  // ---------------------------------------------------------------------------------
+
+  private static final String OPTIMISTIC_LOCK = "org.hibernate.annotations.OptimisticLock";
+  private static final String MISSION_FQN = "de.greluc.krt.iri.basetool.backend.model.Mission";
+  private static final String MISSION_REPOSITORY_FQN =
+      "de.greluc.krt.iri.basetool.backend.repository.MissionRepository";
+  private static final String MISSION_SERVICE_FQN =
+      "de.greluc.krt.iri.basetool.backend.service.MissionService";
+
+  /**
+   * The multi-user signup concurrency contract (see the inline comment block in {@link
+   * de.greluc.krt.iri.basetool.backend.service.MissionService#addParticipant} and the {@code
+   * MissionParticipantConcurrencyTest} integration test): adding or removing a participant must
+   * never bump {@link de.greluc.krt.iri.basetool.backend.model.Mission#getVersion()}, so concurrent
+   * "Anmelden" clicks on the same mission cannot trigger an {@code
+   * ObjectOptimisticLockingFailureException} on the parent row. The annotation that enforces this
+   * at the Hibernate level is {@code @OptimisticLock(excluded = true)} on the {@code participants}
+   * collection in {@code Mission}. Removing the annotation — or flipping {@code excluded} to {@code
+   * false} — silently re-opens the 409-on-concurrent-signup regression class, which only surfaces
+   * in prod under contention. This rule fails the build the moment that annotation drifts.
+   */
+  @Test
+  void missionParticipantsCollectionMustExcludeOptimisticLock() {
+    classes()
+        .that()
+        .haveFullyQualifiedName(MISSION_FQN)
+        .should(missionParticipantsFieldHasOptimisticLockExcluded())
+        .because(
+            "Mission.participants must remain @OptimisticLock(excluded = true) so concurrent"
+                + " participant signups do not bump Mission.version. Removing the annotation"
+                + " re-opens 409s on parallel \"Anmelden\" clicks — see"
+                + " MissionParticipantConcurrencyTest and the comment block on"
+                + " MissionService.addParticipant.")
+        .check(CLASSES);
+  }
+
+  /**
+   * Pins the second half of the signup concurrency contract: the {@code addParticipant} overloads
+   * in {@link de.greluc.krt.iri.basetool.backend.service.MissionService} must never call {@code
+   * missionRepository.save(...)} (or {@code saveAndFlush}). The save is the only realistic way to
+   * dirty the parent {@code mission} row from inside this method — and a dirty parent row would
+   * issue an {@code UPDATE mission} statement that, under contention, races between threads and
+   * surfaces as {@code ObjectOptimisticLockingFailureException}. Persisting the new participant via
+   * {@code missionParticipantRepository.save(participant)} is the supported path; Hibernate's
+   * cascade + dirty-check on the inverse-side collection handles the rest without touching the
+   * parent row.
+   *
+   * <p>The rule is structural: it walks the bytecode of every method named {@code addParticipant}
+   * declared on {@code MissionService} and rejects any direct call into {@code
+   * MissionRepository#save*}. False positives (e.g. a future legitimate reason to re-save the
+   * mission inside the signup flow) should be carved out by renaming the method or by extracting
+   * the save into a dedicated helper that is itself documented.
+   */
+  @Test
+  void missionServiceAddParticipantMustNotSaveMission() {
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .haveFullyQualifiedName(MISSION_SERVICE_FQN)
+        .and()
+        .haveName("addParticipant")
+        .should(notCallMissionRepositorySave())
+        .because(
+            "MissionService.addParticipant must not bump Mission.version under concurrent signups"
+                + " — calling missionRepository.save(mission) inside the flow would dirty the"
+                + " parent row and re-open 409s on parallel \"Anmelden\" clicks. Persist the new"
+                + " participant via missionParticipantRepository.save(participant) and let"
+                + " Hibernate's cascade handle the rest. See"
+                + " MissionParticipantConcurrencyTest and the comment block on"
+                + " MissionService.addParticipant.")
+        .check(CLASSES);
+  }
+
+  private static ArchCondition<JavaClass> missionParticipantsFieldHasOptimisticLockExcluded() {
+    return new ArchCondition<JavaClass>(
+        "declare Mission.participants with @OptimisticLock(excluded = true)") {
+      @Override
+      public void check(JavaClass clazz, ConditionEvents events) {
+        var participantsField =
+            clazz.getFields().stream()
+                .filter(f -> "participants".equals(f.getName()))
+                .findFirst()
+                .orElse(null);
+        if (participantsField == null) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  clazz,
+                  clazz.getFullName()
+                      + " — `participants` field is missing entirely; the signup concurrency"
+                      + " contract assumes Mission has a participants collection annotated with"
+                      + " @OptimisticLock(excluded = true)."));
+          return;
+        }
+        if (!participantsField.isAnnotatedWith(OPTIMISTIC_LOCK)) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  participantsField,
+                  participantsField.getFullName()
+                      + " — missing @OptimisticLock annotation; adding a participant would dirty"
+                      + " the parent collection and bump Mission.version, breaking concurrent"
+                      + " signups."));
+          return;
+        }
+        JavaAnnotation<?> annotation = participantsField.getAnnotationOfType(OPTIMISTIC_LOCK);
+        boolean excluded =
+            annotation
+                .tryGetExplicitlyDeclaredProperty("excluded")
+                .map(value -> Boolean.TRUE.equals(value))
+                .orElse(false);
+        if (!excluded) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  participantsField,
+                  participantsField.getFullName()
+                      + " — @OptimisticLock is present but `excluded` is not explicitly set to"
+                      + " true. Concurrent signups will bump Mission.version and trigger 409s."
+                      + " Restore `@OptimisticLock(excluded = true)`."));
+        }
+      }
+    };
+  }
+
+  private static ArchCondition<JavaMethod> notCallMissionRepositorySave() {
+    return new ArchCondition<JavaMethod>("not invoke MissionRepository#save* from its body") {
+      @Override
+      public void check(JavaMethod method, ConditionEvents events) {
+        method.getMethodCallsFromSelf().stream()
+            .filter(
+                call -> MISSION_REPOSITORY_FQN.equals(call.getTarget().getOwner().getFullName()))
+            .filter(call -> call.getTarget().getName().startsWith("save"))
+            .forEach(
+                call ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            method,
+                            method.getFullName()
+                                + " calls "
+                                + call.getTarget().getOwner().getSimpleName()
+                                + "#"
+                                + call.getTarget().getName()
+                                + " — that dirties the parent Mission row and re-opens"
+                                + " optimistic-locking failures on concurrent participant"
+                                + " signups. Persist the new participant via"
+                                + " missionParticipantRepository.save(participant) instead.")));
+      }
+    };
+  }
 }
