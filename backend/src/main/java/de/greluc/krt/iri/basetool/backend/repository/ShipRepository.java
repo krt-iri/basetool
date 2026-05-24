@@ -68,14 +68,14 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
   List<Ship> findByOwnerId(UUID ownerId);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
@@ -83,7 +83,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * configured relations via {@code @EntityGraph}.
    */
   @Override
-  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
   Page<Ship> findAll(Pageable pageable);
 
   /**
@@ -92,7 +92,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * (admin "all squadrons" mode). Eagerly fetches {@code shipType}, {@code location} and {@code
    * owner} via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
   @Query(
       "SELECT s FROM Ship s WHERE (:owningSquadronId IS NULL OR s.owningSquadron.id ="
           + " :owningSquadronId)")
@@ -119,7 +119,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Derived Spring-Data query - returns entities matching {@code ShipTypeIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location"})
+  @EntityGraph(attributePaths = {"owner", "location", "owningSquadron"})
   List<Ship> findByShipTypeIn(List<de.greluc.krt.iri.basetool.backend.model.ShipType> shipTypes);
 
   /**

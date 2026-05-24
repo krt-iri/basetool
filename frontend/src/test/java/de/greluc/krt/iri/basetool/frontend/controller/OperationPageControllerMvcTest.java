@@ -76,7 +76,8 @@ class OperationPageControllerMvcTest {
     // bug rendered this verbatim in the table cell — we now expect the
     // German translation "GEPLANT".
     OperationDto op =
-        new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null);
+        new OperationDto(
+            UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
@@ -100,7 +101,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void operationsList_rendersOperationStatusViaI18n_inEnglish() throws Exception {
     OperationDto op =
-        new OperationDto(UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L, null);
+        new OperationDto(
+            UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
     when(backendApiClient.get(
@@ -127,7 +129,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "SQUADRON_MEMBER")
   void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -144,7 +147,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void operationDetail_missionManager_seesEnabledFormAndSaveButton() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -183,7 +187,7 @@ class OperationPageControllerMvcTest {
 
     // Operation: status COMPLETED → German "ABGESCHLOSSEN".
     OperationDto operation =
-        new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null);
+        new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null, null, null);
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
         .thenReturn(operation);
@@ -248,7 +252,8 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     // Backend signals at least one mission still lacks actualStartTime/EndTime.
     stubDetailEndpoints(
-        opId, new OperationDto(opId, "Ongoing Op", "", "ACTIVE", null, 0L, Boolean.TRUE));
+        opId,
+        new OperationDto(opId, "Ongoing Op", "", "ACTIVE", null, 0L, null, null, Boolean.TRUE));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -265,7 +270,8 @@ class OperationPageControllerMvcTest {
       throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
-        opId, new OperationDto(opId, "Closed Op", "", "COMPLETED", null, 0L, Boolean.FALSE));
+        opId,
+        new OperationDto(opId, "Closed Op", "", "COMPLETED", null, 0L, null, null, Boolean.FALSE));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -278,7 +284,8 @@ class OperationPageControllerMvcTest {
   void operationDetail_hidesPreliminaryWarning_whenBackendOmitsFlag() throws Exception {
     UUID opId = UUID.randomUUID();
     // payoutPreliminary == null is treated as "unknown" — banner stays hidden.
-    stubDetailEndpoints(opId, new OperationDto(opId, "Unknown Op", "", "PLANNED", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Unknown Op", "", "PLANNED", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -380,7 +387,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void operationDetail_missionManager_rendersCanUnsetPaidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -395,7 +403,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void operationDetail_officer_rendersCanUnsetPaidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -407,7 +416,8 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void operationDetail_admin_rendersCanUnsetPaidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
-    stubDetailEndpoints(opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null));
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op", "", "ACTIVE", null, 0L, null, null, null));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))

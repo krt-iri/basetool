@@ -9,4 +9,5 @@ public record JobOrderHandoverItemDto(
     MaterialDto material,
     Integer quality,
     Double amount,
+    String locationName,
     Long version) {}

@@ -30,7 +30,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers",
         "handovers.items",
         "handovers.items.material",
-        "assignees"
+        "assignees",
+        "creatingSquadron",
+        "requestingSquadron"
       })
   @Override
   Optional<JobOrder> findById(UUID id);
@@ -46,7 +48,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "materials.material",
         "handovers",
         "handovers.items",
-        "handovers.items.material"
+        "handovers.items.material",
+        "creatingSquadron",
+        "requestingSquadron"
       })
   @Query(
       "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId"
@@ -57,7 +61,15 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "assignees",
+        "handovers",
+        "handovers.items",
+        "creatingSquadron",
+        "requestingSquadron"
+      })
   Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
 
   /**
@@ -79,7 +91,15 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param pageable page request.
    * @return paged job-orders matching both predicates.
    */
-  @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "assignees",
+        "handovers",
+        "handovers.items",
+        "creatingSquadron",
+        "requestingSquadron"
+      })
   @Query(
       "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND (:squadronId IS NULL OR"
           + " o.creatingSquadron.id = :squadronId OR o.requestingSquadron.id = :squadronId)")
@@ -98,7 +118,15 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param pageable page request.
    * @return paged job-orders.
    */
-  @EntityGraph(attributePaths = {"materials", "assignees", "handovers", "handovers.items"})
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "assignees",
+        "handovers",
+        "handovers.items",
+        "creatingSquadron",
+        "requestingSquadron"
+      })
   @Query(
       "SELECT o FROM JobOrder o WHERE :squadronId IS NULL OR o.creatingSquadron.id = :squadronId"
           + " OR o.requestingSquadron.id = :squadronId")

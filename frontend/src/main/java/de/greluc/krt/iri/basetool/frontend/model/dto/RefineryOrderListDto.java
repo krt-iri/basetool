@@ -19,6 +19,7 @@ public record RefineryOrderListDto(
     RefiningMethodDto refiningMethod,
     String status,
     List<RefineryGoodDto> goods,
+    SquadronReferenceDto owningSquadron,
     Long version) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.

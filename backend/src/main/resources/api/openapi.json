@@ -30895,6 +30895,9 @@
               "$ref" : "#/components/schemas/RefineryGoodDto"
             }
           },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
