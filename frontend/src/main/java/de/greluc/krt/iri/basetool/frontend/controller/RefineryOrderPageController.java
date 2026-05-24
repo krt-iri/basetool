@@ -426,9 +426,21 @@ public class RefineryOrderPageController {
                 storeItem.setMaterialId(good.outputMaterial().id());
                 storeItem.setMaterialName(good.outputMaterial().name());
 
+                // The output quantity from the refinery good is stored as units (centi-SCU)
+                // when the material is SCU-measured: 100 units == 1 SCU. We divide by 100 to
+                // get the SCU value the user will enter in the store dialog. Default to the
+                // SCU branch whenever the material's quantityType is anything other than the
+                // explicit string "PIECE": UEX-imported materials historically have a NULL
+                // quantity_type (the UEX sync never set the field — see issue #230), and a
+                // refinery never produces piece-counted goods anyway, so treating "unknown"
+                // as SCU here is both safer (avoids 100x over-booking) and matches the
+                // domain. Backed by the V95 migration that backfills NULL -> 'SCU'.
                 double amount = 0.0;
+                String materialQuantityType = good.outputMaterial().quantityType();
                 if (good.outputQuantity() != null) {
-                  if ("SCU".equals(good.outputMaterial().quantityType())) {
+                  if ("PIECE".equals(materialQuantityType)) {
+                    amount = good.outputQuantity();
+                  } else {
                     java.math.RoundingMode rm;
                     try {
                       rm = java.math.RoundingMode.valueOf(roundingMode);
@@ -439,15 +451,15 @@ public class RefineryOrderPageController {
                         java.math.BigDecimal.valueOf(good.outputQuantity() / 100.0)
                             .setScale(3, rm)
                             .doubleValue();
-                  } else {
-                    amount = good.outputQuantity();
                   }
                   storeItem.setAmountFixed(true);
                 } else {
                   storeItem.setAmountFixed(false);
                 }
                 storeItem.setAmount(amount);
-                storeItem.setQuantityType(good.outputMaterial().quantityType());
+                // Normalize the per-row quantityType the template sees so the unit label
+                // ("(SCU)" / "(Stück)") matches the converted amount above.
+                storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
 
                 storeItem.setQuality(good.quality() != null ? good.quality() : 0);
                 if (orderDto.location() != null) {

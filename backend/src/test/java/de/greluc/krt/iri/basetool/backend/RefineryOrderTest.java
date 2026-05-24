@@ -564,11 +564,13 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     RefineryGood updated = stored.getGoods().iterator().next();
+    // Quantanium is an SCU material (entity defaults to QuantityType.SCU; see issue #230 fix).
+    // The user-entered 42.125 SCU is written back as units (centi-SCU): round(42.125 * 100) = 4213.
     assertEquals(
-        42,
+        4213,
         updated.getOutputQuantity().intValue(),
         "Manuell eingegebene Menge muss zurueck in RefineryGood.outputQuantity geschrieben werden"
-            + " (Units, gerundet)");
+            + " (Units, gerundet; 42.125 SCU -> 4213 Units)");
   }
 
   @Test
