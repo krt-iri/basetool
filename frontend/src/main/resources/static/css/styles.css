@@ -81,17 +81,16 @@ body {
     margin: 0;
     padding: 0;
     /*
-     * Flex column so the JS-relocated footer (moved by sidebar.html to the
-     * end of <body> on DOMContentLoaded) sticks to the bottom of the
-     * viewport on short pages while still flowing naturally after content
-     * on long pages. The width regression that this layout used to cause
-     * on <main> is fixed by the explicit `width: 100%; box-sizing: border-box`
-     * on the <main> rule below — without it, the auto-margins on a flex
-     * item override the stretch default and main collapses to its
-     * intrinsic content width.
+     * `min-height: 100vh` keeps the dark page background painted across the
+     * full viewport even when the content is short. The previous `display:
+     * flex; flex-direction: column` was only there to power a sticky-footer
+     * pattern (`<main flex: 1 0 auto>` grew to push the footer down). The
+     * footer is now `position: fixed; bottom: 0` (see `.krt-footer`), so it
+     * stays anchored to the viewport bottom on every scroll position
+     * regardless of content length — the flex column trick is no longer
+     * needed and is dropped to keep <main>'s normal block-layout width
+     * calculation simple.
      */
-    display: flex;
-    flex-direction: column;
     min-height: 100vh;
 }
 
@@ -217,16 +216,18 @@ nav .links a:hover {
 
 main {
     padding: 2rem;
+    /*
+     * Reserve viewport-bottom space for the fixed footer (see `.krt-footer`).
+     * Without this, the last line of long pages would scroll under the
+     * always-pinned footer and be permanently hidden. The mobile media query
+     * below bumps the reservation because the footer stacks to two rows
+     * (column flex-direction) at <=768px.
+     */
+    padding-bottom: 5rem;
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
     box-sizing: border-box;
-    /*
-     * Push the global footer to the bottom of the viewport on short pages.
-     * `flex: 1 0 auto` makes main grow to fill the remaining flex column
-     * space without shrinking past its content size.
-     */
-    flex: 1 0 auto;
 }
 
 .greeting {
@@ -301,16 +302,20 @@ tr:hover {
  * the sidebar, but a visible footer matches standard web convention so users
  * looking for Impressum / Datenschutz / Nutzungsbedingungen can find them
  * without opening the navigation drawer.
- */
-/*
- * The footer is included from `fragments/sidebar.html` near the top of
- * <body>, before <header> and <main>. Sidebar JS moves the element to be
- * the last child of <body> on DOMContentLoaded so it renders below the
- * content without forcing body into a flex layout (which would break the
- * width calculation of <main { max-width; margin: 0 auto }>).
+ *
+ * The footer is `position: fixed; bottom: 0` so it stays anchored to the
+ * viewport bottom on every scroll position, overlaying the content. The
+ * z-index sits below the sticky header (1000), the sidebar drawer (2000),
+ * modals (3000) and toasts (9999) so those always paint above the footer.
+ * `<main>` reserves vertical space via `padding-bottom: 5rem` (7rem on
+ * mobile) so the last line of long pages is not permanently obscured.
  */
 .krt-footer {
-    margin-top: 2rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
     padding: 1rem 2rem;
     background-color: var(--color-bg-dark-gray);
     border-top: 1px solid var(--color-gray-3);
@@ -343,6 +348,14 @@ tr:hover {
     .krt-footer {
         flex-direction: column;
         align-items: flex-start;
+    }
+    /*
+     * Footer becomes two rows (column flex) on small screens, so <main>
+     * needs more bottom padding to keep the last line of content above the
+     * fixed footer.
+     */
+    main {
+        padding-bottom: 7rem;
     }
 }
 
