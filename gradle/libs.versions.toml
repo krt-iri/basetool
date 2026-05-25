@@ -20,12 +20,12 @@ springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
 asciidoctor = "4.0.5"
 testcontainers = "1.21.4"
-flyway = "12.6.1"
+flyway = "12.6.2"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 # Stay on 1.6.x stable; only 1.7.0.Beta1 is available upstream as of 2026-05.
 resilience4j = "2.4.0"
-bucket4j = "8.18.0"
+bucket4j = "8.19.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.4.2"
@@ -33,7 +33,7 @@ springdocOpenapi = "3.0.3"
 okhttp3 = "5.3.2"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
-openpdf = "3.0.4"
+openpdf = "3.0.5"
 
 [libraries]
 
