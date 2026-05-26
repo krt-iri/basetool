@@ -2,7 +2,7 @@ package de.greluc.krt.iri.basetool.backend.logging;
 
 import de.greluc.krt.iri.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,7 +54,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   private final LoggingProperties loggingProperties;
   private final AuthHelperService authHelperService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   @Override
   protected void doFilterInternal(
@@ -64,11 +64,16 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       throws ServletException, IOException {
     final String correlationId = resolveCorrelationId(request);
     final String userId = resolveUserId();
-    final String squadronId = resolveSquadronId();
+    // R5.e: write the same resolved value into BOTH legacy `squadronId` and new `orgUnitId`
+    // MDC keys for one release so log-pipeline dashboards can migrate at their own pace
+    // (SPEZIALKOMMANDO_PLAN.md R14). The legacy key comes out once downstream consumers have
+    // switched.
+    final String orgUnitId = resolveSquadronId();
 
     MDC.put(loggingProperties.getCorrelationIdMdcKey(), correlationId);
     MDC.put(loggingProperties.getUserIdMdcKey(), userId);
-    MDC.put(loggingProperties.getSquadronIdMdcKey(), squadronId);
+    MDC.put(loggingProperties.getSquadronIdMdcKey(), orgUnitId);
+    MDC.put(loggingProperties.getOrgUnitIdMdcKey(), orgUnitId);
     response.setHeader(loggingProperties.getCorrelationIdHeader(), correlationId);
     try {
       filterChain.doFilter(request, response);
@@ -76,6 +81,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       MDC.remove(loggingProperties.getCorrelationIdMdcKey());
       MDC.remove(loggingProperties.getUserIdMdcKey());
       MDC.remove(loggingProperties.getSquadronIdMdcKey());
+      MDC.remove(loggingProperties.getOrgUnitIdMdcKey());
     }
   }
 
@@ -92,7 +98,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       if (!authHelperService.isAuthenticated()) {
         return ANONYMOUS;
       }
-      return squadronScopeService
+      return ownerScopeService
           .currentSquadronId()
           .map(UUID::toString)
           .orElseGet(() -> authHelperService.isAdmin() ? "all" : "none");

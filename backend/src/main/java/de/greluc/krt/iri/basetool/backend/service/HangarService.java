@@ -48,7 +48,7 @@ public class HangarService {
   private final MissionUnitRepository missionUnitRepository;
   private final ShipMapper shipMapper;
   private final EntityManager entityManager;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns the paged ship list scoped to the caller's squadron context: admin without an active
@@ -59,8 +59,9 @@ public class HangarService {
    * @return paged list of ships in the caller's squadron context
    */
   public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return shipRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return shipRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -83,7 +84,8 @@ public class HangarService {
     ship.setInsurance(dto.insurance());
     ship.setFitted(dto.fitted());
     ship.setOwner(user);
-    ship.setOwningSquadron(user.getSquadron());
+    ship.setOwningSquadron(
+        ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId()));
     ship.setShipType(
         shipTypeRepository
             .findById(dto.shipTypeId())
@@ -120,8 +122,10 @@ public class HangarService {
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    Page<Object[]> p = shipRepository.countShipsByType(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Page<Object[]> p =
+        shipRepository.countShipsByType(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
 
     List<de.greluc.krt.iri.basetool.backend.model.ShipType> types =
         includeOwnerDetails
@@ -283,7 +287,8 @@ public class HangarService {
    */
   @Transactional
   public void resetAllFittedStatus() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    shipRepository.resetAllFittedScoped(owningSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    shipRepository.resetAllFittedScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 }

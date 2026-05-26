@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.model.form;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /**
  * Form-binding object for mission input.
@@ -18,6 +19,12 @@ import jakarta.validation.constraints.Size;
  * javascript:fetch(document.cookie)} stored-XSS payload — Thymeleaf's {@code th:href} only
  * HTML-escapes the value, not the scheme. The backend mirrors the same constraint on its DTO so
  * both layers reject the payload independently (audit finding H-1).
+ *
+ * <p>{@code owningOrgUnitId} (R5.d.d) is the owner-picker output: when the caller belongs to more
+ * than one OrgUnit, the picker offers each membership and the chosen id lands here. The backend
+ * service validates it via {@code OwnerScopeService.resolveSquadronForPickerOutput} and rejects
+ * Spezialkommando selections with 400 until the destructive cleanup release loosens NOT NULL on the
+ * legacy {@code owning_squadron_id} column. {@code null} preserves the legacy stamping path.
  */
 public record MissionForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
@@ -36,4 +43,5 @@ public record MissionForm(
     Long version,
     Long coreVersion,
     Long scheduleVersion,
-    Long flagsVersion) {}
+    Long flagsVersion,
+    UUID owningOrgUnitId) {}

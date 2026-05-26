@@ -40,7 +40,7 @@ public class PromotionCategoryService {
   private final PromotionCategoryRepository repository;
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryMapper mapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns a paginated slice of every {@link PromotionCategoryResponse} across all topics. The
@@ -51,7 +51,7 @@ public class PromotionCategoryService {
    * @return a page of categories
    */
   public Page<PromotionCategoryResponse> list(@NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
     return repository.findAll(pageable).map(mapper::toResponse);
@@ -67,7 +67,7 @@ public class PromotionCategoryService {
    */
   public Page<PromotionCategoryResponse> listByTopic(
       @NotNull UUID topicId, @NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
     return repository.findAllByTopicId(topicId, pageable).map(mapper::toResponse);
@@ -81,7 +81,7 @@ public class PromotionCategoryService {
    * @return the topic's categories in display order
    */
   public List<PromotionCategoryResponse> listAllByTopic(@NotNull UUID topicId) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
     return repository.findAllByTopicIdOrderBySortOrderAsc(topicId).stream()
@@ -97,7 +97,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if no category exists for that id
    */
   public PromotionCategoryResponse get(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -112,7 +112,7 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic topic =
         topicRepository
             .findById(request.topicId())
@@ -144,7 +144,7 @@ public class PromotionCategoryService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionCategoryResponse update(
       @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());
     if (!entity.getVersion().equals(request.version())) {
@@ -175,7 +175,7 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());
     repository.delete(entity);
@@ -193,7 +193,7 @@ public class PromotionCategoryService {
     if (topic == null || topic.getOwningSquadron() == null) {
       return;
     }
-    if (!squadronScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
+    if (!ownerScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing this promotion topic's children");
     }

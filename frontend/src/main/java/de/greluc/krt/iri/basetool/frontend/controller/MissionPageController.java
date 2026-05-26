@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateMissionRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;
@@ -10,6 +11,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto;
@@ -422,7 +424,9 @@ public class MissionPageController {
                 mission.version(),
                 mission.coreVersion(),
                 mission.scheduleVersion(),
-                mission.flagsVersion()));
+                mission.flagsVersion(),
+                // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
+                null));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
@@ -1053,7 +1057,8 @@ public class MissionPageController {
       model.addAttribute(
           "missionForm",
           new MissionForm(
-              "", "", "", "PLANNED", "", "", "", "", "", false, null, null, null, null, null));
+              "", "", "", "PLANNED", "", "", "", "", "", false, null, null, null, null, null,
+              null));
     }
     model.addAttribute("isNew", true);
     model.addAttribute(
@@ -1063,7 +1068,38 @@ public class MissionPageController {
             null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
+    model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "mission-detail";
+  }
+
+  /**
+   * Fetches the {@link OrgUnitMembershipOptionDto} list that drives the R5.d.d owner-picker on the
+   * mission-create form. Mission creation has no explicit owner selector — the caller is the
+   * implicit owner — so the picker reflects the caller's own memberships, not a separately-chosen
+   * owner's. Falls back to an empty list when the lookup fails (the fragment collapses to a hidden
+   * state for an empty option list).
+   *
+   * @param principal authenticated OIDC user; the membership lookup uses {@code /api/v1/users/me}
+   *     to resolve the caller's id without forcing the JWT subject through a UUID parse.
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
+    if (principal == null) {
+      return List.of();
+    }
+    try {
+      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      if (me == null || me.id() == null) {
+        return List.of();
+      }
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch memberships for mission-create owner-picker", e);
+      return List.of();
+    }
   }
 
   /**
@@ -1113,40 +1149,20 @@ public class MissionPageController {
                   null)
               : null;
 
-      MissionDto missionDto =
-          new MissionDto(
-              null, // id
-              form.name(), // name
-              form.description(), // description
-              form.calendarLink(), // calendarLink
-              form.status(), // status
-              meetingTime, // meetingTime
-              plannedStartTime, // plannedStartTime
-              null, // actualStartTime
-              plannedEndTime, // plannedEndTime
-              null, // actualEndTime
-              form.isInternal(), // isInternal
-              null, // participants
-              null, // assignedUnits
-              null, // frequencies
-              null, // subMissions
-              null, // inventoryEntries
-              null, // refineryOrders
-              operation, // operation
-              null, // owner
-              null, // managers
-              null, // canEdit
-              null, // canManageManagers
-              null, // version
-              null, // coreVersion (server-assigned)
-              null, // scheduleVersion (server-assigned)
-              null, // flagsVersion (server-assigned)
-              0, // checkedInParticipants
-              0, // registeredParticipants
-              null // owningSquadron (server-assigned)
-              );
+      CreateMissionRequest createRequest =
+          new CreateMissionRequest(
+              form.name(),
+              form.description(),
+              form.calendarLink(),
+              form.status(),
+              meetingTime,
+              plannedStartTime,
+              plannedEndTime,
+              form.isInternal(),
+              operation != null ? operation.id() : null,
+              form.owningOrgUnitId());
 
-      backendApiClient.post("/api/v1/missions", missionDto, Void.class);
+      backendApiClient.post("/api/v1/missions", createRequest, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Create mission failed", e);

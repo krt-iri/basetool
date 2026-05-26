@@ -36,7 +36,7 @@ public class PromotionLevelContentService {
   private final PromotionLevelContentRepository repository;
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns a paginated slice of every {@link PromotionLevelContentResponse} across all categories.
@@ -47,7 +47,7 @@ public class PromotionLevelContentService {
    * @return a page of level contents
    */
   public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
     return repository.findAll(pageable).map(mapper::toResponse);
@@ -62,7 +62,7 @@ public class PromotionLevelContentService {
    * @return the category's level contents in display order
    */
   public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
     return repository.findAllByCategoryIdOrderByLevel(categoryId).stream()
@@ -78,7 +78,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if no level content exists for that id
    */
   public PromotionLevelContentResponse get(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     return mapper.toResponse(load(id));
   }
 
@@ -93,7 +93,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentCreateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
             .findById(request.categoryId())
@@ -126,7 +126,7 @@ public class PromotionLevelContentService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentUpdateRequest request) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());
     if (!entity.getVersion().equals(request.version())) {
@@ -157,7 +157,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public void delete(@NotNull UUID id) {
-    squadronScopeService.assertPromotionFeatureEnabled();
+    ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());
     repository.delete(entity);
@@ -177,7 +177,7 @@ public class PromotionLevelContentService {
         || category.getTopic().getOwningSquadron() == null) {
       return;
     }
-    if (!squadronScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
+    if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing level contents of this scope");
     }

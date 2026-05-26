@@ -72,7 +72,7 @@ class MissionServiceLifecycleTest {
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private UserService userService;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private MissionService service;
 
@@ -440,22 +440,26 @@ class MissionServiceLifecycleTest {
 
   @Test
   void findAllActiveReference_delegatesToRepository() {
-    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.empty());
-    when(missionRepository.findAllActiveReference(null)).thenReturn(java.util.List.of());
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(missionRepository.findAllActiveReference(true, null, java.util.Set.of()))
+        .thenReturn(java.util.List.of());
 
     assertNotNull(service.findAllActiveReference());
-    verify(missionRepository).findAllActiveReference(null);
+    verify(missionRepository).findAllActiveReference(true, null, java.util.Set.of());
   }
 
   @Test
   void findAllActiveReference_passesCurrentSquadronIdToRepository() {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
-    when(squadronScopeService.currentSquadronId()).thenReturn(java.util.Optional.of(squadronId));
-    when(missionRepository.findAllActiveReference(squadronId)).thenReturn(java.util.List.of());
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
+    when(missionRepository.findAllActiveReference(false, squadronId, java.util.Set.of()))
+        .thenReturn(java.util.List.of());
 
     service.findAllActiveReference();
 
-    verify(missionRepository).findAllActiveReference(squadronId);
+    verify(missionRepository).findAllActiveReference(false, squadronId, java.util.Set.of());
   }
 
   // ---------------------------------------------------------------

@@ -201,7 +201,8 @@ class InventoryItemControllerTest {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
-        new InventoryItemCreateDto(null, materialId, locationId, 750, 25.0, false, null, null);
+        new InventoryItemCreateDto(
+            null, materialId, locationId, 750, 25.0, false, null, null, null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -229,6 +230,7 @@ class InventoryItemControllerTest {
             25.0,
             false,
             null,
+            null,
             null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -251,7 +253,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L);
+        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -271,7 +273,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L);
+        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
     when(inventoryItemService.bookOutInventoryItem(itemId, bookOutDto, ownerId, true))

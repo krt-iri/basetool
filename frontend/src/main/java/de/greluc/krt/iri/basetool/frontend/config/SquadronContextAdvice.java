@@ -1,8 +1,10 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
 import de.greluc.krt.iri.basetool.frontend.controller.MeFrontendController;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -76,13 +78,26 @@ public class SquadronContextAdvice {
     if (!authHelper.isAuthenticated()) {
       return null;
     }
-    if (authHelper.isAdmin()) {
-      HttpSession session = request.getSession(false);
-      if (session == null) {
-        return null;
+    HttpSession session = request.getSession(false);
+    if (session != null) {
+      // R5.e: prefer the new session key; fall back to the legacy one so admin sessions
+      // stored under the old name during deploy keep working. Same dual-read pattern as
+      // ActiveSquadronContextFilter.
+      UUID fromSession =
+          de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
+              session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
+      if (fromSession == null) {
+        fromSession =
+            de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
+                session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
       }
-      return de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext.coerce(
-          session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
+      if (fromSession != null) {
+        return fromSession;
+      }
+    }
+    if (authHelper.isAdmin()) {
+      // Admin without an active session pin → all-scopes mode, no badge.
+      return null;
     }
     try {
       ActiveSquadronResponse resp =
@@ -139,6 +154,12 @@ public class SquadronContextAdvice {
     if (!authHelper.isAuthenticated()) {
       return List.of();
     }
+    // R5.e: kept identical to the pre-R5.e semantics — load the full Squadron catalogue for
+    // every authenticated caller. The {@link #activeSquadron} dereference and the per-squadron
+    // {@code promotionEnabled} gate downstream both read from this list, so a non-admin narrowing
+    // would break the {@code SquadronContextAdvice.activeSquadron} resolution for non-admin
+    // pages. The new sidebar switcher reads {@link #availableOrgUnits} instead — the two
+    // attributes coexist with disjoint purposes.
     try {
       PageResponse<SquadronDto> page =
           backendApiClient.get(
@@ -146,6 +167,102 @@ public class SquadronContextAdvice {
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
+      return List.of();
+    }
+  }
+
+  /**
+   * R5.e — list of {@link OrgUnitMembershipOptionDto} that the caller can switch their active scope
+   * to. Replaces {@link #availableSquadrons()} for the post-R5.e sidebar switcher: admins see the
+   * full Squadron + SpecialCommand catalogue; non-admins see only the OrgUnits they are a member of
+   * (Staffel + every SK membership). The switcher template hides itself when this list has fewer
+   * than two entries — no choice to offer means no UI noise (plan §7.2).
+   *
+   * <p>Backend round-trips:
+   *
+   * <ul>
+   *   <li>Admin: still uses {@code /api/v1/squadrons} (Staffel-only today) merged with {@code
+   *       /api/v1/special-commands}. Both calls are paginated to {@code size=1000} which is
+   *       generous for the foreseeable OrgUnit population.
+   *   <li>Non-admin: uses the lean {@code /api/v1/users/{id}/memberships} that R5.d.a introduced
+   *       for the picker fragment. Reuses the existing wire shape so no new endpoint is needed.
+   * </ul>
+   *
+   * <p>Failures degrade silently to an empty list — the switcher then hides itself rather than
+   * 500'ing the sidebar render.
+   *
+   * @return the OrgUnit options visible in the switcher; never {@code null}.
+   */
+  @ModelAttribute("availableOrgUnits")
+  public List<OrgUnitMembershipOptionDto> availableOrgUnits() {
+    if (!authHelper.isAuthenticated()) {
+      return List.of();
+    }
+    if (authHelper.isAdmin()) {
+      return loadAdminOrgUnitCatalogue();
+    }
+    return loadCallerMemberships();
+  }
+
+  /**
+   * Admin path of {@link #availableOrgUnits()} — concatenates the Squadron catalogue with the
+   * SpecialCommand catalogue. Both lists are paginated server-side; we ask for {@code size=1000}
+   * which exceeds the foreseeable OrgUnit count by an order of magnitude.
+   *
+   * @return Squadron + SK catalogue, never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> loadAdminOrgUnitCatalogue() {
+    java.util.List<OrgUnitMembershipOptionDto> combined = new java.util.ArrayList<>();
+    try {
+      PageResponse<SquadronDto> squadrons =
+          backendApiClient.get(
+              "/api/v1/squadrons?size=1000&sort=name,asc", new ParameterizedTypeReference<>() {});
+      if (squadrons != null && squadrons.content() != null) {
+        for (SquadronDto s : squadrons.content()) {
+          combined.add(new OrgUnitMembershipOptionDto(s.id(), s.name(), s.shorthand(), "SQUADRON"));
+        }
+      }
+    } catch (Exception ex) {
+      log.debug("Failed to load Squadron catalogue for admin switcher", ex);
+    }
+    try {
+      PageResponse<SquadronDto> specialCommands =
+          backendApiClient.get(
+              "/api/v1/special-commands?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<>() {});
+      if (specialCommands != null && specialCommands.content() != null) {
+        for (SquadronDto sk : specialCommands.content()) {
+          combined.add(
+              new OrgUnitMembershipOptionDto(
+                  sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND"));
+        }
+      }
+    } catch (Exception ex) {
+      log.debug("Failed to load SpecialCommand catalogue for admin switcher", ex);
+    }
+    return combined;
+  }
+
+  /**
+   * Non-admin path of {@link #availableOrgUnits()} — reads the caller's memberships via the lean
+   * R5.d.a endpoint. One round-trip to {@code /api/v1/users/me} to resolve the principal's id, then
+   * one to {@code /api/v1/users/{id}/memberships}; the second call already returns the Staffel +
+   * every SK membership in one shot.
+   *
+   * @return the caller's memberships, never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> loadCallerMemberships() {
+    try {
+      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      if (me == null || me.id() == null) {
+        return List.of();
+      }
+      List<OrgUnitMembershipOptionDto> memberships =
+          backendApiClient.get(
+              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+      return memberships != null ? memberships : List.of();
+    } catch (Exception ex) {
+      log.debug("Failed to load memberships for non-admin switcher", ex);
       return List.of();
     }
   }

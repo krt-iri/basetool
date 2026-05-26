@@ -8,6 +8,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
@@ -80,14 +83,39 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   /**
    * Squadron that owns this inventory item (i.e., the squadron whose physical stock this row
-   * represents). Set at creation time from the caller's active squadron and immutable afterwards.
-   * The direct Lager-View filters by this column; an item linked to a job order via {@link
-   * #jobOrder} additionally surfaces in that order's UI for ALL squadrons (cross-squadron
-   * workspace, see MULTI_SQUADRON_PLAN.md). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
-   * the column to NOT NULL.
+   * represents). Legacy field — kept authoritative during the R4 dual-write soak. The plan-aligned
+   * {@link #owningOrgUnit} mirror field is kept in sync by {@link #syncOwnerFields()} on every
+   * lifecycle event. A later release will drop this field along with the matching DB column.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_squadron_id", nullable = false)
   @ToString.Exclude
   private Squadron owningSquadron;
+
+  /**
+   * Org-unit owner of this inventory item — the R4 dual-write mirror of {@link #owningSquadron}.
+   * Pointed at the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
+   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
+   * window so a missed sync does not break inserts.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "owning_org_unit_id")
+  @ToString.Exclude
+  private OrgUnit owningOrgUnit;
+
+  /**
+   * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
+   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()} for
+   * the rule.
+   */
+  @PrePersist
+  @PreUpdate
+  @PostLoad
+  private void syncOwnerFields() {
+    if (owningSquadron != null) {
+      owningOrgUnit = owningSquadron;
+    } else if (owningOrgUnit instanceof Squadron s) {
+      owningSquadron = s;
+    }
+  }
 }

@@ -8,10 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,8 @@ class ShipInsuranceTest {
 
   @Autowired private UserRepository userRepository;
 
+  @Autowired private SquadronRepository squadronRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -57,6 +61,11 @@ class ShipInsuranceTest {
     user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("pilot1");
+    // R6.b: the owner resolver requires the target user to have at least one org-unit
+    // membership before stamping. The legacy Squadron link is still the authoritative source
+    // for the home Staffel — use the V80-seeded IRIDIUM row so existing test paths work
+    // without pre-populating the org_unit_membership table.
+    user.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     userRepository.save(user);
 
     shipType = new ShipType();
@@ -65,7 +74,7 @@ class ShipInsuranceTest {
   }
 
   private ShipRequestDto createShipWithInsurance(String insurance) {
-    return new ShipRequestDto("Test Ship", shipType.getId(), insurance, null, false, null);
+    return new ShipRequestDto("Test Ship", shipType.getId(), insurance, null, false, null, null);
   }
 
   @Test

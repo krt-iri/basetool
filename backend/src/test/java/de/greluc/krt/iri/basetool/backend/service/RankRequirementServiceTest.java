@@ -35,7 +35,7 @@ class RankRequirementServiceTest {
 
   @Mock private RankRequirementMapper mapper;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -44,9 +44,7 @@ class RankRequirementServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient()
-        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
-        .thenReturn(true);
+    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
   }
 
   @InjectMocks private RankRequirementService service;

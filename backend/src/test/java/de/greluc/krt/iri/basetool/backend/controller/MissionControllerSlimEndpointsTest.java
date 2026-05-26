@@ -57,17 +57,17 @@ class MissionControllerSlimEndpointsTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @MockitoBean
-  private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService squadronScopeService;
+  private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     // The participant-add / participant-slim endpoints are now gated by
-    // `@squadronScopeService.canSeeMission(#id)` (MULTI_SQUADRON_PLAN.md §1: non-internal
+    // `@ownerScopeService.canSeeMission(#id)` (MULTI_SQUADRON_PLAN.md §1: non-internal
     // missions are open to anonymous + cross-staffel callers). These tests target the slim
     // endpoints' branching logic, not the squadron gate — default the gate to true so the
     // controller code path under test actually runs.
-    when(squadronScopeService.canSeeMission(any(UUID.class))).thenReturn(true);
+    when(ownerScopeService.canSeeMission(any(UUID.class))).thenReturn(true);
   }
 
   private SimpleGrantedAuthority officer() {

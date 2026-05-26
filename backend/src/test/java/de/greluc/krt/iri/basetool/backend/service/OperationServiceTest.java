@@ -62,7 +62,7 @@ class OperationServiceTest {
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
   @Mock private SystemSettingService systemSettingService;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private OperationService operationService;
 
@@ -74,15 +74,42 @@ class OperationServiceTest {
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
-    when(squadronScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
+    // No caller resolved → service falls back to currentSquadron(), which we leave empty here
+    // because the test doesn't care about the stamp value, only that the save runs.
+    when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
+    when(ownerScopeService.currentSquadron()).thenReturn(java.util.Optional.empty());
 
     // When
-    Operation result = operationService.createOperation(operation);
+    Operation result = operationService.createOperation(operation, null);
 
     // Then
     assertNotNull(result);
     assertEquals("Test Op", result.getName());
     verify(operationRepository, times(1)).save(operation);
+  }
+
+  @Test
+  void createOperation_withResolvedCallerAndPickerOutput_delegatesToOwnerScopeResolver() {
+    Operation operation = new Operation();
+    operation.setName("Picker Op");
+    operation.setStatus(OperationStatus.PLANNED);
+
+    de.greluc.krt.iri.basetool.backend.model.User caller =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    caller.setId(UUID.randomUUID());
+    de.greluc.krt.iri.basetool.backend.model.Squadron picked =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    picked.setId(UUID.randomUUID());
+    UUID pickedOrgUnitId = picked.getId();
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveSquadronForPickerOutput(caller, pickedOrgUnitId))
+        .thenReturn(picked);
+    when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
+
+    assertEquals(picked, saved.getOwningSquadron(), "picker output must be honoured verbatim");
   }
 
   @Test
@@ -114,7 +141,9 @@ class OperationServiceTest {
     // Given
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
-    when(operationRepository.findAllScoped(null, pageable)).thenReturn(page);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(operationRepository.findAllScoped(true, null, Set.of(), pageable)).thenReturn(page);
 
     // When
     Page<Operation> result = operationService.getAllOperations(pageable);
@@ -132,14 +161,16 @@ class OperationServiceTest {
     @Test
     void forwardsCallerSuppliedStatusList_andResolvesScopeFromSquadronService() {
       // The service must (1) honour the caller's status list verbatim and (2) read the squadron
-      // scope through SquadronScopeService, NOT bypass it - operations are a strict-staffel
+      // scope through OwnerScopeService, NOT bypass it - operations are a strict-staffel
       // aggregate and a missing scope filter would leak other squadrons' operations.
       PageRequest pageable = PageRequest.of(0, 20);
       UUID squadronId = UUID.randomUUID();
       List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
 
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(squadronId));
-      when(operationRepository.searchOperations("alpha", requestedStatus, squadronId, pageable))
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
+      when(operationRepository.searchOperations(
+              "alpha", requestedStatus, false, squadronId, Set.of(), pageable))
           .thenReturn(new PageImpl<>(List.of(new Operation())));
 
       Page<Operation> result =
@@ -147,7 +178,7 @@ class OperationServiceTest {
 
       assertEquals(1, result.getTotalElements());
       verify(operationRepository, times(1))
-          .searchOperations("alpha", requestedStatus, squadronId, pageable);
+          .searchOperations("alpha", requestedStatus, false, squadronId, Set.of(), pageable);
     }
 
     @Test
@@ -156,9 +187,11 @@ class OperationServiceTest {
       // the service must therefore expand `null`/empty to every OperationStatus name so callers
       // can omit the parameter to mean "all statuses".
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
-      when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
+      when(operationRepository.searchOperations(
+              any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, null, pageable);
@@ -175,9 +208,11 @@ class OperationServiceTest {
     void emptyStatusList_alsoFallsBackToFullEnumSet() {
       // `List.of()` is a separate code path from `null` — both must produce the same fallback.
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
-      when(operationRepository.searchOperations(any(), statusCaptor.capture(), any(), any()))
+      when(operationRepository.searchOperations(
+              any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, List.of(), pageable);
@@ -187,18 +222,20 @@ class OperationServiceTest {
 
     @Test
     void adminAllSquadronsMode_passesNullScopeToRepository() {
-      // SquadronScopeService.currentSquadronId() returns Optional.empty() for admins without an
-      // active squadron selection ("all squadrons" mode). The service must translate that to a
-      // null owningSquadronId so the JPA query disables the scope filter.
+      // OwnerScopeService.currentScopePredicate() returns adminAllScope=true for admins without
+      // an active squadron selection ("all squadrons" mode). The service must forward that to the
+      // repository so the JPA query disables the scope filter.
       PageRequest pageable = PageRequest.of(0, 20);
-      when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
-      when(operationRepository.searchOperations(any(), any(), any(), any()))
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
+      when(operationRepository.searchOperations(
+              any(), any(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, List.of("PLANNED"), pageable);
 
       verify(operationRepository, times(1))
-          .searchOperations(null, List.of("PLANNED"), null, pageable);
+          .searchOperations(null, List.of("PLANNED"), true, null, Set.of(), pageable);
     }
   }
 

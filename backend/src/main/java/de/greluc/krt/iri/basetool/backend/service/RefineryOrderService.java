@@ -56,7 +56,7 @@ public class RefineryOrderService {
   private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
   private final RefineryYieldRepository refineryYieldRepository;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Owner-scoped paged list with optional status filter.
@@ -120,11 +120,17 @@ public class RefineryOrderService {
   public Page<RefineryOrder> getAllRefineryOrders(
       List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
       @NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     if (statuses != null && !statuses.isEmpty()) {
-      return refineryOrderRepository.findByStatusInScoped(statuses, owningSquadronId, pageable);
+      return refineryOrderRepository.findByStatusInScoped(
+          statuses,
+          scope.adminAllScope(),
+          scope.activeOrgUnitId(),
+          scope.memberOrgUnitIds(),
+          pageable);
     }
-    return refineryOrderRepository.findAllScoped(owningSquadronId, pageable);
+    return refineryOrderRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -134,8 +140,9 @@ public class RefineryOrderService {
    * @return paged orders across all users
    */
   public Page<RefineryOrder> getAllRefineryOrders(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return refineryOrderRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return refineryOrderRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -162,14 +169,23 @@ public class RefineryOrderService {
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
+   * @param owningOrgUnitId optional R5.d picker output: the {@link
+   *     de.greluc.krt.iri.basetool.backend.model.OrgUnit} on whose stock the new order should land.
+   *     When {@code null}, the service stamps the order owner's home Staffel (legacy behaviour).
+   *     When non-null, must point at an org unit the order owner is a member of — {@link
+   *     OwnerScopeService#resolveSquadronForPickerOutput} performs the validation and rejects
+   *     unknown / foreign / Spezialkommando selections with {@link
+   *     de.greluc.krt.iri.basetool.backend.exception.BadRequestException}.
    * @return the persisted order
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
    *     is unknown
    * @throws de.greluc.krt.iri.basetool.backend.exception.BadRequestException when the chosen
-   *     location does not host a refinery
+   *     location does not host a refinery, or the picker output is not a valid membership of the
+   *     order owner
    */
   @Transactional
-  public RefineryOrder createRefineryOrder(@NotNull UUID userId, @NotNull RefineryOrder order) {
+  public RefineryOrder createRefineryOrder(
+      @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
     User user =
         userRepository
             .findById(userId)
@@ -179,7 +195,8 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
-    order.setOwningSquadron(user.getSquadron());
+    order.setOwningSquadron(
+        ownerScopeService.resolveSquadronForPickerOutput(user, owningOrgUnitId));
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
@@ -534,8 +551,12 @@ public class RefineryOrderService {
                             "JobOrder not found: " + itemDto.jobOrderId()));
       }
 
+      // Pessimistic write lock on the merge target so a parallel store of the same refinery
+      // order (or a parallel inventory create with the same natural key) cannot read the same
+      // pre-merge amount and both write their delta on top of it — see
+      // InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
       java.util.List<InventoryItem> existingItems =
-          inventoryItemRepository.findMatchingInventoryItem(
+          inventoryItemRepository.findMatchingInventoryItemForUpdate(
               assignee, mat, loc, itemDto.quality(), order.getMission(), jobOrder, false);
 
       java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
@@ -567,7 +588,15 @@ public class RefineryOrderService {
       } else {
         InventoryItem item = new InventoryItem();
         item.setUser(assignee);
-        item.setOwningSquadron(assignee.getSquadron());
+        // R6.b: route the stamp through OwnerScopeService instead of the legacy
+        // `assignee.getSquadron()` direct read. The store form has no owner picker (refinery
+        // STORE is admin-driven and predates the R5.d picker wave), so {@code owningOrgUnitId}
+        // is passed as {@code null} — the resolver auto-stamps when the assignee has exactly
+        // one org-unit membership (today's 100% case) and surfaces a clean 400
+        // ("owningOrgUnitId is required") for multi-membership assignees. The latter case
+        // currently can't be resolved from the UI; widening the store form with a per-output
+        // picker is tracked as a follow-up to the SK §5.5 stamping wave.
+        item.setOwningSquadron(ownerScopeService.resolveSquadronForPickerOutput(assignee, null));
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);

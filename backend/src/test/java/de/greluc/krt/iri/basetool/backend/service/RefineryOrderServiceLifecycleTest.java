@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -85,7 +86,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private RefineryOrderService service;
 
@@ -198,20 +199,26 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_emptyStatusList_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      // After Phase 3 the admin "all orders" list goes through the squadron-scoped
-      // variant; the test class has no squadron stub so currentSquadronId() returns
-      // Optional.empty() and the service forwards null as the scope.
-      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
+      // After Phase 3 the admin "all orders" list goes through the squadron-scoped variant; the
+      // test class has no squadron stub so currentScopePredicate() resolves to the admin-all
+      // shape and the service forwards adminAllScope=true / no IDs.
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
+          .thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(List.of(), pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByStatusInScoped(any(), any(), any());
+      verify(refineryOrderRepository, never())
+          .findByStatusInScoped(any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
     void getAllRefineryOrders_withStatuses_callsFindByStatusIn() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
       when(refineryOrderRepository.findByStatusInScoped(
-              List.of(RefineryOrderStatus.COMPLETED), null, pageable))
+              List.of(RefineryOrderStatus.COMPLETED), true, null, java.util.Set.of(), pageable))
           .thenReturn(page);
 
       assertEquals(
@@ -224,7 +231,10 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void getAllRefineryOrders_secondOverload_callsFindAll() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findAllScoped(null, pageable)).thenReturn(page);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
+          .thenReturn(page);
 
       assertEquals(1, service.getAllRefineryOrders(pageable).getTotalElements());
     }
@@ -261,7 +271,8 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setLocation(refineryLocation);
 
-      assertThrows(NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+      assertThrows(
+          NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
       verify(refineryOrderRepository, never()).save(any());
     }
 
@@ -271,7 +282,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           BadRequestException.class,
-          () -> service.createRefineryOrder(OWNER_ID, new RefineryOrder()));
+          () -> service.createRefineryOrder(OWNER_ID, new RefineryOrder(), null));
       verify(refineryOrderRepository, never()).save(any());
     }
 
@@ -285,7 +296,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setLocation(withoutId);
 
       assertThrows(
-          BadRequestException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+          BadRequestException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -295,7 +306,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           NotFoundException.class,
-          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation()));
+          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
     @Test
@@ -309,7 +320,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           IllegalArgumentException.class,
-          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation()));
+          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
     @Test
@@ -324,7 +335,7 @@ class RefineryOrderServiceLifecycleTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation());
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null);
 
       assertSame(cityLoc, result.getLocation());
     }
@@ -335,7 +346,7 @@ class RefineryOrderServiceLifecycleTest {
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation());
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null);
 
       assertSame(refineryLocation, result.getLocation());
     }
@@ -353,7 +364,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           IllegalArgumentException.class,
-          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation()));
+          () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
     @Test
@@ -367,7 +378,8 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setMission(missionRef);
 
-      assertThrows(NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+      assertThrows(
+          NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -379,7 +391,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setMission(null);
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming);
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
       assertNull(result.getMission());
     }
 
@@ -394,7 +406,8 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setRefiningMethod(methodRef);
 
-      assertThrows(NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+      assertThrows(
+          NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -407,7 +420,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setGoods(new HashSet<>(Set.of(bad)));
 
       assertThrows(
-          BadRequestException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+          BadRequestException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -428,7 +441,7 @@ class RefineryOrderServiceLifecycleTest {
       IllegalArgumentException ex =
           assertThrows(
               IllegalArgumentException.class,
-              () -> service.createRefineryOrder(OWNER_ID, incoming));
+              () -> service.createRefineryOrder(OWNER_ID, incoming, null));
       assert ex.getMessage().contains("RAW");
     }
 
@@ -449,7 +462,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
-      service.createRefineryOrder(OWNER_ID, incoming);
+      service.createRefineryOrder(OWNER_ID, incoming, null);
 
       assertSame(flagged, good.getInputMaterial());
     }
@@ -466,7 +479,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
-      service.createRefineryOrder(OWNER_ID, incoming);
+      service.createRefineryOrder(OWNER_ID, incoming, null);
       assertSame(rawInput, good.getOutputMaterial());
     }
 
@@ -486,7 +499,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
-      service.createRefineryOrder(OWNER_ID, incoming);
+      service.createRefineryOrder(OWNER_ID, incoming, null);
       assertSame(refinedOf, good.getOutputMaterial());
     }
 
@@ -509,7 +522,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
-      service.createRefineryOrder(OWNER_ID, incoming);
+      service.createRefineryOrder(OWNER_ID, incoming, null);
       assertSame(refinedOf, good.getOutputMaterial());
     }
 
@@ -537,7 +550,8 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
       assertThrows(
-          IllegalArgumentException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+          IllegalArgumentException.class,
+          () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -554,7 +568,8 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
-      assertThrows(NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming));
+      assertThrows(
+          NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test
@@ -563,7 +578,7 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Instant before = Instant.now();
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation());
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null);
       Instant after = Instant.now();
 
       assertNotNull(result.getStartedAt());
@@ -580,7 +595,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setStartedAt(explicit);
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming);
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
       assertEquals(explicit, result.getStartedAt());
     }
 
@@ -594,7 +609,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setOtherExpenses(0.0);
       incoming.setOreSales(0.0);
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming);
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
       assertNull(result.getExpenses());
       assertNull(result.getOtherExpenses());
       assertNull(result.getOreSales());
@@ -610,7 +625,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setOtherExpenses(50.0);
       incoming.setOreSales(1000.0);
 
-      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming);
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
       assertEquals(100.0, result.getExpenses());
       assertEquals(50.0, result.getOtherExpenses());
       assertEquals(1000.0, result.getOreSales());

@@ -84,7 +84,7 @@ public class InventoryItemService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -93,9 +93,10 @@ public class InventoryItemService {
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
-        .getAggregatedInventory(owningSquadronId, pageable)
+        .getAggregatedInventory(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
         .map(
             obj ->
                 new AggregatedInventoryDto(
@@ -120,9 +121,14 @@ public class InventoryItemService {
         materialRepository
             .findById(materialId)
             .orElseThrow(() -> new NotFoundException("Material not found"));
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
-        .findByMaterialAndPersonalFalseScoped(material, owningSquadronId, pageable)
+        .findByMaterialAndPersonalFalseScoped(
+            material,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
         .map(inventoryItemMapper::toDto);
   }
 
@@ -242,7 +248,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<InventoryItemDto> items =
         inventoryItemRepository
             .findGlobalByFilters(
@@ -253,7 +259,9 @@ public class InventoryItemService {
                 hasJobOrders ? jobOrderIds : null,
                 hasMissions,
                 hasMissions ? missionIds : null,
-                owningSquadronId,
+                scope.adminAllScope(),
+                scope.activeOrgUnitId(),
+                scope.memberOrgUnitIds(),
                 Pageable.unpaged())
             .getContent()
             .stream()
@@ -346,7 +354,7 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findGlobalByFilters(
             hasMaterials,
@@ -356,7 +364,9 @@ public class InventoryItemService {
             hasJobOrders ? jobOrderIds : null,
             hasMissions,
             hasMissions ? missionIds : null,
-            owningSquadronId,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
             pageable)
         .map(inventoryItemMapper::toDto);
   }
@@ -414,8 +424,12 @@ public class InventoryItemService {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
 
+    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls
+    // with the same seven-dimension natural key serialise on the row instead of both reading the
+    // same `amount`, both adding their delta, and the last writer clobbering the other's
+    // increment — see InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
     java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItem(
+        inventoryItemRepository.findMatchingInventoryItemForUpdate(
             user, material, location, dto.quality(), mission, jobOrder, isPersonal);
 
     java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
@@ -428,7 +442,8 @@ public class InventoryItemService {
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
-    item.setOwningSquadron(user.getSquadron());
+    item.setOwningSquadron(
+        ownerScopeService.resolveSquadronForPickerOutput(user, dto.owningOrgUnitId()));
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
@@ -512,8 +527,11 @@ public class InventoryItemService {
       item.setMission(null);
     }
 
+    // Pessimistic write lock on the merge target — same race-condition reasoning as the create
+    // path; if a concurrent update mutates the merge target between our read and our write, the
+    // unguarded read would let us overwrite that update with a stale amount.
     java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItem(
+        inventoryItemRepository.findMatchingInventoryItemForUpdate(
             item.getUser(),
             item.getMaterial(),
             item.getLocation(),
@@ -673,7 +691,9 @@ public class InventoryItemService {
 
       InventoryItem newItem = new InventoryItem();
       newItem.setUser(targetUser);
-      newItem.setOwningSquadron(targetUser.getSquadron());
+      newItem.setOwningSquadron(
+          ownerScopeService.resolveSquadronForPickerOutput(
+              targetUser, dto.targetOwningOrgUnitId()));
       newItem.setMaterial(item.getMaterial());
       newItem.setLocation(targetLocation);
       newItem.setQuality(item.getQuality());
@@ -738,13 +758,20 @@ public class InventoryItemService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    log.info("Bulk delete of global inventory requested (scope={})", owningSquadronId);
-    int removed = inventoryItemRepository.deleteAllNonPersonal(owningSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     log.info(
-        "Bulk delete of global inventory completed: {} item(s) removed (scope={})",
+        "Bulk delete of global inventory requested (adminAll={}, active={}, members={})",
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds().size());
+    int removed =
+        inventoryItemRepository.deleteAllNonPersonal(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+    log.info(
+        "Bulk delete of global inventory completed: {} item(s) removed (adminAll={}, active={})",
         removed,
-        owningSquadronId);
+        scope.adminAllScope(),
+        scope.activeOrgUnitId());
     return removed;
   }
 

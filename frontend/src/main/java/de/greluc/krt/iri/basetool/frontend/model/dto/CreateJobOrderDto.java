@@ -5,22 +5,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's {@code CreateJobOrderDto}. Mirrors the dual-squadron model
- * (MULTI_SQUADRON_PLAN.md section 4.5):
- *
- * <ul>
- *   <li>{@code creatingSquadronId} — optional admin-override (the backend rejects non-admin
- *       senders); {@code null} means "stamp from the caller's active squadron context".
- *   <li>{@code requestingSquadronId} — the squadron the order is executed for; any Logistician+ may
- *       set or change it. When {@code null} the backend falls back to {@code creatingSquadronId}.
- * </ul>
- *
- * <p>The legacy free-text {@code squadron} fallback was removed together with the Phase 7 part 3 /
- * V90 DROP COLUMN migration. The frontend form binds directly to {@code requestingSquadronId}.
+ * Frontend mirror of the backend's {@code CreateJobOrderDto}. Carries the picker output for the Job
+ * Order create form (R5.d.c): the {@link #requestingOrgUnitId} field replaces the historical {@code
+ * requestingSquadronId} so the form picker can offer Staffel + Spezialkommando alike; today SK
+ * selections are rejected with 400 by the backend until the destructive cleanup release lowers NOT
+ * NULL on the legacy {@code requesting_squadron_id} column. The {@code creatingSquadronId} admin
+ * override stays untouched in R5.d.c — its plan-aligned rename to {@code creatingOrgUnitId} ships
+ * in a follow-up.
  */
 public record CreateJobOrderDto(
     @Nullable UUID creatingSquadronId,
-    @Nullable UUID requestingSquadronId,
+    @Nullable UUID requestingOrgUnitId,
     String handle,
     List<CreateJobOrderMaterialDto> materials,
     Long version) {}

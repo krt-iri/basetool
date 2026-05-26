@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.backend.service.OperationService;
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +44,7 @@ class OperationPayoutPaidOutSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private OperationService operationService;
-  @MockitoBean private SquadronScopeService squadronScopeService;
+  @MockitoBean private OwnerScopeService ownerScopeService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
@@ -87,7 +87,7 @@ class OperationPayoutPaidOutSecurityTest {
   void missionManager_canSet_paidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
-    when(squadronScopeService.canEditOperation(opId)).thenReturn(true);
+    when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
     when(operationService.setPayoutStatus(eq(opId), eq(key), eq(true)))
         .thenReturn(refreshedRow(key));
 
@@ -106,7 +106,7 @@ class OperationPayoutPaidOutSecurityTest {
   void missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
-    when(squadronScopeService.canEditOperation(opId)).thenReturn(true);
+    when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
 
     mockMvc
         .perform(
@@ -126,7 +126,7 @@ class OperationPayoutPaidOutSecurityTest {
   void officer_canSet_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
-    when(squadronScopeService.canEditOperation(opId)).thenReturn(true);
+    when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
     when(operationService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 
@@ -145,7 +145,7 @@ class OperationPayoutPaidOutSecurityTest {
   void admin_canSet_paidOutFalse() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
-    when(squadronScopeService.canEditOperation(opId)).thenReturn(true);
+    when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
     when(operationService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 
@@ -164,7 +164,7 @@ class OperationPayoutPaidOutSecurityTest {
   void officer_canStillSet_paidOutTrue() throws Exception {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
-    when(squadronScopeService.canEditOperation(opId)).thenReturn(true);
+    when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
     when(operationService.setPayoutStatus(eq(opId), eq(key), eq(true)))
         .thenReturn(refreshedRow(key));
 

@@ -61,7 +61,7 @@ class MissionExpansionTest {
     Mission mission =
         missionService.createMission(
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test Mission", null, null, "PLANNED", null, null, null, false, null));
+                "Test Mission", null, null, "PLANNED", null, null, null, false, null, null));
 
     // 4. Add Ship to Mission
     mission =

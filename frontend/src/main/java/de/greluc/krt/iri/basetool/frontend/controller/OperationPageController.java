@@ -5,7 +5,9 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
@@ -118,7 +120,37 @@ public class OperationPageController {
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "operations-index :: operationsResults";
     }
+    model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "operations-index";
+  }
+
+  /**
+   * Fetches the caller's OrgUnit memberships for the R5.d.e owner-picker fragment on the
+   * operation-create modal. Operations have no explicit owner field — the actor (caller) is the
+   * implicit owner — so the picker reflects the caller's own memberships. Returns an empty list for
+   * anonymous callers or on backend hiccup; the fragment collapses to its hidden state in either
+   * case.
+   *
+   * @param principal authenticated OIDC user, may be {@code null} for guests.
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
+    if (principal == null) {
+      return List.of();
+    }
+    try {
+      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      if (me == null || me.id() == null) {
+        return List.of();
+      }
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch memberships for operation-create owner-picker", e);
+      return List.of();
+    }
   }
 
   /**

@@ -411,7 +411,7 @@
                 <div class="flex-gap-md">
                     <div style="flex: 1;">
                         <label for="targetUserId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
-                        <select id="targetUserId" th:field="*{targetUserId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-my-target-user-changed" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
                             <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
                         </select>
                     </div>
@@ -421,6 +421,16 @@
                             <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
                         </select>
                     </div>
+                </div>
+                <!-- R5.d.g target-OrgUnit picker. Hidden by default; populated dynamically by
+                     refreshTargetOwningOrgUnitPicker() which fetches the destination user's
+                     memberships from /api/v1/users/{id}/memberships when the target-user select
+                     changes. -->
+                <div id="targetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
+                    <label for="targetOwningOrgUnitId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
+                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                        <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
+                    </select>
                 </div>
             </div>
             
@@ -959,6 +969,52 @@
         }
     }
 
+    /**
+     * R5.d.g: re-populate the target-OrgUnit picker when the destination user changes. Fetches
+     * the destination user's memberships from {@code GET /api/v1/users/{id}/memberships} on
+     * demand — keeps the page render cheap (no upfront N×membership fetch) and the picker
+     * always reflects the current backend state. Hides the picker wrapper when the destination
+     * user has ≤1 membership — at most one membership means there is no choice to offer, and
+     * the backend's legacy "stamp target user's home Staffel" fallback kicks in.
+     */
+    function refreshTargetOwningOrgUnitPicker() {
+        const wrapper = document.getElementById('targetOwningOrgUnitWrapper');
+        const select = document.getElementById('targetOwningOrgUnitId');
+        const userSelect = document.getElementById('targetUserId');
+        if (!wrapper || !select || !userSelect) return;
+        const targetUserId = userSelect.value;
+        // Strip every option except the placeholder (the first one).
+        while (select.options.length > 1) select.remove(1);
+        select.value = '';
+        if (!targetUserId) {
+            wrapper.style.display = 'none';
+            return;
+        }
+        fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        }).then(function(r) {
+            if (!r.ok) return [];
+            return r.json();
+        }).then(function(memberships) {
+            if (!Array.isArray(memberships) || memberships.length <= 1) {
+                wrapper.style.display = 'none';
+                return;
+            }
+            memberships.forEach(function(opt) {
+                const o = document.createElement('option');
+                o.value = opt.orgUnitId;
+                o.textContent = opt.orgUnitName;
+                select.appendChild(o);
+            });
+            wrapper.style.display = 'block';
+        }).catch(function() {
+            // On error, leave the picker hidden — the backend stamps the destination user's
+            // home Staffel via the legacy fallback in OwnerScopeService.
+            wrapper.style.display = 'none';
+        });
+    }
+
     function toggleBookOutTypeFields() {
         const typeDiscard = document.querySelector('input[name="type"][value="DISCARD"]').checked;
         const typeTransfer = document.querySelector('input[name="type"][value="TRANSFER"]').checked;
@@ -1227,6 +1283,7 @@
         window.krtEvents.on('input', 'inv-my-amount-from-target', updateAmountFromTarget);
         window.krtEvents.on('input', 'inv-my-target-from-amount', updateTargetFromAmount);
         window.krtEvents.on('change', 'inv-my-toggle-bookout-type', toggleBookOutTypeFields);
+        window.krtEvents.on('change', 'inv-my-target-user-changed', refreshTargetOwningOrgUnitPicker);
         window.krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
         window.krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
         window.krtEvents.on('click', 'inv-my-save-note', saveNote);

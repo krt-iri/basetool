@@ -68,6 +68,36 @@ class ArchitectureTest {
 
   private static final String REQUEST_BODY = "org.springframework.web.bind.annotation.RequestBody";
 
+  private static final String JOIN_COLUMN = "jakarta.persistence.JoinColumn";
+
+  private static final String PROMOTION_TOPIC_FQN =
+      "de.greluc.krt.iri.basetool.backend.model.PromotionTopic";
+
+  private static final String SQUADRON_FQN = "de.greluc.krt.iri.basetool.backend.model.Squadron";
+
+  private static final String USER_FQN = "de.greluc.krt.iri.basetool.backend.model.User";
+
+  /**
+   * Legacy entities that legitimately reference the {@code squadron_id} column today and are
+   * grandfathered by {@link #noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities()}.
+   * The destructive-cleanup release drops the column on both tables in a coordinated migration;
+   * until then, both fields stay. New staffel-scoped aggregates MUST use the {@code
+   * owning_squadron_id} (legacy mirror) or {@code owning_org_unit_id} (new column) name instead of
+   * {@code squadron_id}.
+   *
+   * <ul>
+   *   <li>{@code User.squadron} — the global user→squadron link on {@code app_user}. Migration to
+   *       per-membership ownership is the destructive-cleanup release.
+   *   <li>{@code MissionParticipant.squadron} — the per-mission-participant squadron snapshot taken
+   *       at mission-join time on {@code mission_participant}; used by the payout calculator
+   *       (MULTI_SQUADRON_PLAN.md Phase 6) so payouts honour the participant's squadron membership
+   *       at participation time, not at payout time. Stays until the org-unit-aware participant
+   *       snapshot lands.
+   * </ul>
+   */
+  private static final Set<String> SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS =
+      Set.of(USER_FQN, "de.greluc.krt.iri.basetool.backend.model.MissionParticipant");
+
   /**
    * DTOs that are response-only — they may be returned from {@code @GetMapping} methods or used as
    * {@code @PostMapping} return types, but MUST NOT be accepted as a {@code @RequestBody} on any
@@ -592,8 +622,8 @@ class ArchitectureTest {
   /**
    * {@code true} iff one of the method's request-mapping annotations declares a path that contains
    * the literal {@code "{id}"} placeholder. Used by {@link
-   * #staffelScopedWriteEndpointsMustGateOnSquadronScopeService()} to scope the rule to endpoints
-   * that target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
+   * #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to scope the rule to endpoints that
+   * target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
    * endpoints whose only {@code UUID} path variable is a related entity like {@code userId}).
    */
   private static boolean mappingPathContainsIdPlaceholder(JavaMethod method) {
@@ -624,9 +654,11 @@ class ArchitectureTest {
 
   /**
    * Staffel-scoped aggregate services MUST consult either {@code AuthHelperService} (for raw
-   * principal / role lookups) or {@code SquadronScopeService} (for canSee/canEdit + active-context
-   * resolution) - otherwise the data they emit might leak across squadrons. Phase 3 of
-   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift.
+   * principal / role lookups) or {@code OwnerScopeService} (for canSee/canEdit + active-context
+   * resolution) - otherwise the data they emit might leak across org units. Phase 3 of
+   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift, and
+   * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted {@code
+   * SquadronScopeService} shim to its successor in R2.c.
    *
    * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
    * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
@@ -635,7 +667,7 @@ class ArchitectureTest {
    * AuthHelperService route.
    */
   @Test
-  void staffelScopedServicesMustWireSquadronOrAuthHelper() {
+  void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
     // JobOrderService AND JobOrderHandoverService are intentionally excluded — Job Orders are a
     // cross-staffel workspace by design (MULTI_SQUADRON_PLAN.md section 1 + 4.6), so the squadron
     // filter does not apply. Both services do inject AuthHelperService anyway for the owner stamp
@@ -650,7 +682,7 @@ class ArchitectureTest {
             "OperationService");
 
     String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
-    String squadronScope = "de.greluc.krt.iri.basetool.backend.service.SquadronScopeService";
+    String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";
 
     classes()
         .that(
@@ -661,21 +693,21 @@ class ArchitectureTest {
               }
             })
         .should(
-            new ArchCondition<>("depend on AuthHelperService or SquadronScopeService") {
+            new ArchCondition<>("depend on AuthHelperService or OwnerScopeService") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean hasIt =
                     javaClass.getFields().stream()
                         .map(f -> f.getRawType().getFullName())
-                        .anyMatch(t -> t.equals(authHelper) || t.equals(squadronScope));
+                        .anyMatch(t -> t.equals(authHelper) || t.equals(ownerScope));
                 if (!hasIt) {
                   events.add(
                       SimpleConditionEvent.violated(
                           javaClass,
                           javaClass.getName()
                               + " is in the staffel-scoped service whitelist but injects neither"
-                              + " AuthHelperService nor SquadronScopeService - that means it"
-                              + " cannot enforce the multi-tenant filter / squadron stamp."));
+                              + " AuthHelperService nor OwnerScopeService - that means it"
+                              + " cannot enforce the multi-tenant filter / org-unit stamp."));
                 }
               }
             })
@@ -683,9 +715,9 @@ class ArchitectureTest {
   }
 
   /**
-   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6): write endpoints on
-   * staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression that calls into the
-   * {@code SquadronScopeService} (canEdit* / canSee*). A bare
+   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md
+   * §5.3): write endpoints on staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression
+   * that calls into the {@code OwnerScopeService} (canEdit* / canSee*). A bare
    * {@code @PreAuthorize("isAuthenticated()")} on POST / PUT / PATCH / DELETE for {@code
    * /api/v1/missions}, {@code /api/v1/operations}, {@code /api/v1/hangar}, {@code
    * /api/v1/inventory} or {@code /api/v1/refinery-orders} would silently allow cross-staffel writes
@@ -695,7 +727,7 @@ class ArchitectureTest {
    * only fires when the URL path carries a primary-resource id placeholder (i.e. {@code /{id}}).
    * POSTs that do not target a specific resource (top-level create, bulk operations,
    * cross-user-administrative endpoints like {@code /users/{userId}/...}) are skipped — the service
-   * layer enforces ownership there and a per-id squadron gate has nothing to bind to.
+   * layer enforces ownership there and a per-id org-unit gate has nothing to bind to.
    *
    * <ul>
    *   <li>Read endpoints stay free of the rule — list endpoints lean on service-layer filtering
@@ -704,19 +736,28 @@ class ArchitectureTest {
    *       orders are a cross-staffel workspace by design, admin endpoints already require {@code
    *       hasRole('ADMIN')} which carries no squadron component.
    *   <li>Endpoints that use a role-only check ({@code hasRole('LOGISTICIAN')} etc.) without
-   *       additionally calling the squadron-scope service still violate — the rule looks for the
-   *       literal {@code squadronScopeService} reference in the SpEL expression.
+   *       additionally calling the owner-scope service still violate — the rule looks for the
+   *       literal {@code ownerScopeService} reference in the SpEL expression.
    * </ul>
    */
   @Test
-  void staffelScopedWriteEndpointsMustGateOnSquadronScopeService() {
+  void staffelScopedWriteEndpointsMustGateOnOwnerScopeService() {
     Set<String> staffelScopedControllerSimpleNames =
         Set.of(
             "MissionController",
             "OperationController",
             "HangarController",
             "InventoryItemController",
-            "RefineryOrderController");
+            "RefineryOrderController",
+            // R6.a — SPEZIALKOMMANDO_PLAN.md §8.1 extension.
+            // SpecialCommandController is fully ADMIN-gated (R5.a). Adding it to the whitelist
+            // makes the audit's reach explicit and would catch a future maintainer who relaxes
+            // any endpoint to a non-admin gate without wiring the owner-scope check.
+            "SpecialCommandController",
+            // SpecialCommandMembershipController is admin-or-Lead-gated via
+            // @specialCommandSecurityService.canManageMembers (R5.b); the Lead-toggle endpoint
+            // is admin-only. The accepted-gate set below widens to recognise that bean.
+            "SpecialCommandMembershipController");
 
     noMethods()
         .that()
@@ -750,7 +791,7 @@ class ArchitectureTest {
         .areAnnotatedWith(PRE_AUTHORIZE)
         .should(
             new ArchCondition<JavaMethod>(
-                "gate on @squadronScopeService in the @PreAuthorize SpEL expression") {
+                "gate on @ownerScopeService in the @PreAuthorize SpEL expression") {
               @Override
               public void check(JavaMethod method, ConditionEvents events) {
                 // Skip endpoints that do not target a specific resource id in their path. The
@@ -777,29 +818,42 @@ class ArchitectureTest {
                 JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
                 String value =
                     ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-                // Accepted gate references:
-                //   - @squadronScopeService.canSee*/canEdit* — the direct squadron-scope check;
+                // Accepted gate references (R3 narrowed the set back to one canonical name after
+                // the shim was deleted; R6.a widened it to also accept the Spezialkommando
+                // membership gate):
+                //   - @ownerScopeService.canSee*/canEdit*/canSeeOrgUnit/canEditOrgUnit — the
+                //     plan-aligned org-unit-scope check introduced in R2.c and the only accepted
+                //     scope-resolver since the SquadronScopeService shim was deleted in R3;
                 //   - @missionSecurityService.canManage*/canAccessParticipant/canChangeOwner —
                 //     mission-aggregate gate that itself folds in canEditMission() for elevated
                 //     authorities (see MissionSecurityService — squadron-scope-aware as of the
                 //     Phase 6 follow-up);
+                //   - @specialCommandSecurityService.canManageMembers — Spezialkommando
+                //     membership gate (R5.b / SPEZIALKOMMANDO_PLAN.md §6.1): admin-or-Lead of
+                //     the exact SK whose id sits in the path. A Lead of a different SK does
+                //     not carry over, so the gate is per-aggregate-row just like the
+                //     ownerScopeService.canEdit* family;
                 //   - hasRole('ADMIN') alone — admin always passes the squadron filter, no extra
                 //     scope check needed (MULTI_SQUADRON_PLAN.md section 1).
-                boolean hasSquadronScope = value.contains("squadronScopeService");
+                boolean hasOwnerScope = value.contains("ownerScopeService");
                 boolean hasMissionSecurity = value.contains("missionSecurityService");
+                boolean hasSpecialCommandSecurity = value.contains("specialCommandSecurityService");
                 boolean hasAdminOnly =
                     value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
-                if (!hasSquadronScope && !hasMissionSecurity && !hasAdminOnly) {
+                if (!hasOwnerScope
+                    && !hasMissionSecurity
+                    && !hasSpecialCommandSecurity
+                    && !hasAdminOnly) {
                   events.add(
                       SimpleConditionEvent.violated(
                           method,
                           method.getFullName()
                               + " is a write endpoint on a staffel-scoped aggregate but its"
-                              + " @PreAuthorize expression does not gate on @squadronScopeService"
+                              + " @PreAuthorize expression does not gate on @ownerScopeService"
                               + " (or @missionSecurityService / hasRole('ADMIN')) - that means"
                               + " cross-staffel writes are not blocked. Add `and"
-                              + " @squadronScopeService.canEdit*(#id)` to the SpEL"
-                              + " (MULTI_SQUADRON_PLAN.md section 4.6)."));
+                              + " @ownerScopeService.canEdit*(#id)` to the SpEL"
+                              + " (SPEZIALKOMMANDO_PLAN.md §5.3)."));
                 }
               }
             })
@@ -808,7 +862,7 @@ class ArchitectureTest {
 
   /**
    * Audit finding C-1 guard (2026-05-20 security audit): mission endpoints gated only by
-   * {@code @PreAuthorize("@squadronScopeService.canSeeMission(#id)")} (without an additional {@code
+   * {@code @PreAuthorize("@ownerScopeService.canSeeMission(#id)")} (without an additional {@code
    * isAuthenticated()} / {@code hasRole(...)} / {@code hasAuthority(...)} clause) are reachable by
    * anonymous callers for non-internal missions — {@link
    * de.greluc.krt.iri.basetool.backend.config.SecurityConfig} declares the matching paths as {@code
@@ -1095,6 +1149,13 @@ class ArchitectureTest {
           "owningSquadronId",
           "squadronId",
           "squadron",
+          // Owning OrgUnit — object-form references blocked (R6.a /
+          // SPEZIALKOMMANDO_PLAN.md §8.3). The plain UUID variant {@code owningOrgUnitId} is
+          // intentionally allowed as the picker output (R5.d.d); only the JPA-entity-form
+          // references are server-managed and must never be bound from the request body.
+          "owningOrgUnit",
+          "creatingOrgUnit",
+          "requestingOrgUnit",
           // Parent — for sub-missions, taken from the path variable; never the body.
           "parent",
           "parentId",
@@ -1177,6 +1238,64 @@ class ArchitectureTest {
                 + " re-opens 409s on parallel \"Anmelden\" clicks — see"
                 + " MissionParticipantConcurrencyTest and the comment block on"
                 + " MissionService.addParticipant.")
+        .check(CLASSES);
+  }
+
+  /**
+   * R6.a / SPEZIALKOMMANDO_PLAN.md §8.2 + §11 R4: {@link
+   * de.greluc.krt.iri.basetool.backend.model.PromotionTopic#owningSquadron} MUST stay typed {@link
+   * de.greluc.krt.iri.basetool.backend.model.Squadron}, never loosened to {@link
+   * de.greluc.krt.iri.basetool.backend.model.OrgUnit}. The V97 CHECK constraint blocks the
+   * column-level case (Postgres rejects an SK row in {@code promotion_topic.owning_squadron_id} via
+   * the trigger from §3.3), but a careless Java-side refactor that retypes the field to {@code
+   * OrgUnit} would let a service-layer setter accept a {@link
+   * de.greluc.krt.iri.basetool.backend.model.SpecialCommand} reference, bypass the V97
+   * application-side guard ({@code SpecialCommand} constructor sets {@code isPromotionEnabled =
+   * false}), and only fail at flush time with a generic constraint-violation 500 instead of a clean
+   * 400 at the service boundary. This rule catches the type loosening before the code compiles its
+   * way into prod.
+   */
+  @Test
+  void promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit() {
+    classes()
+        .that()
+        .haveFullyQualifiedName(PROMOTION_TOPIC_FQN)
+        .should(
+            new ArchCondition<JavaClass>(
+                "declare an `owningSquadron` field whose raw type is Squadron (not OrgUnit)") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                var owningSquadronField =
+                    javaClass.getFields().stream()
+                        .filter(f -> "owningSquadron".equals(f.getName()))
+                        .findFirst();
+                if (owningSquadronField.isEmpty()) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          javaClass,
+                          "PromotionTopic is missing the `owningSquadron` field —"
+                              + " SPEZIALKOMMANDO_PLAN.md §3.3 explicitly keeps this field"
+                              + " typed Squadron (not OrgUnit) so promotion data can only"
+                              + " reference Squadron rows. If you renamed it, restore the"
+                              + " field; if you removed it entirely, drop this guard with a"
+                              + " code-comment rationale."));
+                  return;
+                }
+                String rawType = owningSquadronField.get().getRawType().getFullName();
+                if (!SQUADRON_FQN.equals(rawType)) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          owningSquadronField.get(),
+                          "PromotionTopic.owningSquadron has raw type "
+                              + rawType
+                              + " — must stay "
+                              + SQUADRON_FQN
+                              + ". Loosening it to OrgUnit lets a SpecialCommand reference"
+                              + " sneak past the application-side guard"
+                              + " (SPEZIALKOMMANDO_PLAN.md §8.2 / §11 R4)."));
+                }
+              }
+            })
         .check(CLASSES);
   }
 
@@ -1290,5 +1409,71 @@ class ArchitectureTest {
                                 + " missionParticipantRepository.save(participant) instead.")));
       }
     };
+  }
+
+  /**
+   * R6.a / SPEZIALKOMMANDO_PLAN.md §8.5: no new {@code @JoinColumn(name = "squadron_id")} outside
+   * the grandfathered legacy entities listed in {@link #SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS}.
+   * Those columns are on the destructive-cleanup release's drop list — once {@code
+   * app_user.squadron_id} (and the matching {@code mission_participant.squadron_id} snapshot) are
+   * gone, every reference to that column name in JPA mappings becomes a Hibernate validation
+   * failure at boot. Re-introducing the name on a new entity (e.g. a fresh staffel-scoped aggregate
+   * that forgets to follow the {@code owning_squadron_id} convention) would silently re-create the
+   * legacy coupling. This rule keeps the migration one-way: only the allowlisted entities may
+   * reference the column; anything else has to use {@code owning_squadron_id} (legacy mirror) or
+   * {@code owning_org_unit_id} (new column).
+   */
+  @Test
+  void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
+    classes()
+        .that()
+        .resideInAPackage("de.greluc.krt.iri.basetool.backend.model..")
+        .and()
+        .areNotInterfaces()
+        .should(
+            new ArchCondition<JavaClass>(
+                "not declare any @JoinColumn(name = \"squadron_id\") field outside the"
+                    + " grandfathered legacy entities (User, MissionParticipant)") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                if (SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS.contains(javaClass.getFullName())) {
+                  return;
+                }
+                javaClass
+                    .getFields()
+                    .forEach(
+                        field ->
+                            field.getAnnotations().stream()
+                                .filter(a -> JOIN_COLUMN.equals(a.getRawType().getFullName()))
+                                .forEach(
+                                    a -> {
+                                      String name =
+                                          a.tryGetExplicitlyDeclaredProperty("name")
+                                              .map(Object::toString)
+                                              .orElse("");
+                                      if ("squadron_id".equals(name)) {
+                                        events.add(
+                                            SimpleConditionEvent.violated(
+                                                field,
+                                                javaClass.getFullName()
+                                                    + "#"
+                                                    + field.getName()
+                                                    + " uses @JoinColumn(name ="
+                                                    + " \"squadron_id\") — that column name is"
+                                                    + " on the destructive-cleanup drop list"
+                                                    + " (SPEZIALKOMMANDO_PLAN.md §4 R3). Use"
+                                                    + " owning_squadron_id (legacy mirror) or"
+                                                    + " owning_org_unit_id (new column) on new"
+                                                    + " staffel-scoped aggregates. Only the"
+                                                    + " grandfathered legacy entities listed"
+                                                    + " in SQUADRON_ID_COLUMN_"
+                                                    + "GRANDFATHERED_FQNS may use this column"
+                                                    + " name; new entries require a"
+                                                    + " code-comment rationale."));
+                                      }
+                                    }));
+              }
+            })
+        .check(CLASSES);
   }
 }

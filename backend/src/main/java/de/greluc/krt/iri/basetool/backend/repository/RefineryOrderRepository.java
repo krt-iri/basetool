@@ -100,25 +100,37 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @EntityGraph(
       attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE (:owningSquadronId IS NULL OR r.owningSquadron.id ="
-          + " :owningSquadronId)")
+      "SELECT r FROM RefineryOrder r WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   Page<RefineryOrder> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      Pageable pageable);
 
   /**
-   * Scoped variant of {@link #findByStatusIn(List, Pageable)}: filters by owning squadron when
-   * {@code owningSquadronId} is non-null. Used by the refinery list page when an admin selected an
-   * active squadron via the switcher.
+   * Scoped variant of {@link #findByStatusIn(List, Pageable)}: filters by org-unit scope using the
+   * standard {@code isAdminAllScope} / {@code activeOrgUnitId} / {@code memberOrgUnitIds} triple.
+   * Used by the refinery list page when an admin selected an active squadron via the switcher and
+   * by non-admin users to see the union of their org-unit refinery orders.
    */
   @EntityGraph(
       attributePaths = {"owner", "location", "mission", "refiningMethod", "owningSquadron"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND (:owningSquadronId IS NULL OR"
-          + " r.owningSquadron.id = :owningSquadronId)")
+      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
   Page<RefineryOrder> findByStatusInScoped(
       @Param("statuses")
           List<de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus> statuses,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**

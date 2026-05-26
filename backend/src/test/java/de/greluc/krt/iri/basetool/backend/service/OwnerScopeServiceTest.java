@@ -2,28 +2,37 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,13 +45,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Mockito unit tests for {@link SquadronScopeService}. Covers the squadron-context resolution paths
- * (admin via {@code X-Active-Squadron-Id} request header, non-admin via persistent user record),
- * the aggregate-specific access checks for the five staffel-scoped roots, and the Mission
- * cross-staffel-visibility escape clause (`is_internal = false`).
+ * Mockito unit tests for {@link OwnerScopeService}. Inherits the test scenarios that previously
+ * lived under {@code SquadronScopeServiceTest} before the R2.c rename — the implementation moved
+ * from {@code SquadronScopeService} to {@code OwnerScopeService} but every behavioural invariant
+ * stayed the same. Covers the org-unit-context resolution paths (admin via {@code
+ * X-Active-Squadron-Id} request header, non-admin via persistent user record), the aggregate-
+ * specific access checks for the five staffel-scoped roots, and the Mission cross-staffel-
+ * visibility escape clause ({@code is_internal = false}).
+ *
+ * <p>The thin {@code SquadronScopeService} shim that still carries the legacy class name has its
+ * own minimal smoke test ({@link SquadronScopeServiceTest}) verifying that every shim method
+ * forwards to this service.
  */
 @ExtendWith(MockitoExtension.class)
-class SquadronScopeServiceTest {
+class OwnerScopeServiceTest {
 
   @Mock private AuthHelperService authHelper;
   @Mock private UserRepository userRepository;
@@ -51,9 +67,10 @@ class SquadronScopeServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private HttpServletRequest request;
 
-  @InjectMocks private SquadronScopeService service;
+  @InjectMocks private OwnerScopeService service;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
@@ -84,7 +101,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithoutHeader_returnsEmpty_admin_seesAllSquadrons() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -92,7 +109,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithActiveSquadronHeader_returnsThatSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER))
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
       assertEquals(Optional.of(SQUADRON_B_ID), service.currentSquadronId());
@@ -101,7 +118,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithBlankHeader_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("");
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn("");
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -109,7 +126,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithMalformedHeader_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn("not-a-uuid");
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn("not-a-uuid");
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -161,7 +178,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminInAllSquadronsMode_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.currentSquadron().isEmpty());
     }
@@ -173,7 +190,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithoutSelection_canSeeAnySquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertTrue(service.canSeeSquadron(SQUADRON_B_ID));
@@ -182,7 +199,7 @@ class SquadronScopeServiceTest {
     @Test
     void adminWithSelection_seesOnlySelectedSquadron() {
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER))
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
@@ -267,7 +284,6 @@ class SquadronScopeServiceTest {
 
     @Test
     void memberCannotEditPublicMissionOfOtherSquadron() {
-      // canEdit is strict — the is_internal escape clause does NOT apply to writes.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronB, false);
       when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
@@ -312,7 +328,6 @@ class SquadronScopeServiceTest {
 
     @Test
     void memberRejectsForeignSquadronInventoryItem() {
-      // Strict — no public-escape clause for inventory.
       UUID itemId = UUID.randomUUID();
       InventoryItem item = new InventoryItem();
       item.setId(itemId);
@@ -382,7 +397,7 @@ class SquadronScopeServiceTest {
       order.setOwningSquadron(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(SquadronScopeService.ACTIVE_SQUADRON_HEADER)).thenReturn(null);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
       assertTrue(service.canSeeRefineryOrder(orderId));
       assertTrue(service.canEditRefineryOrder(orderId));
@@ -390,11 +405,10 @@ class SquadronScopeServiceTest {
   }
 
   /**
-   * Verifies the request-scoped memoisation on {@link SquadronScopeService#currentSquadronId()} and
-   * {@link SquadronScopeService#currentSquadron()}. Without this, every controller call chain on a
+   * Verifies the request-scoped memoisation on {@link OwnerScopeService#currentSquadronId()} and
+   * {@link OwnerScopeService#currentSquadron()}. Without this, every controller call chain on a
    * non-admin request would re-hit {@code userRepository.findById} and {@code
-   * squadronRepository.findById} once per scope query - cheap on a single call, but multiplied
-   * across the authz checks and list filters that fire inside one HTTP request the cost compounds.
+   * squadronRepository.findById} once per scope query.
    */
   @Nested
   class RequestScopedCacheTests {
@@ -458,6 +472,161 @@ class SquadronScopeServiceTest {
 
       verify(userRepository, times(1)).findById(MEMBER_USER_ID);
     }
+  }
+
+  // --- resolveSquadronForPickerOutput (R5.d picker shared helper, hardened in R6.b
+  //     to enforce the plan §5.5.1 0/1/>1 membership matrix) ----------------------
+
+  @Test
+  void resolveSquadronForPickerOutput_singleStaffelOnlyMembership_nullPicker_autoStamps() {
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+    // No SK memberships — single-Staffel user, picker is hidden in the UI so {@code null}
+    // is the only realistic owner choice.
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, null);
+
+    assertSame(homeStaffel, result);
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_noMembershipAtAll_throwsBadRequest() {
+    // Memberless user (admin / guest / freshly created without a backfill) — must be rejected
+    // before the stamp lands. Today this state is impossible (app_user.squadron_id is NOT NULL
+    // and V95 backfilled every existing row), but the guard is defensive against the post-D3
+    // world where the legacy Staffel column is dropped.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, null));
+    assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
+    verify(squadronRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_multipleMemberships_nullPicker_throwsBadRequest() {
+    // User in Staffel + at least one SK. Plan §5.5.1: ambiguous, must reject. Before R6.b
+    // this path silently stamped the legacy Staffel — exactly the audit regression #4.
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+
+    OrgUnitMembership skMembership = new OrgUnitMembership();
+    OrgUnitMembershipId skId = new OrgUnitMembershipId(user.getId(), UUID.randomUUID());
+    skMembership.setId(skId);
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of(skMembership));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, null));
+    assertTrue(
+        ex.getMessage().toLowerCase().contains("owningorgunitid is required"), ex.getMessage());
+    verify(squadronRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_validStaffelPick_returnsPickedSquadron() {
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, homeStaffelId);
+
+    assertSame(homeStaffel, result, "the picked Staffel must be returned verbatim");
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_validMultiMembershipStaffelPick_returnsPickedSquadron() {
+    // User has Staffel + SK; picker output points at the Staffel. Honoured.
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+
+    OrgUnitMembership skMembership = new OrgUnitMembership();
+    skMembership.setId(new OrgUnitMembershipId(user.getId(), UUID.randomUUID()));
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of(skMembership));
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, homeStaffelId);
+
+    assertSame(homeStaffel, result);
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
+    // Picker output references an OrgUnit the target user does NOT belong to (membership
+    // forgery vector).
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of());
+    UUID foreignId = UUID.randomUUID();
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.resolveSquadronForPickerOutput(user, foreignId));
+    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+    verify(squadronRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_pickedOrgUnitIsSpecialCommand_throwsBadRequest() {
+    // The user has Staffel + SK; the picker points at the SK. SquadronRepository.findById
+    // returns empty for an SK id (the JPA single-table discriminator filter limits the repo
+    // to kind='SQUADRON' rows), so the soft block fires.
+    Squadron homeStaffel = new Squadron();
+    homeStaffel.setId(UUID.randomUUID());
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setSquadron(homeStaffel);
+
+    UUID skId = UUID.randomUUID();
+    OrgUnitMembership skMembership = new OrgUnitMembership();
+    skMembership.setId(new OrgUnitMembershipId(user.getId(), skId));
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
+        .thenReturn(List.of(skMembership));
+    when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, skId));
+    assertTrue(
+        ex.getMessage().toLowerCase().contains("spezialkommando ownership"), ex.getMessage());
   }
 
   // --- helpers ------------------------------------------------------------------

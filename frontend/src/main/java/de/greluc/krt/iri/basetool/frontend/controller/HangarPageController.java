@@ -2,11 +2,13 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ManufacturerDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronShipOverviewDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.ParallelPageLoader;
@@ -207,8 +209,33 @@ public class HangarPageController {
     model.addAttribute("shipTypes", shipTypes);
     model.addAttribute("locations", locations);
     model.addAttribute("manufacturers", manufacturers);
+    model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
 
     return "hangar";
+  }
+
+  /**
+   * Fetches the caller's OrgUnit memberships for the R5.d.f owner-picker on the add-ship modal.
+   * Ships are always added for the calling user (no admin-cross-user override on this page), so the
+   * picker reflects the caller's own memberships. Falls back to an empty list on backend hiccup;
+   * the fragment collapses to its hidden state in that case.
+   *
+   * @return picker options or empty list; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
+    try {
+      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      if (me == null || me.id() == null) {
+        return List.of();
+      }
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch memberships for hangar add-ship owner-picker", e);
+      return List.of();
+    }
   }
 
   /**
@@ -278,7 +305,8 @@ public class HangarPageController {
               form.getInsurance(),
               form.getLocationId(),
               form.isFitted(),
-              null);
+              null,
+              form.getOwningOrgUnitId());
       backendApiClient.post("/api/v1/hangar/ships", request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_add");
     } catch (Exception e) {
@@ -324,7 +352,9 @@ public class HangarPageController {
               form.getInsurance(),
               form.getLocationId(),
               form.isFitted(),
-              form.getVersion());
+              form.getVersion(),
+              // Update path: owningOrgUnitId is not editable, the existing stamp survives.
+              null);
       backendApiClient.put("/api/v1/hangar/ships/" + id, request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
     } catch (Exception e) {

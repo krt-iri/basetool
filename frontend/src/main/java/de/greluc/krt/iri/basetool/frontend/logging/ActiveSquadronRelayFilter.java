@@ -7,32 +7,54 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
- * Relays the admin's active squadron selection from the frontend's Spring Session to the backend
- * via the {@code X-Active-Squadron-Id} request header on every outbound {@code WebClient} call.
+ * Relays the caller's active OrgUnit selection from the frontend's Spring Session to the backend
+ * via the {@code X-Active-Org-Unit-Id} request header on every outbound {@code WebClient} call. The
+ * legacy {@code X-Active-Squadron-Id} header is sent in parallel for one release so backend deploys
+ * lagging the frontend deploy still honour the pin (SPEZIALKOMMANDO_PLAN.md §7.2 / R5.e).
  *
  * <p>The state lives on the frontend because backend REST calls do not relay session cookies (the
  * frontend's {@code BackendApiClient} only attaches the OAuth2 bearer token), so a backend-side
- * {@code HttpSession} would be lost between calls. The active squadron is snapshotted onto a
+ * {@code HttpSession} would be lost between calls. The active OrgUnit is snapshotted onto a
  * thread-local by {@link ActiveSquadronContextFilter} at the start of every servlet request and
  * read here on the WebClient pipeline. Reactor's automatic context propagation (enabled by Spring
  * Boot 4) carries the thread-local across the hop to the Netty reactor thread that actually issues
  * the I/O.
  *
+ * <p>R5.e widening: the filter no longer special-cases admin callers — it relays a pinned selection
+ * for any authenticated user with &gt;1 membership. The backend independently re-validates
+ * non-admin pins against the caller's actual memberships (see {@link
+ * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#currentScopePredicate()}), so a
+ * spoofed thread-local cannot widen visibility past what the user's memberships permit.
+ *
  * <p>Failure modes degrade silently: no thread-local bound (background task / scheduled job) and no
- * active squadron set both yield "no header added" — the backend then falls through to its default
- * behaviour (admin sees all squadrons, members see their home squadron).
+ * active OrgUnit set both yield "no header added" — the backend then falls through to its default
+ * behaviour (admin sees all OrgUnits, members see the union of their memberships).
  */
 @Component
 public class ActiveSquadronRelayFilter {
 
-  /** HTTP header name carrying the admin's active squadron selection to the backend. */
-  public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
+  /**
+   * R5.e replacement for {@link #ACTIVE_SQUADRON_HEADER}. HTTP header name carrying the caller's
+   * active OrgUnit selection to the backend. {@link
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService} reads this name first.
+   */
+  public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
 
   /**
-   * Returns the filter function that adds the {@code X-Active-Squadron-Id} header to outbound
-   * requests when an admin has a squadron selected in the frontend session. No header is added for
-   * non-admin users (their effective squadron is resolved by the backend from {@code
-   * app_user.squadron_id}) or for admins in "all squadrons" mode.
+   * Legacy HTTP header name preserved for one release as an alias of {@link
+   * #ACTIVE_ORG_UNIT_HEADER}. Sent in parallel by the relay so a backend deploy lagging the
+   * frontend deploy still honours the pin. Removed in the destructive cleanup release.
+   *
+   * @deprecated R5.e replacement is {@link #ACTIVE_ORG_UNIT_HEADER}.
+   */
+  @Deprecated public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
+
+  /**
+   * Returns the filter function that adds both the {@code X-Active-Org-Unit-Id} header (new
+   * canonical name) and the {@code X-Active-Squadron-Id} header (one-release alias) to outbound
+   * requests when the caller has an OrgUnit selected in the frontend session. No header is added
+   * for callers without an active selection — the backend then falls through to its default
+   * behaviour (admin sees all OrgUnits, non-admin sees the union of memberships).
    *
    * @return filter function for the WebClient pipeline; never {@code null}.
    */
@@ -44,7 +66,10 @@ public class ActiveSquadronRelayFilter {
         return next.exchange(request);
       }
       return next.exchange(
-          ClientRequest.from(request).header(ACTIVE_SQUADRON_HEADER, active.toString()).build());
+          ClientRequest.from(request)
+              .header(ACTIVE_ORG_UNIT_HEADER, active.toString())
+              .header(ACTIVE_SQUADRON_HEADER, active.toString())
+              .build());
     };
   }
 }

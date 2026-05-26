@@ -15,7 +15,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.MissionFinanceEntryService;
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +52,7 @@ class MissionFinanceEntryControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MissionFinanceEntryService financeEntryService;
-  @MockitoBean private SquadronScopeService squadronScopeService;
+  @MockitoBean private OwnerScopeService ownerScopeService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
@@ -106,7 +106,7 @@ class MissionFinanceEntryControllerSecurityTest {
   void createFinanceEntry_anonymousOnPublicMission_returnsSlimAckWithoutParticipant()
       throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(squadronScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -151,7 +151,7 @@ class MissionFinanceEntryControllerSecurityTest {
     // canSeeMission returns false for an anonymous caller on an internal mission — the
     // @PreAuthorize
     // gate denies BEFORE the service is invoked.
-    when(squadronScopeService.canSeeMission(missionId)).thenReturn(false);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
 
     mockMvc
         .perform(
@@ -171,7 +171,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_authenticatedOfficer_keepsFullPii() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(squadronScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -204,7 +204,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_noteOver2000Chars_isBadRequest() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(squadronScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
 
     String oversizedNote = "a".repeat(2001);
     mockMvc
@@ -227,7 +227,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_amountOverCap_isBadRequest() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(squadronScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
         .perform(

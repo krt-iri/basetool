@@ -194,7 +194,7 @@ public class OperationController {
    * @return the operation DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
   @Operation(
       summary = "Get operation by ID",
       description =
@@ -221,7 +221,7 @@ public class OperationController {
    * @return finance summary DTO
    */
   @GetMapping("/{id}/finances")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
   @Operation(
       summary = "Get aggregated finances for an operation",
       description =
@@ -247,7 +247,7 @@ public class OperationController {
    * @return payout rows sorted by participant name
    */
   @GetMapping("/{id}/payouts")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
   @Operation(
       summary = "Get participation payout breakdown with amounts and paid-out status",
       description =
@@ -291,7 +291,7 @@ public class OperationController {
   // expression encodes both halves in one gate.
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id) "
+      "hasRole('MISSION_MANAGER') and @ownerScopeService.canEditOperation(#id) "
           + "and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
@@ -342,7 +342,8 @@ public class OperationController {
   public OperationDto createOperation(@Valid @RequestBody OperationCreateDto createDto) {
     de.greluc.krt.iri.basetool.backend.model.Operation operation =
         operationMapper.toEntity(createDto);
-    return operationMapper.toDto(operationService.createOperation(operation));
+    return operationMapper.toDto(
+        operationService.createOperation(operation, createDto.owningOrgUnitId()));
   }
 
   /**
@@ -356,7 +357,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('MISSION_MANAGER') and @squadronScopeService.canEditOperation(#id)")
+  @PreAuthorize("hasRole('MISSION_MANAGER') and @ownerScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =
@@ -398,7 +399,7 @@ public class OperationController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN') and @squadronScopeService.canEditOperation(#id)")
+  @PreAuthorize("hasRole('ADMIN') and @ownerScopeService.canEditOperation(#id)")
   @Operation(
       summary = "Delete an operation",
       description =

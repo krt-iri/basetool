@@ -31,7 +31,7 @@ class PromotionLevelContentServiceTest {
 
   @Mock private PromotionLevelContentMapper mapper;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -40,9 +40,7 @@ class PromotionLevelContentServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient()
-        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
-        .thenReturn(true);
+    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
   }
 
   @InjectMocks private PromotionLevelContentService service;

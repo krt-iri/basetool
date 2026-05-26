@@ -47,8 +47,27 @@ public class LoggingProperties {
    * sentinel {@code none}/{@code all} when no squadron applies. Mirrors the MULTI_SQUADRON_PLAN.md
    * section 7 logging requirement; keep this in sync with the {@code %X{squadronId}} placeholder in
    * {@code logback-spring.xml}.
+   *
+   * <p>R5.e / SPEZIALKOMMANDO_PLAN.md R14: this MDC key is being renamed to {@code orgUnitId} (see
+   * {@link #orgUnitIdMdcKey}). For one release {@link
+   * de.greluc.krt.iri.basetool.backend.logging.CorrelationIdFilter} populates BOTH keys with the
+   * same value so log-pipeline dashboards can migrate at their own pace. The legacy {@code
+   * squadronId} key comes out together with the legacy {@code X-Active-Squadron-Id} header alias
+   * once the new field has soaked one release cycle.
    */
   @NotBlank private String squadronIdMdcKey = "squadronId";
+
+  /**
+   * R5.e / SPEZIALKOMMANDO_PLAN.md R14 replacement for {@link #squadronIdMdcKey}. The post-rename
+   * MDC key under which {@link de.greluc.krt.iri.basetool.backend.logging.CorrelationIdFilter}
+   * stores the resolved OrgUnit context of the current request. Plan §3.5 widens the concept from
+   * "the user's Staffel" to "the user's active OrgUnit (Staffel or Spezialkommando, possibly the
+   * union of memberships)" — same set of sentinel values ({@code anonymous} / {@code none} / {@code
+   * all} / a UUID), the name just stops implying Staffel-only. Both this key and {@link
+   * #squadronIdMdcKey} are written for one release; downstream dashboards should switch to this
+   * name and drop the legacy alias on next deploy.
+   */
+  @NotBlank private String orgUnitIdMdcKey = "orgUnitId";
 
   /**
    * Requests taking longer than this threshold (in milliseconds) are logged at {@code WARN} instead

@@ -58,7 +58,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
 
@@ -91,13 +91,13 @@ class JobOrderServicePriorityAndStatusTest {
             });
 
     // Multi-tenant: createJobOrder + updateJobOrder resolve the caller's squadron through
-    // SquadronScopeService. Stub a lenient default so the update path (which touches the
+    // OwnerScopeService. Stub a lenient default so the update path (which touches the
     // resolver when jobOrder.creatingSquadron is unset, as in these mock-built fixtures)
     // does not NPE; read paths leave the stub unused and the lenient() suppresses the
     // UnnecessaryStubbingException.
     Squadron testSquadron = new Squadron();
     testSquadron.setShorthand("Alpha");
-    lenient().when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(testSquadron));
+    lenient().when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(testSquadron));
   }
 
   // ---------------------------------------------------------------

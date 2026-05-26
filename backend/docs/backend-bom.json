@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:6a2e8a3d-cd3f-4c47-99ff-b0fd03dfc1be",
+  "serialNumber" : "urn:uuid:76037608-6e93-4e39-b84d-e650e90b9c50",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-22T20:23:47Z",
+    "timestamp" : "2026-05-26T07:16:09Z",
     "tools" : {
       "components" : [
         {
@@ -286,6 +286,120 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "group" : "com.aayushatharva.brotli4j",
+      "name" : "brotli4j",
+      "version" : "1.23.0",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "8a0578e7bd8cb161185aae98d8f176fa"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "eec13740c1ee09cbe9c6e836f17ee2c984a10333"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "5fcf13ad78d07319cc507465dcf61cbc3efee9f45c9ae1c42a9902414696bc0b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "579f7fe00eb5d2ce09d975980babb186335791ee3b035d2e99c13abcbbe3daf1588d53a1892c70bdbe0df7e565a597c1058222c6bc93484e22c963351edbf38c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "f968ede93edec24e403b3177dca8884d8f6709974b35ab8ea7d440dd6ee5f1c7bb9ab109154b53691cad1ebcc4c33929"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "262a46c422b4b744bfeb58d54e6a20bdf5e853795ab9747785c9fde0576b614a9b18bb0b078dbb73c61a518c2244a68b"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "6f962fd8decc413cf8d6e411d7f98475e1b080fed8fd56af1039e24fe05465ec"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "c3be55e02bd46b5c5784f1560277ec2dbb3c4792bd89a8d02a6a7cb9120cbd6f1d26a1b2f8b617362e8fae612772a5d8fa9e603b76b0c450955ee4256963de16"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "group" : "com.aayushatharva.brotli4j",
+      "name" : "service",
+      "version" : "1.23.0",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "034392efa0a6d8f43a35818f9eea20a0"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "872c4907f6b97765dcad9693f2b1ae118b8bc435"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "7f298d44dbb7688419f0179ee1dfa0e4436633272b05d38a5faf3a2b8d08697b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "114012480fc387de7607fc311ab265c59679a772a8df03d9047df0f17ecc450221285be75999ade8789a35dcc337771e481223e7f7091b0cf9e8e7628e577538"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "74b5dd53743b8a620b40cbb24b01f559242b22225c77f6c85243abd2f45e77716fae8ee7591cb927fc2a44be99f91ad5"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "c98f7a03583227a67df43def68d223a10e5d50fa70426cba5c470787ddd6e5c0a99c6c16f2f1a327615e72987cbd7599"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "2d7d4c3f0ab61650b33e7c0333d65812ca55c14af93b89d346fe330155508250"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "e66d229962b72be498eefd71aadac9e97219731b12296c32bd2fe887652c9c5aa4ae1efa7c57334a268113d775b0c73ef1dce72bc3fb742fa6bb98bb3f5f577e"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/com.beust/jcommander@1.82?type=jar",
       "group" : "com.beust",
       "name" : "jcommander",
@@ -353,43 +467,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar",
+      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
       "group" : "com.bucket4j",
       "name" : "bucket4j_jdk17-core",
-      "version" : "8.18.0",
+      "version" : "8.19.0",
       "description" : "Bucket4j core library",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "6064eed2a4b5630f39cedaddca0b5102"
+          "content" : "a5c80b0934147b34b721b329b2f79e18"
         },
         {
           "alg" : "SHA-1",
-          "content" : "13a366b2c45a5fbb92a5575e079a156261191c94"
+          "content" : "ac649e24d0f3518010c588302cea0dfdf4763511"
         },
         {
           "alg" : "SHA-256",
-          "content" : "0ce8d0a942a498cea26006f74ae6fd1bed69527260dd3b8978df19fe16a26b85"
+          "content" : "603885663799e203f7e17394315fdbdc584fe021643614d8a34b49b53e618c74"
         },
         {
           "alg" : "SHA-512",
-          "content" : "cbce577ab345403c6864260c8e71ab2802c6a319136d57b14a1f492ac652a8b1be675adaed01b71538368517144dd36cd3ab32a1e96f9c95318cb3e14824db53"
+          "content" : "59d7f6a2034c3b8afa6eaee4d6d4a97d2e9009bd212e99769209ceba0c97d20fbcbdca9b54f01f57c67c88eaf35512973daf085691d148eaac7250de2f137a26"
         },
         {
           "alg" : "SHA-384",
-          "content" : "34f2399e7df2c7dd638839744a14c8d1bd0baf5381f6527a2a7b022f2cad6c632058c539a10f91e0e9067252caa908a2"
+          "content" : "f563f64186b04a0445ec0d3245728bc2bb4fb498caea5414acd44ddb2050009078ec49c21ab744b45c9d1f2b098993ce"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "2a620a2c46f18ded908da3f42a0de12e1e89f6a1e61db83bc79668881eedb2e637a7ae2414167a8ca70e14310c7cedf9"
+          "content" : "2ca3399bfd65ff8f38128763a065661aa05e2226064aa494d12365c068c0ccaddcdf9525ab54c8e812d86a309f46316b"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "be66a0b57a6bb3b9ac2bbbd19f8d42b4b92ea4d3f4589d593b8394a2b63c6a8c"
+          "content" : "94e2ad1fa92e67f08771068a34c3733d4d012c5283cc5c7030ed4d2f0dd4609d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "e4cbb5609c653f6c6ad18c5c6a5b695f7ed0c0e1befaad5ed077f741050a22cf64be6ff34691ed22079dd14e30337c6cf6a8e3173a0dc873ce07aa9578a28a84"
+          "content" : "2617e742a19aea4ecd8f76ea25359556800183e03aba841d41bb42d750282d58d100acc2e3283e5e36ffeae0c34809a62590732293eaff6d7fec1fe5bd46821f"
         }
       ],
       "licenses" : [
@@ -399,7 +513,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar",
+      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -1059,43 +1173,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar",
+      "bom-ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
       "group" : "com.github.librepdf",
       "name" : "openpdf",
-      "version" : "3.0.4",
+      "version" : "3.0.5",
       "description" : "Open and Free PDF library. It uses the new package name `org.openpdf`.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "9eb85871cd0e707dddaf9cf8d6561e2c"
+          "content" : "1e8e56e03e1eacc7e7858d34e0500429"
         },
         {
           "alg" : "SHA-1",
-          "content" : "973d0c4427a43a94f83c8d3d62415553b6e247a5"
+          "content" : "4d8174b818f61820f318a578f060cf3e2846ec7f"
         },
         {
           "alg" : "SHA-256",
-          "content" : "838993e2be202e31ac9ba72305fb8c1f51165df51e4ca4f02e68d491436772ec"
+          "content" : "2a70c6024bb10b6192b4b91d8bb581de24b776a799a30ef5b87748e54aca2144"
         },
         {
           "alg" : "SHA-512",
-          "content" : "049e396613d3eef191ea2e5f39a1e6612e7c3fad83554743de2b102643da7dc1170df5033fa04b32ba799332ed1e234111c59d0cc9e7fd49a78db2e2801f4e7c"
+          "content" : "aabe8ca4eea976a3d7b27af500a32a03dcd46b36a453706b8b3c0b0d81be9c484a0bd7f5dd9afd8c87fc793582262c35b706d77d68f36abcd2bb935cbe88f2f9"
         },
         {
           "alg" : "SHA-384",
-          "content" : "5bc5cfbdae5a19efa39696d9d216c862810f04435e978181813a573bef4dfb931e898178862afd38349f9e5c44b79475"
+          "content" : "e430c90b41676fbc433511fb94d620558de0867ba4e9a9360fa93fa9e39d4985963b48269299a82c7c77a522958e635c"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "1d00bfefb9721ae9019001424da535d29c5cb1c37cb8a9e4c930e5dc715c5bc6634e26edd63a03548b6e832a238f8dff"
+          "content" : "d0eb665bae81c9024f091002d84a369d67f58e9b2526b2e675761cdfac8e2cc795e0cf953fec92869656630a35ac8b31"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "cef7a48e18910a73df54f946cbd9c05f9f47eeb8594d4a97c62320b493c4a8fe"
+          "content" : "bafa6416c25cc63c85942d620b9839e497d80083f0d8e044666ddc76d9a2ab4d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "959ea5b907080acde930001dada3f5182a2a173c850fb21e5c4314a8a138bc843b9212bba43e1cd9cdcff858318521b77295d635b20dc7b0a3d6a3cb54bcfffc"
+          "content" : "ad7ac24f895c5354d8a03d243ddef3319ff7666165930944e5226a5d884e5dc70d5fccaf2e6b621420fd55103f9e8172952de4b5ad77e6a07ee7164e9ec79e0e"
         }
       ],
       "licenses" : [
@@ -1112,7 +1226,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar",
+      "purl" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7958,42 +8072,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.6.2?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "12.6.1",
+      "version" : "12.6.2",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "f99fc5fa3f6a8b53ab3d784e53b82aae"
+          "content" : "ab6cf61d6ed8c93e426452cf1e6748d6"
         },
         {
           "alg" : "SHA-1",
-          "content" : "d42fec034f4e56da4083dc1d5df55b0f470ad8c3"
+          "content" : "512f9a2609bdf50257443630d2eb92302ec97e82"
         },
         {
           "alg" : "SHA-256",
-          "content" : "9a5b4be2e6193d4d42e954cae023c09c3f48cd933acb2d56c46945df08ff8a7e"
+          "content" : "791b1e8f46dcee1b3f4ab01652fc94adfd17785eb5afbaba57a23ca4a7814908"
         },
         {
           "alg" : "SHA-512",
-          "content" : "de515533fb08953b983f3b3eb66c033fe00e82d1c70195d62c9b5b2bcc0fd7475b5db593692b74230bf220fa01737d33a477b6268f4d3be6d9f1e5939fa4b048"
+          "content" : "7a3a6c73fbd60fa2dc2139e51fd7e590112b42d96cc3326d1e8e1fdbb08f2858596f8c65f733ca4817dea158326919720dcc144c88176eafc39bb26ff169d65d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "8b4d0f35d39c58b16775a89ccfc988c3c73301b69ae942aa3bd20ade4910e6e3391a7846ec2840409fe8397e0824428e"
+          "content" : "bb8f8346a7c044b10c8cfb20796cc888e64be5dc70a803c6018153e8321ca332ae08dc367b8535db789fd04fcc3bc16b"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "dd2145e701c0a4581e95b5c85cfcf9f4d76b9eeb74048d8772e6fdc0fe89c5234f1f4760bb4a1fcc93b71904c0768597"
+          "content" : "10e488f021911812901d27e97c3efaeba303caed45219c86a5ae2316b184c7bb020f037f4fe16f3e0729c20c53083074"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "57cda60d2f430f959c8566726679e9b7f506df9d5015c0001d37c9fa3380e79c"
+          "content" : "66a643a7a7e4a1086bd37a1a3c3a1635c0399d33dad41664059974590eb5382f"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "9bb6604e822a8810566521b2a6d776102120a0e91b6b1e124b64d37164a7bc8d5b4fc619f2d9180d58383ef68dfb6baee3b0802942bbf961d302ea816702fa34"
+          "content" : "77928902d6b458acce27248e4e38dc13a4d55b8bb345757ce247e38a059c517f6a6d7b20ae6625f02d8cfce03dd6591a2f9d35bea9568b82416701dfbf0832e9"
         }
       ],
       "licenses" : [
@@ -8003,7 +8117,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.6.2?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -8014,42 +8128,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.2?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "12.6.1",
+      "version" : "12.6.2",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "b44fc20a5aaefa1ef5108b8515325a56"
+          "content" : "a6ef822eeac57bca9b232e66be3a1633"
         },
         {
           "alg" : "SHA-1",
-          "content" : "714930c5467b6426afa6647459e6c88eec0e412b"
+          "content" : "94f18cbb297d6cd32d1555b7949dc1ba500a4d73"
         },
         {
           "alg" : "SHA-256",
-          "content" : "7679df22b77c47474d10db97531b3f9f2eab73ef3b1858f55d0e33c7883ffab0"
+          "content" : "da918bfc3a0a2a246fa8e721d8f04b067ec978f2d2d1082e0c2f4cc7ffdcf655"
         },
         {
           "alg" : "SHA-512",
-          "content" : "c7ff42afdf3aca08b8745ff0fa8e5a23398ad20c93d93735984dcd9b7918912e71863b6eaaadd45170ea81d8744a5777998f45f23f07b4644b51129e14fd9fb4"
+          "content" : "db8bd7cc6cfc860c69b02d1159226c45ec556f0637ea2f7d4888a0f5be3035b9880b8c887a5d350e3363114e2ccdcb294703cf26c7dbfcb877711bef6a7b8bf6"
         },
         {
           "alg" : "SHA-384",
-          "content" : "137d0455095796e19109d2adc22731333c6b5cdf93883e23326b41df2aa8a66f5024cc3a674691b798d3b56d0651e6fb"
+          "content" : "52403b4d4ffc723b28a1241be50ecad65a72442728ea91008c22b65a128e2caee32e19674ff7c4c669a4ef3a974edfb9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "beb5b02562d6ef2131b1908a828db32dd449323591c94390bafb631b7ba1d1f23d66aaaacdd108f5a43d26f90c057c66"
+          "content" : "12984ce00e46ae82ff1d4a058aca735b615dbfec84b8f164c5715ecdfc0e613e98a0194d00a7c12049655b22c53602f3"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "4db6c03c786fef8649b185f0bebf21983332381f8accccb58db389e632cf3d74"
+          "content" : "20e83b4c441412f025e134d20800efc4ddd31f325c15ff48a8c20f7bb47557b3"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "193a5ce4dab905c24224e11b3e915f4d184de844799b1ac423ec8c67e829b72cb027d00e722a1957c6c6cfe5c24b34fd08c8b230521e24a332190e572324af0f"
+          "content" : "c9d5b160ef92142135838d4460c4dda975c2c57af3f2b34ca1df2372d6ad8a78f371508c4f7a1c5b3ef385c06e318cda959a39c7da09712e8ccd8f1a836ca00c"
         }
       ],
       "licenses" : [
@@ -8059,7 +8173,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.2?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -18743,11 +18857,21 @@
       "dependsOn" : [ ]
     },
     {
+      "ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
       "ref" : "pkg:maven/com.beust/jcommander@1.82?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar",
+      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -18821,8 +18945,10 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar",
-      "dependsOn" : [ ]
+      "ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+      "dependsOn" : [
+        "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"
+      ]
     },
     {
       "ref" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar",
@@ -19012,18 +19138,18 @@
     {
       "ref" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
       "dependsOn" : [
-        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.18.0?type=jar",
+        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar",
-        "pkg:maven/com.github.librepdf/openpdf@3.0.4?type=jar",
+        "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.4.2?type=jar",
         "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
         "pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@12.6.2?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.2?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
@@ -19613,15 +19739,15 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.6.2?type=jar",
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.2?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.1?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.6.2?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@12.6.1?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@12.6.2?type=jar"
       ]
     },
     {

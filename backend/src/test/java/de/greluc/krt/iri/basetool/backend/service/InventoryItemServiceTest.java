@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
@@ -16,6 +17,7 @@ import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.*;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -54,7 +56,7 @@ class InventoryItemServiceTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
 
   @Mock private MaterialMapper materialMapper;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private InventoryItemService inventoryItemService;
 
@@ -115,7 +117,7 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
 
-    when(inventoryItemRepository.findMatchingInventoryItem(
+    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
             any(User.class),
             any(Material.class),
             any(Location.class),
@@ -143,7 +145,10 @@ class InventoryItemServiceTest {
   void getAggregatedInventory_shouldReturnPage() {
     Object[] obj = new Object[] {new Material(), 10.0, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
-    when(inventoryItemRepository.getAggregatedInventory(isNull(), any(Pageable.class)))
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.getAggregatedInventory(
+            anyBoolean(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
     when(materialMapper.toDto(any())).thenReturn(null);
 
@@ -162,9 +167,10 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
     // Post-fix #5: getInventoryByMaterial routes through the scoped repository variant so
     // a Lager-direct drilldown stays strictly squadron-isolated.
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findByMaterialAndPersonalFalseScoped(
-            any(), org.mockito.ArgumentMatchers.isNull(), any()))
+            any(), anyBoolean(), any(), any(), any()))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
@@ -192,6 +198,8 @@ class InventoryItemServiceTest {
 
   @Test
   void getAllInventory_shouldReturnAll_whenMaterialIdIsNull() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
@@ -200,7 +208,9 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -220,6 +230,8 @@ class InventoryItemServiceTest {
     List<UUID> jobOrderIds = List.of(jobOrderId);
     List<UUID> missionIds = List.of(missionId);
 
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
@@ -228,7 +240,9 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -250,7 +264,9 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
-            isNull(),
+            anyBoolean(),
+            any(),
+            any(),
             any(Pageable.class));
   }
 
@@ -380,7 +396,8 @@ class InventoryItemServiceTest {
     UUID locationId = UUID.randomUUID();
 
     InventoryItemCreateDto dto =
-        new InventoryItemCreateDto(userId, materialId, locationId, 100, 10.0, false, null, null);
+        new InventoryItemCreateDto(
+            userId, materialId, locationId, 100, 10.0, false, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -432,7 +449,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, inputAmount, false, null, null);
+            userId, materialId, locationId, 100, inputAmount, false, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -466,7 +483,7 @@ class InventoryItemServiceTest {
     UUID targetUserId = UUID.randomUUID();
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            targetUserId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null);
+            targetUserId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, null);
 
     assertThrows(
         AccessDeniedException.class,
@@ -479,7 +496,7 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -501,7 +518,7 @@ class InventoryItemServiceTest {
   void bookOutInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -521,7 +538,8 @@ class InventoryItemServiceTest {
     UUID targetUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L);
+        new InventoryItemBookOutDto(
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -549,7 +567,7 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -579,7 +597,7 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -602,7 +620,7 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L);
+        new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -625,7 +643,8 @@ class InventoryItemServiceTest {
             CheckoutType.SELL,
             "Terminal 1",
             new java.math.BigDecimal("100.50"),
-            1L);
+            1L,
+            null);
 
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -1077,42 +1096,124 @@ class InventoryItemServiceTest {
 
   @Test
   void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
-    // Given: admin in "all squadrons" mode (no active scope) — null scope = cross-staffel wipe.
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(42);
+    // Given: admin in "all squadrons" mode (no active scope) — adminAllScope=true wipes across.
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
+        .thenReturn(42);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(42, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(null);
+    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
     // Given
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
-    when(inventoryItemRepository.deleteAllNonPersonal(null)).thenReturn(0);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
+        .thenReturn(0);
 
     // When
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     // Then
     assertEquals(0, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(null);
+    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
   }
 
   @Test
   void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
     // Given: focused admin / member in squadron A — only their own stock gets wiped.
     UUID scope = UUID.randomUUID();
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
-    when(inventoryItemRepository.deleteAllNonPersonal(scope)).thenReturn(7);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
+    when(inventoryItemRepository.deleteAllNonPersonal(false, scope, java.util.Set.of()))
+        .thenReturn(7);
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(7, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(scope);
+    verify(inventoryItemRepository).deleteAllNonPersonal(false, scope, java.util.Set.of());
+  }
+
+  // --- R5.d picker output (owningOrgUnitId) ---------------------------------
+  // The membership-validation + Squadron-resolution logic itself is centralised on
+  // OwnerScopeService.resolveSquadronForPickerOutput and pinned by OwnerScopeServiceTest. These two
+  // tests just verify that InventoryItemService.createInventoryItem delegates to the helper and
+  // honours / propagates its outcome.
+
+  @Test
+  void createInventoryItem_delegatesPickerResolutionToOwnerScopeService() {
+    UUID userId = UUID.randomUUID();
+    UUID pickedOrgUnitId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            pickedOrgUnitId);
+
+    User user = new User();
+    user.setId(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
+    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
+
+    Squadron resolved = new Squadron();
+    resolved.setId(pickedOrgUnitId);
+    when(ownerScopeService.resolveSquadronForPickerOutput(user, pickedOrgUnitId))
+        .thenReturn(resolved);
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    inventoryItemService.createInventoryItem(dto, userId, true);
+
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(
+        resolved,
+        captor.getValue().getOwningSquadron(),
+        "owner-picker resolution must be honoured verbatim");
+  }
+
+  @Test
+  void createInventoryItem_propagatesBadRequestFromOwnerScopeService() {
+    UUID userId = UUID.randomUUID();
+    UUID foreignOrgUnitId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            foreignOrgUnitId);
+
+    User user = new User();
+    user.setId(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
+    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
+    when(ownerScopeService.resolveSquadronForPickerOutput(user, foreignOrgUnitId))
+        .thenThrow(new BadRequestException("not a membership"));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, true));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 }

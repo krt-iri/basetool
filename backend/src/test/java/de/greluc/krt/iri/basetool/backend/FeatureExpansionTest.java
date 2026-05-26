@@ -174,7 +174,8 @@ class FeatureExpansionTest {
   @Test
   void testShipWithLocation() throws Exception {
     ShipRequestDto req =
-        new ShipRequestDto("Located Ship", fighter.getId(), "LTI", stanton.getId(), false, null);
+        new ShipRequestDto(
+            "Located Ship", fighter.getId(), "LTI", stanton.getId(), false, null, null);
 
     // Use HangarController to add ship
     String response =

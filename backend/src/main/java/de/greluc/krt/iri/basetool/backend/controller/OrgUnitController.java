@@ -1,0 +1,67 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Read-only REST surface for the org-unit hierarchy ({@link
+ * de.greluc.krt.iri.basetool.backend.model.OrgUnit}). Lives at {@code /api/v1/org-units} and today
+ * exposes a single endpoint — the active-options list that the R5.d.c Job Order create form's
+ * owner-picker consumes.
+ *
+ * <p>The endpoint complements {@code /api/v1/users/{id}/memberships} (introduced in R5.d.a):
+ *
+ * <ul>
+ *   <li>{@code /users/{id}/memberships} returns the picker options bounded by a specific user's
+ *       memberships. Used by aggregate-creation forms whose owner row carries a Staffel membership
+ *       (inventory create, refinery-order create).
+ *   <li>{@code /org-units/active} returns every active org unit, irrespective of any user's
+ *       memberships. Used by the Job Order create form because Job Orders are cross-staffel
+ *       workspaces — any active org unit may be the {@code requestingOrgUnitId} of a new order.
+ * </ul>
+ *
+ * <p>Both endpoints return the same {@link OrgUnitMembershipOptionDto} wire shape so the picker
+ * fragment can iterate them identically without branching on the source endpoint.
+ */
+@RestController
+@RequestMapping("/api/v1/org-units")
+@RequiredArgsConstructor
+@Tag(name = "org-unit-controller", description = "Read-only org-unit hierarchy endpoints")
+public class OrgUnitController {
+
+  private final OrgUnitMembershipService orgUnitMembershipService;
+
+  /**
+   * Lists every active org unit (Staffel + Spezialkommando) as picker options. Open to every
+   * authenticated member — the response reveals only public attributes (name + shorthand + kind),
+   * no PII, and Job Order creation already exposes the requesting org unit on the wire.
+   *
+   * @return picker options sorted Staffel-first then Spezialkommandos alphabetical.
+   */
+  @GetMapping("/active")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "List every active org unit",
+      description =
+          "Returns the full active Staffel + Spezialkommando catalog as picker options. Drives the"
+              + " R5.d.c Job Order create form's owner-picker — Job Orders are cross-staffel"
+              + " workspaces and the picker must offer the full active list, not the caller's"
+              + " memberships.")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
+  public List<OrgUnitMembershipOptionDto> listActiveOrgUnits() {
+    return orgUnitMembershipService.listAllActiveOptions();
+  }
+}

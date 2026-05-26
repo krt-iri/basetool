@@ -108,7 +108,7 @@ public class OperationService {
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
   private final SystemSettingService systemSettingService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns paged operation list.
@@ -117,8 +117,9 @@ public class OperationService {
    * @return paged operation list
    */
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return operationRepository.findAllScoped(owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.findAllScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
   }
 
   /**
@@ -128,7 +129,7 @@ public class OperationService {
    * missions' date-range filter has no meaningful equivalent here and is deliberately omitted.
    * Falls back to the full {@link OperationStatus} enum set when {@code status} is {@code null} or
    * empty - the SQL contract requires a non-empty list. The squadron scope is resolved through
-   * {@link SquadronScopeService} (admin "all squadrons" mode resolves to {@code null}).
+   * {@link OwnerScopeService} (admin "all squadrons" mode resolves to {@code null}).
    *
    * @param query free-text name/description fragment, may be {@code null}
    * @param status status list (string names of {@link OperationStatus}); {@code null}/empty means
@@ -143,8 +144,14 @@ public class OperationService {
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
             : status;
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return operationRepository.searchOperations(query, effectiveStatus, owningSquadronId, pageable);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.searchOperations(
+        query,
+        effectiveStatus,
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**
@@ -158,8 +165,9 @@ public class OperationService {
   @NotNull
   public java.util.List<de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto>
       findAllReference() {
-    UUID owningSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return operationRepository.findAllReferenceScoped(owningSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return operationRepository.findAllReferenceScoped(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 
   /**
@@ -197,15 +205,38 @@ public class OperationService {
   }
 
   /**
-   * Persists a new operation.
+   * Persists a new operation. R5.d.e routes the owning-Staffel stamp through the shared picker
+   * resolver when an authenticated caller is on the security context.
+   *
+   * <ul>
+   *   <li>Caller resolved AND {@code owningOrgUnitId} provided → resolver validates the picked org
+   *       unit against the caller's memberships and stamps the corresponding Staffel (rejecting
+   *       Spezialkommando selections with {@code BadRequestException} until the cleanup release
+   *       lifts the NOT NULL on {@code owning_squadron_id}).
+   *   <li>Caller resolved AND {@code owningOrgUnitId} is {@code null} → resolver falls back to the
+   *       caller's home Staffel via {@code User.getSquadron()}. Functionally identical to the
+   *       legacy "stamp from active scope" path for the common single-membership case.
+   *   <li>No authenticated caller (admin in "all squadrons" mode, anonymous fallback) → preserve
+   *       the historical {@code OwnerScopeService.currentSquadron()} path. The picker UUID, if
+   *       supplied, cannot be membership-validated without a user, so it is ignored.
+   * </ul>
    *
    * @param operation transient entity
+   * @param owningOrgUnitId optional picker output from {@link
+   *     de.greluc.krt.iri.basetool.backend.model.dto.OperationCreateDto#owningOrgUnitId}; {@code
+   *     null} for the legacy implicit-scope path.
    * @return the persisted operation
    */
   @Transactional
-  public Operation createOperation(@NotNull Operation operation) {
+  public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
     if (operation.getOwningSquadron() == null) {
-      squadronScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+      User caller = userService.getCurrentUser().orElse(null);
+      if (caller != null) {
+        operation.setOwningSquadron(
+            ownerScopeService.resolveSquadronForPickerOutput(caller, owningOrgUnitId));
+      } else {
+        ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+      }
     }
     return operationRepository.save(operation);
   }

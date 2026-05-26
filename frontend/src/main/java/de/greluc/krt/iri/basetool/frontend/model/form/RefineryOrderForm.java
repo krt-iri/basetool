@@ -47,6 +47,14 @@ public class RefineryOrderForm {
   private de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus status;
   private Long version;
   private String source;
+
+  /**
+   * R5.d owner-picker output: the {@code OrgUnit} the new refinery order should be stamped on.
+   * {@code null} when the chosen owner has at most one org-unit membership (fragment is hidden in
+   * that case and the backend falls back to the owner's home Staffel).
+   */
+  private UUID owningOrgUnitId;
+
   @Valid private List<RefineryGoodForm> goods = new ArrayList<>();
 
   /** Seeds the form with one empty good row so the "add good" UI starts non-empty. */

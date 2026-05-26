@@ -93,7 +93,7 @@ public class RefineryOrderController {
    * @return the refinery-order DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canSeeRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeRefineryOrder(#id)")
   @Transactional(readOnly = true)
   public RefineryOrderDto getRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
@@ -171,7 +171,8 @@ public class RefineryOrderController {
       }
     }
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
+        refineryOrderService.createRefineryOrder(
+            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -185,7 +186,7 @@ public class RefineryOrderController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
   public RefineryOrderDto updateMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -221,7 +222,7 @@ public class RefineryOrderController {
    * #updateMyRefineryOrder}.
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
   public void deleteMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     refineryOrderService.deleteRefineryOrder(
@@ -233,7 +234,7 @@ public class RefineryOrderController {
    * target location.
    */
   @PostMapping("/{id}/store")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
   public void storeMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -318,7 +319,8 @@ public class RefineryOrderController {
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     RefineryOrder saved =
-        refineryOrderService.createRefineryOrder(userId, mapper.toEntity(orderDto));
+        refineryOrderService.createRefineryOrder(
+            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -329,7 +331,7 @@ public class RefineryOrderController {
    * @return the persisted DTO
    */
   @PutMapping("/users/{userId}/{orderId}")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @squadronScopeService.canEditRefineryOrder(#orderId)")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId)")
   public RefineryOrderDto updateUserRefineryOrder(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
@@ -342,7 +344,7 @@ public class RefineryOrderController {
 
   /** Logistician-only: cancels a target user's refinery order. */
   @DeleteMapping("/users/{userId}/{orderId}")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @squadronScopeService.canEditRefineryOrder(#orderId)")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId)")
   public void deleteUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
     refineryOrderService.deleteRefineryOrder(userId, orderId, true);

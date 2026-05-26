@@ -170,7 +170,7 @@ public class HangarController {
    * @return the persisted ship DTO
    */
   @PutMapping("/ships/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditShip(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditShip(#id)")
   @Transactional
   public ShipDto updateMyShip(
       @AuthenticationPrincipal Jwt jwt,
@@ -184,7 +184,7 @@ public class HangarController {
    * Deletes one of the calling user's ships. Mission-unit references are detached before delete.
    */
   @DeleteMapping("/ships/{id}")
-  @PreAuthorize("isAuthenticated() and @squadronScopeService.canEditShip(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditShip(#id)")
   public void deleteMyShip(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     hangarService.deleteShip(userService.getUserIdFromJwt(jwt), id);
   }

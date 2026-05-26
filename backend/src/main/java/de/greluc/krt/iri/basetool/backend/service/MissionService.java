@@ -88,7 +88,7 @@ public class MissionService {
   private final MissionOwnershipRepository missionOwnershipRepository;
   private final OperationRepository operationRepository;
   private final UserService userService;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
 
   /**
@@ -117,18 +117,19 @@ public class MissionService {
   /**
    * Returns lightweight reference projection of active missions (id + display name + status +
    * planned start) used by typeaheads. Squadron-scoped via {@link
-   * SquadronScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's
-   * missions PLUS any non-internal mission of any squadron, mirroring {@link
-   * #searchMissions(String, Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all
-   * squadrons" mode get the unfiltered cross-staffel list. Audit finding H-4: the previous
-   * implementation leaked the names of foreign squadrons' internal missions through this dropdown.
+   * OwnerScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's missions
+   * PLUS any non-internal mission of any squadron, mirroring {@link #searchMissions(String,
+   * Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all squadrons" mode get the
+   * unfiltered cross-staffel list. Audit finding H-4: the previous implementation leaked the names
+   * of foreign squadrons' internal missions through this dropdown.
    *
    * @return lightweight reference projection of active missions visible to the caller
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
-    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
-    return missionRepository.findAllActiveReference(scopeSquadronId);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return missionRepository.findAllActiveReference(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 
   /**
@@ -155,9 +156,18 @@ public class MissionService {
     if (!authHelperService.isAuthenticated()) {
       effectiveIsInternal = Boolean.FALSE;
     }
-    UUID scopeSquadronId = squadronScopeService.currentSquadronId().orElse(null);
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return missionRepository.searchMissions(
-        query, start, end, status, effectiveIsInternal, operationId, scopeSquadronId, pageable);
+        query,
+        start,
+        end,
+        status,
+        effectiveIsInternal,
+        operationId,
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**
@@ -209,16 +219,24 @@ public class MissionService {
     Mission mission = new Mission();
     applyCreatePayload(mission, request);
 
-    // Fail-fast on the time-window validation BEFORE the userService / squadronScopeService
+    // Fail-fast on the time-window validation BEFORE the userService / ownerScopeService
     // round-trips so a malformed payload does not waste a DB / security-context lookup.
     validateMissionTimes(mission);
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
 
-    if (mission.getOwner() != null && mission.getOwner().getSquadron() != null) {
-      mission.setOwningSquadron(mission.getOwner().getSquadron());
+    if (mission.getOwner() != null) {
+      // R5.d.d: owner present → route through the shared picker resolver, which honours an
+      // explicit owningOrgUnitId from the form if the caller is a member of that org unit, and
+      // falls back to the owner's home Staffel when the field is null.
+      mission.setOwningSquadron(
+          ownerScopeService.resolveSquadronForPickerOutput(
+              mission.getOwner(), request.owningOrgUnitId()));
     } else {
-      squadronScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
+      // No authenticated owner (admin in "all squadrons" mode or anonymous fallback) — the
+      // picker field, if supplied, cannot be membership-validated. Honour the historical
+      // behaviour: stamp from the active squadron scope.
+      ownerScopeService.currentSquadron().ifPresent(mission::setOwningSquadron);
     }
 
     return missionRepository.save(mission);

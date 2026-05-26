@@ -66,7 +66,7 @@ public class PromotionEligibilityService {
 
   private final RankRequirementRepository rankRequirementRepository;
   private final MemberEvaluationRepository memberEvaluationRepository;
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Evaluates the eligibility of the given user for one specific rank transition.
@@ -82,7 +82,7 @@ public class PromotionEligibilityService {
    */
   public PromotionEligibilityResponse evaluateForRanks(
       @NotNull String userId, int fromRank, int toRank) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
     }
     List<RankRequirement> requirements =
@@ -121,7 +121,7 @@ public class PromotionEligibilityService {
    * @return eligibility entries for every configured transition, possibly empty
    */
   public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull String userId) {
-    if (!squadronScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
     List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitions();

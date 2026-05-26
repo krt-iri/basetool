@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface over mission finance entries. Reads are mission-scoped (via {@code
  * /missions/{missionId}/finance-entries}); writes are entry-scoped (via {@code
  * /finance-entries/{entryId}}). Creation stays open to anonymous callers so guest participants can
- * record their own payouts, but the {@code @squadronScopeService.canSeeMission} gate now blocks
+ * record their own payouts, but the {@code @ownerScopeService.canSeeMission} gate now blocks
  * unauthenticated POSTs against internal missions (audit finding C-2) and the response is redacted
  * for guests via {@link #cleanupParticipantForGuest}. Update/delete remain authenticated and are
  * gated on {@link
@@ -93,8 +93,8 @@ public class MissionFinanceEntryController {
 
   /**
    * Creates a finance entry. Open to anonymous callers (guests recording their own payout line),
-   * but gated by {@code @squadronScopeService.canSeeMission(dto.missionId)} so internal missions
-   * are not writable without authentication, and the response is redacted via {@link
+   * but gated by {@code @ownerScopeService.canSeeMission(dto.missionId)} so internal missions are
+   * not writable without authentication, and the response is redacted via {@link
    * #cleanupParticipantForGuest} when the caller is anonymous to avoid leaking the linked
    * participant's email / real name / roles (audit finding C-2).
    *
@@ -104,7 +104,7 @@ public class MissionFinanceEntryController {
    */
   @PostMapping("/finance-entries")
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("@squadronScopeService.canSeeMission(#dto.missionId())")
+  @PreAuthorize("@ownerScopeService.canSeeMission(#dto.missionId())")
   public MissionFinanceEntryDto createFinanceEntry(
       @RequestBody @Valid MissionFinanceEntryCreateDto dto, @AuthenticationPrincipal Jwt jwt) {
     MissionFinanceEntryDto created = financeEntryService.createEntry(dto);

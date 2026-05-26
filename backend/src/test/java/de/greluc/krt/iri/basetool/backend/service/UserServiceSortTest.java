@@ -32,7 +32,7 @@ class UserServiceSortTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private UserService userService;
 
@@ -43,7 +43,7 @@ class UserServiceSortTest {
   void findAll_shouldRequestSortedUsers() {
     // Given: admin in "all squadrons" mode — squadron scope is empty so the repository receives
     // a null filter alongside the case-insensitive sort.
-    when(squadronScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
     when(userRepository.findAllScopedList(
             org.mockito.ArgumentMatchers.<java.util.UUID>any(),
             org.mockito.ArgumentMatchers.<Sort>any()))

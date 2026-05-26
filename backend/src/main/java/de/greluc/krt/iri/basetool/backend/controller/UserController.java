@@ -1,9 +1,11 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.iri.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import java.time.LocalDate;
@@ -45,6 +47,7 @@ public class UserController {
   private final UserService userService;
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
    * Paged user list. Open to every authenticated member because the participant pickers in the
@@ -138,8 +141,33 @@ public class UserController {
   }
 
   /**
+   * Lists every org unit the given user is a member of, materialised as picker-optimised {@link
+   * OrgUnitMembershipOptionDto} rows. Backs the R5.d owner-picker fragment: a Thymeleaf form with
+   * an explicit target-user dropdown can populate its {@code <select>} of legal {@code
+   * owningOrgUnitId} values directly from this endpoint, without having to thread membership data
+   * through every page controller.
+   *
+   * <p>Access policy: open to every authenticated member. The endpoint reveals only the names and
+   * shorthands of org units a target user belongs to — equivalent in sensitivity to the {@code
+   * /lookup} typeahead, which is already broadly accessible. A non-admin cannot derive any
+   * personally identifying data from the response (no display name, no email, no rank). Keeping the
+   * surface symmetric with {@code /lookup} avoids forcing the picker fragment to branch on the
+   * caller's role at render time.
+   *
+   * @param id the user id whose memberships to list; never {@code null}.
+   * @return picker-friendly option DTOs sorted Staffel-first then SK alphabetical; never {@code
+   *     null}, possibly empty when the user has no memberships.
+   */
+  @GetMapping("/{id}/memberships")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @Transactional(readOnly = true)
+  public List<OrgUnitMembershipOptionDto> getUserMemberships(@PathVariable @NotNull UUID id) {
+    return orgUnitMembershipService.listOptionsForUser(id);
+  }
+
+  /**
    * Returns {@code true} when the caller is a non-admin and the target user belongs to a foreign
-   * squadron (or to a squadron the caller cannot see via {@code SquadronScopeService}). Used to
+   * squadron (or to a squadron the caller cannot see via {@code OwnerScopeService}). Used to
    * tighten {@link #getUserById} to "same squadron or admin" for full-PII access. Users without a
    * squadron (admins, unassigned) are treated as cross-squadron for non-admin callers — full PII on
    * an unassigned account remains admin-only.

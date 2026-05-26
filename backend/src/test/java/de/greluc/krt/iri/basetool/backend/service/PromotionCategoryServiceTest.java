@@ -32,7 +32,7 @@ class PromotionCategoryServiceTest {
 
   @Mock private PromotionCategoryMapper mapper;
 
-  @Mock private SquadronScopeService squadronScopeService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private PromotionCategoryService service;
 
@@ -44,9 +44,7 @@ class PromotionCategoryServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient()
-        .when(squadronScopeService.isPromotionFeatureEnabledForCurrentScope())
-        .thenReturn(true);
+    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
   }
 
   @Test

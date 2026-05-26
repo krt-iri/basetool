@@ -19,10 +19,12 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import de.greluc.krt.iri.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,8 +46,7 @@ class MissionServiceTest {
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
-  @Mock
-  private de.greluc.krt.iri.basetool.backend.service.SquadronScopeService squadronScopeService;
+  @Mock private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService ownerScopeService;
 
   @Mock private de.greluc.krt.iri.basetool.backend.service.UserService userService;
 
@@ -93,14 +94,17 @@ class MissionServiceTest {
     // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
     // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
     Pageable pageable = PageRequest.of(0, 10);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, null, pageable))
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
-        .searchMissions(query, start, end, status, Boolean.FALSE, null, null, pageable);
+        .searchMissions(
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable);
   }
 
   @Test
@@ -199,6 +203,7 @@ class MissionServiceTest {
             plannedStart,
             null,
             false,
+            null,
             null);
 
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
@@ -217,6 +222,7 @@ class MissionServiceTest {
             now.plus(2, ChronoUnit.HOURS),
             now.plus(1, ChronoUnit.HOURS),
             false,
+            null,
             null);
 
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
@@ -238,35 +244,59 @@ class MissionServiceTest {
     caller.setSquadron(home);
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveSquadronForPickerOutput(caller, null)).thenReturn(home);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null));
 
     assertEquals(home, saved.getOwningSquadron());
     assertEquals(caller, saved.getOwner());
   }
 
   @Test
-  void createMission_fallsBackToCurrentSquadronScopeWhenOwnerHasNoSquadron() {
-    User callerWithoutHome = new User();
-    callerWithoutHome.setId(UUID.randomUUID());
-    callerWithoutHome.setSquadron(null);
+  void createMission_fallsBackToCurrentSquadronScopeWhenNoOwnerResolved() {
     Squadron scopeSquadron = new Squadron();
     scopeSquadron.setId(UUID.randomUUID());
 
-    when(userService.getCurrentUser()).thenReturn(Optional.of(callerWithoutHome));
-    when(squadronScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
+    // R5.d.d branch flip: the fallback fires when getCurrentUser() returns empty, not when the
+    // owner has no home Staffel. An authenticated owner without a home Staffel now flows through
+    // OwnerScopeService.resolveSquadronForPickerOutput and inherits whatever that returns.
+    when(userService.getCurrentUser()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentSquadron()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null));
 
     assertEquals(scopeSquadron, saved.getOwningSquadron());
+  }
+
+  @Test
+  void createMission_honoursOwningOrgUnitIdFromTheRequestViaPickerResolver() {
+    Squadron home = new Squadron();
+    home.setId(UUID.randomUUID());
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setSquadron(home);
+    Squadron picked = new Squadron();
+    picked.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveSquadronForPickerOutput(caller, picked.getId()))
+        .thenReturn(picked);
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Mission saved =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Test", null, null, "PLANNED", null, null, null, false, null, picked.getId()));
+
+    assertEquals(picked, saved.getOwningSquadron(), "picker output must be honoured verbatim");
   }
 
   @Test
@@ -285,7 +315,7 @@ class MissionServiceTest {
         missionService.addSubMission(
             parentId,
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Sub", null, null, "PLANNED", null, null, null, false, null));
+                "Sub", null, null, "PLANNED", null, null, null, false, null, null));
 
     assertEquals(parentSquadron, saved.getOwningSquadron());
     assertEquals(parent, saved.getParent());

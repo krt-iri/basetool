@@ -1,6 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
-import de.greluc.krt.iri.basetool.backend.service.SquadronScopeService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class MeController {
 
-  private final SquadronScopeService squadronScopeService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Returns the squadron context that the backend currently applies to staffel-scoped queries for
@@ -40,7 +40,7 @@ public class MeController {
    */
   @GetMapping("/active-squadron")
   public ActiveSquadronResponse getActiveSquadron() {
-    return new ActiveSquadronResponse(squadronScopeService.currentSquadronId().orElse(null));
+    return new ActiveSquadronResponse(ownerScopeService.currentSquadronId().orElse(null));
   }
 
   /**

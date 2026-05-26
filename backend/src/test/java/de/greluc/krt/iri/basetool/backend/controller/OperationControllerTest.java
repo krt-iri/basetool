@@ -42,14 +42,15 @@ class OperationControllerTest {
   @Test
   void shouldCreateOperation() {
     // Given
-    OperationCreateDto createDto = new OperationCreateDto("Test", "Desc", OperationStatus.PLANNED);
+    OperationCreateDto createDto =
+        new OperationCreateDto("Test", "Desc", OperationStatus.PLANNED, null);
     Operation operation = new Operation();
     OperationDto operationDto =
         new OperationDto(
             UUID.randomUUID(), "Test", "Desc", OperationStatus.PLANNED, null, 0L, null, null, null);
 
     when(operationMapper.toEntity(createDto)).thenReturn(operation);
-    when(operationService.createOperation(operation)).thenReturn(operation);
+    when(operationService.createOperation(operation, null)).thenReturn(operation);
     when(operationMapper.toDto(operation)).thenReturn(operationDto);
 
     // When
@@ -58,7 +59,7 @@ class OperationControllerTest {
     // Then
     assertNotNull(result);
     assertEquals("Test", result.name());
-    verify(operationService, times(1)).createOperation(operation);
+    verify(operationService, times(1)).createOperation(operation, null);
   }
 
   // --- Sort whitelisting ---------------------------------------------------

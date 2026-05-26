@@ -44,10 +44,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Verifies the per-squadron promotion-feature gate end-to-end through {@link SquadronScopeService}
- * + the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
+ * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
+ * the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
  * pattern, so one representative is enough — every gated call site uses the same {@code
- * SquadronScopeService} primitive).
+ * OwnerScopeService} primitive).
  *
  * <p>What's pinned here: admins bypass the gate (because they own the toggle), Officers / members
  * of a flag-off squadron get empty reads and {@link AccessDeniedException} on writes, and the
@@ -67,7 +67,11 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private OperationRepository operationRepository;
   @Mock private ShipRepository shipRepository;
 
-  @InjectMocks private SquadronScopeService squadronScopeService;
+  // R2.c: the real flag-resolution logic moved from OwnerScopeService to OwnerScopeService;
+  // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
+  // tests further down still receive the OwnerScopeService shim as a plain Mockito mock — the
+  // shim's bean shape is unchanged from the caller's perspective.
+  @InjectMocks private OwnerScopeService ownerScopeService;
 
   private static Squadron squadron(UUID id, boolean enabled) {
     Squadron s = new Squadron();
@@ -87,8 +91,8 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("Admin always bypasses the feature flag, even when the squadron has it OFF")
   void adminAlwaysPassesGate() {
     when(authHelper.isAdmin()).thenReturn(true);
-    assertTrue(squadronScopeService.isPromotionFeatureEnabledForCurrentScope());
-    squadronScopeService.assertPromotionFeatureEnabled();
+    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    ownerScopeService.assertPromotionFeatureEnabled();
   }
 
   @Test
@@ -103,8 +107,8 @@ class PromotionFeatureFlagServiceGateTest {
     when(squadronRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, true)));
 
-    assertTrue(squadronScopeService.isPromotionFeatureEnabledForCurrentScope());
-    squadronScopeService.assertPromotionFeatureEnabled();
+    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    ownerScopeService.assertPromotionFeatureEnabled();
   }
 
   @Test
@@ -119,11 +123,10 @@ class PromotionFeatureFlagServiceGateTest {
     when(squadronRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, false)));
 
-    assertFalse(squadronScopeService.isPromotionFeatureEnabledForCurrentScope());
+    assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     AccessDeniedException ex =
         assertThrows(
-            AccessDeniedException.class,
-            () -> squadronScopeService.assertPromotionFeatureEnabled());
+            AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
     assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
   }
 
@@ -131,7 +134,7 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("Non-admin without an effective squadron defaults to enabled")
   void nonAdminWithoutSquadronDefaultsToEnabled() {
     when(authHelper.currentUserId()).thenReturn(Optional.empty());
-    assertTrue(squadronScopeService.isPromotionFeatureEnabledForCurrentScope());
+    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
   }
 
   @Test
@@ -139,7 +142,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicList_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
     Pageable pageable = PageRequest.of(0, 20);
@@ -155,7 +158,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicListAll_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
 
@@ -168,7 +171,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicCreate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
@@ -183,7 +186,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicUpdate_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
@@ -200,7 +203,7 @@ class PromotionFeatureFlagServiceGateTest {
   void topicDelete_throwsWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
-    SquadronScopeService scopeStub = mock(SquadronScopeService.class);
+    OwnerScopeService scopeStub = mock(OwnerScopeService.class);
     PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 

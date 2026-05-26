@@ -71,6 +71,7 @@ class InventoryItemServiceBookOutTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private InventoryItemService service;
 
@@ -611,7 +612,74 @@ class InventoryItemServiceBookOutTest {
       BigDecimal sellAmount,
       Long version) {
     return new InventoryItemBookOutDto(
-        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version);
+        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version, null);
+  }
+
+  // --- R5.d.g TRANSFER picker delegation -----------------------------------
+
+  @Test
+  void bookOutInventoryItem_transferWithTargetOwningOrgUnitId_routesThroughResolver() {
+    UUID itemId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID pickedOrgUnitId = UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.backend.model.User owner =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    owner.setId(UUID.randomUUID());
+    de.greluc.krt.iri.basetool.backend.model.User targetUser =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    targetUser.setId(targetUserId);
+    de.greluc.krt.iri.basetool.backend.model.Squadron picked =
+        new de.greluc.krt.iri.basetool.backend.model.Squadron();
+    picked.setId(pickedOrgUnitId);
+
+    de.greluc.krt.iri.basetool.backend.model.InventoryItem item =
+        new de.greluc.krt.iri.basetool.backend.model.InventoryItem();
+    item.setId(itemId);
+    item.setVersion(1L);
+    item.setAmount(10.0);
+    item.setUser(owner);
+    de.greluc.krt.iri.basetool.backend.model.Location loc =
+        new de.greluc.krt.iri.basetool.backend.model.Location();
+    loc.setId(UUID.randomUUID());
+    item.setLocation(loc);
+    item.setMaterial(new de.greluc.krt.iri.basetool.backend.model.Material());
+    item.setPersonal(false);
+
+    org.mockito.Mockito.when(inventoryItemRepository.findById(itemId))
+        .thenReturn(java.util.Optional.of(item));
+    org.mockito.Mockito.when(userRepository.findById(targetUserId))
+        .thenReturn(java.util.Optional.of(targetUser));
+    org.mockito.Mockito.when(
+            ownerScopeService.resolveSquadronForPickerOutput(targetUser, pickedOrgUnitId))
+        .thenReturn(picked);
+    org.mockito.ArgumentCaptor<de.greluc.krt.iri.basetool.backend.model.InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(
+            de.greluc.krt.iri.basetool.backend.model.InventoryItem.class);
+    org.mockito.Mockito.when(
+            inventoryItemRepository.save(
+                any(de.greluc.krt.iri.basetool.backend.model.InventoryItem.class)))
+        .thenAnswer(i -> i.getArguments()[0]);
+
+    InventoryItemBookOutDto dto =
+        new InventoryItemBookOutDto(
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, pickedOrgUnitId);
+
+    service.bookOutInventoryItem(itemId, dto, owner.getId(), false);
+
+    org.mockito.Mockito.verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce())
+        .save(captor.capture());
+    java.util.List<de.greluc.krt.iri.basetool.backend.model.InventoryItem> saved =
+        captor.getAllValues();
+    de.greluc.krt.iri.basetool.backend.model.InventoryItem newRow =
+        saved.stream()
+            .filter(i -> i.getUser() == targetUser)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected a save for the new transfer row"));
+    org.junit.jupiter.api.Assertions.assertSame(
+        picked,
+        newRow.getOwningSquadron(),
+        "picker output must flow through resolveSquadronForPickerOutput on the new row");
   }
 
   private static InventoryItemDto sentinelDto(Double amount) {
