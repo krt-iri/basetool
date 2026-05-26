@@ -1273,7 +1273,7 @@ public class MissionPageController {
    */
   @PostMapping("/{id}/managers/{userId}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Void> addManager(
+  public org.springframework.http.ResponseEntity<Object> addManager(
       @PathVariable String id, @PathVariable String userId) {
     log.debug("START addManager - id: '{}', userId: '{}'", id, userId);
     try {
@@ -1314,7 +1314,7 @@ public class MissionPageController {
             e.getStatusCode(),
             e.getMessage(),
             e.getReadableErrorMessage());
-        return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        return propagateBackendError(e);
       }
     } catch (Exception e) {
       log.debug(
@@ -1335,7 +1335,7 @@ public class MissionPageController {
    */
   @DeleteMapping("/{id}/managers/{userId}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Void> removeManager(
+  public org.springframework.http.ResponseEntity<Object> removeManager(
       @PathVariable String id, @PathVariable String userId) {
     log.debug("START removeManager - id: '{}', userId: '{}'", id, userId);
     try {
@@ -1375,7 +1375,7 @@ public class MissionPageController {
           e.getStatusCode(),
           e.getMessage(),
           e.getReadableErrorMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in removeManager: id='{}', userId='{}', error={}",
@@ -1395,7 +1395,7 @@ public class MissionPageController {
    */
   @PutMapping("/{id}/owner/{userId}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Void> setMissionOwner(
+  public org.springframework.http.ResponseEntity<Object> setMissionOwner(
       @PathVariable String id, @PathVariable String userId) {
     log.debug("START setMissionOwner - id: '{}', userId: '{}'", id, userId);
     try {
@@ -1436,7 +1436,7 @@ public class MissionPageController {
             e.getStatusCode(),
             e.getMessage(),
             e.getReadableErrorMessage());
-        return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+        return propagateBackendError(e);
       }
     } catch (Exception e) {
       log.debug(
@@ -1522,7 +1522,7 @@ public class MissionPageController {
           "Add/update frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1550,7 +1550,7 @@ public class MissionPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Delete frequency (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
@@ -1578,7 +1578,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1605,7 +1605,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1626,7 +1626,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1662,7 +1662,7 @@ public class MissionPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1698,7 +1698,7 @@ public class MissionPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Update participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}",
@@ -1731,7 +1731,7 @@ public class MissionPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Delete participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}",
@@ -1768,7 +1768,7 @@ public class MissionPageController {
           "Check-in participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}",
@@ -1805,7 +1805,7 @@ public class MissionPageController {
           "Check-out participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}",
@@ -1839,7 +1839,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1870,7 +1870,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}",
@@ -1903,7 +1903,7 @@ public class MissionPageController {
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}",
@@ -1938,11 +1938,41 @@ public class MissionPageController {
           "Get unassigned participants (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
+  }
+
+  /**
+   * Re-emits a backend {@link de.greluc.krt.iri.basetool.frontend.service.BackendServiceException}
+   * as an {@code application/problem+json} response that preserves the stable {@code code} and
+   * human-readable {@code detail} from the upstream RFC 7807 body.
+   *
+   * <p>The mission-detail AJAX layer (see {@code mission-subresource.js}) reads {@code code} to
+   * decide between a "stale data, reload?" prompt (only for {@code OPTIMISTIC_LOCK} / {@code
+   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts ({@code DUPLICATE_ENTITY},
+   * {@code BUSINESS_CONFLICT}, …). Returning {@code .build()} with only the status code stripped
+   * that signal and made every 409 look like an optimistic-lock conflict.
+   *
+   * @param e parsed backend exception with status + RFC 7807 fields
+   * @return problem+json response mirroring the upstream status and body
+   */
+  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+      @NotNull de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   private String extractParticipantName(MissionParticipantDto participant) {
