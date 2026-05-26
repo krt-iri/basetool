@@ -172,7 +172,7 @@
         title.textContent = document.documentElement.lang === 'en'
             ? 'Edit Special Command'
             : 'Spezialkommando bearbeiten';
-        form.action = btn.getAttribute('data-action');
+        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         versionInput.value = btn.getAttribute('data-version') || '0';
         nameInput.value = btn.getAttribute('data-name') || '';
         shorthandInput.value = btn.getAttribute('data-shorthand') || '';
