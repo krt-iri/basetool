@@ -68,7 +68,17 @@
 
     /**
      * Render a KRT-styled error toast for a RFC7807 Problem response.
-     * Offers a "reload" action on 409 conflicts via the KRT confirm modal.
+     *
+     * On a 409 we look at the RFC 7807 `code` extension property emitted by the backend
+     * (see backend/.../GlobalExceptionHandler.java) to pick the right UX:
+     *
+     *  - `OPTIMISTIC_LOCK` / `PESSIMISTIC_LOCK`: stale data — offer a reload prompt via the
+     *    KRT confirm modal so the user can pull in the fresh values.
+     *  - Anything else (`DUPLICATE_ENTITY`, `BUSINESS_CONFLICT`, `ENTITY_IN_USE`,
+     *    `DATA_INTEGRITY_VIOLATION`, …): the request is rejected because of a domain rule
+     *    such as "user already in mission" or "crew slot taken". The user's input is NOT
+     *    stale — they need to see *why* the save was refused, not be asked to throw their
+     *    input away by reloading. Just show the localized detail in a toast.
      *
      * @param {Response}       response     fetch Response
      * @param {string}         sectionKey   e.g. 'participant', 'unit', ...
@@ -77,25 +87,42 @@
     async function handleProblem(response, sectionKey, problem) {
         const sectionLabel = i18n('mission.conflict.section.' + sectionKey, sectionKey);
         if (response.status === 409) {
-            const title = i18n('mission.conflict.toast.title', 'Konflikt');
+            const problemCode = (problem && typeof problem === 'object' && problem.code)
+                ? String(problem.code)
+                : null;
+            const isStaleData = (problemCode === 'OPTIMISTIC_LOCK'
+                || problemCode === 'PESSIMISTIC_LOCK');
+            if (isStaleData) {
+                const title = i18n('mission.conflict.toast.title', 'Konflikt');
+                const detail = (problem && problem.detail)
+                    ? problem.detail
+                    : i18n('mission.conflict.toast.detail', 'Bitte Seite neu laden.');
+                const msg = sectionLabel + ': ' + detail;
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(msg);
+                }
+                if (typeof window.showKrtConfirm === 'function') {
+                    const ok = await window.showKrtConfirm(
+                        title,
+                        i18n('mission.conflict.action.reload.question',
+                             'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen gehen sie verloren).'),
+                        i18n('mission.conflict.action.reload', 'Aktuelle Werte laden'),
+                        i18n('mission.conflict.action.dismiss', 'Schliessen')
+                    );
+                    if (ok) {
+                        window.location.reload();
+                    }
+                }
+                return;
+            }
+            // Domain conflict (duplicate, in-use, business-state). Surface the backend's
+            // localized detail directly — never the reload prompt, because the user's input
+            // is fine, the operation itself is what the server refused.
             const detail = (problem && problem.detail)
                 ? problem.detail
-                : i18n('mission.conflict.toast.detail', 'Bitte Seite neu laden.');
-            const msg = sectionLabel + ': ' + detail;
+                : i18n('mission.save.section.error', 'Speichern fehlgeschlagen.');
             if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(msg);
-            }
-            if (typeof window.showKrtConfirm === 'function') {
-                const ok = await window.showKrtConfirm(
-                    title,
-                    i18n('mission.conflict.action.reload.question',
-                         'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen gehen sie verloren).'),
-                    i18n('mission.conflict.action.reload', 'Aktuelle Werte laden'),
-                    i18n('mission.conflict.action.dismiss', 'Schliessen')
-                );
-                if (ok) {
-                    window.location.reload();
-                }
+                window.showFrontendErrorToast(sectionLabel + ': ' + detail);
             }
             return;
         }

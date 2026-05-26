@@ -665,7 +665,7 @@ public class MissionService {
               .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(finalUserId));
       if (exists) {
         throw new de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException(
-            "Nutzer ist bereits Teilnehmer dieser Mission.");
+            "error.mission.participant.duplicate.user");
       }
     } else if (finalGuestName != null && !finalGuestName.isBlank()) {
       boolean exists =
@@ -673,7 +673,7 @@ public class MissionService {
               .anyMatch(p -> finalGuestName.equalsIgnoreCase(p.getGuestName()));
       if (exists) {
         throw new de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException(
-            "Ein Gast mit diesem Namen ist bereits Teilnehmer dieser Mission.");
+            "error.mission.participant.duplicate.guest");
       }
     }
 
@@ -1191,7 +1191,7 @@ public class MissionService {
 
     if (isAlreadyAssigned) {
       throw new de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException(
-          "Teilnehmer ist bereits Crewmitglied einer Einheit in dieser Mission.");
+          "error.mission.crew.duplicate");
     }
 
     MissionCrew crew = new MissionCrew();
