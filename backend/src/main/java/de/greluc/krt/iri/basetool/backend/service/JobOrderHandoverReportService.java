@@ -344,11 +344,9 @@ public class JobOrderHandoverReportService {
       canvas.rectangle(0, 0, 4, PageSize.A4.getHeight());
       canvas.fill();
 
-      // IRIDIUM logo (bottom-right)
+      // KRT logo (bottom-right)
       try (InputStream logoStream =
-          getClass()
-              .getClassLoader()
-              .getResourceAsStream("META-INF/resources/logos/staffel_iridium.png")) {
+          getClass().getClassLoader().getResourceAsStream("META-INF/resources/logos/krt.png")) {
         if (logoStream != null) {
           Image logo = Image.getInstance(logoStream.readAllBytes());
           float logoHeight = 60f;
@@ -360,7 +358,7 @@ public class JobOrderHandoverReportService {
           logo.setAbsolutePosition(PageSize.A4.getWidth() - logoWidth - margin, margin + 4f);
           canvas.addImage(logo);
         } else {
-          log.warn("staffel_iridium.png not found in classpath");
+          log.warn("krt.png not found in classpath");
         }
       } catch (Exception e) {
         log.warn("Failed to render logo on page background", e);

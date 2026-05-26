@@ -12,8 +12,10 @@ import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -24,6 +26,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openpdf.text.pdf.PdfReader;
+import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverReportServiceTest {
@@ -249,6 +253,262 @@ class JobOrderHandoverReportServiceTest {
   }
 
   // -------------------------------------------------------------------------
+  // PDF content tests (using PdfTextExtractor)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void generateHandoverReport_pdfContainsTitleAndMetaLabels() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    assertTrue(text.contains("ÜBERGABEPROTOKOLL"), "Title must appear in PDF");
+    assertTrue(text.contains("AUFTRAGSNUMMER"));
+    assertTrue(text.contains("DATUM DER ÜBERGABE"));
+    assertTrue(text.contains("UHRZEIT DER ÜBERGABE"));
+    assertTrue(text.contains("EMPFÄNGER (HANDLE)"));
+  }
+
+  @Test
+  void generateHandoverReport_pdfContainsMetaValues() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    // jobOrder.displayId = 42 → "#42"
+    assertTrue(text.contains("#42"), "Job order number '#42' must appear");
+    // handoverTime is 2025-06-15T10:30:00Z, null zone → defaults to UTC
+    assertTrue(text.contains("15.06.2025"), "Handover date must appear in dd.MM.yyyy");
+    assertTrue(text.contains("10:30"), "Handover time must appear in HH:mm");
+    assertTrue(text.contains("(Lokalzeit)"), "Local-time annotation must appear");
+    assertTrue(text.contains("TestPilot"), "Recipient handle must appear");
+  }
+
+  @Test
+  void generateHandoverReport_pdfContainsMaterialSectionAndColumnHeaders() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    assertTrue(text.contains("ÜBERGEBENE MATERIALIEN"), "Section header must appear");
+    assertTrue(text.contains("MATERIAL"));
+    assertTrue(text.contains("STANDORT"));
+    assertTrue(text.contains("MENGE"));
+    assertTrue(text.contains("QUALITÄT"));
+  }
+
+  @Test
+  void generateHandoverReport_pdfContainsItemRowData() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    // String.format("%.3f SCU", 5.0) uses the JVM default locale (e.g. comma decimal in DE,
+    // period in en_US) — mirror that here so the assertion is portable across CI locales.
+    String expectedAmount = String.format("%.3f SCU", 5.0);
+    assertTrue(text.contains("Laranite"));
+    assertTrue(text.contains("Port Olisar"));
+    assertTrue(
+        text.contains(expectedAmount),
+        "SCU amount must be formatted with three decimals (expected '" + expectedAmount + "')");
+    assertTrue(text.contains("100"), "Quality value must appear");
+  }
+
+  @Test
+  void generateHandoverReport_pdfContainsFooter() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    assertTrue(text.contains("Generiert von Profit Basetool"), "Footer must appear");
+  }
+
+  @Test
+  void generateHandoverReport_emptyItemList_showsKeineMaterialienText() throws IOException {
+    // Given
+    handover.setItems(Set.of());
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    assertTrue(
+        text.contains("Keine Materialien vorhanden."),
+        "Empty-state text must appear when no items");
+  }
+
+  @Test
+  void generateHandoverReport_userZoneShiftsHandoverTime() throws IOException {
+    // Given – handoverTime in setUp is 2025-06-15T10:30:00Z (UTC).
+    // In June, Europe/Berlin is CEST (UTC+2) → expected display time is 12:30.
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text =
+        extractAllText(
+            service.generateHandoverReport(jobOrderId, handoverId, ZoneId.of("Europe/Berlin")));
+
+    // Then
+    assertTrue(text.contains("12:30"), "Time must be shifted to Europe/Berlin CEST (12:30)");
+    assertFalse(text.contains("10:30"), "UTC 10:30 must NOT appear when zone is Europe/Berlin");
+  }
+
+  @Test
+  void generateHandoverReport_pieceQuantityType_rendersAsIntegerNotScuFormat() throws IOException {
+    // Given
+    Material material = buildMaterial("MedPen", QuantityType.PIECE);
+    JobOrderHandoverItem item = buildItem(material, 25.0, 100, "Lorville");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    assertTrue(text.contains("25"), "PIECE amount must render as integer '25'");
+    // Locale-aware SCU format — must NOT appear for PIECE items, regardless of CI locale.
+    String scuFormatted = String.format("%.3f SCU", 25.0);
+    assertFalse(text.contains(scuFormatted), "PIECE amount must NOT be formatted as SCU");
+  }
+
+  @Test
+  void generateHandoverReport_itemsAppearInTextInSortedOrder() throws IOException {
+    // Given – unique location markers per item so we can locate each row in the extracted text.
+    // Expected order: Agricium (alphabetical first), then Laranite (q100/a5 → q100/a1 → q80/a3).
+    Material laranite = buildMaterial("Laranite", QuantityType.SCU);
+    Material agricium = buildMaterial("Agricium", QuantityType.SCU);
+
+    JobOrderHandoverItem laraniteLowQ = buildItem(laranite, 3.0, 80, "LocLowQ");
+    JobOrderHandoverItem laraniteHighQLowA = buildItem(laranite, 1.0, 100, "LocHighQLowA");
+    JobOrderHandoverItem laraniteHighQHighA = buildItem(laranite, 5.0, 100, "LocHighQHighA");
+    JobOrderHandoverItem agriciumItem = buildItem(agricium, 2.0, 90, "LocAgricium");
+
+    handover.setItems(Set.of(laraniteLowQ, laraniteHighQLowA, laraniteHighQHighA, agriciumItem));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    // Then
+    int idxAgricium = text.indexOf("LocAgricium");
+    int idxHighQHighA = text.indexOf("LocHighQHighA");
+    int idxHighQLowA = text.indexOf("LocHighQLowA");
+    int idxLowQ = text.indexOf("LocLowQ");
+
+    assertTrue(
+        idxAgricium >= 0 && idxHighQHighA >= 0 && idxHighQLowA >= 0 && idxLowQ >= 0,
+        "All location markers must appear in extracted text");
+    assertTrue(
+        idxAgricium < idxHighQHighA, "Agricium row must precede Laranite rows (alphabetical)");
+    assertTrue(
+        idxHighQHighA < idxHighQLowA,
+        "Laranite q100/a5 must precede q100/a1 (higher amount within same quality)");
+    assertTrue(
+        idxHighQLowA < idxLowQ, "Laranite q100 rows must precede q80 row (higher quality first)");
+  }
+
+  @Test
+  void generateHandoverReport_smallContent_fitsOnSinglePage() throws IOException {
+    // Given
+    Material material = buildMaterial("Laranite", QuantityType.SCU);
+    JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
+    handover.setItems(Set.of(item));
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    // When
+    byte[] pdf = service.generateHandoverReport(jobOrderId, handoverId, null);
+
+    // Then
+    assertEquals(1, countPages(pdf), "Small handover content must fit on a single page");
+  }
+
+  @Test
+  void generateHandoverReportPreview_pdfContainsTitleMetaItemDataAndFooter() throws IOException {
+    // Given
+    HandoverReportPreviewRequestDto dto =
+        new HandoverReportPreviewRequestDto(
+            "#777",
+            LocalDateTime.parse("2025-12-01T14:45:00"),
+            "PreviewPilot",
+            List.of(
+                new HandoverReportPreviewRequestDto.HandoverReportItemDto(
+                    "Laranite", "Port Olisar", 3.5, 90, "SCU")));
+
+    // When
+    String text = extractAllText(service.generateHandoverReportPreview(dto));
+
+    // Then
+    assertTrue(text.contains("ÜBERGABEPROTOKOLL"));
+    assertTrue(text.contains("#777"));
+    assertTrue(text.contains("01.12.2025"));
+    assertTrue(text.contains("14:45"));
+    assertTrue(text.contains("PreviewPilot"));
+    assertTrue(text.contains("Laranite"));
+    assertTrue(text.contains("Port Olisar"));
+    // Locale-aware: same JVM default locale as production formatAmount(...).
+    assertTrue(text.contains(String.format("%.3f SCU", 3.5)));
+    assertTrue(text.contains("90"));
+    assertTrue(text.contains("Generiert von Profit Basetool"));
+  }
+
+  @Test
+  void generateHandoverReportPreview_localDateTimeRenderedWithoutZoneConversion()
+      throws IOException {
+    // Given – LocalDateTime has no zone; service must render the entered time as-is.
+    HandoverReportPreviewRequestDto dto =
+        new HandoverReportPreviewRequestDto(
+            "#1",
+            LocalDateTime.parse("2025-06-15T14:45:00"),
+            "Pilot",
+            List.of(
+                new HandoverReportPreviewRequestDto.HandoverReportItemDto(
+                    "X", "Y", 1.0, 50, "SCU")));
+
+    // When
+    String text = extractAllText(service.generateHandoverReportPreview(dto));
+
+    // Then
+    assertTrue(
+        text.contains("14:45"),
+        "Time must render as entered (no zone conversion in preview branch)");
+    assertTrue(text.contains("15.06.2025"));
+  }
+
+  // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
 
@@ -269,5 +529,28 @@ class JobOrderHandoverReportServiceTest {
     item.setQuality(quality);
     item.setLocationName(locationName);
     return item;
+  }
+
+  private static String extractAllText(byte[] pdf) throws IOException {
+    PdfReader reader = new PdfReader(pdf);
+    try {
+      PdfTextExtractor extractor = new PdfTextExtractor(reader);
+      StringBuilder sb = new StringBuilder();
+      for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+        sb.append(extractor.getTextFromPage(i)).append('\n');
+      }
+      return sb.toString();
+    } finally {
+      reader.close();
+    }
+  }
+
+  private static int countPages(byte[] pdf) throws IOException {
+    PdfReader reader = new PdfReader(pdf);
+    try {
+      return reader.getNumberOfPages();
+    } finally {
+      reader.close();
+    }
   }
 }
