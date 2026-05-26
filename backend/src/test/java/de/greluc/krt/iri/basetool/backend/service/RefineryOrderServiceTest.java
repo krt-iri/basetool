@@ -62,7 +62,7 @@ import org.springframework.security.access.AccessDeniedException;
  *   <li>per-item lookups (material / location / user / job-order {@link NotFoundException}s)
  *   <li>assignee resolution (explicit user vs order-owner fallback)
  *   <li>aggregation into an existing InventoryItem vs creation of a new one (the {@code
- *       findMatchingInventoryItem} branch)
+ *       findMatchingInventoryItemForUpdate} branch)
  *   <li>note merge semantics (null preserved, blank replaced, novel appended with newline,
  *       duplicate dropped, &gt;1000 truncated)
  *   <li>note normalisation (null / blank / trimmed)
@@ -293,7 +293,7 @@ class RefineryOrderServiceTest {
     @Test
     void usesOrderOwnerAsAssignee_whenItemUserIdIsNull() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -313,7 +313,7 @@ class RefineryOrderServiceTest {
 
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -336,7 +336,7 @@ class RefineryOrderServiceTest {
     @Test
     void createsNewInventoryItem_whenNoMatchExists() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -364,7 +364,7 @@ class RefineryOrderServiceTest {
       existing.setNote(null);
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -393,7 +393,7 @@ class RefineryOrderServiceTest {
       existing.setNote("keep this");
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -415,7 +415,7 @@ class RefineryOrderServiceTest {
       existing.setNote("keep this");
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -435,7 +435,7 @@ class RefineryOrderServiceTest {
       existing.setNote(null);
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -455,7 +455,7 @@ class RefineryOrderServiceTest {
       existing.setNote("   ");
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -475,7 +475,7 @@ class RefineryOrderServiceTest {
       existing.setNote("first batch");
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -498,7 +498,7 @@ class RefineryOrderServiceTest {
       existing.setNote("first batch (urgent)");
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -525,7 +525,7 @@ class RefineryOrderServiceTest {
       existing.setNote(existingNote);
 
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(List.of(existing));
 
@@ -544,7 +544,7 @@ class RefineryOrderServiceTest {
     @Test
     void newItem_storesNormalizedIncomingNote() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -562,7 +562,7 @@ class RefineryOrderServiceTest {
     @Test
     void newItem_blankIncomingNote_storedAsNull() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -678,7 +678,7 @@ class RefineryOrderServiceTest {
       // Use a single item with a valid material; the storeRefineryOrder path
       // still calls updateGoodOutputQuantity, which must return on null goods.
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItem(
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
               any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(Collections.emptyList());
 
@@ -700,7 +700,7 @@ class RefineryOrderServiceTest {
   @Test
   void afterAllItemsProcessed_orderStatusIsCOMPLETED_andOrderSaved() {
     stubLookupsForSingleItem();
-    when(inventoryItemRepository.findMatchingInventoryItem(
+    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
             any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Collections.emptyList());
 
@@ -716,7 +716,7 @@ class RefineryOrderServiceTest {
     stubLookupsForSingleItem();
     // Also stub for a second material id; we'll reuse the same material to keep
     // the fixture light — the stub uses ArgumentMatchers.any() in this case.
-    when(inventoryItemRepository.findMatchingInventoryItem(
+    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
             any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Collections.emptyList());
 
@@ -754,7 +754,7 @@ class RefineryOrderServiceTest {
     lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
     lenient()
         .when(
-            inventoryItemRepository.findMatchingInventoryItem(
+            inventoryItemRepository.findMatchingInventoryItemForUpdate(
                 any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Collections.emptyList());
 

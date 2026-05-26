@@ -551,8 +551,12 @@ public class RefineryOrderService {
                             "JobOrder not found: " + itemDto.jobOrderId()));
       }
 
+      // Pessimistic write lock on the merge target so a parallel store of the same refinery
+      // order (or a parallel inventory create with the same natural key) cannot read the same
+      // pre-merge amount and both write their delta on top of it — see
+      // InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
       java.util.List<InventoryItem> existingItems =
-          inventoryItemRepository.findMatchingInventoryItem(
+          inventoryItemRepository.findMatchingInventoryItemForUpdate(
               assignee, mat, loc, itemDto.quality(), order.getMission(), jobOrder, false);
 
       java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();

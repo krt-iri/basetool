@@ -117,7 +117,7 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
 
-    when(inventoryItemRepository.findMatchingInventoryItem(
+    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
             any(User.class),
             any(Material.class),
             any(Location.class),

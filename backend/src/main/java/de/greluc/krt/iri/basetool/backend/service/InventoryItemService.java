@@ -424,8 +424,12 @@ public class InventoryItemService {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
 
+    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls
+    // with the same seven-dimension natural key serialise on the row instead of both reading the
+    // same `amount`, both adding their delta, and the last writer clobbering the other's
+    // increment — see InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
     java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItem(
+        inventoryItemRepository.findMatchingInventoryItemForUpdate(
             user, material, location, dto.quality(), mission, jobOrder, isPersonal);
 
     java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
@@ -523,8 +527,11 @@ public class InventoryItemService {
       item.setMission(null);
     }
 
+    // Pessimistic write lock on the merge target — same race-condition reasoning as the create
+    // path; if a concurrent update mutates the merge target between our read and our write, the
+    // unguarded read would let us overwrite that update with a stale amount.
     java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItem(
+        inventoryItemRepository.findMatchingInventoryItemForUpdate(
             item.getUser(),
             item.getMaterial(),
             item.getLocation(),
