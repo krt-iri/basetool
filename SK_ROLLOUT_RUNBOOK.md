@@ -68,7 +68,141 @@ docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test
 Confirm Flyway applies the migrations cleanly. Tear the test stack down with
 `docker compose ... down --volumes` afterwards.
 
-### 0.4 Re-base awareness
+### 0.4 Backup strategy per stage
+
+Each stage has a different rollback-safety profile and a correspondingly
+different backup posture. Take the backup **immediately before** the merge
+that triggers the deploy — not yesterday's nightly. Restorability must be
+verified by restoring into a throwaway DB and running a sample `COUNT(*)`
+on the aggregate tables; an untested backup is not a backup.
+
+**Stage 1 (Foundation, additive only)** — logical backup sufficient.
+Schema changes are V97 → V100, all additive (CREATE TABLE, ADD COLUMN
+nullable, CREATE TRIGGER). A rollback drops the new tables/columns; no
+existing data is mutated. The backup is your insurance against an
+unexpected app-layer regression that corrupts existing rows during the
+dual-write window.
+
+```bash
+pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+  --no-owner --no-acl --file=basetool-pre-foundation-$(date +%Y%m%d-%H%M).dump \
+  basetool
+# Verify the dump opens and lists the expected tables:
+pg_restore --list basetool-pre-foundation-*.dump | grep -c "TABLE.*public" # > 0
+```
+
+**Stage 2 (Identity, write-path change)** — logical backup pflicht.
+V101 adds a trigger; the riskier change is the JWT-converter and the
+membership-row dual-write. A subtle role-resolution bug between merge
+and revert could leave users with stale flag state. Same `pg_dump`
+command as Stage 1, fresh timestamp.
+
+**Stage 3 (Cleanup, destructive + irreversible)** — both logical
+**and** physical backup. V103 / V104 / V105 drop columns and the
+legacy `squadron` table; once committed, the only recovery is a
+restore. Add a base backup (`pg_basebackup`) on top of the
+`pg_dump` so you have point-in-time recovery to the pre-V102 state
+even if the logical dump turns out unreadable:
+
+```bash
+# Logical dump (same as above, with a different filename).
+pg_dump --host=<prod-host> --format=custom --no-owner --no-acl \
+  --file=basetool-pre-cleanup-$(date +%Y%m%d-%H%M).dump basetool
+
+# Physical base backup (run on the DB host, not the app host):
+pg_basebackup --host=<prod-host> --username=<replication-user> \
+  --pgdata=/var/backups/basetool-base-$(date +%Y%m%d-%H%M) \
+  --format=tar --gzip --progress --verbose --checkpoint=fast
+```
+
+**Verification (all stages):** restore the logical dump into a throwaway
+PostgreSQL container and run, at minimum:
+
+```sql
+SELECT (SELECT COUNT(*) FROM mission)        AS missions,
+       (SELECT COUNT(*) FROM inventory_item) AS inventory,
+       (SELECT COUNT(*) FROM job_order)      AS jobs,
+       (SELECT COUNT(*) FROM app_user)       AS users,
+       (SELECT COUNT(*) FROM squadron)       AS squadrons;
+```
+
+The counts must match the prod values you captured immediately before
+the `pg_dump` ran. If anything is off, the dump is suspect — do **not**
+proceed with the deploy until you have a verified backup.
+
+### 0.5 Smoke-test catalog (referenced by §1.5 / §2.5 / §3.6)
+
+Every stage's post-deploy smoke section runs the **same three canonical
+user-flow cases** plus stage-specific schema checks. The cases stay
+identical across stages so a regression on the canonical path always
+surfaces on the same step — regardless of which deploy triggered it.
+
+**Case A — Single-Staffel-User golden path** (every existing user today
+falls into this case; if this case breaks, every user is affected).
+
+1. Log in as a regular `SQUADRON_MEMBER` with exactly one Staffel
+   membership and no SK memberships. Capture the user's JWT and verify
+   the role claims include `ROLE_SQUADRON_MEMBER` (plus role-hierarchy
+   inheritance from the Keycloak realm role).
+2. Open `/missions` → mission list loads, only shows missions the user
+   can see (own Staffel + public missions of foreign Staffeln). No
+   500s in `frontend.json`.
+3. Click into an arbitrary mission detail → page renders, the
+   "Anmelden" / "Abmelden" button reflects the user's current
+   participation status.
+4. Open `/inventory/my` → personal inventory list renders. Add a new
+   entry via the input modal; verify it lands in the list and carries
+   the user's home Staffel as `owningOrgUnit` in the backend response.
+5. Open `/operations` → operation list renders. Open one with active
+   missions, scroll to the payout table.
+6. Open `/orders` → Job Order list renders. Click any order whose user
+   is a member.
+
+**Pass criterion:** every step succeeds without 500 / 403 / 409, and
+the sidebar's active-context chip (when visible) shows the Staffel's
+shorthand.
+
+**Case B — Active-context switcher** (admin path; relevant after Stage
+1, becomes more relevant after Stage 2 when non-admins with >1
+membership see the switcher too).
+
+1. Log in as an `ADMIN` user. Sidebar shows the switcher with options
+   {"alle", Staffel-A, Staffel-B, …, every active SK}.
+2. Default state is "alle" — `/inventory/all` shows global inventory
+   across every Staffel.
+3. Click Staffel-A in the switcher → page reloads, `/inventory/all`
+   now shows only Staffel-A's inventory. Backend log line carries the
+   active-org-unit header (`X-Active-Org-Unit-Id: <staffel-a-uuid>`).
+4. Click an SK in the switcher → page reloads, `/inventory/all` shows
+   only that SK's inventory (empty today on Stage 1 since SK ownership
+   is not unlocked yet — that is expected).
+5. Click "alle" → full Lager-View returns.
+
+**Pass criterion:** every selection narrows the view as expected; the
+switcher persists across page reloads (Spring Session); no 403s on
+admin-only endpoints.
+
+**Case C — Job Order cross-staffel workspace** (Job Order is the only
+cross-staffel aggregate; this case verifies the picker correctly
+exposes the full active-org-unit catalog regardless of caller's
+memberships).
+
+1. Log in as a `LOGISTICIAN` whose home Staffel is A; the user has no
+   SK memberships.
+2. Open `/orders/create`. The `requestingOrgUnitId` dropdown shows
+   **every** active Staffel **and** active SK in two `<optgroup>`
+   sections — not just Staffel-A.
+3. Pick an SK as the requesting org unit. Save. The created Job Order
+   shows up in `/orders` and detail page renders correctly with the
+   chosen SK rendered in the "Anfragende Einheit" badge.
+4. Open the detail page in a fresh tab — the SK badge stays after
+   reload (no stale Thymeleaf binding).
+
+**Pass criterion:** the picker offers cross-staffel options; selection
+persists round-trip; SK rendering does not crash any Thymeleaf
+expression.
+
+### 0.6 Re-base awareness
 
 PR-2 is stacked on PR-1. PR-3 is stacked on PR-2. The base of each PR must
 be retargeted to `main` **after** the previous PR merges. The runbook calls
@@ -134,6 +268,17 @@ this out at each stage.
 
 ### 1.4 Deploy
 
+**Take the pre-deploy backup first** (per §0.4, logical-only is
+sufficient for Stage 1):
+
+```bash
+pg_dump --host=<prod-host> --format=custom --no-owner --no-acl \
+  --file=basetool-pre-foundation-$(date +%Y%m%d-%H%M).dump basetool
+```
+
+Verify the dump restores into a throwaway DB before triggering the
+deploy. Do not proceed without a verified backup.
+
 Follow [`docs/deployment.md`](docs/deployment.md) standard release
 procedure. Key signals to watch:
 
@@ -146,7 +291,12 @@ procedure. Key signals to watch:
 
 ### 1.5 Post-deploy smoke (manual, 10 minutes)
 
-Run these against the deployed prod (or pre-prod equivalent):
+Run the **schema verification table below** (Stage-1-specific), then
+walk through the **three canonical cases from §0.5** (Case A / B / C).
+If any case from §0.5 regresses, that is the primary signal — the
+schema-only smokes underneath are necessary but not sufficient.
+
+Schema verification against the deployed prod (or pre-prod equivalent):
 
 | Step | Expected |
 | -- | -- |
@@ -304,12 +454,30 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
 
 ### 2.4 Merge + deploy
 
+**Take the pre-deploy backup first** (per §0.4, logical-only — Stage 2
+adds only a trigger):
+
+```bash
+pg_dump --host=<prod-host> --format=custom --no-owner --no-acl \
+  --file=basetool-pre-identity-$(date +%Y%m%d-%H%M).dump basetool
+```
+
+Verify the dump restores into a throwaway DB before triggering the
+deploy.
+
 - Merge PR #227 (squash or merge commit).
 - Standard deploy.
 - Backend startup: V101 applies in < 1 second (just creates one trigger + function).
 - No new tables/columns to verify post-startup.
 
 ### 2.5 Post-deploy smoke (manual, 15 minutes)
+
+Run the **identity-specific table below**, then walk through the **three
+canonical cases from §0.5**. After Stage 2 the JWT-converter resolves
+roles through membership rows, so Case A specifically must pass for
+**a user whose `app_user.is_logistician` differs from the membership
+row's flag** — that mismatch is impossible today but becomes the most
+likely R6.e dual-write regression source.
 
 | Step | Expected |
 | -- | -- |
@@ -381,7 +549,12 @@ Before clicking Merge on PR-3:
 - [ ] **Full DB backup** taken within the last 24 hours, **restorability
   verified** by restoring into a throwaway DB and running `SELECT COUNT(*)`
   on every aggregate table. This is non-negotiable: V103 and V105 cannot be
-  reversed without restoring from backup.
+  reversed without restoring from backup. Per §0.4, Stage 3 needs **both**
+  a logical (`pg_dump`) and a physical (`pg_basebackup`) backup.
+- [ ] **MDC log pipeline consumes both fields** (see the dedicated block
+  below — this is a separate sign-off because the failure mode is silent:
+  Stage 3 drops the legacy MDC field and dashboards keyed on it stop
+  populating without throwing any error).
 - [ ] All staging environments are running PR-2 (or newer) so the migrations
   can be exercised at scale before prod.
 - [ ] You have **scheduled downtime** or a maintenance window. The destructive
@@ -430,6 +603,54 @@ Before clicking Merge on PR-3:
     inserted between V99 running and PR-1's lifecycle hook taking effect)
     or R6.e dual-write missed a write path. Investigate the gap first;
     don't push through with broken data.
+
+#### MDC log pipeline readiness (sign-off block)
+
+Stage 1 introduced the dual MDC field — `CorrelationIdFilter` writes
+**both** `squadronId` and `orgUnitId` with the same value, and the
+Logback patterns (`logback-spring.xml` console + file + JSON appender)
+emit both. Stage 3 drops the legacy `squadronId` field along with the
+legacy schema. Anything downstream that indexes only `squadronId`
+silently stops populating after the cutover — no error, no exception,
+no log line. Audit trails that depend on the legacy field would
+disappear with the next prod log rotation.
+
+**Verify the pipeline consumes the new field before merging PR-3.**
+
+1. **Identify every log sink in your stack** that currently reads the
+   MDC field. Typical sinks:
+   - Loki / Grafana (LogQL queries on `{squadronId="..."}`)
+   - ELK / Kibana (Lucene queries on `squadronId:*`)
+   - CloudWatch Insights / Datadog (parsed-field facets)
+   - On-call dashboards that filter by tenant
+2. **Search the configuration repo / Terraform / dashboard JSON** for
+   the literal string `squadronId`. Every match is a place that must
+   be updated to consume `orgUnitId` (or kept dual-keyed during the
+   migration window).
+3. **In each sink, add `orgUnitId` as a parallel index/field** before
+   the deploy. The dual MDC write from Stage 1+2 means both fields
+   carry the same value — adding `orgUnitId` indexing is a no-op
+   today and becomes the only signal after Stage 3.
+4. **Verify with a synthetic request:** make a request to any
+   authenticated endpoint, find the resulting log line in each sink,
+   and confirm both `squadronId` and `orgUnitId` show the same value.
+   If only one appears, the sink is dropping unknown fields — fix the
+   parser before proceeding.
+5. **Communicate the deprecation** to anyone consuming exports / saved
+   queries: a dashboard saved as `squadronId="<uuid>"` will be empty
+   after Stage 3. Migrate or re-save before the cutover.
+
+**Sign-off checklist for the §3.1 checkbox above:**
+
+- [ ] Every log sink in §0.4's stack is enumerated.
+- [ ] `orgUnitId` is indexed/parsed alongside `squadronId` in every
+  sink that needs the value post-Stage-3.
+- [ ] A synthetic request shows both fields with the same value.
+- [ ] Dashboards / saved queries / alerts that referenced the legacy
+  field are migrated or owners are notified.
+
+If any step is not green, **postpone PR-3**. The MDC drop is a one-way
+door — there is no point-in-time recovery for log data.
 
 ### 3.2 Retarget the base
 
@@ -488,8 +709,11 @@ this user belong to" and the contextual role flags.
 
 ### 3.5 Merge + deploy
 
-- **Take one more backup** immediately before merging. Time-stamped, kept
-  separate from your daily backup rotation.
+- **Take one more backup** immediately before merging — both logical
+  (`pg_dump`) and physical (`pg_basebackup`) per §0.4. Time-stamped,
+  kept separate from your daily backup rotation. The physical base
+  backup is the only path to point-in-time recovery if V103 / V105
+  succeeds and a subsequent code-layer regression corrupts data.
 - Merge PR #228.
 - Deploy with **maintenance mode enabled** (display a banner / 503 page to
   end users while migrations run).
@@ -509,6 +733,17 @@ this user belong to" and the contextual role flags.
     restore from backup. Investigate offline.
 
 ### 3.6 Post-deploy verification (mandatory)
+
+Run the **schema verification table below** (Stage-3-specific), then
+walk through the **three canonical cases from §0.5**. After Stage 3
+the legacy `squadron` table no longer exists, so Case A particularly
+exercises the membership-derived path: a single-Staffel user must
+still see their familiar UX (chip, mission list, inventory) with the
+underlying source now being `org_unit_membership` instead of
+`app_user.squadron_id`. **Verify the log pipeline** at the same time:
+new log lines should carry `orgUnitId` (the legacy `squadronId` is
+absent from this deploy on); the dashboards you updated per the §3.1
+MDC sign-off should still populate.
 
 | Step | Expected |
 | -- | -- |
