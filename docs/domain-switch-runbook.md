@@ -1,6 +1,6 @@
 # Domain-Wechsel: `iri-base.org` → `profit-base.online`
 
-Schritt-für-Schritt-Runbook für den Operator. Die Code-Änderungen (Tool-Name "Profit Basetool", neuer Hostname `profit-base.online` in allen YML / Java / Tests / Doku, neues Header-Logo `krt_logo.svg`) liegen als **PR #165** vor: <https://github.com/krt-iri/basetool/pull/165> — mehrfach gegen `main` rebased, alle Tests grün. Diese Anleitung deckt nur die **Operator-Aktionen auf dem Production-Host** ab, die der Code-PR allein nicht bewältigt. Voraussetzung: der PR ist auf `main` gemerged, sonst sind die neuen `KC_HOSTNAME`-/`KEYCLOAK_ISSUER_URI`-Defaults nicht im Image.
+Schritt-für-Schritt-Runbook für den Operator. Die Code-Änderungen (Tool-Name "Profit Basetool", neuer Hostname `profit-base.online` in allen YML / Java / Tests / Doku, neues Header-Logo `krt.webp`) liegen als **PR #165** vor: <https://github.com/krt-iri/basetool/pull/165> — mehrfach gegen `main` rebased, alle Tests grün. Diese Anleitung deckt nur die **Operator-Aktionen auf dem Production-Host** ab, die der Code-PR allein nicht bewältigt. Voraussetzung: der PR ist auf `main` gemerged, sonst sind die neuen `KC_HOSTNAME`-/`KEYCLOAK_ISSUER_URI`-Defaults nicht im Image.
 
 > **Geschätztes Wartungsfenster:** 30–60 Minuten Down-Time für die User (zwischen "Stack stop" und "Smoke-Test grün"). Vorbereitung (Phase 0–2) kann mehrere Stunden im Voraus laufen, ohne Service-Impact.
 
@@ -94,7 +94,7 @@ sudo -u deploy docker compose --profile prod images backend frontend
 
 ## Phase 1 — Release der Code-Änderungen (kein Service-Impact)
 
-Diese Phase produziert die neuen Container-Images mit dem `Profit Basetool`-Branding, dem neuen `krt_logo.svg`, und der neuen URL in den Default-Configs.
+Diese Phase produziert die neuen Container-Images mit dem `Profit Basetool`-Branding, dem neuen `krt.webp`-Logo, und der neuen URL in den Default-Configs.
 
 ### 1.1 PR #165 mergen
 
@@ -370,7 +370,7 @@ sudo install -m 0640 -o deploy -g docker /tmp/realm-export-new.json /var/iri/cod
 
 ### 6.3 Maintenance-Page-Snippets aktualisieren
 
-Die nginx-Maintenance-Hook-Files unter `/var/iri/code/docker/maintenance/` enthalten URL-Referenzen (`maintenance.json` `type`-URI), das KRT-Logo und Branding-Strings (`maintenance.html`). Die in Phase 6.1 hochgeladenen / gepullten Files reinkopieren:
+Die nginx-Maintenance-Hook-Files unter `/var/iri/code/docker/maintenance/` enthalten URL-Referenzen (`maintenance.json` `type`-URI) und Branding-Strings (`maintenance.html`). Die in Phase 6.1 hochgeladenen / gepullten Files reinkopieren:
 
 ```bash
 # Variante A — wenn via scp hochgeladen (Phase 6.1 Variante A):
@@ -380,21 +380,15 @@ sudo install -m 0644 -o deploy -g docker \
 sudo install -m 0644 -o deploy -g docker \
     /tmp/docker-maintenance/static/maintenance.json \
     /var/iri/code/docker/maintenance/static/maintenance.json
-sudo install -m 0644 -o deploy -g docker \
-    /tmp/docker-maintenance/static/krt_logo.svg \
-    /var/iri/code/docker/maintenance/static/krt_logo.svg
 
 # Variante B — wenn via git pull (Phase 6.1 Variante B):
 cd /opt/krt-iri/basetool
 sudo install -m 0644 -o deploy -g docker docker/maintenance/static/maintenance.html /var/iri/code/docker/maintenance/static/
 sudo install -m 0644 -o deploy -g docker docker/maintenance/static/maintenance.json /var/iri/code/docker/maintenance/static/
-sudo install -m 0644 -o deploy -g docker docker/maintenance/static/krt_logo.svg /var/iri/code/docker/maintenance/static/
 
 # Verifikation:
 grep -n "profit-base.online" /var/iri/code/docker/maintenance/static/maintenance.json
 # Erwartet: "type": "https://profit-base.online/problems/maintenance"
-ls -la /var/iri/code/docker/maintenance/static/krt_logo.svg
-# Erwartet: ~110 KB SVG vorhanden
 ```
 
 **Reload des nginx-Configs im NPM-Container** — NPM lädt die Hook-Files (`http.conf`, `server_proxy.conf`) nur beim Container-Start neu, der `static/` Mount wird live gelesen. Da wir die Hook-Files in diesem Schritt NICHT anfassen (nur den static-Content), reicht es, NPM zu signalisieren, dass das nginx-Config-Tree neu durchgegangen werden soll:

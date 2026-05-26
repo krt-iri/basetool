@@ -125,7 +125,7 @@ class AssetAwareAuthenticationSuccessHandlerTest {
         "/js/vendor/dompurify.min.js.map",
         "/css/styles.css.map",
         "/favicon.ico",
-        "/logos/krt_logo.svg",
+        "/logos/krt.webp",
         "/images/flags/de.svg",
         "/fonts/Lato-Bold.woff2",
         "/css/styles.css",
