@@ -91,9 +91,16 @@ class MemberManagementControllerTest {
       String view = controller.listMembers(null, null, null, model);
 
       assertEquals("members", view);
+      // SPEZIALKOMMANDO_PLAN.md §7.5: listMembers now also fetches per-user memberships for the
+      // SK column. Verify the FIRST call (the users-list endpoint) — subsequent membership calls
+      // are exercised by their own test.
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-      verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
-      assertEquals("/api/v1/users?sort=username,asc", uriCaptor.getValue());
+      verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+          .get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
+      assertEquals(
+          "/api/v1/users?sort=username,asc",
+          uriCaptor.getAllValues().get(0),
+          "first backend call must hit the users list endpoint");
       assertEquals(page.content(), model.getAttribute("users"));
       assertSame(page, model.getAttribute("usersPage"));
       assertNull(model.getAttribute("search"));

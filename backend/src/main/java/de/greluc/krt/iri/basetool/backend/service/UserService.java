@@ -67,6 +67,7 @@ public class UserService {
   private final de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -584,7 +585,13 @@ public class UserService {
             .findById(userId)
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
     user.setLogistician(isLogistician);
-    return userRepository.save(user);
+    User saved = userRepository.save(user);
+    // R6.e / Plan D3 write-side: mirror the flag onto the user's Staffel membership so the
+    // authority surface — sourced from `org_unit_membership.is_logistician` since R6.d — picks
+    // up the change. Until the destructive cleanup release drops `app_user.is_logistician`,
+    // the User-level write above is kept as the legacy mirror.
+    orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, isLogistician, null);
+    return saved;
   }
 
   /**
@@ -602,7 +609,10 @@ public class UserService {
             .findById(userId)
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
     user.setMissionManager(isMissionManager);
-    return userRepository.save(user);
+    User saved = userRepository.save(user);
+    // R6.e / Plan D3 write-side mirror — see updateLogisticianStatus for the rationale.
+    orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, null, isMissionManager);
+    return saved;
   }
 
   /**
@@ -635,17 +645,25 @@ public class UserService {
     if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(User.class, userId);
     }
+    de.greluc.krt.iri.basetool.backend.model.Squadron resolvedSquadron;
     if (squadronId == null) {
+      resolvedSquadron = null;
       user.setSquadron(null);
     } else {
-      de.greluc.krt.iri.basetool.backend.model.Squadron squadron =
+      resolvedSquadron =
           squadronRepository
               .findById(squadronId)
               .orElseThrow(
                   () -> new NoSuchElementException("Squadron not found with id: " + squadronId));
-      user.setSquadron(squadron);
+      user.setSquadron(resolvedSquadron);
     }
-    return userRepository.save(user);
+    User saved = userRepository.save(user);
+    // R6.e — keep the org_unit_membership row in lockstep with the legacy app_user.squadron_id
+    // column so the JWT converter's R6.d read path (which queries the membership table) reflects
+    // every Staffel assignment / re-assignment / clearing. Closes the V95-backfill invariant gap
+    // for post-R1 users whose membership row was never created.
+    orgUnitMembershipService.syncStaffelMembership(saved, resolvedSquadron);
+    return saved;
   }
 
   /**

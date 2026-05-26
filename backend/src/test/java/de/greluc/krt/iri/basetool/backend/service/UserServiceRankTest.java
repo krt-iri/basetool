@@ -28,6 +28,7 @@ class UserServiceRankTest {
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 

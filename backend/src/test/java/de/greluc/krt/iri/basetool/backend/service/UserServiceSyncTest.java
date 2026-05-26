@@ -75,6 +75,7 @@ class UserServiceSyncTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuthHelperService authHelperService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 

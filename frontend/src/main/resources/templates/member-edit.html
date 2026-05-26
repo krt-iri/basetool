@@ -120,6 +120,35 @@
             </div>
         </form>
     </div>
+
+    <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — read-only Memberships-Übersicht. Each row links through to
+         the corresponding management surface: Staffel rows to /admin/mission-data (squadron CRUD)
+         or /members/{id}/edit (this page) for flag-toggles; SK rows to /admin/special-commands/{id}
+         for the full roster UI. Full in-form delta-edit is a follow-up release. -->
+    <div class="hud-box mt-2" sec:authorize="hasRole('ADMIN')">
+        <h2 th:text="#{members.memberships.title}">Mitgliedschaften</h2>
+        <p th:if="${memberMemberships == null or memberMemberships.isEmpty()}"
+           th:text="#{members.memberships.none}">Keine Mitgliedschaften.</p>
+        <ul th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
+            class="memberships-list" style="list-style:none; padding-left:0;">
+            <li th:each="m : ${memberMemberships}" style="margin: 0.4rem 0; display:flex; gap:0.6rem; align-items:center;">
+                <span class="squadron-badge"
+                      th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
+                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>
+                <span th:text="${m.orgUnitName()}">IRIDIUM</span>
+                <span class="badge-kind"
+                      th:if="${m.kind() == 'SPECIAL_COMMAND'}"
+                      th:text="#{orgUnit.kind.specialCommand.short}">SK</span>
+                <span class="badge-kind"
+                      th:if="${m.kind() != 'SPECIAL_COMMAND'}"
+                      th:text="#{orgUnit.kind.squadron.short}">Staffel</span>
+                <a th:if="${m.kind() == 'SPECIAL_COMMAND'}"
+                   th:href="@{/admin/special-commands/{id}(id=${m.orgUnitId()})}"
+                   th:text="#{members.memberships.manage}"
+                   class="btn-link">Verwalten</a>
+            </li>
+        </ul>
+    </div>
 </main>
 <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {

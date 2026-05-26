@@ -10,6 +10,49 @@ Read this file before you add a migration. It encodes promises we made to
 ourselves after each production incident; the conventions below exist because
 something broke once.
 
+## Migration timeline — feature releases
+
+- **V80–V93** — Multi-Squadron-Umbau (see [`MULTI_SQUADRON_PLAN.md`](../../../../../../../../MULTI_SQUADRON_PLAN.md)).
+  Introduced `owning_squadron_id` on every staffel-scoped aggregate; tightened
+  the NOT NULL constraint in V89; dropped the legacy `job_order.squadron`
+  VARCHAR in V90.
+- **V94–V96** — Main-line additions unrelated to the Spezialkommando work:
+  - **V94** — `add_is_manual_entry_to_material` (admin-created manual materials).
+  - **V95** — `backfill_material_quantity_type`.
+  - **V96** — `add_mission_participant_user_unique_index` (DB-backstop against
+    duplicate Einsatz-Anmeldungen).
+- **V97–V101** — Spezialkommando-Erweiterung (see `SPEZIALKOMMANDO_PLAN.md`).
+  Introduces the `org_unit` parent table with a `kind` discriminator so SKs
+  can coexist with Staffel as a second tenant kind. The releases land in
+  stages:
+  - **V97** — create `org_unit` with `kind IN ('SQUADRON','SPECIAL_COMMAND')`,
+    copy every existing `squadron` row in as `kind='SQUADRON'`, add the
+    promotion-only-for-Squadron CHECK.
+  - **V98** — create `org_unit_membership` (composite PK, denormalised `kind`
+    column kept in sync by a trigger, partial unique index `one Staffel per
+    user`, `is_lead` CHECK that pins the Lead role to SK rows), backfill one
+    Staffel membership per `app_user.squadron_id`.
+  - **V99** — add nullable `owning_org_unit_id` columns + FKs + indexes on
+    every staffel-scoped aggregate (`mission`, `operation`, `ship`,
+    `inventory_item`, `refinery_order`) and `job_order` (`creating_org_unit_id`,
+    `requesting_org_unit_id`); copy from the legacy columns. `promotion_topic`
+    is intentionally **not** touched — promotion data may only be owned by
+    Squadron rows per `SPEZIALKOMMANDO_PLAN.md` §3.3.
+  - **V100** — one-way sync trigger that mirrors INSERT/UPDATE/DELETE on
+    `org_unit` (for `kind='SQUADRON'` rows) into the legacy `squadron` table.
+    Lets the application write through `org_unit` exclusively while the
+    legacy FK constraints (still pointing at `squadron(id)`) keep resolving.
+  - **V101** — promotion-topic SK-reject trigger (`guard_promotion_topic_owner_kind`)
+    that refuses any INSERT/UPDATE of `promotion_topic.owning_squadron_id`
+    pointing at a non-SQUADRON org_unit. DB-level defence-in-depth on top of
+    the Java-typed Squadron field and ArchUnit rule §8.2.
+- **V102+ (destructive cleanup, deferred)** — tighten `owning_org_unit_id` to
+  NOT NULL on every aggregate, drop the legacy `owning_squadron_id` / job_order
+  squadron FKs, drop `app_user.squadron_id` / `is_logistician` /
+  `is_mission_manager` (the per-membership row is authoritative since R6.d),
+  drop the legacy `squadron` table once V100's mirror is no longer needed.
+  Lands only after R6.e has soaked one full release cycle in prod.
+
 ## Hard rules
 
 1. **One file per change, `V<n>__<snake_case_description>.sql`.** Pick the next

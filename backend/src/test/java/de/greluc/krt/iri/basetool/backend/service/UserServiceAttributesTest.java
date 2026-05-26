@@ -79,6 +79,7 @@ class UserServiceAttributesTest {
 
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 
