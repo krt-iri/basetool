@@ -1,5 +1,5 @@
 -- =====================================================================
--- V98 - Spezialkommando R2.b step 1: one-way sync org_unit -> squadron
+-- V100 - Spezialkommando R2.b step 1: one-way sync org_unit -> squadron
 -- =====================================================================
 -- Why: R2.b refactors the Squadron JPA entity to extend the OrgUnit
 -- abstract superclass and re-points its mapping at the `org_unit` table
@@ -25,7 +25,7 @@
 -- maintained by the database.
 --
 -- Direction is INTENTIONALLY one-way (org_unit -> squadron, never the
--- reverse). Any direct SQL write to `squadron` after V98 is a bug:
+-- reverse). Any direct SQL write to `squadron` after V100 is a bug:
 -- the application now writes to org_unit, the seeder (DataInitializer)
 -- now writes to org_unit via the JPA layer, and nothing else should be
 -- touching either table at runtime. A bidirectional trigger would
