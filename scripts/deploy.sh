@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# IRIDIUM Basetool — Server-side deploy script
+# Profit Basetool — Server-side deploy script
 #
 # Pulls the production backend + frontend images from GHCR (the version tag
 # defaults to `:stable`, which is moved atomically by the `promote.yml`

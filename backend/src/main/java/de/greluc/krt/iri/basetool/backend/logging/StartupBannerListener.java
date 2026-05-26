@@ -54,7 +54,7 @@ public class StartupBannerListener {
   @EventListener(ApplicationReadyEvent.class)
   public void onReady() {
     log.info("============================================================");
-    log.info(" IRIDIUM Basetool :: {} ready", applicationName);
+    log.info(" Profit Basetool :: {} ready", applicationName);
     log.info(" Active profiles     : {}", Arrays.toString(environment.getActiveProfiles()));
     log.info(" Datasource URL      : {}", sanitiseJdbcUrl(datasourceUrl));
     log.info(" Keycloak issuer     : {}", keycloakIssuerUri);

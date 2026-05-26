@@ -169,7 +169,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
           labels: |
             org.opencontainers.image.title=basetool-${{ matrix.module }}
-            org.opencontainers.image.description=IRIDIUM Basetool ${{ matrix.module }} (Spring Boot)
+            org.opencontainers.image.description=Profit Basetool ${{ matrix.module }} (Spring Boot)
             org.opencontainers.image.vendor=KRT IRIDIUM
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md

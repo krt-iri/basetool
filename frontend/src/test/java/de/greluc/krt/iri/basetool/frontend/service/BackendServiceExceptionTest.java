@@ -43,7 +43,7 @@ class BackendServiceExceptionTest {
     void wellFormedProblemBody_populatesAllFields() {
       String body =
           "{"
-              + "\"type\":\"https://iri-base.org/problems/validation\","
+              + "\"type\":\"https://profit-base.online/problems/validation\","
               + "\"title\":\"Bad Request\","
               + "\"status\":400,"
               + "\"detail\":\"name must not be blank\","

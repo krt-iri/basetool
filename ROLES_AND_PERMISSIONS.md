@@ -1,4 +1,4 @@
-# Rollen- und Rechte-Matrix (IRIDIUM Basetool)
+# Rollen- und Rechte-Matrix (Profit Basetool)
 
 > **Stand 2026-05-18 (Multi-Squadron-Umbau, Phase 6 abgeschlossen):**
 > Die untenstehende Matrix wurde gegen alle `@PreAuthorize`-Annotationen
@@ -18,7 +18,7 @@
 > Matrix von der Implementierung abweicht, zaehlen weiterhin die
 > `@PreAuthorize`-Annotationen im Backend.
 
-Dieses Dokument fasst die aktuelle Rollen- und Rechtekonfiguration des IRIDIUM Basetools zusammen, basierend auf der Implementierung in Backend-Controllern und der Datenbank-Initialisierung.
+Dieses Dokument fasst die aktuelle Rollen- und Rechtekonfiguration des Profit Basetools zusammen, basierend auf der Implementierung in Backend-Controllern und der Datenbank-Initialisierung.
 
 Das System nutzt eine Kombination aus **Rollen** (abgeleitet vom Keycloak JWT und in der Datenbank synchronisiert) und zugehörigen **Berechtigungen (Permissions / Authorities)**.
 

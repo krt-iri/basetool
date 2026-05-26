@@ -1,7 +1,7 @@
-# IRIDIUM Basetool — CLA Signatures
+# Profit Basetool — CLA Signatures
 
 This file is the public roster of Contributors who have signed the
-[IRIDIUM Basetool Individual Contributor License Agreement](../CLA.md).
+[Profit Basetool Individual Contributor License Agreement](../CLA.md).
 
 If You are signing for the first time, follow the procedure in
 [§ 11 of the CLA](../CLA.md#11-how-to-sign): open a pull request titled

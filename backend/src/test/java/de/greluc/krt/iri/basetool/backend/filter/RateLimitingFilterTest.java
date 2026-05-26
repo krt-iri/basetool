@@ -48,7 +48,7 @@ class RateLimitingFilterTest {
     properties.setRefillPeriod(Duration.ofMinutes(1));
 
     problemProperties = new AppProblemProperties();
-    problemProperties.setBaseUri("https://iri-base.org/problems/");
+    problemProperties.setBaseUri("https://profit-base.online/problems/");
 
     filter = new RateLimitingFilter(properties, problemProperties);
   }

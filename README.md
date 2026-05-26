@@ -1,6 +1,6 @@
-# IRIDIUM Basetool
+# Profit Basetool
 
-The IRIDIUM Basetool is the squadron-management web app for the
+The Profit Basetool is the squadron-management web app for the
 "DAS KARTELL" / IRIDIUM organization in *Star Citizen*. It provides a central
 platform for mission planning, hangar and inventory tracking, refinery and
 material logistics, terminal data, and member administration — backed by
@@ -548,7 +548,7 @@ commonly tuned values:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `KEYCLOAK_ISSUER_URI` | The URL of the Keycloak realm. | `https://keycloak.iri-base.org/realms/iri` |
+| `KEYCLOAK_ISSUER_URI` | The URL of the Keycloak realm. | `https://keycloak.profit-base.online/realms/iri` |
 | `KEYCLOAK_CLIENT_SECRET` | (Frontend only) The secret for the Keycloak client. | `YOUR_CLIENT_SECRET` |
 | `BACKEND_URL` | (Frontend only) The URL of the backend API. | `http://localhost:11261` |
 | `APP_LOGGING_CORRELATION_ID_HEADER` | HTTP header used for inbound / outbound request correlation (MDC-backed). | `X-Correlation-Id` |
@@ -611,7 +611,7 @@ using RFC 7807 Problem Details with content type `application/problem+json`.
 
 ```json
 {
-  "type": "https://iri-base.org/problems/constraint-violation",
+  "type": "https://profit-base.online/problems/constraint-violation",
   "title": "Validation failed",
   "status": 400,
   "detail": "One or more fields have invalid values.",
@@ -694,4 +694,4 @@ volume mount has to be in place and the container has to bounce.
 
 ## License
 
-IRIDIUM Basetool is released under the [GNU General Public License v3.0](LICENSE.md).
+Profit Basetool is released under the [GNU General Public License v3.0](LICENSE.md).

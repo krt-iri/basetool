@@ -1,10 +1,10 @@
-# IRIDIUM Basetool — Individual Contributor License Agreement
+# Profit Basetool — Individual Contributor License Agreement
 
 **Version 1.0 — effective 2026-05-19.**
 
 This Contributor License Agreement ("Agreement") sets out the terms
 under which You ("the Contributor") license Your contributions to the
-IRIDIUM Basetool project ("the Project"), hosted at
+Profit Basetool project ("the Project"), hosted at
 <https://github.com/krt-iri/basetool>. By submitting a Contribution to
 the Project, You accept and agree to the terms below for Your present
 and future Contributions.
@@ -212,7 +212,7 @@ withdraw under [§ 12 — Withdrawal](#12-withdrawal).
 2. Include the following sign-off in the pull-request description,
    **verbatim**:
 
-   > I have read the IRIDIUM Basetool Individual Contributor License
+   > I have read the Profit Basetool Individual Contributor License
    > Agreement, version 1.0, and I hereby accept and agree to its terms
    > for all of my present and future Contributions to the Project.
 
@@ -277,7 +277,7 @@ otherwise mergeable Contribution under the previously signed version.
 
 ---
 
-*This is the IRIDIUM Basetool Individual CLA, version 1.0, effective
+*This is the Profit Basetool Individual CLA, version 1.0, effective
 2026-05-19. It is published under the same GPL-3.0 license as the rest
 of the Project; the Apache Software Foundation Individual Contributor
 License Agreement v2.0 on which it is based is © Apache Software

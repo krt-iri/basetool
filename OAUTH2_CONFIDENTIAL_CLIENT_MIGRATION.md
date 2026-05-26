@@ -161,7 +161,7 @@ Im `### Security`-Block unter `## [Unreleased]` ergänzen. Form analog zu L-4:
 
 **B.1 — Anmelden in der Keycloak Admin Console**
 
-URL prod: `https://keycloak.iri-base.org/admin/`. Mit Admin-Credentials einloggen (aus `.env`: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`).
+URL prod: `https://keycloak.profit-base.online/admin/`. Mit Admin-Credentials einloggen (aus `.env`: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`).
 
 **B.2 — Client `basetool-frontend` auf confidential umstellen**
 
@@ -246,7 +246,7 @@ Im Log nach `Started FrontendApplication` und `o.s.s.o.client.OAuth2AuthorizedCl
 
 **C.5 — Smoke-Test**
 
-- Inkognito-Browser → `https://iri-base.org` → Login-Button klicken.
+- Inkognito-Browser → `https://profit-base.online` → Login-Button klicken.
 - Weiterleitung zur Keycloak-Login-Seite, Credentials eingeben.
 - Erfolgreicher Redirect zurück auf die Startseite mit gültiger Session.
 - In Browser-DevTools → Network-Tab → bei der Redirect-Response auf `/login/oauth2/code/keycloak` den Token-Exchange-Request inspizieren (sichtbar nur im Backend, nicht im Browser — alternativ Keycloak Event-Log).

@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="${appTitle}">IRIDIUM Basetool</title>
+    <title th:text="${appTitle}">Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <script th:src="@{/js/vendor/marked-18.0.3.min.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/vendor/dompurify-3.4.2.min.js}" th:attr="nonce=${cspNonce}"></script>
@@ -18,15 +18,15 @@
             <span></span>
         </button>
         <a th:href="@{/}" class="brand">
-            <img th:src="@{/logos/iridium.svg}" alt="Logo" width="50" height="50">
-            <span class="logo-text" th:text="${appTitle}">IRIDIUM Basetool</span>
+            <img th:src="@{/logos/krt_logo.svg}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
         </a>
     </nav>
 </header>
 <main>
     <div class="greeting hud-box">
         <h1 th:if="${username}" th:text="#{home.welcome_user(${currentUser != null ? currentUser.effectiveName : username})}">Welcome, <span th:text="${username}">User</span>!</h1>
-        <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Welcome to IRIDIUM Basetool!</h1>
+        <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Welcome to Profit Basetool!</h1>
         <p th:text="#{home.description}">This is the central platform for mission planning and fleet management.</p>
         <div class="mt-1-5">
             

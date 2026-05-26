@@ -1,4 +1,4 @@
-; systemd timer that fires the IRIDIUM Basetool deploy check every 5 minutes.
+; systemd timer that fires the Profit Basetool deploy check every 5 minutes.
 ;
 ; The deploy script itself is idempotent — if the resolved digests of
 ; `:stable` match the last successfully deployed pair, it exits 0 without
@@ -14,7 +14,7 @@
 ; promotions visible the same workday they happen.
 
 [Unit]
-Description=IRIDIUM Basetool — periodic deploy check (every 5 minutes)
+Description=Profit Basetool — periodic deploy check (every 5 minutes)
 Documentation=https://github.com/krt-iri/basetool/blob/main/docs/deployment.md
 Requires=iri-deploy.service
 

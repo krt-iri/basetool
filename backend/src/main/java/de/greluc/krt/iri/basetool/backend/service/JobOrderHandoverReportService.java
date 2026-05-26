@@ -244,7 +244,7 @@ public class JobOrderHandoverReportService {
       // Footer
       document.add(new Paragraph(" ", new Font(Font.HELVETICA, 10)));
       Font footerFont = new Font(Font.HELVETICA, 8, Font.NORMAL, COLOR_LIGHT_GRAY);
-      Paragraph footer = new Paragraph("Generiert von IRIDIUM Basetool", footerFont);
+      Paragraph footer = new Paragraph("Generiert von Profit Basetool", footerFont);
       footer.setAlignment(Element.ALIGN_CENTER);
       document.add(footer);
 

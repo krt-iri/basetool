@@ -31,7 +31,7 @@ class GlobalExceptionHandlerNotFoundTest {
   @BeforeEach
   void setUp() {
     AppProblemProperties props = new AppProblemProperties();
-    props.setBaseUri("https://iri-base.org/problems/");
+    props.setBaseUri("https://profit-base.online/problems/");
     ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
     messageSource.setBasename("messages");
     messageSource.setDefaultEncoding("UTF-8");
@@ -63,7 +63,7 @@ class GlobalExceptionHandlerNotFoundTest {
     assertEquals(404, pd.getStatus());
     assertEquals("Not Found", pd.getTitle());
     assertEquals("Mission not found", pd.getDetail());
-    assertEquals(URI.create("https://iri-base.org/problems/not-found"), pd.getType());
+    assertEquals(URI.create("https://profit-base.online/problems/not-found"), pd.getType());
     assertEquals(URI.create("/api/v1/missions/abc"), pd.getInstance());
     assertNotNull(pd.getProperties());
     assertEquals(GlobalExceptionHandler.CODE_NOT_FOUND, pd.getProperties().get("code"));
