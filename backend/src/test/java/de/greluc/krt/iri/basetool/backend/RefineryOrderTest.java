@@ -197,18 +197,30 @@ class RefineryOrderTest {
     assertEquals("Quantanium", saved.getGoods().iterator().next().getInputMaterial().getName());
     assertEquals(mission.getId(), saved.getMission().getId());
 
-    // Update
-    saved.setRefiningMethod(ferron);
-    // We need to re-set the goods because we want to modify them.
-    // Similar to previous test: create new set for update.
-    saved.setGoods(new HashSet<>());
+    // Build a fresh detached payload for the update — mutating the managed `saved` entity
+    // (returned by findById above) would dirty-mark it in the persistence context. The
+    // controller's getRefineryOrder reloads via the same context, and the subsequent
+    // explicit version check sees the bumped @Version, surfacing as a 409. Sending a
+    // detached payload mirrors what the frontend actually does and dodges the
+    // managed-entity quirk.
+    RefineryOrder updatePayload = new RefineryOrder();
+    updatePayload.setId(saved.getId());
+    updatePayload.setVersion(saved.getVersion());
+    updatePayload.setLocation(saved.getLocation());
+    updatePayload.setStartedAt(saved.getStartedAt());
+    updatePayload.setDurationMinutes(saved.getDurationMinutes());
+    updatePayload.setExpenses(saved.getExpenses());
+    updatePayload.setMission(saved.getMission());
+    updatePayload.setOwner(saved.getOwner());
+    updatePayload.setOwningOrgUnit(saved.getOwningOrgUnit());
+    updatePayload.setRefiningMethod(ferron);
     RefineryGood good2 = new RefineryGood();
     good2.setInputMaterial(gold);
     good2.setInputQuantity(100);
     good2.setOutputMaterial(gold);
     good2.setOutputQuantity(100);
     good2.setQuality(100);
-    saved.getGoods().add(good2);
+    updatePayload.setGoods(new HashSet<>(Set.of(good2)));
 
     mockMvc
         .perform(
@@ -224,7 +236,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(saved)))
+                .content(objectMapper.writeValueAsString(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();

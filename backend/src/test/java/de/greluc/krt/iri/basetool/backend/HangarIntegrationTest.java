@@ -175,6 +175,7 @@ class HangarIntegrationTest {
     ship.setName("User1 Ship");
     ship.setShipType(fighter);
     ship.setOwner(user1);
+    ship.setInsurance("LTI");
     ship = shipRepository.save(ship);
 
     // User2 tries to update
