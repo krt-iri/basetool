@@ -38,6 +38,8 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.SquadronRepository squadronRepository;
 
   @InjectMocks private JobOrderHandoverService service;
 
@@ -520,9 +522,9 @@ class JobOrderHandoverServiceTest {
     squadronB.setId(UUID.randomUUID());
     squadronB.setShorthand("BRV");
 
-    order.setCreatingSquadron(squadronA);
-    order.setRequestingSquadron(squadronA);
-    inventoryItem.setOwningSquadron(squadronB);
+    order.setCreatingOrgUnit(squadronA);
+    order.setRequestingOrgUnit(squadronA);
+    inventoryItem.setOwningOrgUnit(squadronB);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 3.0);
     JobOrderHandoverCreateDto createDto =

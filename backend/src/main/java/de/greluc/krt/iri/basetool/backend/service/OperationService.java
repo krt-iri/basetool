@@ -214,8 +214,9 @@ public class OperationService {
    *       Spezialkommando selections with {@code BadRequestException} until the cleanup release
    *       lifts the NOT NULL on {@code owning_squadron_id}).
    *   <li>Caller resolved AND {@code owningOrgUnitId} is {@code null} → resolver falls back to the
-   *       caller's home Staffel via {@code User.getSquadron()}. Functionally identical to the
-   *       legacy "stamp from active scope" path for the common single-membership case.
+   *       caller's home Staffel via the single SQUADRON-kind row in {@code org_unit_membership}.
+   *       Functionally identical to the legacy "stamp from active scope" path for the common
+   *       single-membership case.
    *   <li>No authenticated caller (admin in "all squadrons" mode, anonymous fallback) → preserve
    *       the historical {@code OwnerScopeService.currentSquadron()} path. The picker UUID, if
    *       supplied, cannot be membership-validated without a user, so it is ignored.
@@ -229,13 +230,13 @@ public class OperationService {
    */
   @Transactional
   public Operation createOperation(@NotNull Operation operation, @Nullable UUID owningOrgUnitId) {
-    if (operation.getOwningSquadron() == null) {
+    if (operation.getOwningOrgUnit() == null) {
       User caller = userService.getCurrentUser().orElse(null);
       if (caller != null) {
-        operation.setOwningSquadron(
-            ownerScopeService.resolveSquadronForPickerOutput(caller, owningOrgUnitId));
+        operation.setOwningOrgUnit(
+            ownerScopeService.resolveOrgUnitForPickerOutput(caller, owningOrgUnitId));
       } else {
-        ownerScopeService.currentSquadron().ifPresent(operation::setOwningSquadron);
+        ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }
     }
     return operationRepository.save(operation);

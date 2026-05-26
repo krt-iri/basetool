@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,8 @@ class FeatureExpansionTest {
 
   @Autowired private UserRepository userRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   @Autowired private ManufacturerRepository manufacturerRepository;
 
   @Autowired private StarSystemRepository starSystemRepository;
@@ -77,20 +80,20 @@ class FeatureExpansionTest {
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officerExp");
-    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
+    saveIridiumMembership(officerUser);
 
     normalUser = new User();
     normalUser.setId(UUID.randomUUID());
     normalUser.setUsername("normalExp");
-    normalUser.setSquadron(iridium);
     userRepository.save(normalUser);
+    saveIridiumMembership(normalUser);
 
     otherUser = new User();
     otherUser.setId(UUID.randomUUID());
     otherUser.setUsername("otherExp");
-    otherUser.setSquadron(iridium);
     userRepository.save(otherUser);
+    saveIridiumMembership(otherUser);
 
     Manufacturer aegis = new Manufacturer();
     aegis.setName("Aegis");
@@ -109,6 +112,18 @@ class FeatureExpansionTest {
     stanton = new Location();
     stanton.setName("Stanton");
     stanton = locationRepository.save(stanton);
+  }
+
+  /**
+   * Post-R9 D3 (V101): the user's home Staffel lives in org_unit_membership — anchoring the fixture
+   * to IRIDIUM via a membership row is the only way for the owner resolver to find a Staffel link.
+   */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   @Test
@@ -201,7 +216,7 @@ class FeatureExpansionTest {
   @Test
   void testSubMission() throws Exception {
     Mission parent = new Mission();
-    parent.setOwningSquadron(iridium);
+    parent.setOwningOrgUnit(iridium);
     parent.setName("Parent Mission");
     parent = missionRepository.save(parent);
 
@@ -248,7 +263,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Finance Mission");
     mission = missionRepository.save(mission);
 
@@ -300,7 +315,7 @@ class FeatureExpansionTest {
   @Test
   void testMissionFinance_OtherUser_Forbidden() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Finance Mission 2");
     mission = missionRepository.save(mission);
 

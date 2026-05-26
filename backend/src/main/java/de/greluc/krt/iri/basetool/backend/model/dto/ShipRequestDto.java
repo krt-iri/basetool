@@ -10,13 +10,10 @@ import org.jetbrains.annotations.Nullable;
  * Data transfer record carrying Ship Request payload (create + update).
  *
  * <p>R5.d.f added the trailing {@link #owningOrgUnitId} picker output. When present on create, the
- * service layer routes the stamping through {@code
- * OwnerScopeService.resolveSquadronForPickerOutput} — the picked OrgUnit is validated against the
- * target user's memberships and Spezialkommando selections are refused with 400 until the
- * destructive cleanup release loosens NOT NULL on the legacy {@code owning_squadron_id} column.
- * When {@code null}, the service falls back to the target user's home Staffel ({@code
- * User.getSquadron()}), preserving the legacy stamping path for the single-membership case that
- * covers 100 % of users today. Ignored on update — the existing stamp survives.
+ * service layer routes the stamping through {@code OwnerScopeService.resolveOrgUnitForPickerOutput}
+ * — the picked OrgUnit is validated against the target user's memberships in {@code
+ * org_unit_membership}. When {@code null}, the resolver auto-stamps the user's single membership
+ * (today's common single-Staffel case). Ignored on update — the existing stamp survives.
  */
 public record ShipRequestDto(
     String name,

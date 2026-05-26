@@ -14,7 +14,19 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OperationMapper {
 
-  /** Maps an {@link Operation} entity to its outbound DTO. */
+  /**
+   * Maps an {@link Operation} entity to its outbound DTO.
+   *
+   * <p>After R9 Step 2 the operation entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
+   * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
+   * stability. The explicit mapping routes the source through {@code
+   * SquadronMapper.orgUnitToReferenceDto} so SK-owned operations surface as {@code null} on the
+   * wire while Staffel-owned ones continue to project as before.
+   *
+   * @param entity the operation entity to project; {@code null} returns {@code null}.
+   * @return the populated operation DTO.
+   */
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   OperationDto toDto(Operation entity);
 
   /**

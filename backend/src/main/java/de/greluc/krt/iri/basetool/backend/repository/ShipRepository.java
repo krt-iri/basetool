@@ -76,14 +76,14 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   List<Ship> findByOwnerId(UUID ownerId);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
@@ -91,7 +91,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * configured relations via {@code @EntityGraph}.
    */
   @Override
-  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   Page<Ship> findAll(Pageable pageable);
 
   /**
@@ -100,7 +100,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * (admin "all squadrons" mode). Eagerly fetches {@code shipType}, {@code location} and {@code
    * owner} via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningSquadron"})
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   @Query(
       "SELECT s FROM Ship s WHERE ("
           + "  :isAdminAllScope = true"
@@ -139,7 +139,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Derived Spring-Data query - returns entities matching {@code ShipTypeIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "owningSquadron"})
+  @EntityGraph(attributePaths = {"owner", "location", "owningOrgUnit"})
   List<Ship> findByShipTypeIn(List<de.greluc.krt.iri.basetool.backend.model.ShipType> shipTypes);
 
   /**

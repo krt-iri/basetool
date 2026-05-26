@@ -27,7 +27,19 @@ public interface JobOrderMapper {
    * was removed from the DTO together with the V90 DROP COLUMN migration; clients consume the
    * structured {@code requestingSquadron} reference (and its {@code shorthand} sub-field) for a
    * human-readable label.
+   *
+   * <p>After R9 Step 2 the entity exposes {@code creatingOrgUnit} / {@code requestingOrgUnit}
+   * (typed {@code OrgUnit}); the DTO still publishes {@code creatingSquadron} / {@code
+   * requestingSquadron} as {@code SquadronReferenceDto} for API stability. The two explicit
+   * mappings below route both fields through {@code SquadronMapper.orgUnitToReferenceDto} so SK-
+   * owned orders surface as {@code null} on the wire while Staffel-owned ones continue to project
+   * as before.
+   *
+   * @param jobOrder the entity to project; {@code null} returns {@code null}.
+   * @return the populated outbound DTO.
    */
+  @Mapping(target = "creatingSquadron", source = "creatingOrgUnit")
+  @Mapping(target = "requestingSquadron", source = "requestingOrgUnit")
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**

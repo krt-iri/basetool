@@ -11,13 +11,17 @@ import de.greluc.krt.iri.basetool.backend.model.JobType;
 import de.greluc.krt.iri.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +58,8 @@ class MissionAccessControlTest {
 
   @Autowired private JobTypeRepository jobTypeRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -70,19 +76,28 @@ class MissionAccessControlTest {
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer1");
-    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
+    saveIridiumMembership(officerUser);
 
     guestUser = new User();
     guestUser.setId(UUID.randomUUID());
     guestUser.setUsername("guest1");
-    guestUser.setSquadron(iridium);
     userRepository.save(guestUser);
+    saveIridiumMembership(guestUser);
 
     testJobType = new JobType();
     testJobType.setName("Test Job");
     testJobType.setArchetype(JobTypeArchetype.MISSION);
     testJobType = jobTypeRepository.save(testJobType);
+  }
+
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   @Test
@@ -125,7 +140,7 @@ class MissionAccessControlTest {
   @Test
   void testJoinMission_Guest_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Open Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -143,7 +158,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_Self_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -180,7 +195,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_OtherGuest_Forbidden() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -193,8 +208,8 @@ class MissionAccessControlTest {
     User otherGuest = new User();
     otherGuest.setId(UUID.randomUUID());
     otherGuest.setUsername("guest2");
-    otherGuest.setSquadron(iridium);
     userRepository.save(otherGuest);
+    saveIridiumMembership(otherGuest);
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
@@ -225,7 +240,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_Officer_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -269,7 +284,7 @@ class MissionAccessControlTest {
   @Test
   void testUpdateParticipant_AllFields() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission Full");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -323,22 +338,22 @@ class MissionAccessControlTest {
 
     Mission m1 = new Mission();
 
-    m1.setOwningSquadron(iridium);
+    m1.setOwningOrgUnit(iridium);
     m1.setName("M1");
     m1.setStatus("PLANNED");
     missionRepository.save(m1);
     Mission m2 = new Mission();
-    m2.setOwningSquadron(iridium);
+    m2.setOwningOrgUnit(iridium);
     m2.setName("M2");
     m2.setStatus("ACTIVE");
     missionRepository.save(m2);
     Mission m3 = new Mission();
-    m3.setOwningSquadron(iridium);
+    m3.setOwningOrgUnit(iridium);
     m3.setName("M3");
     m3.setStatus("COMPLETED");
     missionRepository.save(m3);
     Mission m4 = new Mission();
-    m4.setOwningSquadron(iridium);
+    m4.setOwningOrgUnit(iridium);
     m4.setName("M4");
     m4.setStatus("CANCELLED");
     missionRepository.save(m4);
@@ -355,12 +370,12 @@ class MissionAccessControlTest {
 
     Mission m1 = new Mission();
 
-    m1.setOwningSquadron(iridium);
+    m1.setOwningOrgUnit(iridium);
     m1.setName("M1");
     m1.setStatus("COMPLETED");
     missionRepository.save(m1);
     Mission m2 = new Mission();
-    m2.setOwningSquadron(iridium);
+    m2.setOwningOrgUnit(iridium);
     m2.setName("M2");
     m2.setStatus("CANCELLED");
     missionRepository.save(m2);
@@ -378,7 +393,7 @@ class MissionAccessControlTest {
   @Test
   void testGetMissionById_Guest_Planned_Allowed() throws Exception {
     Mission m = new Mission();
-    m.setOwningSquadron(iridium);
+    m.setOwningOrgUnit(iridium);
     m.setName("Public");
     m.setStatus("PLANNED");
     m = missionRepository.save(m);
@@ -389,7 +404,7 @@ class MissionAccessControlTest {
   @Test
   void testGetMissionById_Guest_Completed_Forbidden() throws Exception {
     Mission m = new Mission();
-    m.setOwningSquadron(iridium);
+    m.setOwningOrgUnit(iridium);
     m.setName("Secret");
     m.setStatus("COMPLETED");
     m = missionRepository.save(m);
@@ -400,7 +415,7 @@ class MissionAccessControlTest {
   @Test
   void testAddParticipantPublic_Anonymous_Allowed() throws Exception {
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Public Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -423,7 +438,7 @@ class MissionAccessControlTest {
   void testUpdateParticipant_AnonymousGuest_Allowed() throws Exception {
     // Given
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -449,7 +464,7 @@ class MissionAccessControlTest {
   void testUpdatePayoutPreference_AnonymousGuest_Allowed() throws Exception {
     // Given
     Mission mission = new Mission();
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

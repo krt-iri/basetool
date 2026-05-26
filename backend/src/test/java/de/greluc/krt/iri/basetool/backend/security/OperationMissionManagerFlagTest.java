@@ -10,11 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OperationStatus;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
@@ -55,6 +59,8 @@ class OperationMissionManagerFlagTest {
   @Autowired private OperationRepository operationRepository;
 
   @Autowired private SquadronRepository squadronRepository;
+
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -128,17 +134,24 @@ class OperationMissionManagerFlagTest {
     User u = new User();
     u.setId(UUID.randomUUID());
     u.setUsername(username);
-    u.setMissionManager(missionManager);
-    // R6.b: stamping resolver requires the user to carry at least one OrgUnit membership.
-    // Anchor to V80-seeded IRIDIUM so createOperation resolves without a picker.
-    u.setSquadron(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
-    return userRepository.save(u);
+    u = userRepository.save(u);
+    // Post-R9 D3 (V101): MissionManager flag + home Staffel both live on the membership row.
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    m.setMissionManager(missionManager);
+    orgUnitMembershipRepository.save(m);
+    return u;
   }
 
   private Operation newOperation(String name) {
     Operation op = new Operation();
     op.setName(name);
     op.setStatus(OperationStatus.PLANNED);
+    // V99 made owning_org_unit_id NOT NULL — anchor every test Operation to IRIDIUM so direct
+    // repository saves do not trip the constraint.
+    op.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     return operationRepository.save(op);
   }
 

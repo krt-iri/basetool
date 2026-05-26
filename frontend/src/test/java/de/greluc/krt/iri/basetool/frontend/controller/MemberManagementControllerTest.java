@@ -237,7 +237,7 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, null, null, null);
+          new MemberEditForm(5, "old desc", "alice", 1L, null, null, null, null, null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -259,7 +259,7 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, "existing-source", null, null);
+          new MemberEditForm(5, "old desc", "alice", 1L, "existing-source", null, null, null, null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -301,7 +301,7 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null);
+      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
       BindingResult br = mock(BindingResult.class);
@@ -320,7 +320,8 @@ class MemberManagementControllerTest {
     void happyPath_putsAttributesAndRedirectsToList() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "desc", "Alice", 1L, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -344,7 +345,8 @@ class MemberManagementControllerTest {
     void happyPath_withProfileSource_redirectsToProfile() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -360,7 +362,8 @@ class MemberManagementControllerTest {
     void backendError_redirectsToEditWithErrorToast() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "desc", "Alice", 1L, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("backend down"))
@@ -378,7 +381,8 @@ class MemberManagementControllerTest {
     void backendError_withSource_redirectsToEditPreservingSource() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("nope")).when(backendApiClient).put(anyString(), any(), any());

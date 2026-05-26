@@ -569,10 +569,15 @@ public class UserService {
   }
 
   /**
-   * Flips the {@code is_logistician} flag on a user. The flag is independent of Keycloak realm
-   * roles — admins can grant the LOGISTICIAN role via this method without a Keycloak round-trip;
-   * the JWT-to-authorities converter promotes the flag to {@code ROLE_LOGISTICIAN} on the next
-   * authentication.
+   * Flips the {@code is_logistician} flag on the user's Staffel membership row. The flag is
+   * independent of Keycloak realm roles — admins can grant the LOGISTICIAN role via this method
+   * without a Keycloak round-trip; the JWT-to-authorities converter promotes the flag to {@code
+   * ROLE_LOGISTICIAN} on the next authentication.
+   *
+   * <p>Post-R9 D3 (V101): the legacy {@code app_user.is_logistician} column was dropped — the write
+   * lands on the user's single Staffel membership in {@code org_unit_membership}. Users without a
+   * Staffel membership (admins, guests) are a no-op on the membership side; the call still returns
+   * the persisted user.
    *
    * @param userId user primary key
    * @param isLogistician new flag value
@@ -584,19 +589,13 @@ public class UserService {
         userRepository
             .findById(userId)
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-    user.setLogistician(isLogistician);
-    User saved = userRepository.save(user);
-    // R6.e / Plan D3 write-side: mirror the flag onto the user's Staffel membership so the
-    // authority surface — sourced from `org_unit_membership.is_logistician` since R6.d — picks
-    // up the change. Until the destructive cleanup release drops `app_user.is_logistician`,
-    // the User-level write above is kept as the legacy mirror.
     orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, isLogistician, null);
-    return saved;
+    return user;
   }
 
   /**
-   * Flips the {@code is_mission_manager} flag on a user. Mirrors {@link #updateLogisticianStatus}
-   * but for the MISSION_MANAGER role.
+   * Flips the {@code is_mission_manager} flag on the user's Staffel membership row. Mirrors {@link
+   * #updateLogisticianStatus} but for the MISSION_MANAGER role.
    *
    * @param userId user primary key
    * @param isMissionManager new flag value
@@ -608,11 +607,8 @@ public class UserService {
         userRepository
             .findById(userId)
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-    user.setMissionManager(isMissionManager);
-    User saved = userRepository.save(user);
-    // R6.e / Plan D3 write-side mirror — see updateLogisticianStatus for the rationale.
     orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, null, isMissionManager);
-    return saved;
+    return user;
   }
 
   /**
@@ -621,16 +617,17 @@ public class UserService {
    * version} parameter: the caller must echo back the version they last read so two admins editing
    * the same row simultaneously surface as 409 instead of one silently overwriting the other.
    *
-   * <p>The {@code app_user.squadron_id} column is the single source of truth for the strict-staffel
-   * scope ({@link OwnerScopeService} reads it to decide which staffel-scoped aggregates a non-admin
-   * sees). Until V86 tightens the column to NOT NULL, {@code null} is a valid value that means
-   * "admin / unassigned" and falls back to the cross-squadron view.
+   * <p>Post-R9 D3 (V101): the legacy {@code app_user.squadron_id} column was dropped — the write
+   * lands as a row in {@code org_unit_membership} (kind=SQUADRON) via {@link
+   * OrgUnitMembershipService#syncStaffelMembership(User, Squadron)}. The membership table is now
+   * the single source of truth for "which Staffel does this user belong to".
    *
    * @param userId user primary key; must exist
    * @param squadronId target squadron id; {@code null} clears the assignment
    * @param version optimistic-lock version echoed back from the last read; {@code null} bypasses
-   *     the explicit check and falls back to Hibernate's UPDATE-WHERE-VERSION
-   * @return the persisted user
+   *     the explicit check
+   * @return the user record (unchanged on the User entity itself — the assignment lives on the
+   *     membership table)
    * @throws NoSuchElementException when {@code userId} does not exist
    * @throws NoSuchElementException when {@code squadronId} is non-null but unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException on version mismatch
@@ -648,22 +645,146 @@ public class UserService {
     de.greluc.krt.iri.basetool.backend.model.Squadron resolvedSquadron;
     if (squadronId == null) {
       resolvedSquadron = null;
-      user.setSquadron(null);
     } else {
       resolvedSquadron =
           squadronRepository
               .findById(squadronId)
               .orElseThrow(
                   () -> new NoSuchElementException("Squadron not found with id: " + squadronId));
-      user.setSquadron(resolvedSquadron);
     }
-    User saved = userRepository.save(user);
-    // R6.e — keep the org_unit_membership row in lockstep with the legacy app_user.squadron_id
-    // column so the JWT converter's R6.d read path (which queries the membership table) reflects
-    // every Staffel assignment / re-assignment / clearing. Closes the V95-backfill invariant gap
-    // for post-R1 users whose membership row was never created.
-    orgUnitMembershipService.syncStaffelMembership(saved, resolvedSquadron);
-    return saved;
+    // Post-R9 D3: the squadron link IS the membership row — there is no User-level column to
+    // update first. The membership-service call creates / deletes / leaves the membership row as
+    // appropriate; the User entity itself does not change.
+    orgUnitMembershipService.syncStaffelMembership(user, resolvedSquadron);
+    return user;
+  }
+
+  /**
+   * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta orchestrator. Applies the supplied
+   * Staffel + SK change set in one transaction so the admin member-edit page can persist every
+   * change with one Save button click — concurrent-admin safety stays intact because every row
+   * still passes through its individual optimistic-lock check (the {@code version} field on each
+   * change).
+   *
+   * <p>Resolution order matters and is fixed by this method:
+   *
+   * <ol>
+   *   <li>Staffel side first — a Staffel reassignment may delete + recreate the membership row, so
+   *       any explicit Staffel-flag patch on the same change must land on the new row, not the old
+   *       one. {@code updateUserSquadron} delegates to {@link
+   *       OrgUnitMembershipService#syncStaffelMembership} which creates the new row with the legacy
+   *       User-level flag values carried over; the explicit-flag patch (if any) then overrides on
+   *       top.
+   *   <li>SK side second, in the order the client sent them. ADD adopts initial flags inline (no
+   *       second {@code save}); REMOVE deletes by composite PK; PATCH validates the per-row
+   *       {@code @Version} before writing. {@code is_lead} is intentionally not part of this
+   *       payload — Lead toggles stay isolated in the SK detail page workflow per Plan D2 so the
+   *       audit trail keeps clear per-toggle attribution.
+   * </ol>
+   *
+   * <p>If any step throws (NotFoundException on a stale id, OptimisticLockingFailureException on a
+   * stale version, DuplicateEntityException on an ADD for an existing membership) the entire
+   * transaction rolls back — partial application is not exposed.
+   *
+   * @param userId the user whose memberships to mutate; never {@code null}.
+   * @param delta the delta to apply; never {@code null}, but both halves may be {@code null} /
+   *     empty (no-op delta is allowed and just returns the current state).
+   * @return the user's complete post-write membership list (Staffel + every SK), never {@code
+   *     null}.
+   * @throws java.util.NoSuchElementException when the user does not exist.
+   */
+  @Transactional
+  public java.util.List<de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership>
+      applyMembershipDelta(
+          UUID userId, de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest delta) {
+    userRepository
+        .findById(userId)
+        .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+
+    if (delta.staffel() != null) {
+      applyStaffelChange(userId, delta.staffel());
+    }
+    if (delta.specialCommands() != null) {
+      for (de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange
+          sk : delta.specialCommands()) {
+        applySpecialCommandChange(userId, sk);
+      }
+    }
+    return orgUnitMembershipService.findAllMembershipsForUser(userId);
+  }
+
+  /**
+   * Staffel-side half of {@link #applyMembershipDelta}. Routes through {@link
+   * #updateUserSquadron(UUID, UUID, Long)} for assignment changes (which in turn syncs the
+   * membership row) and through {@link OrgUnitMembershipService#applyStaffelMembershipFlagDelta}
+   * for explicit flag patches.
+   *
+   * @param userId target user id.
+   * @param change the Staffel-side delta record.
+   */
+  private void applyStaffelChange(
+      UUID userId,
+      de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.StaffelChange change) {
+    userRepository.findById(userId).orElseThrow(() -> new NoSuchElementException("User not found"));
+    // Post-R9 D3 (V101): the user's home Staffel is sourced from org_unit_membership directly —
+    // the legacy app_user.squadron_id column was dropped. Read the current Staffel membership row
+    // to decide whether the squadron assignment actually changes.
+    UUID currentSquadronId =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId).orElse(null);
+    UUID targetSquadronId = change.squadronId();
+    if (!java.util.Objects.equals(currentSquadronId, targetSquadronId)) {
+      updateUserSquadron(userId, targetSquadronId, change.userVersion());
+    }
+    if (change.isLogistician() != null || change.isMissionManager() != null) {
+      orgUnitMembershipService.applyStaffelMembershipFlagDelta(
+          userId, change.isLogistician(), change.isMissionManager());
+    }
+  }
+
+  /**
+   * SK-side half of {@link #applyMembershipDelta}. Dispatches on the action discriminator and
+   * forwards to the existing membership-service primitives. ADD adopts initial flags via a single
+   * {@code save} on the freshly-created row (avoiding the intra-transaction double-version-bump
+   * trap from CLAUDE.md "Concurrency" section); PATCH delegates to {@link
+   * OrgUnitMembershipService#patchFlags} which does its own optimistic-lock check; REMOVE delegates
+   * to {@link OrgUnitMembershipService#removeMember}.
+   *
+   * @param userId target user id.
+   * @param change the SK-side change record.
+   */
+  private void applySpecialCommandChange(
+      UUID userId,
+      de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange
+          change) {
+    switch (change.action()) {
+      case ADD -> {
+        de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership fresh =
+            orgUnitMembershipService.addMember(change.orgUnitId(), userId);
+        if (Boolean.TRUE.equals(change.isLogistician())
+            || Boolean.TRUE.equals(change.isMissionManager())) {
+          // The freshly-created row has version 0 and is still managed in this transaction.
+          // Mutate it in place; Hibernate dirty-checking flushes the second update on commit
+          // without a second explicit save call (avoiding the intra-transaction @Version race
+          // documented in CLAUDE.md).
+          if (Boolean.TRUE.equals(change.isLogistician())) {
+            fresh.setLogistician(true);
+          }
+          if (Boolean.TRUE.equals(change.isMissionManager())) {
+            fresh.setMissionManager(true);
+          }
+        }
+      }
+      case REMOVE -> orgUnitMembershipService.removeMember(change.orgUnitId(), userId);
+      case PATCH ->
+          orgUnitMembershipService.patchFlags(
+              change.orgUnitId(),
+              userId,
+              new de.greluc.krt.iri.basetool.backend.model.dto.MembershipFlagsPatchRequest(
+                  change.isLogistician(), change.isMissionManager(), change.version()));
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported SpecialCommandChange action: " + change.action());
+    }
   }
 
   /**

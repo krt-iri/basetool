@@ -62,6 +62,8 @@ class RefineryOrderTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -85,14 +87,14 @@ class RefineryOrderTest {
     user1 = new User();
     user1.setId(UUID.randomUUID());
     user1.setUsername("refineryUser");
-    user1.setSquadron(iridium);
     userRepository.save(user1);
+    saveIridiumMembership(user1);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
     adminUser.setUsername("refineryAdmin");
-    adminUser.setSquadron(iridium);
     userRepository.save(adminUser);
+    saveIridiumMembership(adminUser);
 
     StarSystem system = new StarSystem();
     system.setName("Stanton");
@@ -110,7 +112,7 @@ class RefineryOrderTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Mining Op");
     missionRepository.save(mission);
 
@@ -133,10 +135,19 @@ class RefineryOrderTest {
     gold = materialRepository.save(gold);
   }
 
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
+  }
+
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -186,18 +197,30 @@ class RefineryOrderTest {
     assertEquals("Quantanium", saved.getGoods().iterator().next().getInputMaterial().getName());
     assertEquals(mission.getId(), saved.getMission().getId());
 
-    // Update
-    saved.setRefiningMethod(ferron);
-    // We need to re-set the goods because we want to modify them.
-    // Similar to previous test: create new set for update.
-    saved.setGoods(new HashSet<>());
+    // Build a fresh detached payload for the update — mutating the managed `saved` entity
+    // (returned by findById above) would dirty-mark it in the persistence context. The
+    // controller's getRefineryOrder reloads via the same context, and the subsequent
+    // explicit version check sees the bumped @Version, surfacing as a 409. Sending a
+    // detached payload mirrors what the frontend actually does and dodges the
+    // managed-entity quirk.
+    RefineryOrder updatePayload = new RefineryOrder();
+    updatePayload.setId(saved.getId());
+    updatePayload.setVersion(saved.getVersion());
+    updatePayload.setLocation(saved.getLocation());
+    updatePayload.setStartedAt(saved.getStartedAt());
+    updatePayload.setDurationMinutes(saved.getDurationMinutes());
+    updatePayload.setExpenses(saved.getExpenses());
+    updatePayload.setMission(saved.getMission());
+    updatePayload.setOwner(saved.getOwner());
+    updatePayload.setOwningOrgUnit(saved.getOwningOrgUnit());
+    updatePayload.setRefiningMethod(ferron);
     RefineryGood good2 = new RefineryGood();
     good2.setInputMaterial(gold);
     good2.setInputQuantity(100);
     good2.setOutputMaterial(gold);
     good2.setOutputQuantity(100);
     good2.setQuality(100);
-    saved.getGoods().add(good2);
+    updatePayload.setGoods(new HashSet<>(Set.of(good2)));
 
     mockMvc
         .perform(
@@ -213,7 +236,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(saved)))
+                .content(objectMapper.writeValueAsString(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();
@@ -246,7 +269,7 @@ class RefineryOrderTest {
   void testAdminManageUserRefineryOrder() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx); // Set a method
@@ -307,7 +330,7 @@ class RefineryOrderTest {
   void testAccessControl() throws Exception {
     // User1 creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     RefineryGood good = new RefineryGood();
@@ -323,8 +346,8 @@ class RefineryOrderTest {
     User user2 = new User();
     user2.setId(UUID.randomUUID());
     user2.setUsername("user2");
-    user2.setSquadron(iridium);
     userRepository.save(user2);
+    saveIridiumMembership(user2);
 
     // User2 tries to update User1's order
     mockMvc
@@ -372,7 +395,7 @@ class RefineryOrderTest {
 
     RefineryOrder order = new RefineryOrder();
 
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
 
@@ -407,7 +430,7 @@ class RefineryOrderTest {
   @Test
   void testCreateRefineryOrder_WithNullMission_ShouldSucceed() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
@@ -457,7 +480,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
     // User creates order
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -503,7 +526,7 @@ class RefineryOrderTest {
   void testStoreRefineryOrder_WithNoteAndAmountOverride() throws Exception {
     // Given: ein Raffinerieauftrag mit einem Output-Material
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
@@ -576,7 +599,7 @@ class RefineryOrderTest {
   @Test
   void testStoreRefineryOrder_RejectsNegativeAmount() throws Exception {
     RefineryOrder order = new RefineryOrder();
-    order.setOwningSquadron(iridium);
+    order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);

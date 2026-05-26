@@ -1,6 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import de.greluc.krt.iri.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
@@ -48,6 +51,7 @@ public class UserController {
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
    * Paged user list. Open to every authenticated member because the participant pickers in the
@@ -181,10 +185,14 @@ public class UserController {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    if (user.getSquadron() == null) {
+    // Post-R9 D3 (V101): the user's home Staffel is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped.
+    UUID userSquadronId =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitId(user.getId()).orElse(null);
+    if (userSquadronId == null) {
       return true;
     }
-    return !authHelperService.canSeeSquadron(user.getSquadron().getId());
+    return !authHelperService.canSeeSquadron(userSquadronId);
   }
 
   /**
@@ -311,6 +319,29 @@ public class UserController {
   public record UpdateUserSquadronRequest(
       @org.jetbrains.annotations.Nullable UUID squadronId,
       @jakarta.validation.constraints.NotNull Long version) {}
+
+  /**
+   * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta endpoint. Lets the admin member-edit
+   * page persist every Staffel-assignment + flag-toggle + SK add / remove / patch as one atomic
+   * transaction. Per-row optimistic-lock survives because every change record carries its own
+   * {@code version}; an inconsistent batch (one row stale, the rest fresh) rolls back the whole
+   * transaction and surfaces as a 409 — partial application is not exposed.
+   *
+   * @param id user primary key.
+   * @param request the delta to apply; never {@code null}, but both halves may be {@code null} /
+   *     empty.
+   * @return the user's complete post-write membership list.
+   */
+  @PatchMapping("/{id}/memberships")
+  @PreAuthorize("hasRole('ADMIN')")
+  public MembershipDeltaResponse patchMemberships(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
+    return new MembershipDeltaResponse(
+        userService.applyMembershipDelta(id, request).stream()
+            .map(orgUnitMembershipMapper::toDto)
+            .toList());
+  }
 
   /**
    * ADMIN-only: deletes a user account along with all owned data (ships, inventory, refinery

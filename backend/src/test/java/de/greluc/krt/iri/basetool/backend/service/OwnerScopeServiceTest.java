@@ -29,7 +29,6 @@ import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -61,13 +60,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OwnerScopeServiceTest {
 
   @Mock private AuthHelperService authHelper;
-  @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Mock
+  private de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository
+      specialCommandRepository;
+
   @Mock private HttpServletRequest request;
 
   @InjectMocks private OwnerScopeService service;
@@ -92,7 +95,23 @@ class OwnerScopeServiceTest {
 
     memberUserInA = new User();
     memberUserInA.setId(MEMBER_USER_ID);
-    memberUserInA.setSquadron(squadronA);
+    // Post-R9 D3 (V101): the home Staffel is sourced from org_unit_membership only.
+  }
+
+  /** Returns a Staffel membership row pointing the given user at the given Squadron. */
+  private static OrgUnitMembership staffelMembership(UUID userId, UUID squadronId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    return m;
+  }
+
+  /** Returns an SK membership row pointing the given user at the given Special Command. */
+  private static OrgUnitMembership skMembership(UUID userId, UUID skOrgUnitId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, skOrgUnitId));
+    m.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    return m;
   }
 
   @Nested
@@ -135,7 +154,10 @@ class OwnerScopeServiceTest {
     void nonAdmin_returnsPersistentUserSquadron() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      // Post-R9 D3 (V101): home Staffel via org_unit_membership.
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
       assertEquals(Optional.of(SQUADRON_A_ID), service.currentSquadronId());
     }
@@ -150,13 +172,12 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdmin_userWithoutSquadron_returnsEmpty() {
-      User squadronlessUser = new User();
-      squadronlessUser.setId(MEMBER_USER_ID);
-      squadronlessUser.setSquadron(null);
-
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(squadronlessUser));
+      // No Staffel membership row → empty.
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of());
 
       assertTrue(service.currentSquadronId().isEmpty());
     }
@@ -169,7 +190,9 @@ class OwnerScopeServiceTest {
     void resolvesEntityFromCurrentSquadronId() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(squadronRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
 
       assertEquals(Optional.of(squadronA), service.currentSquadron());
@@ -211,8 +234,10 @@ class OwnerScopeServiceTest {
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       lenient()
-          .when(userRepository.findById(MEMBER_USER_ID))
-          .thenReturn(Optional.of(memberUserInA));
+          .when(
+              orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+                  MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
@@ -319,7 +344,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       InventoryItem item = new InventoryItem();
       item.setId(itemId);
-      item.setOwningSquadron(squadronA);
+      item.setOwningOrgUnit(squadronA);
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
@@ -331,7 +356,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       InventoryItem item = new InventoryItem();
       item.setId(itemId);
-      item.setOwningSquadron(squadronB);
+      item.setOwningOrgUnit(squadronB);
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
@@ -355,7 +380,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronB);
+      order.setOwningOrgUnit(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
@@ -368,7 +393,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronA);
+      order.setOwningOrgUnit(squadronA);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
@@ -381,7 +406,7 @@ class OwnerScopeServiceTest {
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
-      op.setOwningSquadron(squadronB);
+      op.setOwningOrgUnit(squadronB);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       stubMemberInSquadronA();
 
@@ -394,7 +419,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
-      order.setOwningSquadron(squadronB);
+      order.setOwningOrgUnit(squadronB);
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -407,7 +432,7 @@ class OwnerScopeServiceTest {
   /**
    * Verifies the request-scoped memoisation on {@link OwnerScopeService#currentSquadronId()} and
    * {@link OwnerScopeService#currentSquadron()}. Without this, every controller call chain on a
-   * non-admin request would re-hit {@code userRepository.findById} and {@code
+   * non-admin request would re-hit the {@code org_unit_membership} lookup and {@code
    * squadronRepository.findById} once per scope query.
    */
   @Nested
@@ -432,24 +457,29 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void currentSquadronId_nonAdmin_calledTwice_hitsUserRepoOnce() {
+    void currentSquadronId_nonAdmin_calledTwice_hitsMembershipRepoOnce() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
       Optional<UUID> first = service.currentSquadronId();
       Optional<UUID> second = service.currentSquadronId();
 
       assertEquals(Optional.of(SQUADRON_A_ID), first);
       assertEquals(first, second);
-      verify(userRepository, times(1)).findById(MEMBER_USER_ID);
+      verify(orgUnitMembershipRepository, times(1))
+          .findAllByIdUserIdAndKind(MEMBER_USER_ID, OrgUnitKind.SQUADRON);
     }
 
     @Test
     void currentSquadron_calledTwice_hitsSquadronRepoOnce() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(squadronRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
 
       Optional<Squadron> first = service.currentSquadron();
@@ -461,16 +491,19 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void currentSquadronId_andCanSeeSquadron_shareUserRepoLookup() {
+    void currentSquadronId_andCanSeeSquadron_shareMembershipLookup() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
       service.currentSquadronId();
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
 
-      verify(userRepository, times(1)).findById(MEMBER_USER_ID);
+      verify(orgUnitMembershipRepository, times(1))
+          .findAllByIdUserIdAndKind(MEMBER_USER_ID, OrgUnitKind.SQUADRON);
     }
   }
 
@@ -484,12 +517,9 @@ class OwnerScopeServiceTest {
     homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
-    // No SK memberships — single-Staffel user, picker is hidden in the UI so {@code null}
-    // is the only realistic owner choice.
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of());
+    // Post-R9 D3 (V101): every membership (Staffel + SK) comes from findAllByIdUserId.
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
     Squadron result = service.resolveSquadronForPickerOutput(user, null);
@@ -500,14 +530,11 @@ class OwnerScopeServiceTest {
   @Test
   void resolveSquadronForPickerOutput_noMembershipAtAll_throwsBadRequest() {
     // Memberless user (admin / guest / freshly created without a backfill) — must be rejected
-    // before the stamp lands. Today this state is impossible (app_user.squadron_id is NOT NULL
-    // and V95 backfilled every existing row), but the guard is defensive against the post-D3
-    // world where the legacy Staffel column is dropped.
+    // before the stamp lands. Post-R9 D3 (V101) the legacy Staffel column is dropped, so the
+    // membership-table emptiness is the single criterion.
     User user = new User();
     user.setId(UUID.randomUUID());
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
 
     BadRequestException ex =
         assertThrows(
@@ -521,17 +548,15 @@ class OwnerScopeServiceTest {
     // User in Staffel + at least one SK. Plan §5.5.1: ambiguous, must reject. Before R6.b
     // this path silently stamped the legacy Staffel — exactly the audit regression #4.
     Squadron homeStaffel = new Squadron();
-    homeStaffel.setId(UUID.randomUUID());
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
-
-    OrgUnitMembership skMembership = new OrgUnitMembership();
-    OrgUnitMembershipId skId = new OrgUnitMembershipId(user.getId(), UUID.randomUUID());
-    skMembership.setId(skId);
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of(skMembership));
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), homeStaffelId),
+                skMembership(user.getId(), UUID.randomUUID())));
 
     BadRequestException ex =
         assertThrows(
@@ -548,10 +573,8 @@ class OwnerScopeServiceTest {
     homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
     Squadron result = service.resolveSquadronForPickerOutput(user, homeStaffelId);
@@ -567,13 +590,12 @@ class OwnerScopeServiceTest {
     homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
 
-    OrgUnitMembership skMembership = new OrgUnitMembership();
-    skMembership.setId(new OrgUnitMembershipId(user.getId(), UUID.randomUUID()));
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of(skMembership));
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), homeStaffelId),
+                skMembership(user.getId(), UUID.randomUUID())));
     when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
     Squadron result = service.resolveSquadronForPickerOutput(user, homeStaffelId);
@@ -585,14 +607,11 @@ class OwnerScopeServiceTest {
   void resolveSquadronForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
     // Picker output references an OrgUnit the target user does NOT belong to (membership
     // forgery vector).
-    Squadron homeStaffel = new Squadron();
-    homeStaffel.setId(UUID.randomUUID());
+    UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     UUID foreignId = UUID.randomUUID();
 
     BadRequestException ex =
@@ -608,18 +627,15 @@ class OwnerScopeServiceTest {
     // The user has Staffel + SK; the picker points at the SK. SquadronRepository.findById
     // returns empty for an SK id (the JPA single-table discriminator filter limits the repo
     // to kind='SQUADRON' rows), so the soft block fires.
-    Squadron homeStaffel = new Squadron();
-    homeStaffel.setId(UUID.randomUUID());
+    UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
-    user.setSquadron(homeStaffel);
 
     UUID skId = UUID.randomUUID();
-    OrgUnitMembership skMembership = new OrgUnitMembership();
-    skMembership.setId(new OrgUnitMembershipId(user.getId(), skId));
-    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND))
-        .thenReturn(List.of(skMembership));
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), homeStaffelId), skMembership(user.getId(), skId)));
     when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
 
     BadRequestException ex =
@@ -629,12 +645,165 @@ class OwnerScopeServiceTest {
         ex.getMessage().toLowerCase().contains("spezialkommando ownership"), ex.getMessage());
   }
 
+  // --- resolveOrgUnitForPickerOutput (V99-aligned SK-unblocking successor of
+  // resolveSquadronForPickerOutput; honours SK selections once V99 lifts the legacy NOT NULL) ---
+
+  @Test
+  void resolveOrgUnitForPickerOutput_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    de.greluc.krt.iri.basetool.backend.model.OrgUnit result =
+        service.resolveOrgUnitForPickerOutput(user, null);
+
+    assertSame(homeStaffel, result);
+    // SK repo not consulted on the Staffel branch.
+    verify(specialCommandRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_pickedSpecialCommand_isHonoured() {
+    // V99 unblocks SK ownership: the new method now returns the SpecialCommand entity instead
+    // of throwing "not yet supported". The legacy resolver still rejects, which proves the
+    // dual-track is clean.
+    UUID homeStaffelId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+
+    UUID skId = UUID.randomUUID();
+    de.greluc.krt.iri.basetool.backend.model.SpecialCommand sk =
+        new de.greluc.krt.iri.basetool.backend.model.SpecialCommand();
+    sk.setId(skId);
+    sk.setName("Alpha");
+
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), homeStaffelId), skMembership(user.getId(), skId)));
+    when(squadronRepository.findById(skId)).thenReturn(Optional.empty());
+    when(specialCommandRepository.findById(skId)).thenReturn(Optional.of(sk));
+
+    de.greluc.krt.iri.basetool.backend.model.OrgUnit result =
+        service.resolveOrgUnitForPickerOutput(user, skId);
+
+    assertSame(sk, result);
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
+    UUID homeStaffelId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    UUID foreignId = UUID.randomUUID();
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.resolveOrgUnitForPickerOutput(user, foreignId));
+    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_noMembershipAtAll_throwsBadRequest() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class, () -> service.resolveOrgUnitForPickerOutput(user, null));
+    assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
+  }
+
+  @Nested
+  class HasRoleInOrgUnitTests {
+
+    @Test
+    void admin_alwaysReturnsTrue_evenWithoutAnyAuthorities() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(true);
+      assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void anonymousAuthentication_returnsFalse() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentAuthentication()).thenReturn(Optional.empty());
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void matchingContextualAuthority_returnsTrue() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "LOGISTICIAN", orgUnit);
+      withAuthorities(java.util.List.of(granted));
+      assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void contextualAuthorityForDifferentOrgUnit_returnsFalse() {
+      UUID orgUnitA = UUID.randomUUID();
+      UUID orgUnitB = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "LOGISTICIAN", orgUnitA);
+      withAuthorities(java.util.List.of(granted));
+      assertFalse(service.hasRoleInOrgUnit(orgUnitB, "LOGISTICIAN"));
+    }
+
+    @Test
+    void contextualAuthorityForDifferentRole_returnsFalse() {
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority granted =
+          new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+              "MISSION_MANAGER", orgUnit);
+      withAuthorities(java.util.List.of(granted));
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    @Test
+    void onlyFlatAuthorityNoContextual_returnsFalse() {
+      // The flat ROLE_LOGISTICIAN authority is intentionally NOT matched — that's the
+      // back-compat surface for hasRole('LOGISTICIAN') gates. The contextual helper requires
+      // the contextual authority explicitly.
+      UUID orgUnit = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      org.springframework.security.core.GrantedAuthority flat =
+          new org.springframework.security.core.authority.SimpleGrantedAuthority(
+              "ROLE_LOGISTICIAN");
+      withAuthorities(java.util.List.of(flat));
+      assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
+    }
+
+    private void withAuthorities(
+        java.util.List<? extends org.springframework.security.core.GrantedAuthority> auths) {
+      org.springframework.security.core.Authentication authentication =
+          new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+              "user", "n/a", auths);
+      when(authHelper.currentAuthentication()).thenReturn(Optional.of(authentication));
+    }
+  }
+
   // --- helpers ------------------------------------------------------------------
 
   private Mission newMission(UUID id, Squadron owningSquadron, boolean isInternal) {
     Mission mission = new Mission();
     mission.setId(id);
-    mission.setOwningSquadron(owningSquadron);
+    mission.setOwningOrgUnit(owningSquadron);
     mission.setIsInternal(isInternal);
     return mission;
   }
@@ -642,6 +811,10 @@ class OwnerScopeServiceTest {
   private void stubMemberInSquadronA() {
     lenient().when(authHelper.isAdmin()).thenReturn(false);
     lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-    lenient().when(userRepository.findById(MEMBER_USER_ID)).thenReturn(Optional.of(memberUserInA));
+    lenient()
+        .when(
+            orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+                MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
   }
 }

@@ -8,10 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.time.Instant;
@@ -49,6 +52,8 @@ class MissionManagerRoleTest {
 
   @Autowired private MissionRepository missionRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private ObjectMapper objectMapper =
       new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
@@ -69,25 +74,25 @@ class MissionManagerRoleTest {
     owner = new User();
     owner.setId(UUID.randomUUID());
     owner.setUsername("owner");
-    owner.setSquadron(iridium);
     userRepository.save(owner);
+    saveIridiumMembership(owner, false, false);
 
     otherMember = new User();
     otherMember.setId(UUID.randomUUID());
     otherMember.setUsername("other");
-    otherMember.setSquadron(iridium);
     userRepository.save(otherMember);
+    saveIridiumMembership(otherMember, false, false);
 
     managerMember = new User();
     managerMember.setId(UUID.randomUUID());
     managerMember.setUsername("manager");
-    managerMember.setMissionManager(true);
-    managerMember.setSquadron(iridium);
     userRepository.save(managerMember);
+    // Post-R9 D3 (V101): the MissionManager flag lives on the Staffel membership row only.
+    saveIridiumMembership(managerMember, false, true);
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setOwner(owner);
     mission.setPlannedStartTime(Instant.now().plusSeconds(3600));
@@ -255,10 +260,10 @@ class MissionManagerRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("manager_user");
-    user.setMissionManager(true);
-    user.setSquadron(iridium);
     userRepository.save(user);
     userRepository.flush();
+    // Post-R9 D3 (V101): the MissionManager flag lives on the Staffel membership row only.
+    saveIridiumMembership(user, false, true);
 
     Jwt jwt =
         Jwt.withTokenValue("token")
@@ -271,5 +276,17 @@ class MissionManagerRoleTest {
     org.junit.jupiter.api.Assertions.assertTrue(
         authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER")),
         "Should have ROLE_MISSION_MANAGER");
+  }
+
+  /** Post-R9 D3 (V101): home Staffel + flag values via the membership row. */
+  private void saveIridiumMembership(User u, boolean logistician, boolean missionManager) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    m.setLogistician(logistician);
+    m.setMissionManager(missionManager);
+    orgUnitMembershipRepository.save(m);
+    orgUnitMembershipRepository.flush();
   }
 }

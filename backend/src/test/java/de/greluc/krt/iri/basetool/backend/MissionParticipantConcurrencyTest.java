@@ -113,7 +113,7 @@ class MissionParticipantConcurrencyTest {
   void addParticipant_underRealConcurrentContention_allThreadsSucceed() throws Exception {
     Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     Mission seed = new Mission();
-    seed.setOwningSquadron(iridium);
+    seed.setOwningOrgUnit(iridium);
     seed.setName("Concurrency Signup Mission " + UUID.randomUUID());
     seed.setStatus("PLANNED");
     seedMissionId = missionRepository.save(seed).getId();
@@ -229,7 +229,7 @@ class MissionParticipantConcurrencyTest {
       throws Exception {
     Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     Mission seed = new Mission();
-    seed.setOwningSquadron(iridium);
+    seed.setOwningOrgUnit(iridium);
     seed.setName("Concurrency Duplicate Mission " + UUID.randomUUID());
     seed.setStatus("PLANNED");
     seedMissionId = missionRepository.save(seed).getId();

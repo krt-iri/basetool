@@ -15,6 +15,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,8 @@ class MissionValidationTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
   private Squadron iridium;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -75,8 +78,8 @@ class MissionValidationTest {
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer1");
-    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
+    saveIridiumMembership(officerUser);
 
     testSquadron = new Squadron();
     testSquadron.setName("Test Sq");
@@ -89,7 +92,7 @@ class MissionValidationTest {
 
     Ship ship = new Ship();
 
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Test Ship");
     ship.setInsurance("10");
     ship.setOwner(officerUser);
@@ -98,7 +101,7 @@ class MissionValidationTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
@@ -118,6 +121,15 @@ class MissionValidationTest {
     crewJobType.setName("Crew Job");
     crewJobType.setArchetype(JobTypeArchetype.CREW); // Incorrect archetype for participant fields
     crewJobType = jobTypeRepository.save(crewJobType);
+  }
+
+  /** Post-R9 D3 (V101): home Staffel via membership row. */
+  private void saveIridiumMembership(User u) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));
+    m.setUser(u);
+    m.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(m);
   }
 
   private UUID getParticipantId(User user) {
@@ -232,8 +244,8 @@ class MissionValidationTest {
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("lord_adley");
-    caller.setSquadron(iridium);
     userRepository.save(caller);
+    saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
         new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null);
@@ -269,14 +281,14 @@ class MissionValidationTest {
     User target = new User();
     target.setId(UUID.randomUUID());
     target.setUsername("lord_adley");
-    target.setSquadron(iridium);
     userRepository.save(target);
+    saveIridiumMembership(target);
 
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("caller");
-    caller.setSquadron(iridium);
     userRepository.save(caller);
+    saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
         new AddParticipantPublicRequest(null, "Lord_Adley", null, null, null);
@@ -303,21 +315,21 @@ class MissionValidationTest {
     u1.setId(UUID.randomUUID());
     u1.setUsername("ambig_a");
     u1.setDisplayName("Shared Alias");
-    u1.setSquadron(iridium);
     userRepository.save(u1);
+    saveIridiumMembership(u1);
 
     User u2 = new User();
     u2.setId(UUID.randomUUID());
     u2.setUsername("ambig_b");
     u2.setDisplayName("Shared Alias");
-    u2.setSquadron(iridium);
     userRepository.save(u2);
+    saveIridiumMembership(u2);
 
     User caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("caller2");
-    caller.setSquadron(iridium);
     userRepository.save(caller);
+    saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
         new AddParticipantPublicRequest(null, "Shared Alias", null, null, null);

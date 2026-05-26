@@ -11,6 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class MissionUnitCrewTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private JobTypeRepository jobTypeRepository;
   @Autowired private SquadronRepository squadronRepository;
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   private Squadron iridium;
 
@@ -60,8 +62,13 @@ class MissionUnitCrewTest {
     officerUser = new User();
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer_crew");
-    officerUser.setSquadron(iridium);
     userRepository.save(officerUser);
+    // Post-R9 D3 (V101): home Staffel via membership row.
+    OrgUnitMembership iridiumMembership = new OrgUnitMembership();
+    iridiumMembership.setId(new OrgUnitMembershipId(officerUser.getId(), Squadron.IRIDIUM_ID));
+    iridiumMembership.setUser(officerUser);
+    iridiumMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(iridiumMembership);
 
     ShipType shipType = new ShipType();
     shipType.setName("Test Type");
@@ -70,7 +77,7 @@ class MissionUnitCrewTest {
 
     ship = new Ship();
 
-    ship.setOwningSquadron(iridium);
+    ship.setOwningOrgUnit(iridium);
     ship.setName("Test Ship Crew");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
@@ -79,7 +86,7 @@ class MissionUnitCrewTest {
 
     mission = new Mission();
 
-    mission.setOwningSquadron(iridium);
+    mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission Crew");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);

@@ -13,8 +13,8 @@ import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -109,8 +109,8 @@ public class OwnerScopeService {
       OwnerScopeService.class.getName() + ".currentSquadron";
 
   private final AuthHelperService authHelper;
-  private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
+  private final SpecialCommandRepository specialCommandRepository;
   private final MissionRepository missionRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
@@ -126,7 +126,7 @@ public class OwnerScopeService {
    * "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
    * unauthenticated / anonymous).
    *
-   * <p>The non-admin branch's {@code userRepository.findById} round-trip is memoised on the {@link
+   * <p>The non-admin branch's {@code org_unit_membership} lookup is memoised on the {@link
    * HttpServletRequest} via {@link #readPersistentSquadronFromUser()}, so repeated calls within the
    * same request collapse to a single DB hit. The admin branch reads the request header (in-memory)
    * and is not cached separately — it is already constant-time.
@@ -218,6 +218,10 @@ public class OwnerScopeService {
    * the resolver is invoked exactly once per request (via {@link #currentScopePredicate()}) and the
    * additional cache key would only pay off if the resolver was called multiple times.
    *
+   * <p>Post-D3: every membership row (Staffel + SK) flows through {@code
+   * OrgUnitMembershipRepository.findAllByIdUserId} — the legacy {@code User.squadron} column was
+   * dropped in R9 Step 5 / V101.
+   *
    * @return the union of OrgUnit ids the caller belongs to, never {@code null}.
    */
   @NotNull
@@ -226,18 +230,8 @@ public class OwnerScopeService {
     if (userIdOpt.isEmpty()) {
       return java.util.Set.of();
     }
-    Optional<User> userOpt = userRepository.findById(userIdOpt.get());
-    if (userOpt.isEmpty()) {
-      return java.util.Set.of();
-    }
-    User user = userOpt.get();
     java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
-    if (user.getSquadron() != null) {
-      ids.add(user.getSquadron().getId());
-    }
-    for (OrgUnitMembership m :
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            user.getId(), OrgUnitKind.SPECIAL_COMMAND)) {
+    for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get())) {
       ids.add(m.getId().getOrgUnitId());
     }
     return ids;
@@ -344,14 +338,11 @@ public class OwnerScopeService {
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    Squadron homeStaffel = targetUser.getSquadron();
-    if (homeStaffel != null) {
-      memberOrgUnitIds.add(homeStaffel.getId());
-    }
-    List<OrgUnitMembership> skMemberships =
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-            targetUser.getId(), OrgUnitKind.SPECIAL_COMMAND);
-    for (OrgUnitMembership m : skMemberships) {
+    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped in R9 Step 5 / V101.
+    List<OrgUnitMembership> allMemberships =
+        orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
+    for (OrgUnitMembership m : allMemberships) {
       memberOrgUnitIds.add(m.getId().getOrgUnitId());
     }
 
@@ -382,6 +373,80 @@ public class OwnerScopeService {
             () ->
                 new BadRequestException(
                     "Spezialkommando ownership of this aggregate is not yet supported"));
+  }
+
+  /**
+   * V99-aligned successor of {@link #resolveSquadronForPickerOutput(User, UUID)} — applies the same
+   * SPEZIALKOMMANDO_PLAN.md §5.5.1 picker-output matrix (0 / 1 / &gt;1 memberships, valid / foreign
+   * choice) but returns an {@link OrgUnit} so SK selections are honoured instead of rejected. Use
+   * with {@code entity.setOwningOrgUnit(...)}; the existing entity dual-write lifecycle hook
+   * mirrors the value onto the legacy {@code owningSquadron} field whenever the resolved OrgUnit
+   * happens to be a {@link Squadron}, so the legacy column stays populated for Staffel ownership
+   * during the V99-NOT-NULL-relaxed soak. For SpecialCommand ownership the legacy column stays null
+   * — which is now valid because V99 dropped the {@code NOT NULL} constraint.
+   *
+   * <p>If the resolver produces an SK selection (allowed post-V99 with the lifted NOT NULL on the
+   * legacy column), the caller writes only the new {@code owningOrgUnitId} via {@code
+   * entity.setOwningOrgUnit(...)}. The lifecycle hook leaves the legacy column null for that row,
+   * which is now legal.
+   *
+   * <p>Decision matrix matches {@link #resolveSquadronForPickerOutput(User, UUID)} byte-for-byte: 0
+   * memberships → 400; 1 + null picker → auto-stamp; 1 + valid → honour; 1 + mismatch → 400; &gt;1
+   * + null picker → 400 (force explicit choice); &gt;1 + valid → honour; &gt;1 + foreign → 400.
+   *
+   * @param targetUser the user whose memberships gate the picker output validation; never {@code
+   *     null}.
+   * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
+   *     path when the user has exactly one membership.
+   * @return the resolved {@link OrgUnit} — either a {@link Squadron} or a {@link
+   *     de.greluc.krt.iri.basetool.backend.model.SpecialCommand}; never {@code null}.
+   * @throws BadRequestException per the matrix above.
+   */
+  public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+    Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
+    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
+    // User.squadron column was dropped in R9 Step 5 / V101.
+    List<OrgUnitMembership> allMemberships =
+        orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
+    for (OrgUnitMembership m : allMemberships) {
+      memberOrgUnitIds.add(m.getId().getOrgUnitId());
+    }
+
+    if (memberOrgUnitIds.isEmpty()) {
+      throw new BadRequestException(
+          "User has no org-unit membership — cannot stamp an aggregate owner");
+    }
+
+    UUID stampedOrgUnitId;
+    if (owningOrgUnitId == null) {
+      if (memberOrgUnitIds.size() == 1) {
+        stampedOrgUnitId = memberOrgUnitIds.iterator().next();
+      } else {
+        throw new BadRequestException(
+            "User belongs to multiple org units; owningOrgUnitId is required");
+      }
+    } else {
+      if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
+        throw new BadRequestException(
+            "Selected owner org unit is not a membership of the target user");
+      }
+      stampedOrgUnitId = owningOrgUnitId;
+    }
+
+    // Resolve to the concrete subtype. Staffel-side: SquadronRepository (discriminator filter
+    // matches). SK-side: SpecialCommandRepository. Picker output was validated against the
+    // membership set above so a missing row here is a hard contract violation, surfaced as 400.
+    Optional<Squadron> sq = squadronRepository.findById(stampedOrgUnitId);
+    if (sq.isPresent()) {
+      return sq.get();
+    }
+    return specialCommandRepository
+        .findById(stampedOrgUnitId)
+        .map(s -> (OrgUnit) s)
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "Picked owner org unit no longer resolves — repository miss"));
   }
 
   /**
@@ -443,6 +508,57 @@ public class OwnerScopeService {
   }
 
   /**
+   * SPEZIALKOMMANDO_PLAN.md §6.1 contextual-authority check. Returns {@code true} iff the current
+   * authenticated principal carries an {@link
+   * de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority} matching {@code
+   * (roleName, orgUnitId)}. Admins always pass — they have implicit elevated access in every
+   * OrgUnit (mirrors the {@link #canEditSquadron} short-circuit).
+   *
+   * <p>Designed for {@code @PreAuthorize} SpEL where the OrgUnit id is only known at runtime (from
+   * a request DTO field, a path variable, etc.). Example:
+   *
+   * <pre>{@code
+   * @PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')")
+   * public InventoryItemDto createInventoryItem(@Valid @RequestBody InventoryItemCreateDto dto)
+   * }</pre>
+   *
+   * <p>The dual-track migration: the JWT converter emits both the flat {@code ROLE_LOGISTICIAN}
+   * (back-compat for existing {@code hasRole('LOGISTICIAN')} gates) and the contextual {@code
+   * ROLE_LOGISTICIAN@<uuid>}. This helper matches against the contextual surface; flat-role gates
+   * keep working through {@code hasRole(...)} unchanged.
+   *
+   * @param orgUnitId the OrgUnit the caller wants to act on; never {@code null}. {@code null}
+   *     OrgUnit id is a programming error — use {@link #canEditSquadron(UUID)} for the "any
+   *     OrgUnit" semantics, this method is exclusively contextual.
+   * @param roleName the role to check for. Standard values today: {@code "LOGISTICIAN"}, {@code
+   *     "MISSION_MANAGER"}. Never {@code null}.
+   * @return {@code true} iff the caller is an admin or holds the contextual authority.
+   */
+  public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    Optional<org.springframework.security.core.Authentication> authentication =
+        authHelper.currentAuthentication();
+    if (authentication.isEmpty()
+        || !authentication.get().isAuthenticated()
+        || authentication.get().getAuthorities() == null) {
+      return false;
+    }
+    de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority target =
+        new de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority(
+            roleName, orgUnitId);
+    for (org.springframework.security.core.GrantedAuthority a :
+        authentication.get().getAuthorities()) {
+      if (a instanceof de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority ctx
+          && ctx.equals(target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * {@code true} iff the current principal may read mission {@code missionId}. Combines the generic
    * {@link #canSeeSquadron(UUID)} check with Mission's cross-staffel-visibility rule
    * (MULTI_SQUADRON_PLAN.md section 1): non-internal missions are visible from any squadron,
@@ -488,10 +604,10 @@ public class OwnerScopeService {
    * that owning squadron, or the mission is explicitly non-internal.
    */
   private boolean canSeeMissionRow(Mission m) {
-    if (m.getOwningSquadron() == null) {
+    if (m.getOwningOrgUnit() == null) {
       return true;
     }
-    if (canSeeSquadron(m.getOwningSquadron().getId())) {
+    if (canSeeSquadron(m.getOwningOrgUnit().getId())) {
       return true;
     }
     return !Boolean.TRUE.equals(m.getIsInternal());
@@ -509,7 +625,7 @@ public class OwnerScopeService {
   public boolean canEditMission(@NotNull UUID missionId) {
     return missionRepository
         .findById(missionId)
-        .map(m -> m.getOwningSquadron() == null || canEditSquadron(m.getOwningSquadron().getId()))
+        .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -524,7 +640,7 @@ public class OwnerScopeService {
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningSquadron() == null || canSeeSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningOrgUnit() == null || canSeeSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -540,7 +656,7 @@ public class OwnerScopeService {
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningSquadron() == null || canEditSquadron(i.getOwningSquadron().getId()))
+        .map(i -> i.getOwningOrgUnit() == null || canEditSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -555,7 +671,7 @@ public class OwnerScopeService {
   public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -569,7 +685,7 @@ public class OwnerScopeService {
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -583,7 +699,7 @@ public class OwnerScopeService {
   public boolean canSeeOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(o -> o.getOwningSquadron() == null || canSeeSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -597,7 +713,7 @@ public class OwnerScopeService {
   public boolean canEditOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(o -> o.getOwningSquadron() == null || canEditSquadron(o.getOwningSquadron().getId()))
+        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -611,7 +727,7 @@ public class OwnerScopeService {
   public boolean canSeeShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningSquadron() == null || canSeeSquadron(s.getOwningSquadron().getId()))
+        .map(s -> s.getOwningOrgUnit() == null || canSeeSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -625,7 +741,7 @@ public class OwnerScopeService {
   public boolean canEditShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningSquadron() == null || canEditSquadron(s.getOwningSquadron().getId()))
+        .map(s -> s.getOwningOrgUnit() == null || canEditSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -706,12 +822,22 @@ public class OwnerScopeService {
     if (cached.isPresent()) {
       return cached.get();
     }
+    // Post-D3: the user's home Staffel lives in org_unit_membership (kind=SQUADRON). The V95
+    // partial unique index guarantees at most one row, so a List read with an in-loop pick is the
+    // right shape — Spring Data's findOneByIdUserIdAndKind would throw on the data-corruption case
+    // we tolerate elsewhere.
     Optional<UUID> resolved =
         authHelper
             .currentUserId()
-            .flatMap(userRepository::findById)
-            .map(User::getSquadron)
-            .map(Squadron::getId);
+            .flatMap(
+                userId -> {
+                  List<OrgUnitMembership> rows =
+                      orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+                          userId, OrgUnitKind.SQUADRON);
+                  return rows.isEmpty()
+                      ? Optional.empty()
+                      : Optional.of(rows.get(0).getId().getOrgUnitId());
+                });
     request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);
     return resolved;
   }

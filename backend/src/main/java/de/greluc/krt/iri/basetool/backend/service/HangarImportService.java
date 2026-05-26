@@ -123,6 +123,7 @@ public class HangarImportService {
   private final ShipTypeRepository shipTypeRepository;
   private final UserRepository userRepository;
   private final ObjectMapper objectMapper;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Parses an uploaded ship-export JSON file (Fleetview or HangarXPLOR Shiplist) and imports all
@@ -210,12 +211,13 @@ public class HangarImportService {
         for (int i = 0; i < toCreate; i++) {
           Ship ship = new Ship();
           ship.setOwner(user);
-          // Stamp owning squadron from the importer's home squadron — same contract as
-          // HangarService.createShip uses for the manual create path. Phase 7's V89 makes
-          // `ship.owning_squadron_id` NOT NULL, so the import path must populate it
-          // explicitly; the previous nullable column hid this missing-stamp bug for the
-          // entire Phase 6 release window.
-          ship.setOwningSquadron(user.getSquadron());
+          // Stamp owning org-unit through the shared picker resolver — same contract as
+          // HangarService.addShip's create path. V99 makes `ship.owning_org_unit_id` NOT NULL,
+          // so the import path must populate it explicitly. The import flow has no picker UI;
+          // passing {@code null} for the picker output triggers the resolver's "auto-stamp the
+          // single membership" branch — multi-membership importers surface as a clean 400 from
+          // the resolver until a per-import picker is added (post-SK §5.5 stamping wave).
+          ship.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(user, null));
           ship.setShipType(shipType);
           ship.setInsurance(insurance);
           ship.setFitted(false);

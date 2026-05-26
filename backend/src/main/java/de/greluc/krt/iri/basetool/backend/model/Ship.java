@@ -7,9 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PostLoad;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
@@ -56,38 +53,13 @@ public class Ship extends AbstractEntity<UUID> {
   private User owner;
 
   /**
-   * Squadron that owns this ship. Legacy field — kept authoritative during the R4 dual-write soak.
-   * The plan-aligned {@link #owningOrgUnit} mirror field is kept in sync by {@link
-   * #syncOwnerFields()} on every lifecycle event. A later release will drop this field along with
-   * the matching DB column.
+   * Org-unit owner of this ship. After R9 Step 2 dropped the legacy {@code owningSquadron} mirror
+   * field together with the {@code syncOwnerFields()} lifecycle hook, callers stamp this field
+   * directly via {@code OwnerScopeService.resolveOrgUnitForPickerOutput}; V100 drops the matching
+   * {@code owning_squadron_id} column. {@code nullable = false} reflects V99's NOT NULL tightening
+   * on the new column.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_squadron_id", nullable = false)
-  private Squadron owningSquadron;
-
-  /**
-   * Org-unit owner of this ship — the R4 dual-write mirror of {@link #owningSquadron}. Pointed at
-   * the {@code owning_org_unit_id} FK column that Flyway migration V96 added in R1, kept
-   * synchronised with the legacy field by {@link #syncOwnerFields()}. JPA-nullable for the R4 soak
-   * window so a missed sync does not break inserts.
-   */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_org_unit_id")
+  @JoinColumn(name = "owning_org_unit_id", nullable = false)
   private OrgUnit owningOrgUnit;
-
-  /**
-   * Lifecycle hook that keeps {@link #owningSquadron} and {@link #owningOrgUnit} aligned on every
-   * INSERT / UPDATE / SELECT path. See the matching method on {@link Mission#syncOwnerFields()} for
-   * the rule.
-   */
-  @PrePersist
-  @PreUpdate
-  @PostLoad
-  private void syncOwnerFields() {
-    if (owningSquadron != null) {
-      owningOrgUnit = owningSquadron;
-    } else if (owningOrgUnit instanceof Squadron s) {
-      owningSquadron = s;
-    }
-  }
 }
