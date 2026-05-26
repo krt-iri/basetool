@@ -10,11 +10,11 @@ for executing that rollout safely.
 
 | # | PR | Branch | Adds | Risk | Soak |
 | -- | -- | -- | -- | -- | -- |
-| 1 | [#226](https://github.com/krt-iri/basetool/pull/226) Foundation | `consolidate/spezialkommando-foundation` | V95–V98, OrgUnit + SpecialCommand entities, picker on 7 forms, admin pages, switcher | **Low** — fully additive + dual-write | ≥ 1 release |
-| 2 | [#227](https://github.com/krt-iri/basetool/pull/227) Identity | `consolidate/spezialkommando-identity` | V99 promotion guard, JWT converter on memberships, flag-writes to membership row | **Medium** — touches auth path, has legacy fallback | ≥ 1 release |
-| 3 | [#228](https://github.com/krt-iri/basetool/pull/228) Cleanup | `consolidate/spezialkommando-cleanup` | V100–V103, drops legacy `squadron` table + columns | **High** — irreversible without DB backup | n/a (terminal) |
+| 1 | [#226](https://github.com/krt-iri/basetool/pull/226) Foundation | `consolidate/spezialkommando-foundation` | V97–V100, OrgUnit + SpecialCommand entities, picker on 7 forms, admin pages, switcher | **Low** — fully additive + dual-write | ≥ 1 release |
+| 2 | [#227](https://github.com/krt-iri/basetool/pull/227) Identity | `consolidate/spezialkommando-identity` | V101 promotion guard, JWT converter on memberships, flag-writes to membership row | **Medium** — touches auth path, has legacy fallback | ≥ 1 release |
+| 3 | [#228](https://github.com/krt-iri/basetool/pull/228) Cleanup | `consolidate/spezialkommando-cleanup` | V102–V105, drops legacy `squadron` table + columns | **High** — irreversible without DB backup | n/a (terminal) |
 
-**Total deployable releases: 3. Total Flyway migrations: 9 (V95–V103). Total soak windows: 2.**
+**Total deployable releases: 3. Total Flyway migrations: 9 (V97–V105). Total soak windows: 2.**
 
 The rule of thumb: **never merge two stages back-to-back.** Each stage needs
 its own deploy and its own soak before the next merges.
@@ -27,8 +27,8 @@ Before touching any of the three PRs, confirm the following baselines.
 
 ### 0.1 Production state
 
-- [ ] Production is on the latest `main` (commit `a12ff66` or later — pre-V94 state is fine, V94 manual-material may or may not be deployed depending on when you read this).
-- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC LIMIT 5` returns the expected set on prod; no V95+ entries.
+- [ ] Production is on the latest `main` (commit `604e81e4` or later — V94 manual-material, V95 quantity-type backfill, V96 mission-participant-unique-index are all on main; SK migrations start at V97).
+- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC LIMIT 5` returns the expected set on prod; no V97+ entries.
 - [ ] DB version: PostgreSQL 18+. Java runtime: 25. Keycloak: 26.
 - [ ] Redis is up and responding (Spring Session depends on it).
 - [ ] `.env.test` exists locally with throwaway credentials (per
@@ -81,8 +81,8 @@ this out at each stage.
 **PR:** [#226](https://github.com/krt-iri/basetool/pull/226)
 **Branch:** `consolidate/spezialkommando-foundation`
 **Base:** `main` (already correct)
-**Commits:** 23 (R1 → R5.e + R6.a-c + CHANGELOG cleanup tail)
-**Migrations:** V95 V96 V97 V98 (all additive — table creation + nullable columns + sync trigger)
+**Commits:** 26 (R1 → R5.e + R6.a-c + CHANGELOG cleanup tail + rebase onto current main + CodeQL XSS sink wrap)
+**Migrations:** V97 V98 V99 V100 (all additive — table creation + nullable columns + sync trigger)
 
 ### 1.1 What it adds
 
@@ -127,7 +127,7 @@ this out at each stage.
 ### 1.3 Merge
 
 - Pick **squash merge** or **merge commit** based on team convention. Either
-  is fine — the 23 commits are all yours, no foreign authors to preserve.
+  is fine — the 26 commits are all yours, no foreign authors to preserve.
 - After merge: do **not** delete the branch yet. Keep
   `consolidate/spezialkommando-foundation` until PR-3 has been deployed
   (forensic backup if a rollback is needed).
@@ -138,7 +138,7 @@ Follow [`docs/deployment.md`](docs/deployment.md) standard release
 procedure. Key signals to watch:
 
 - **Backend startup logs:** Flyway should report
-  `Migrating schema "public" to version "95 - ..."` ... up through `"98 - ..."`.
+  `Migrating schema "public" to version "97 - ..."` ... up through `"100 - ..."`.
   Total time: < 5 seconds on a typical squadron table (sub-megabyte).
 - **No `ddl-auto` warnings:** Hibernate is configured to `validate`. Any
   "Schema validation failed" line is a deal-breaker — STOP, investigate.
@@ -152,10 +152,10 @@ Run these against the deployed prod (or pre-prod equivalent):
 | -- | -- |
 | `SELECT COUNT(*) FROM org_unit` | Matches `(SELECT COUNT(*) FROM squadron)`. |
 | `SELECT COUNT(*) FROM org_unit_membership WHERE kind = 'SQUADRON'` | Matches `(SELECT COUNT(*) FROM app_user WHERE squadron_id IS NOT NULL)`. |
-| `SELECT COUNT(*) FROM mission WHERE owning_org_unit_id IS NULL` | `0` (V97 backfill populated every row). |
+| `SELECT COUNT(*) FROM mission WHERE owning_org_unit_id IS NULL` | `0` (V99 backfill populated every row). |
 | Same for operation, ship, inventory_item, refinery_order | `0` each. |
 | `SELECT COUNT(*) FROM job_order WHERE creating_org_unit_id IS NULL OR requesting_org_unit_id IS NULL` | `0`. |
-| `SELECT proname FROM pg_proc WHERE proname = 'sync_org_unit_to_squadron'` | `1` (V98 trigger function present). |
+| `SELECT proname FROM pg_proc WHERE proname = 'sync_org_unit_to_squadron'` | `1` (V100 trigger function present). |
 | Existing Staffel-only user logs in via Keycloak → app | Identical UX. |
 | Open `/inventory/input` as that user | Picker NOT visible (single membership). |
 | Open `/admin/special-commands` as ADMIN | Empty list, "Anlegen" button visible. |
@@ -198,17 +198,17 @@ If PR-1 needs to be reverted before PR-2 lands:
    git push origin main
    ```
 2. Re-deploy.
-3. **The schema changes (V95–V98) stay applied** — they're additive, the
+3. **The schema changes (V97–V100) stay applied** — they're additive, the
    reverted app code simply stops writing/reading the new tables and
    columns. The legacy `squadron` table is still authoritative.
 4. To roll back the **schema** too (rare — only if the new tables are causing
    issues by their mere presence):
    ```sql
-   -- Drop the V98 sync trigger first
+   -- Drop the V100 sync trigger first
    DROP TRIGGER IF EXISTS trg_sync_org_unit_to_squadron ON org_unit;
    DROP FUNCTION IF EXISTS sync_org_unit_to_squadron();
 
-   -- Drop the new columns on aggregates (V97)
+   -- Drop the new columns on aggregates (V99)
    ALTER TABLE mission         DROP COLUMN IF EXISTS owning_org_unit_id;
    ALTER TABLE operation       DROP COLUMN IF EXISTS owning_org_unit_id;
    ALTER TABLE ship            DROP COLUMN IF EXISTS owning_org_unit_id;
@@ -217,14 +217,14 @@ If PR-1 needs to be reverted before PR-2 lands:
    ALTER TABLE job_order       DROP COLUMN IF EXISTS creating_org_unit_id;
    ALTER TABLE job_order       DROP COLUMN IF EXISTS requesting_org_unit_id;
 
-   -- Drop the membership table (V96)
+   -- Drop the membership table (V98)
    DROP TABLE org_unit_membership;
 
-   -- Drop the org_unit table (V95)
+   -- Drop the org_unit table (V97)
    DROP TABLE org_unit;
 
    -- Remove the migration history entries (so a re-deploy doesn't refuse)
-   DELETE FROM flyway_schema_history WHERE version IN ('95', '96', '97', '98');
+   DELETE FROM flyway_schema_history WHERE version IN ('97', '98', '99', '100');
    ```
    This is **not** something Flyway can do for you — it must be a manual
    SQL session on the prod DB. Take a backup first.
@@ -237,7 +237,7 @@ If PR-1 needs to be reverted before PR-2 lands:
 **Branch:** `consolidate/spezialkommando-identity`
 **Base on disk:** `consolidate/spezialkommando-foundation` (will be retargeted)
 **Commits:** 4 (R6.d + R6.e + R7-sweep + doc V-sweep)
-**Migrations:** V99 promotion-topic-guard trigger (no schema drops, no data changes)
+**Migrations:** V101 promotion-topic-guard trigger (no schema drops, no data changes)
 
 ### 2.1 Retarget the base
 
@@ -274,7 +274,7 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
 
 ### 2.2 What it adds
 
-- **Schema:** V99 trigger `guard_promotion_topic_owner_kind` that rejects any
+- **Schema:** V101 trigger `guard_promotion_topic_owner_kind` that rejects any
   `INSERT/UPDATE` of `promotion_topic.owning_squadron_id` referencing a non-`SQUADRON`
   org_unit. Defence-in-depth on top of the Java type guard.
 - **JWT layer:** `CustomJwtGrantedAuthoritiesConverter` now resolves
@@ -306,7 +306,7 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
 
 - Merge PR #227 (squash or merge commit).
 - Standard deploy.
-- Backend startup: V99 applies in < 1 second (just creates one trigger + function).
+- Backend startup: V101 applies in < 1 second (just creates one trigger + function).
 - No new tables/columns to verify post-startup.
 
 ### 2.5 Post-deploy smoke (manual, 15 minutes)
@@ -336,7 +336,7 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
   in logs.
 - 409s on the new membership-patch endpoint (optimistic-lock races between
   concurrent admin actions).
-- Promotion-topic-related 500s after V99 (the trigger raises an EXCEPTION
+- Promotion-topic-related 500s after V101 (the trigger raises an EXCEPTION
   that should never fire under normal operation — if it does, someone is
   trying to bind a promotion topic to an SK, which is a bug).
 
@@ -349,11 +349,11 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
 ### 2.7 Rollback (PR-2 only)
 
 1. Revert the merge commit, re-deploy.
-2. The V99 trigger stays. To drop:
+2. The V101 trigger stays. To drop:
    ```sql
    DROP TRIGGER IF EXISTS trg_guard_promotion_topic_owner_kind ON promotion_topic;
    DROP FUNCTION IF EXISTS guard_promotion_topic_owner_kind();
-   DELETE FROM flyway_schema_history WHERE version = '99';
+   DELETE FROM flyway_schema_history WHERE version = '101';
    ```
 3. After revert: JWT converter falls back to the legacy user-table flags
    (the code path is still present in PR-1 since R6.d's converter rewrite
@@ -368,8 +368,8 @@ git log --oneline origin/main..consolidate/spezialkommando-identity
 **PR:** [#228](https://github.com/krt-iri/basetool/pull/228)
 **Branch:** `consolidate/spezialkommando-cleanup`
 **Base on disk:** `consolidate/spezialkommando-identity` (will be retargeted)
-**Commits:** 7 (R8 + R9 Step 1-6 + plan-status doc + V-sweep)
-**Migrations:** V100 V101 V102 V103 — **all four are destructive and
+**Commits:** 8 (R8 + R9 Step 1-6 + plan-status doc + V-sweep + test-fix for two R9-surfaced regressions)
+**Migrations:** V102 V103 V104 V105 — **all four are destructive and
 collectively irreversible**.
 
 ### 3.1 ABSOLUTE PREREQUISITES
@@ -380,7 +380,7 @@ Before clicking Merge on PR-3:
   zero incidents traced to identity layer.
 - [ ] **Full DB backup** taken within the last 24 hours, **restorability
   verified** by restoring into a throwaway DB and running `SELECT COUNT(*)`
-  on every aggregate table. This is non-negotiable: V101 and V103 cannot be
+  on every aggregate table. This is non-negotiable: V103 and V105 cannot be
   reversed without restoring from backup.
 - [ ] All staging environments are running PR-2 (or newer) so the migrations
   can be exercised at scale before prod.
@@ -426,8 +426,8 @@ Before clicking Merge on PR-3:
           AND m.is_mission_manager = TRUE);
   ```
   Each query must return `0`. If any returns > 0:
-  - V97 backfill didn't catch every row (rare, but possible if rows were
-    inserted between V97 running and PR-1's lifecycle hook taking effect)
+  - V99 backfill didn't catch every row (rare, but possible if rows were
+    inserted between V99 running and PR-1's lifecycle hook taking effect)
     or R6.e dual-write missed a write path. Investigate the gap first;
     don't push through with broken data.
 
@@ -444,26 +444,26 @@ git rebase origin/main
 git push --force-with-lease origin consolidate/spezialkommando-cleanup
 ```
 
-Confirm PR-3's diff shows only 7 commits, not 30+.
+Confirm PR-3's diff shows only 8 commits, not 30+.
 
 ### 3.3 What it does
 
-- **V100:** `ALTER TABLE ... ALTER COLUMN owning_org_unit_id SET NOT NULL`
+- **V102:** `ALTER TABLE ... ALTER COLUMN owning_org_unit_id SET NOT NULL`
   on every staffel-scoped aggregate; `DROP NOT NULL` on the legacy
   `owning_squadron_id` columns. This **unlocks SK ownership** — the
   rejection branch in `OwnerScopeService.resolveSquadronForPickerOutput`
   ("Spezialkommando ownership not yet supported") is no longer reachable.
-- **V101:** Drops the legacy `owning_squadron_id` / `creating_squadron_id` /
+- **V103:** Drops the legacy `owning_squadron_id` / `creating_squadron_id` /
   `requesting_squadron_id` columns on every aggregate + the V91/V93 indexes
   that referenced them. After this, the only owner column on each aggregate
   is `owning_org_unit_id`.
-- **V102:** Drops `app_user.squadron_id` (column + FK + index) and
+- **V104:** Drops `app_user.squadron_id` (column + FK + index) and
   `app_user.is_logistician` / `app_user.is_mission_manager`. The
   per-membership row is the sole authority.
-- **V103:** Retargets the 3 FKs that still reference `squadron(id)`
+- **V105:** Retargets the 3 FKs that still reference `squadron(id)`
   (`promotion_topic.owning_squadron_id`, `mission_participant.squadron_id`,
   `job_order_handover.executing_squadron_id`) to `org_unit(id)`. Drops the
-  V98 sync trigger + function. Drops the `squadron` table itself.
+  V100 sync trigger + function. Drops the `squadron` table itself.
 
 After this PR ships, **the legacy `squadron` table no longer exists**, and
 `org_unit_membership` is the sole source of truth for "which Staffel does
@@ -493,13 +493,13 @@ this user belong to" and the contextual role flags.
 - Merge PR #228.
 - Deploy with **maintenance mode enabled** (display a banner / 503 page to
   end users while migrations run).
-- Backend startup will run V100 → V101 → V102 → V103. Total expected time:
-  - **V100** NOT NULL changes: a few seconds on small tables, minute-scale
+- Backend startup will run V102 → V103 → V104 → V105. Total expected time:
+  - **V102** NOT NULL changes: a few seconds on small tables, minute-scale
     on big tables (millions of rows).
-  - **V101** column drops: fast (PostgreSQL stores columns as catalog
+  - **V103** column drops: fast (PostgreSQL stores columns as catalog
     metadata; DROP COLUMN is a catalog update without rewriting the table).
-  - **V102** same as V101.
-  - **V103** FK retargets + trigger drop + table drop: a few seconds.
+  - **V104** same as V103.
+  - **V105** FK retargets + trigger drop + table drop: a few seconds.
 - **If any migration fails**: STOP. The migration that failed will have
   rolled back its own transaction. Check the error in `flyway_schema_history`
   (last row, `success = false`). Decide:
@@ -514,10 +514,10 @@ this user belong to" and the contextual role flags.
 | -- | -- |
 | `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'squadron'` | `0` (table dropped). |
 | `SELECT proname FROM pg_proc WHERE proname = 'sync_org_unit_to_squadron'` | `0` (trigger function dropped). |
-| `SELECT proname FROM pg_proc WHERE proname = 'guard_promotion_topic_owner_kind'` | `1` (V99 guard stays). |
-| `SELECT column_name FROM information_schema.columns WHERE table_name='mission' AND column_name='owning_squadron_id'` | empty (V101 dropped it). |
-| `SELECT column_name FROM information_schema.columns WHERE table_name='app_user' AND column_name IN ('squadron_id', 'is_logistician', 'is_mission_manager')` | empty (V102 dropped them). |
-| `SELECT confrelid::regclass FROM pg_constraint WHERE conname = 'fk_promotion_topic_owning_squadron'` | `org_unit` (V103 retargeted). |
+| `SELECT proname FROM pg_proc WHERE proname = 'guard_promotion_topic_owner_kind'` | `1` (V101 guard stays). |
+| `SELECT column_name FROM information_schema.columns WHERE table_name='mission' AND column_name='owning_squadron_id'` | empty (V103 dropped it). |
+| `SELECT column_name FROM information_schema.columns WHERE table_name='app_user' AND column_name IN ('squadron_id', 'is_logistician', 'is_mission_manager')` | empty (V104 dropped them). |
+| `SELECT confrelid::regclass FROM pg_constraint WHERE conname = 'fk_promotion_topic_owning_squadron'` | `org_unit` (V105 retargeted). |
 | App `/actuator/health` | `UP`. |
 | Login as existing Staffel-only user | JWT-resolved roles match expected (verify with a logistician-only action). |
 | Mission create | Picker hidden for single-membership user; defaults to the user's Staffel via membership row. |
@@ -542,7 +542,7 @@ If the post-deploy verification fails or production exhibits regressions:
 4. The app will boot against the restored schema (with the `squadron` table
    present, `owning_squadron_id` columns present, `app_user.squadron_id`
    present). Flyway will see the restored `flyway_schema_history` and pick
-   up where it left off — V100+ will be absent so it won't try to re-apply.
+   up where it left off — V102+ will be absent so it won't try to re-apply.
 
 The restoration window is dictated by your DB backup-restore time (likely
 30–60 minutes for a multi-gigabyte database).
@@ -557,7 +557,7 @@ After PR-3 has been in production for one release cycle without incident:
 2. **Move all items in [Project 1](https://github.com/orgs/krt-iri/projects/1) to "Done"** status.
 3. **Tag the release** with a semver bump:
    ```bash
-   git tag -a v0.X.Y -m "Spezialkommando rollout complete (V95-V103)"
+   git tag -a v0.X.Y -m "Spezialkommando rollout complete (V97-V105)"
    git push origin v0.X.Y
    ```
 4. **Update [CHANGELOG.md](CHANGELOG.md)** — move the `[Unreleased]` section
@@ -589,12 +589,12 @@ After PR-3 has been in production for one release cycle without incident:
 - **Don't merge two stages back-to-back.** Each stage's soak window catches
   regressions that the integration tests can't simulate (real user load,
   long-running transactions, cache invalidation patterns).
-- **Don't skip the backup before PR-3.** V101–V103 are irreversible. The
+- **Don't skip the backup before PR-3.** V103–V105 are irreversible. The
   "I'll roll back via Git" reflex does not work — Git doesn't carry the
   dropped data.
 - **Don't merge PR-3 before PR-2 has soaked.** R8 + R9 assume the
   membership row is authoritative (R6.d JWT converter) and that the dual-
-  write is in lockstep (R6.e). Without those, V102 (dropping `app_user`
+  write is in lockstep (R6.e). Without those, V104 (dropping `app_user`
   legacy columns) could orphan users from their roles.
 - **Don't use `--no-verify` on commits.** The DCO check is mandatory on PR
   branches — bypassing it locally just means CI catches it later.
@@ -608,7 +608,7 @@ After PR-3 has been in production for one release cycle without incident:
 - **Don't forget the active-context header alias window.** Browsers may
   cache the old `X-Active-Squadron-Id` header through PR-1's soak. Both
   names are honored until PR-3 drops the legacy one (which it does
-  implicitly via the user-table column drop in V102 — the session-attribute
+  implicitly via the user-table column drop in V104 — the session-attribute
   alias gets cleaned up via deploy-time session invalidation if you have
   one configured; otherwise users see one extra Keycloak round-trip after
   PR-3, harmless).
