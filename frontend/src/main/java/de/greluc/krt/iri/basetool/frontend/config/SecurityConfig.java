@@ -26,6 +26,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 /** Spring configuration for Security. */
@@ -218,6 +219,7 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/",
                         "/error",
+                        "/error/**",
                         "/css/**",
                         "/js/**",
                         "/images/**",
@@ -229,7 +231,21 @@ public class SecurityConfig {
                         // M-17: static robots.txt with "Disallow: /" so legitimate crawlers
                         // (Google, Bing, archive.org) get an explicit no-index preference
                         // instead of a custom-app-signal 404.
-                        "/robots.txt")
+                        "/robots.txt",
+                        // Browser-side asset paths that must never trigger an OAuth2 entry-point
+                        // (and therefore must never land in HttpSessionRequestCache as a saved
+                        // request). Background sourcemap lookups fired by DevTools and browser
+                        // extensions (Sentry Replay's /sm/<hash>.map, plus generic /**/*.map
+                        // probes against vendor bundles we ship without sourcemaps) used to fall
+                        // into the anyRequest().authenticated() catch-all — the saved URL was
+                        // then replayed by SavedRequestAwareAuthenticationSuccessHandler after a
+                        // user clicked Login, landing them on the custom 404 page instead of /.
+                        // Resource handler returns 404 for the missing files, which is the
+                        // correct contract for the browser. Defense-in-depth for any asset path
+                        // missed here lives in AssetAwareAuthenticationSuccessHandler.
+                        "/favicon.ico",
+                        "/sm/**",
+                        "/**/*.map")
                     .permitAll()
                     .requestMatchers("/missions", "/missions/")
                     .permitAll()
@@ -257,6 +273,7 @@ public class SecurityConfig {
                 oauth2
                     .loginPage("/oauth2/authorization/keycloak")
                     .failureUrl("/?error")
+                    .successHandler(oauth2LoginSuccessHandler())
                     .authorizationEndpoint(
                         auth ->
                             auth.authorizationRequestResolver(
@@ -303,6 +320,21 @@ public class SecurityConfig {
   public org.springframework.security.web.session.HttpSessionEventPublisher
       httpSessionEventPublisher() {
     return new org.springframework.security.web.session.HttpSessionEventPublisher();
+  }
+
+  /**
+   * Builds the post-OAuth2-login success handler. Wraps the default {@link
+   * org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler}
+   * so that saved requests pointing to static-asset URLs (background sourcemap lookups,
+   * favicon/font/CSS probes from DevTools and browser extensions) are dropped and the user is sent
+   * to the context root instead of a 404 asset path. See {@link
+   * AssetAwareAuthenticationSuccessHandler} for the full rationale and the matched-path list.
+   *
+   * @return the success handler wired into {@code .oauth2Login().successHandler(...)}
+   */
+  @Bean
+  public AuthenticationSuccessHandler oauth2LoginSuccessHandler() {
+    return new AssetAwareAuthenticationSuccessHandler();
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
