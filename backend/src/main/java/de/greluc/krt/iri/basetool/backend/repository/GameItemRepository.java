@@ -1,0 +1,60 @@
+package de.greluc.krt.iri.basetool.backend.repository;
+
+import de.greluc.krt.iri.basetool.backend.model.GameItem;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Spring Data repository for {@link GameItem}. The sync services use {@link
+ * #findByExternalUuid(UUID)} as the primary fast-path and {@link #findByUexItemId(Integer)} as the
+ * secondary path; the soft-delete sweep at the end of a successful sync run uses {@link
+ * #markUexDeletedExcept(Collection, Instant)} to flag rows UEX no longer returns.
+ */
+@Repository
+public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
+
+  /**
+   * Resolution-chain step 1 (R2): match an inbound DTO row to an existing local row via the shared
+   * in-game asset UUID. {@code external_uuid} is the joint key with the {@code UNIQUE} constraint
+   * enforcing the §3.6 identity invariant.
+   *
+   * @param externalUuid in-game asset UUID
+   * @return matching {@link GameItem} if present
+   */
+  Optional<GameItem> findByExternalUuid(UUID externalUuid);
+
+  /**
+   * Resolution-chain step 2 (R2 UEX side): match by UEX's integer item id. Used when the UEX
+   * payload carries no UUID (~30% of rows) but the row was already created on a previous run.
+   *
+   * @param uexItemId UEX's integer item id
+   * @return matching {@link GameItem} if present
+   */
+  Optional<GameItem> findByUexItemId(Integer uexItemId);
+
+  /**
+   * Soft-deletes UEX-side ownership of every row whose {@code uex_item_id} is set, NOT included in
+   * {@code seenIds}, and whose {@code uex_deleted_at} is currently NULL. Mirrors the {@code
+   * MaterialPriceRepository.clearStalePrices} pattern: gated by a non-empty {@code seenIds} so a
+   * sync that fails on every row never wipes the entire table.
+   *
+   * @param seenIds UEX item ids successfully processed in the current run
+   * @param now timestamp to stamp on the soft-deleted rows
+   * @return number of rows marked deleted
+   */
+  @Modifying
+  @Query(
+      "UPDATE GameItem g SET g.uexDeletedAt = :now "
+          + "WHERE g.uexItemId IS NOT NULL "
+          + "AND g.uexItemId NOT IN :seenIds "
+          + "AND g.uexDeletedAt IS NULL")
+  int markUexDeletedExcept(
+      @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
+}
