@@ -45,6 +45,7 @@ mapstruct-core = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct"
 mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
 resilience4j-spring-boot3 = { module = "io.github.resilience4j:resilience4j-spring-boot3", version.ref = "resilience4j" }
 resilience4j-reactor = { module = "io.github.resilience4j:resilience4j-reactor", version.ref = "resilience4j" }
+micrometer-context-propagation = { module = "io.micrometer:context-propagation" }
 bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
 semver4j-core = { module = "org.semver4j:semver4j", version.ref = "semver4j" }
 logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstashLogback" }
