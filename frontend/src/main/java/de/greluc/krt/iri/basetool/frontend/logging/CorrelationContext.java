@@ -13,10 +13,10 @@ import org.jetbrains.annotations.Nullable;
  * {@link de.greluc.krt.iri.basetool.frontend.config.ReactorContextPropagationConfig} hooks
  * Reactor's automatic context propagation to a registered {@code ThreadLocalAccessor} so this
  * holder is restored on whichever Reactor worker thread runs the downstream operator. See the
- * {@code CORRELATION_CONTEXT_KEY} constant on that config class for the registry key. Without
- * that wiring the value would be invisible inside {@code WebClient} exchange filters and
- * outbound backend calls would log a different correlation id than the inbound frontend request,
- * breaking the audit-trail join.
+ * {@code CORRELATION_CONTEXT_KEY} constant on that config class for the registry key. Without that
+ * wiring the value would be invisible inside {@code WebClient} exchange filters and outbound
+ * backend calls would log a different correlation id than the inbound frontend request, breaking
+ * the audit-trail join.
  */
 public final class CorrelationContext {
 
