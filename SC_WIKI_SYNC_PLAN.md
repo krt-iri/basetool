@@ -41,7 +41,7 @@ The Wiki API additionally **already exposes UEX cross-references**: every wiki i
 
 **Wiki side — new integration:**
 - New integration package `integration/scwiki` mirroring the existing UEX package shape.
-- A scheduled job (`SCWikiScheduler`) on its own `@Async` executor.
+- A scheduled job (`ScWikiScheduler`) on its own `@Async` executor.
 - Sync of: **wiki commodities, wiki blueprints, wiki items (all kinds), wiki vehicles, wiki manufacturers**.
 - **Merging wiki commodities into the existing `material` table** (same row when matched by name/alias, separate row when not).
 
@@ -476,26 +476,26 @@ backend/src/main/java/de/greluc/krt/iri/basetool/backend/
 │  ─── NEW SC Wiki side ───
 │
 ├── integration/scwiki/                          ← NEW
-│   ├── SCWikiClient.java                        — WebClient + ETag (clone of UexClient)
-│   ├── SCWikiScheduler.java                     — @Scheduled orchestrator
-│   ├── SCWikiCommoditySyncService.java          — /api/commodities → material
-│   ├── SCWikiBlueprintSyncService.java          — /api/blueprints → blueprint + blueprint_ingredient
-│   ├── SCWikiItemSyncService.java               — /api/items + per-classification → game_item (Wiki cols)
-│   ├── SCWikiVehicleSyncService.java            — /api/vehicles → ship_type (Wiki cols)
-│   ├── SCWikiManufacturerSyncService.java       — /api/manufacturers → manufacturer (Wiki cols)
-│   ├── SCWikiAliasService.java                  — applies commodity-name alias seed + admin entries
-│   └── SCWikiSyncReportService.java             — collects unmatched / skipped → admin notification
+│   ├── ScWikiClient.java                        — WebClient + ETag (clone of UexClient)
+│   ├── ScWikiScheduler.java                     — @Scheduled orchestrator
+│   ├── ScWikiCommoditySyncService.java          — /api/commodities → material
+│   ├── ScWikiBlueprintSyncService.java          — /api/blueprints → blueprint + blueprint_ingredient
+│   ├── ScWikiItemSyncService.java               — /api/items + per-classification → game_item (Wiki cols)
+│   ├── ScWikiVehicleSyncService.java            — /api/vehicles → ship_type (Wiki cols)
+│   ├── ScWikiManufacturerSyncService.java       — /api/manufacturers → manufacturer (Wiki cols)
+│   ├── ScWikiAliasService.java                  — applies commodity-name alias seed + admin entries
+│   └── ScWikiSyncReportService.java             — collects unmatched / skipped → admin notification
 ├── dto/scwiki/                                  ← NEW
-│   ├── SCWikiResponseDto.java                   — {data: T[], links, meta} envelope
-│   ├── SCWikiCommodityDto.java
-│   ├── SCWikiBlueprintDto.java
-│   ├── SCWikiBlueprintIngredientDto.java
-│   ├── SCWikiItemDto.java
-│   ├── SCWikiVehicleDto.java                    — rich vehicle payload (cargo_grids, sizes, etc.)
-│   ├── SCWikiManufacturerDto.java
-│   └── SCWikiMetaDto.java                       — {current_page, last_page, per_page, total}
+│   ├── ScWikiResponseDto.java                   — {data: T[], links, meta} envelope
+│   ├── ScWikiCommodityDto.java
+│   ├── ScWikiBlueprintDto.java
+│   ├── ScWikiBlueprintIngredientDto.java
+│   ├── ScWikiItemDto.java
+│   ├── ScWikiVehicleDto.java                    — rich vehicle payload (cargo_grids, sizes, etc.)
+│   ├── ScWikiManufacturerDto.java
+│   └── ScWikiMetaDto.java                       — {current_page, last_page, per_page, total}
 ├── config/
-│   └── SCWikiProperties.java                    — @ConfigurationProperties("krt.scwiki")
+│   └── ScWikiProperties.java                    — @ConfigurationProperties("krt.scwiki")
 │
 │  ─── EXTENDED UEX side ───
 │
@@ -525,13 +525,13 @@ backend/src/main/java/de/greluc/krt/iri/basetool/backend/
     └── UexProperties.java                       ← EXTEND with itemsEndpoint, itemsPricesEndpoint, categoriesEndpoint
 ```
 
-### 5.2 SCWikiProperties
+### 5.2 ScWikiProperties
 
 ```java
 @Data @Validated @Configuration
 @EnableScheduling @EnableAsync                  // already enabled by UexProperties; re-enabling is fine
 @ConfigurationProperties(prefix = "krt.scwiki")
-public class SCWikiProperties {
+public class ScWikiProperties {
   @NotBlank private String apiUrl = "https://api.star-citizen.wiki";
   @NotBlank private String commoditiesEndpoint     = "/api/commodities";
   @NotBlank private String blueprintsEndpoint     = "/api/blueprints";
@@ -557,7 +557,7 @@ public class SCWikiProperties {
 
 ### 5.3 Reusing `UexClient` patterns
 
-`SCWikiClient` is a near-copy of `UexClient` with three behavioral differences:
+`ScWikiClient` is a near-copy of `UexClient` with three behavioral differences:
 
 1. **Pagination loop** — `fetchAllPages(endpoint, type)` walks `?page[number]=1..last_page`, accumulating into one list. Pages are independently `ETag`-cached.
 2. **Rate-limit pacing** — between page fetches, sleep `1000 / requestsPerSecond`. Plain `Thread.sleep` in the async executor is fine; we're already off the request thread.
@@ -567,7 +567,7 @@ The 16 MB max-in-memory buffer is enough: largest probed response is the OpenAPI
 
 ### 5.4 Scheduling
 
-**Both schedulers run independently** on their own `@Async` executor with their own fixed-delay cycle. The `UexScheduler` keeps its hourly cadence (existing); `SCWikiScheduler` defaults to every 24 h (Wiki data changes only on game patches).
+**Both schedulers run independently** on their own `@Async` executor with their own fixed-delay cycle. The `UexScheduler` keeps its hourly cadence (existing); `ScWikiScheduler` defaults to every 24 h (Wiki data changes only on game patches).
 
 ```
 UexScheduler                                    ← EXISTING — calls extended in order:
@@ -588,7 +588,7 @@ UexScheduler                                    ← EXISTING — calls extended 
     syncItems();                                // 98 category calls → game_item (UEX cols)
     if (itemPriceSyncEnabled) syncItemPrices(); // → game_item_price (feature-flagged)
 
-SCWikiScheduler                                 ← NEW separate executor
+ScWikiScheduler                                 ← NEW separate executor
   @Async("scWikiExecutor")
   @Scheduled(fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}")  // 24h default
   run():
@@ -633,7 +633,7 @@ private Instant scwikiSyncedAt;                   // last successful wiki touch
 private Instant scwikiDeletedAt;                  // set when wiki stops returning this row
 
 @Column(name = "density_g_per_cc")
-private Double densityGPerCc;                     // physical density (wiki-only)
+private Double densityGramPerCc;                     // physical density (wiki-only)
 
 @Column(name = "instability")
 private Double instability;                       // wiki-only refining hint
@@ -732,7 +732,7 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(nullable = false)
   private GameItemKind kind = GameItemKind.GENERIC;
 
-  // ---- Wiki-sourced columns (only SCWiki sync writes) ----
+  // ---- Wiki-sourced columns (only ScWiki sync writes) ----
   @Column(name = "scwiki_slug")
   private String scwikiSlug;                          // "venture-helmet-white-2"
 
@@ -1175,7 +1175,7 @@ All migrations follow `backend/src/main/resources/db/migration/README.md` conven
 
 ## 8. Sync algorithms
 
-### 8.1 Commodity sync (`SCWikiCommoditySyncService`)
+### 8.1 Commodity sync (`ScWikiCommoditySyncService`)
 
 ```
 fetched = scWikiClient.fetchAllPages(/api/commodities)
@@ -1215,7 +1215,7 @@ materialRepository.markScwikiDeleted(
 
 Step 4 also rejects multi-target ambiguity: if `canon(dto.name)` hits 2+ UEX rows, we **log a `MULTI_MATCH` warning and pick none**, deferring to the admin alias UI.
 
-### 8.2 Blueprint sync (`SCWikiBlueprintSyncService`)
+### 8.2 Blueprint sync (`ScWikiBlueprintSyncService`)
 
 ```
 fetched = scWikiClient.fetchAllPages(/api/blueprints)
@@ -1350,7 +1350,7 @@ The 3% Wiki-404 rate for UEX items WITH UUIDs (§3.6) and the unrecoverable ~25-
 
 This is **expected and acceptable.** Admin sync-report flags every such row with `CREATED_UEX_ONLY` at first sight, and the admin can manually clear the flag once they've confirmed it's not a wiki bug worth reporting upstream.
 
-### 8.4 Wiki item sync (`SCWikiItemSyncService`)
+### 8.4 Wiki item sync (`ScWikiItemSyncService`)
 
 Two modes selected by `krt.scwiki.sync-all-items`:
 
@@ -1373,7 +1373,7 @@ The Wiki sync calls `resolveGameItem(wikiDto)` with the same chain but kicking o
 manufacturerRepo.findByScwikiUuid(dto.manufacturer.uuid)
   .or(() -> manufacturerRepo.findByNameIgnoreCase(dto.manufacturer.name))
   .or(() -> {
-      // create stub; SCWikiManufacturerSyncService backfills missing fields next cycle
+      // create stub; ScWikiManufacturerSyncService backfills missing fields next cycle
       var m = new Manufacturer();
       m.setName(dto.manufacturer.name);
       m.setAbbreviation(dto.manufacturer.code != null ? dto.manufacturer.code : "UNKN");
@@ -1409,7 +1409,7 @@ shipTypeRepo.markUexDeletedExcept(seenUexVehicleIds, now());
 
 The synthesized `description` column keeps being written by `updateShipType()` for back-compat — but new code reads `descriptionEn`/`descriptionDe` instead.
 
-### 8.6 Wiki vehicle sync (`SCWikiVehicleSyncService`)
+### 8.6 Wiki vehicle sync (`ScWikiVehicleSyncService`)
 
 Iterates `/api/vehicles?page[size]=200`, paginating until last_page. Per vehicle:
 
@@ -1503,7 +1503,7 @@ Per-row "Add alias" link drops the admin on a pre-filled alias form (commodity e
 The verification in §4.3 found that the original flag-based heuristic (`kind==""` etc.) was unreliable — it dropped real harvestables like `Uncut SLAM`, `Blue Bilva`, `Molina Mold`, `Oza` that have no flags but are real game commodities. The revised filter is **purely name-pattern based** for hard drops; everything else is imported with `is_visible=false` for admin review.
 
 ```java
-boolean isCommodityHardJunk(SCWikiCommodityDto dto) {
+boolean isCommodityHardJunk(ScWikiCommodityDto dto) {
   if (dto.name() == null || dto.name().isBlank()) return true;
   String n = dto.name();
   if (n.contains("<") || n.contains(">"))   return true;     // HTML / placeholder
@@ -1567,13 +1567,13 @@ i18n keys go under `admin.scwiki.*` (`messages_en.properties` + `messages_de.pro
 The same release pattern as the SK rollout (small slices, each independently mergeable + reversible). The UEX side ships **before** the Wiki side for each joint table — that way the canonical `external_uuid` is already populated when Wiki sync runs, and Wiki sync is a pure column-fill.
 
 ### R1 — Foundation (one PR, additive only)
-- `SCWikiProperties`, `SCWikiClient` (with one-page-only mode), shared `SyncReportService`.
+- `ScWikiProperties`, `ScWikiClient` (with one-page-only mode), shared `SyncReportService`.
 - New `UexProperties` keys for `itemsEndpoint`, `itemsPricesEndpoint`, `categoriesEndpoint`.
 - Migration **V106** (material columns) + **V107** (manufacturer columns) + **V108** (alias + seed) + **V109** (uex_category).
 - `material_external_alias` admin CRUD.
-- Skeleton `SCWikiScheduler` with `schedulerEnabled = false` default — does nothing until R3 hooks in services.
-- ArchUnit rule: any class in `integration/scwiki` must inject `SCWikiClient` (mirror of the existing UEX rule).
-- Tests: WireMock-based unit tests for `SCWikiClient` pagination + ETag.
+- Skeleton `ScWikiScheduler` with `schedulerEnabled = false` default — does nothing until R3 hooks in services.
+- ArchUnit rule: any class in `integration/scwiki` must inject `ScWikiClient` (mirror of the existing UEX rule).
+- Tests: WireMock-based unit tests for `ScWikiClient` pagination + ETag.
 
 ### R2 — UEX item catalogue + UEX manufacturer/vehicle hardening
 - Migration **V110** (game_item) + **V111** (ship_type extensions) + **V112** (backfill `external_uuid` on existing ship_type rows).
@@ -1585,7 +1585,7 @@ The same release pattern as the SK rollout (small slices, each independently mer
 - Tests: WireMock fixture of one helmet category response; verify `game_item` row carries the right `kind`, `uex_*` cols, and `manufacturer` FK; ArchUnit pins that `UexItemSyncService` writes only `uex_*` and canonical cols (never `scwiki_*`).
 
 ### R3 — Wiki commodity merge
-- `SCWikiCommoditySyncService` with junk filter, fuzzy + alias resolution.
+- `ScWikiCommoditySyncService` with junk filter, fuzzy + alias resolution.
 - Schedule it weekly first (`scheduler-delay = 604800000`) on a feature flag (`krt.scwiki.commodity-sync-enabled`).
 - Backfill in test: assert the §4.1 fuzzy seed produces 4 matches and the §4.2 manual seed produces 5 matches (Construction Pieces excluded until user confirms domain mapping).
 - Sync-report page lists `MULTI_MATCH_AMBIGUOUS` and `CREATED_WIKI_ONLY` events.
@@ -1593,9 +1593,9 @@ The same release pattern as the SK rollout (small slices, each independently mer
 
 ### R4 — Wiki items merge (closure mode) + Wiki vehicles
 - Migration **V113** (blueprint tables).
-- `SCWikiItemSyncService` in **closure mode** — fills Wiki columns on every row UEX already put in `game_item`, plus the items referenced by blueprints. Mostly Wiki-fills, very few new rows expected.
-- `SCWikiVehicleSyncService` writes Wiki columns on every `ship_type` row UEX already put there, picking up `descriptionEn` / `descriptionDe` / `game_name` / `cargo_grids` / dimensions.
-- `SCWikiBlueprintSyncService` writes the recipe graph; ingredient resolution uses the shared `external_uuid` on `game_item`.
+- `ScWikiItemSyncService` in **closure mode** — fills Wiki columns on every row UEX already put in `game_item`, plus the items referenced by blueprints. Mostly Wiki-fills, very few new rows expected.
+- `ScWikiVehicleSyncService` writes Wiki columns on every `ship_type` row UEX already put there, picking up `descriptionEn` / `descriptionDe` / `game_name` / `cargo_grids` / dimensions.
+- `ScWikiBlueprintSyncService` writes the recipe graph; ingredient resolution uses the shared `external_uuid` on `game_item`.
 - Tests: WireMock fixture of one blueprint with both `RESOURCE` and `ITEM` ingredients; verify the FKs land correctly and CHECK constraints fire when violated. Verify that a row with both `uex_synced_at` and `scwiki_synced_at` ends up with `source_systems = BOTH`.
 
 ### R5 — Full Wiki item backfill (feature-flagged)
@@ -1605,7 +1605,7 @@ The same release pattern as the SK rollout (small slices, each independently mer
 - Expected result: ~12 700 Wiki items, of which ~5000 already exist (UEX seeded them), ~7000 new rows with `source_systems = WIKI_ONLY` (paints, variant skins UEX doesn't track).
 
 ### R6 — Manufacturer Wiki reconciliation
-- `SCWikiManufacturerSyncService` populates `scwiki_uuid` / `scwiki_code` on rows where UEX has set `uex_company_id`.
+- `ScWikiManufacturerSyncService` populates `scwiki_uuid` / `scwiki_code` on rows where UEX has set `uex_company_id`.
 - Same pattern, much smaller scale (~50 manufacturers).
 - No new entities, no new tables — just the V107 columns from R1 finally getting Wiki-side writes.
 
@@ -1632,19 +1632,19 @@ Per CLAUDE.md "every new feature ships with tests". Concrete test plan:
 
 | Layer | Test | What it pins |
 |---|---|---|
-| Unit | `SCWikiClientTest` (WireMock) | pagination loop, ETag short-circuit, 304 handling, rate-limit pacing, empty-response idempotence |
-| Unit | `SCWikiCommoditySyncServiceTest` (Mockito) | junk filter, scwiki_uuid match, alias match, name match, canonical-form match, multi-match rejection, orphan marking gated on non-empty seen set |
-| Unit | `SCWikiBlueprintSyncServiceTest` | ingredient kind discriminator, RESOURCE FK to material, ITEM FK to game_item, CHECK violation propagates, shrinking ingredient count drops trailing lines |
-| Unit | `SCWikiAliasServiceTest` | seed insert produces expected matches, admin-added alias picked up at next run |
-| Unit | `SCWikiItemSyncServiceClosureTest` | closure-mode pulls only items already in `game_item` + blueprint refs, never enumerates full /items list |
+| Unit | `ScWikiClientTest` (WireMock) | pagination loop, ETag short-circuit, 304 handling, rate-limit pacing, empty-response idempotence |
+| Unit | `ScWikiCommoditySyncServiceTest` (Mockito) | junk filter, scwiki_uuid match, alias match, name match, canonical-form match, multi-match rejection, orphan marking gated on non-empty seen set |
+| Unit | `ScWikiBlueprintSyncServiceTest` | ingredient kind discriminator, RESOURCE FK to material, ITEM FK to game_item, CHECK violation propagates, shrinking ingredient count drops trailing lines |
+| Unit | `ScWikiAliasServiceTest` | seed insert produces expected matches, admin-added alias picked up at next run |
+| Unit | `ScWikiItemSyncServiceClosureTest` | closure-mode pulls only items already in `game_item` + blueprint refs, never enumerates full /items list |
 | Unit | `UexItemSyncServiceTest` (WireMock) | walks 98 categories, kind derivation per section, `external_uuid` set, `source_systems` flips UEX_ONLY→BOTH when row already has `scwiki_synced_at` |
 | Unit | `UexCategoryRefServiceTest` | reference table populates with all 98 rows, idempotent on re-run |
 | Unit | `UexVehicleServiceUuidMatchTest` | UUID-first chain: uuid → uex_vehicle_id → name; legacy name-only rows get backfilled with `external_uuid` |
-| Unit | `SCWikiVehicleSyncServiceTest` | wiki row enters joint `ship_type` row via `external_uuid` match; UEX `is_*` flags untouched; descriptions filled |
+| Unit | `ScWikiVehicleSyncServiceTest` | wiki row enters joint `ship_type` row via `external_uuid` match; UEX `is_*` flags untouched; descriptions filled |
 | Unit | `GameItemConflictResolutionTest` | name prefers Wiki (longer, properly-cased); manufacturer is sticky on UEX; kind tie-breaker (more-specific wins) |
 | Integration | `UexItemSyncIntegrationTest` (`@SpringBootTest` with WireMock) | full UEX item run against a fixture of 3 categories; end-state DB matches expected snapshot |
-| Integration | `SCWikiSchedulerIntegrationTest` (`@SpringBootTest` with WireMock) | full happy-path cycle: commodities → blueprints → items closure → vehicles, end-state DB matches expected snapshot, including UEX_ONLY→BOTH flips |
-| ArchUnit | extend `ArchitectureTest` | classes in `integration.scwiki` must inject `SCWikiClient`; new `BlueprintIngredient` is not a JPA entity exposed by a controller (DTO-only); `GameItem` table not directly returned by `@RestController`; `UexItemSyncService` writes only `uex_*` cols + canonical (`name`, `manufacturer`, `kind`) — verified via field-write set in unit tests |
+| Integration | `ScWikiSchedulerIntegrationTest` (`@SpringBootTest` with WireMock) | full happy-path cycle: commodities → blueprints → items closure → vehicles, end-state DB matches expected snapshot, including UEX_ONLY→BOTH flips |
+| ArchUnit | extend `ArchitectureTest` | classes in `integration.scwiki` must inject `ScWikiClient`; new `BlueprintIngredient` is not a JPA entity exposed by a controller (DTO-only); `GameItem` table not directly returned by `@RestController`; `UexItemSyncService` writes only `uex_*` cols + canonical (`name`, `manufacturer`, `kind`) — verified via field-write set in unit tests |
 | Migration | `V106Test` ... | each migration ports a frozen DB snapshot and verifies the schema delta |
 
 All tests run via `./gradlew :backend:test` per CLAUDE.md hard rule. No mocked DB — every integration test uses a real Postgres via the existing TestContainers config.

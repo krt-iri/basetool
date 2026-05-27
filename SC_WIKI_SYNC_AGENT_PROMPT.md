@@ -93,10 +93,10 @@ reviewers see the context next to the code.
 - **Existing UEX integration** to mirror:
   - [`UexClient.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/integration/UexClient.java)
     — WebClient with ETag + 16 MB buffer + 30 s timeout, fail-soft `List<>`
-    returns. Read this file *first* before writing `SCWikiClient`.
+    returns. Read this file *first* before writing `ScWikiClient`.
   - [`UexProperties.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/UexProperties.java)
     — `@ConfigurationProperties("krt.uex")` with `@Validated` constraints.
-    Mirror exactly for `SCWikiProperties`.
+    Mirror exactly for `ScWikiProperties`.
   - [`UexScheduler.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UexScheduler.java)
     — `@Async("uexExecutor")` + `@Scheduled(fixedDelayString=...)`,
     per-service exception swallow.
@@ -148,20 +148,20 @@ use any test stack with production credentials —
 isolated `docker-compose.test.yml` stack only.
 
 ### 3.2 New `integration/scwiki` package
-- `SCWikiProperties.java` — exactly the property block in plan §5.2. All
+- `ScWikiProperties.java` — exactly the property block in plan §5.2. All
   Bean Validation constraints (`@NotBlank`, `@Min`, `@Max`, `@NotNull`).
   `schedulerEnabled` defaults to **`false`** in R1 (the plan defaults to
   `true`, but for R1 we don't want it running until R2 ships the services).
-- `SCWikiClient.java` — clone of `UexClient` with the three behavioral
+- `ScWikiClient.java` — clone of `UexClient` with the three behavioral
   differences in plan §5.3 (paginated `fetchAllPages`, rate-limit pacing,
   `include=` support). Re-use the same ETag pattern verbatim.
-- `dto/scwiki/SCWikiResponseDto.java`, `SCWikiCommodityDto.java`,
-  `SCWikiMetaDto.java`, `SCWikiPaginationLinksDto.java`. Records. Add the
+- `dto/scwiki/ScWikiResponseDto.java`, `ScWikiCommodityDto.java`,
+  `ScWikiMetaDto.java`, `ScWikiPaginationLinksDto.java`. Records. Add the
   `@JsonIgnoreProperties(ignoreUnknown = true)` annotation on each.
-- A skeleton `SCWikiScheduler.java` with the `@Async("scWikiExecutor")` +
+- A skeleton `ScWikiScheduler.java` with the `@Async("scWikiExecutor")` +
   `@Scheduled(fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}")`
   declarations. Body is just a guard `if (!properties.getSchedulerEnabled())
-  return;` and a `log.info("SCWikiScheduler invoked but disabled")`. The real
+  return;` and a `log.info("ScWikiScheduler invoked but disabled")`. The real
   services come in R2/R3.
 - `AsyncConfig.SCWIKI_EXECUTOR` constant + bean — size 2, queue 0, declared
   in the existing `AsyncConfig` class. Re-use the MDC-propagating decorator
@@ -186,14 +186,14 @@ isolated `docker-compose.test.yml` stack only.
 Add to
 [`ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java):
 
-> *Any class in `integration.scwiki` must inject `SCWikiClient`.*
+> *Any class in `integration.scwiki` must inject `ScWikiClient`.*
 
 Mirror the existing UEX rule if there is one (search for "UexClient" in
 ArchitectureTest); otherwise model on the
 `staffelScopedServicesMustWireOwnerScopeOrAuthHelper` rule's shape.
 
 ### 3.5 Tests
-- `SCWikiClientTest` — WireMock-backed: pagination loop, ETag 304
+- `ScWikiClientTest` — WireMock-backed: pagination loop, ETag 304
   short-circuit, rate-limit pacing assertion (count `Thread.sleep`-ish
   durations or use the `Mockito` clock), empty-response idempotence.
 - `MaterialExternalAliasServiceTest` — Mockito; CRUD + seed integrity check.
@@ -429,7 +429,7 @@ the production push. Items include:
 1. **Read the plan and this prompt fully.** Cross-check the §5 "pitfalls"
    list — do not start coding until each pitfall makes sense to you.
 2. **Inspect the existing UEX integration files** named in §2 of this
-   prompt. Understand the patterns. Don't write `SCWikiClient` until you've
+   prompt. Understand the patterns. Don't write `ScWikiClient` until you've
    read `UexClient.java` and `UexCommodityService.java` end to end.
 3. **Plan task list** with `TaskCreate` — 5–8 items, one per substantive
    subsection of §3 (migrations, properties + client, scheduler skeleton,
@@ -499,7 +499,7 @@ To prevent scope creep — these are R2+ concerns; do not touch them in R1:
 - [ ] Plan + this prompt are committed on the R1 implementation branch
       (or already present via main). §2.0 resolved.
 - [ ] V106 → V109 migrations exist, are formatted, and pass migration tests.
-- [ ] `SCWikiProperties`, `SCWikiClient`, `SCWikiScheduler` skeleton exist
+- [ ] `ScWikiProperties`, `ScWikiClient`, `ScWikiScheduler` skeleton exist
       and pass unit tests.
 - [ ] `MaterialExternalAlias` CRUD (entity, repository, service,
       controller, Thymeleaf page) exists, is `@PreAuthorize`-gated, and

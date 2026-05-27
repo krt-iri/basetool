@@ -1412,6 +1412,53 @@ class ArchitectureTest {
   }
 
   /**
+   * SC_WIKI_SYNC_PLAN.md §3.4 / R1 guard: every class in the {@code integration.scwiki} package
+   * MUST depend on {@code ScWikiClient}. The rule keeps the package focused on classes that
+   * interact with the SC Wiki HTTP API — a helper / DTO / scheduler that does not consult the
+   * client belongs elsewhere (most likely under {@code service.scwiki} once R3 ships).
+   *
+   * <p>{@code ScWikiClient} itself is exempt: it IS the dependency target. Future sync services
+   * ({@code ScWikiCommoditySyncService}, {@code ScWikiBlueprintSyncService}, …) added in R3+
+   * inherit the requirement automatically.
+   *
+   * <p>Modelled on {@link #staffelScopedServicesMustWireOwnerScopeOrAuthHelper}: walks the declared
+   * fields of each candidate class and checks the raw-type FQN for the client.
+   */
+  @Test
+  void scWikiIntegrationClassesMustWireScWikiClient() {
+    String scWikiClientFqn = "de.greluc.krt.iri.basetool.backend.integration.scwiki.ScWikiClient";
+    classes()
+        .that()
+        .resideInAPackage("..backend.integration.scwiki..")
+        .and()
+        .doNotHaveSimpleName("ScWikiClient")
+        .should(
+            new ArchCondition<JavaClass>("inject ScWikiClient") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                boolean injectsClient =
+                    javaClass.getFields().stream()
+                        .map(f -> f.getRawType().getFullName())
+                        .anyMatch(scWikiClientFqn::equals);
+                if (!injectsClient) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          javaClass,
+                          javaClass.getName()
+                              + " lives under integration.scwiki but does not inject"
+                              + " ScWikiClient. Either depend on the shared HTTP client or move"
+                              + " the class to a different package (e.g. service.scwiki)."));
+                }
+              }
+            })
+        // R1 has ScWikiClient + ScWikiScheduler in the package; the latter satisfies the rule.
+        // Allowing empty here keeps the guard intact when R9 / hypothetical refactors move all
+        // sync services out of the package, leaving only the client behind.
+        .allowEmptyShould(true)
+        .check(CLASSES);
+  }
+
+  /**
    * R6.a / SPEZIALKOMMANDO_PLAN.md §8.5: no new {@code @JoinColumn(name = "squadron_id")} outside
    * the grandfathered legacy entities listed in {@link #SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS}.
    * Those columns are on the destructive-cleanup release's drop list — once {@code
