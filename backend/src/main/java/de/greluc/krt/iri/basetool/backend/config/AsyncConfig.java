@@ -1,9 +1,13 @@
 package de.greluc.krt.iri.basetool.backend.config;
 
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
@@ -43,6 +47,17 @@ public class AsyncConfig {
    * align with the application-wide {@code server.shutdown=graceful} window so an in-flight sync is
    * given a chance to finish before the JVM exits.
    *
+   * <p><b>MDC propagation</b> via {@link MdcPropagatingTaskDecorator}: classic {@link ThreadLocal}
+   * holders (including SLF4J's {@code MDC}) do not flow across thread boundaries automatically.
+   * Without a decorator, every UEX-sync log line would emit empty {@code correlationId} / {@code
+   * userId} / {@code orgUnitId} MDC fields because the {@code @Scheduled}-triggered task picks a
+   * fresh thread from this pool that never ran the request filter chain. The decorator snapshots
+   * the submitting thread's MDC map and restores it on the worker before the runnable runs, then
+   * clears MDC afterwards so two consecutive tasks on the same pool thread cannot bleed fields into
+   * each other. Scheduled-only triggers carry no inbound request so the captured map is typically
+   * empty — but admin-triggered re-syncs and tests do submit from a request thread, and those
+   * should keep their correlation id in the resulting log lines.
+   *
    * @return configured UEX async executor
    */
   @Bean(name = UEX_EXECUTOR)
@@ -55,7 +70,43 @@ public class AsyncConfig {
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(20);
+    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
     executor.initialize();
     return executor;
+  }
+
+  /**
+   * {@link TaskDecorator} that snapshots the submitting thread's SLF4J {@link MDC} context map and
+   * restores it on the worker thread before the wrapped runnable runs. Used by {@link
+   * #uexExecutor()} so {@code @Async}-dispatched UEX-sync log lines keep the correlation id, user
+   * id and org-unit id of the request (or scheduled trigger) that submitted them.
+   *
+   * <p>The decorator clears MDC in the {@code finally} block to prevent a fresh task picked up by
+   * the same pool thread from inheriting the previous task's MDC fields — the executor reuses
+   * worker threads, and a missing clear here would bleed correlation ids across unrelated
+   * submissions.
+   *
+   * <p>A {@code null} snapshot (no MDC on the submitting thread — typical for scheduler-triggered
+   * runs at JVM startup) is handled explicitly: the worker starts with an empty MDC and clears it
+   * the same way at the end. This avoids an NPE inside {@code MDC.setContextMap(null)} which some
+   * SLF4J bindings throw.
+   */
+  static class MdcPropagatingTaskDecorator implements TaskDecorator {
+
+    @NotNull
+    @Override
+    public Runnable decorate(@NotNull Runnable runnable) {
+      Map<String, String> snapshot = MDC.getCopyOfContextMap();
+      return () -> {
+        try {
+          if (snapshot != null) {
+            MDC.setContextMap(snapshot);
+          }
+          runnable.run();
+        } finally {
+          MDC.clear();
+        }
+      };
+    }
   }
 }
