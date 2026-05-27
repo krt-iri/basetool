@@ -115,6 +115,10 @@ dependencies {
   // Resilience4j for resilience patterns + Reactor operators
   implementation(libs.resilience4j.spring.boot3)
   implementation(libs.resilience4j.reactor)
+  // Reactor ThreadLocal propagation across WebClient worker threads — required so the active-OrgUnit
+  // pin and the correlation id flow from the servlet thread into the WebClient exchange filter.
+  // Version is resolved by the Spring Boot BOM (no version.ref here).
+  implementation(libs.micrometer.context.propagation)
   implementation(libs.logstash.logback.encoder)
   
   compileOnly("org.projectlombok:lombok")

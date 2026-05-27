@@ -8,9 +8,15 @@ import org.jetbrains.annotations.Nullable;
  * re-reading the original {@code HttpServletRequest}. Populated by {@link CorrelationIdFilter} at
  * the beginning of every request and cleared in the matching {@code finally} block.
  *
- * <p>Virtual threads and reactive pipelines copy the owning thread's thread-locals on submission,
- * so the value is visible inside {@code WebClient} exchange filters that run on the request thread.
- * Calls escaping to a different scheduler must pass the id explicitly.
+ * <p>Reactor pipelines do <strong>not</strong> copy classic {@code ThreadLocal} values onto their
+ * worker threads automatically — the holder only lives on the thread that called {@link #set}. The
+ * {@link de.greluc.krt.iri.basetool.frontend.config.ReactorContextPropagationConfig} hooks
+ * Reactor's automatic context propagation to a registered {@code ThreadLocalAccessor} so this
+ * holder is restored on whichever Reactor worker thread runs the downstream operator. See the
+ * {@code CORRELATION_CONTEXT_KEY} constant on that config class for the registry key. Without that
+ * wiring the value would be invisible inside {@code WebClient} exchange filters and outbound
+ * backend calls would log a different correlation id than the inbound frontend request, breaking
+ * the audit-trail join.
  */
 public final class CorrelationContext {
 
