@@ -358,17 +358,29 @@ public class SquadronContextAdvice {
   }
 
   /**
-   * Computes whether the promotion subsystem is exposed to the current caller. Admins always see
-   * the menu (regardless of the per-squadron flag) so they can re-enable a squadron that locked
-   * itself out; for everyone else the flag stored on {@link SquadronDto#isPromotionEnabled()} of
-   * their active squadron decides. {@code null} active squadron (anonymous caller, member without
-   * squadron) defaults to {@code true} — the squadron-scope filter in the backend already returns
-   * empty lists for them so a hidden menu would be redundant and inconsistent with the rest of the
-   * sidebar.
+   * Computes whether the promotion subsystem is exposed to the current caller. The active squadron
+   * (admin pin or non-admin home staffel) decides:
+   *
+   * <ul>
+   *   <li>Admin without an active pin — {@code activeSquadron} resolves to {@code null} (all-scopes
+   *       mode); this branch falls through to the {@code null}-default of {@code true} so the
+   *       toggle UI stays reachable for re-enabling locked-out staffeln.
+   *   <li>Admin pinned to a squadron — {@code activeSquadron} reflects the pin and its {@code
+   *       isPromotionEnabled()} flag drives the menu visibility. An admin who pinned a squadron
+   *       with promotion disabled now sees the same hidden-menu state as a member would — which
+   *       matches the pinned-view UX promise. To re-enable, the admin clears the pin (back to
+   *       all-scopes) or navigates directly to {@code /admin/settings} (not gated by this check).
+   *   <li>Non-admin — the home-squadron flag decides, unchanged from previous behaviour.
+   *   <li>Anonymous / squadron-less caller — {@code activeSquadron} is {@code null}, defaults to
+   *       {@code true} so an empty squadron-scope filter doesn't get a hidden menu on top.
+   * </ul>
    *
    * <p>The sidebar's {@code Beförderung} section reads this attribute via {@code
    * th:if="${promotionFeatureEnabled}"}, and every {@code PromotionPageController} {@code
    * GetMapping} blocks the request with HTTP 403 when it resolves to {@code false}.
+   *
+   * <p>The earlier blanket admin bypass was dropped because it broke the pinned-view UX — see
+   * CLAUDE.md "Multi-squadron tenancy" for the updated semantics.
    *
    * @param activeSquadron previously-resolved squadron mini-record, or {@code null}.
    * @return {@code true} when the promotion menu should be exposed; {@code false} when it must be
@@ -377,9 +389,6 @@ public class SquadronContextAdvice {
   @ModelAttribute("promotionFeatureEnabled")
   public boolean promotionFeatureEnabled(
       @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
     if (activeSquadron == null || activeSquadron.isPromotionEnabled() == null) {
       return true;
     }

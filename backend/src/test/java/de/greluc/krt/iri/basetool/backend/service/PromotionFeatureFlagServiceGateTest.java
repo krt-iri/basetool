@@ -52,9 +52,11 @@ import org.springframework.security.access.AccessDeniedException;
  * pattern, so one representative is enough — every gated call site uses the same {@code
  * OwnerScopeService} primitive).
  *
- * <p>What's pinned here: admins bypass the gate (because they own the toggle), Officers / members
- * of a flag-off squadron get empty reads and {@link AccessDeniedException} on writes, and the
- * squadron-toggle service method flips only the flag without touching any other column.
+ * <p>What's pinned here: an admin without an active pin keeps the menu open (so they can re-enable
+ * a locked-out squadron); an admin pinned to a squadron honours that squadron's flag so the pinned
+ * view matches what a member would see; Officers / members of a flag-off squadron get empty reads
+ * and {@link AccessDeniedException} on writes; and the squadron-toggle service method flips only
+ * the flag without touching any other column.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionFeatureFlagServiceGateTest {
@@ -91,11 +93,42 @@ class PromotionFeatureFlagServiceGateTest {
   }
 
   @Test
-  @DisplayName("Admin always bypasses the feature flag, even when the squadron has it OFF")
-  void adminAlwaysPassesGate() {
+  @DisplayName("Admin without an active pin passes the gate (re-enable a locked-out squadron)")
+  void adminWithoutPinPassesGate() {
     when(authHelper.isAdmin()).thenReturn(true);
+    // No active pin → request.getHeader returns null → currentSquadronId().isEmpty() → defaults
+    // to true so the toggle UI stays reachable.
     assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     ownerScopeService.assertPromotionFeatureEnabled();
+  }
+
+  @Test
+  @DisplayName("Admin pinned to a squadron with the flag ON passes the gate")
+  void adminWithPinOnEnabledSquadronPassesGate() {
+    UUID pinnedId = UUID.randomUUID();
+    when(authHelper.isAdmin()).thenReturn(true);
+    when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
+    when(squadronRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, true)));
+
+    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    ownerScopeService.assertPromotionFeatureEnabled();
+  }
+
+  @Test
+  @DisplayName(
+      "Admin pinned to a squadron with the flag OFF respects the pin and fails the gate "
+          + "(regression: previously bypassed unconditionally for admins)")
+  void adminWithPinOnDisabledSquadronHonoursPin() {
+    UUID pinnedId = UUID.randomUUID();
+    when(authHelper.isAdmin()).thenReturn(true);
+    when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
+    when(squadronRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, false)));
+
+    assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    AccessDeniedException ex =
+        assertThrows(
+            AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
+    assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
   }
 
   @Test

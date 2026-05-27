@@ -1,6 +1,9 @@
 # Changelog
 ## [Unreleased]
 
+### Fixed
+- **Promotion-Menü respektiert jetzt den Admin-Pin auf eine Staffel mit deaktiviertem Beförderungssystem.** Vorher hat der Admin-Bypass im `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()` und `SquadronContextAdvice.promotionFeatureEnabled` das Menü bedingungslos sichtbar gelassen — auch wenn der Admin sich aktiv in die Sicht einer Staffel mit `promotion_enabled = false` gepinnt hatte. Jetzt steuert die gepinnte Staffel auch für Admins die Sichtbarkeit; der Admin sieht dieselbe Sicht wie ein Member dieser Staffel. Admin ohne Pin (all-scopes) behält das Menü, damit er eine gelockt-out Staffel re-enablen kann; alternativ direkt `/admin/settings` (nicht durch den Gate). Backend- + Frontend-Test-Suite (`PromotionFeatureFlagServiceGateTest`, `PromotionFeatureFlagPageGateTest`) um die Admin-Pin-Pfade erweitert.
+
 ### Changed
 - **Handover-PDF zeigt jetzt das KRT-Corporate-Logo statt des IRIDIUM-Staffel-Logos (Follow-up #251).** `JobOrderHandoverReportService` liest die neue `krt.png` (101x72, aus `frontend/.../krt.webp` konvertiert, da OpenPDF kein WebP dekodiert) aus dem Backend-Classpath; die jetzt verwaisten `staffel_iridium.{png,svg}`-Kopien in beiden Modulen wurden entfernt. Design-Master `design/logos/staffel_iridium.svg` bleibt erhalten.
 

@@ -102,4 +102,30 @@ class PromotionFeatureFlagPageGateTest {
     stubSquadronContext(UUID.randomUUID(), false);
     mockMvc.perform(get("/promotion/admin/rank-requirements")).andExpect(status().isForbidden());
   }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void adminPinnedToFlagOffSquadron_overviewIsForbidden() throws Exception {
+    // Regression: previously the admin bypass on SquadronContextAdvice.promotionFeatureEnabled
+    // returned true unconditionally for admins, so an admin pinned to a flag-off squadron still
+    // saw the menu. After fix/promotion-gate-honor-admin-pin the pinned squadron's flag drives
+    // visibility for admins too.
+    UUID pinnedId = UUID.randomUUID();
+    stubSquadronContext(pinnedId, false);
+    mockMvc
+        .perform(get("/promotion/overview").sessionAttr("iridium.activeOrgUnitId", pinnedId))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void adminPinnedToFlagOnSquadron_overviewIsAccessible() throws Exception {
+    // Counterpart to the regression test above — an admin pinned to a squadron with the flag ON
+    // still sees the menu (pinned view consistent with what a member of that squadron sees).
+    UUID pinnedId = UUID.randomUUID();
+    stubSquadronContext(pinnedId, true);
+    mockMvc
+        .perform(get("/promotion/overview").sessionAttr("iridium.activeOrgUnitId", pinnedId))
+        .andExpect(status().is2xxSuccessful());
+  }
 }
