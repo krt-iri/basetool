@@ -749,19 +749,25 @@ public class OwnerScopeService {
    * Reports whether the per-squadron promotion-system feature flag is on for the caller's scope.
    *
    * <ul>
-   *   <li>Admin — always {@code true}; admins must retain access regardless of the flag so they can
-   *       re-enable a squadron that locked itself out and pick up exactly where it left off.
-   *   <li>Caller has an effective squadron — returns the flag stored on that squadron's row.
-   *   <li>Caller has no effective squadron (unauthenticated / member without squadron) — {@code
+   *   <li>Admin without an active pin (all-scopes mode) — {@code true}; admins keep access so they
+   *       can re-enable a squadron that locked itself out without losing the menu entry.
+   *   <li>Admin pinned to a squadron — uses the pinned squadron's flag so the pinned view stays
+   *       consistent with what a member of that squadron would see. An admin who wants to re-enable
+   *       a locked-out squadron either clears the pin first (all-scopes mode) or navigates directly
+   *       to {@code /admin/settings} (not gated by this check).
+   *   <li>Non-admin with an effective squadron — returns the flag stored on that squadron's row.
+   *   <li>Caller without an effective squadron (anonymous / member without squadron) — {@code
    *       true}, since the squadron-scope filter already returns empty lists for them.
    * </ul>
+   *
+   * <p>The pin-awareness comes from {@link #currentSquadron()}, which already resolves an admin's
+   * pin from the request header and a non-admin's home squadron from the membership row. The
+   * earlier blanket admin bypass was dropped because it broke the pinned-view UX — see CLAUDE.md
+   * "Multi-squadron tenancy" for the updated semantics.
    *
    * @return {@code true} when the promotion menu may be exposed for the caller.
    */
   public boolean isPromotionFeatureEnabledForCurrentScope() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
     return currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
   }
 
