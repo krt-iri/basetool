@@ -23,7 +23,7 @@ Request; "Date" is the production deploy timestamp.
 |---|---|---|---|---|---|---|
 | R1 - Foundation | TBD | TBD | TBD | TBD | TBD | additive only; scheduler default off |
 | R2 - UEX items + vehicle hardening | TBD | TBD | TBD | TBD | TBD | game_item table + 47 ship_type flags; no Wiki traffic |
-| R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | first Wiki sync goes live |
+| R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on |
 | R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph land + closure-mode item fill |
 | R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | feature-flagged backfill (~12 700 rows) |
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | |
@@ -441,33 +441,142 @@ docker compose logs backend | grep -E "ScWikiScheduler.*disabled"
 
 ## 3. R3 - Wiki commodity merge
 
-*(Stub - written when R3 lands. First phase that flips
-`krt.scwiki.scheduler-enabled` to `true`. Adds the junk filter, fuzzy seed
-verification, and the sync-report admin page.)*
+### 3.1 Scope summary (R3)
 
-### 3.1 Scope summary
+R3 ships the first SC Wiki sync — the commodity merge — but **dark**: the
+code, audit table and admin page all land, yet **no live Wiki traffic is
+generated** until an operator flips `krt.scwiki.commodity-sync-enabled` to
+`true` (default `false`, mirroring R7's price flag). The master switch
+`krt.scwiki.scheduler-enabled` default flips to `true` in R3 so the
+scheduler bean ticks; each tick still no-ops while the per-sync flag is off.
 
-TBD.
+- Flyway migration **V113** — new append-only `external_sync_report`
+  audit table (`run_id`, `ran_at`, `source_system` CHECK, `event_type`,
+  `aggregate`, external ref columns, `detail`) + two indexes.
+- `SyncReportService` — collects findings into `external_sync_report`,
+  keeps the last 30 runs per source.
+- `ScWikiCommoditySyncService` — pulls `/api/commodities`, applies the
+  §8.9 hard-junk name filter, and merges the rest into `material` via the
+  §8.1.1 resolution chain (`scwiki_uuid` → alias table → exact name →
+  canonical name with multi-match rejection). Conflict policy (§4.6): UEX
+  stays canonical for `name` / `code` / `kind` / prices / flags; the Wiki
+  sync only writes `scwiki_uuid` / `scwiki_key` / `scwiki_slug` /
+  `density_g_per_cc` and flips `source_systems` `UEX_ONLY → BOTH`.
+  Wiki-only commodities become fresh `WIKI_ONLY` rows **inserted invisible**
+  (`is_visible = false`) so they never reach the trading UI until reviewed.
+- Admin sync-report pages at `/admin/sync-reports`, `/scwiki`, `/uex`
+  (read-only, ADMIN-gated) backed by `GET /api/v1/sync-reports`.
+- **Deviation from plan §8.1 pseudocode (documented in the service):** a
+  canonical *multi-match* skips the row (logs `MULTI_MATCH_AMBIGUOUS`)
+  instead of creating a `WIKI_ONLY` row, because stamping the Wiki UUID on
+  a new row would let step 1 shadow the admin's later alias fix forever.
 
 ### 3.2 Pre-deployment checks (R3)
 
-TBD.
+- [ ] R2 (PR [#263](https://github.com/krt-iri/basetool/pull/263)) deployed
+      and stable; `game_item` + `material` cross-ref columns populated.
+- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC
+      LIMIT 5` shows V112 as the latest applied migration; no V113.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R3
+      branch.
+- [ ] Decide the soak cadence: leave `krt.scwiki.scheduler-delay` at the
+      24h default, or set it to weekly (`604800000`) for the first runs
+      per plan §11 R3 ("weekly first, escalate to 24h once the report is
+      clean").
+- [ ] Confirm `krt.scwiki.commodity-sync-enabled` is **unset / false** in
+      prod `.env` for the initial deploy — R3 ships dark.
 
 ### 3.3 Deployment steps (production, R3)
 
-TBD.
+1. **Take the logical backup** (commodity merge mutates `material`):
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r3-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R3 PR.** Watch the deploy log for V113:
+   ```
+   Migrating schema "public" to version "113 - create external sync report"
+   ```
+3. **Confirm the dark state.** Within 24h the SC Wiki scheduler ticks and
+   logs (commodity sync is still gated off):
+   ```
+   SC Wiki commodity sync invoked but disabled (krt.scwiki.commodity-sync-enabled=false) — skipping.
+   ```
+4. **Enable the merge when ready.** Set `KRT_SCWIKI_COMMODITY_SYNC_ENABLED=true`
+   in the prod `.env` and restart the backend (or wait for the next tick if
+   the runtime re-reads properties). The next tick runs the real merge:
+   ```
+   Starting SC Wiki commodity merge...
+   Finished SC Wiki commodity merge: NNN linked, NN created WIKI_ONLY, NN junk-skipped, N ambiguous-skipped.
+   ```
 
 ### 3.4 Smoke tests (R3, post-deploy)
 
-TBD.
+```bash
+# 1. Audit table exists.
+psql -d basetool -c "\d external_sync_report" | grep -E 'run_id|event_type|source_system'
+
+# 2. Admin sync-report page renders (ADMIN session).
+curl -fsS -H "Cookie: <session-cookie>" https://<host>/admin/sync-reports/scwiki \
+  | grep -c 'admin.syncReports.title'   # expect >= 1
+
+# --- after enabling commodity-sync-enabled and one tick: ---
+
+# 3. Events were recorded.
+psql -d basetool -c "SELECT event_type, count(*) FROM external_sync_report \
+                       WHERE source_system='SCWIKI' GROUP BY event_type ORDER BY 1"
+# Expect a mix of LINKED_VIA_ALIAS / CREATED_WIKI_ONLY / SKIP_JUNK; possibly
+# LOOKS_LIKE_ITEM / MULTI_MATCH_AMBIGUOUS.
+
+# 4. Existing UEX commodities gained Wiki cross-refs (UEX_ONLY -> BOTH).
+psql -d basetool -c "SELECT source_systems, count(*) FROM material GROUP BY source_systems"
+# Expect BOTH > 0 and the bulk of pre-R3 rows still UEX_ONLY (Wiki-only gaps).
+
+# 5. CRITICAL — Wiki-only rows are invisible (must NOT pollute trading).
+psql -d basetool -c "SELECT count(*) FILTER (WHERE is_visible) AS visible, \
+                            count(*) FILTER (WHERE NOT is_visible) AS hidden \
+                       FROM material WHERE source_systems='WIKI_ONLY'"
+# Expect visible = 0 : every WIKI_ONLY row ships invisible until admin review.
+
+# 6. Existing UEX-sourced catalogue stayed visible.
+psql -d basetool -c "SELECT count(*) FROM material WHERE source_systems IN ('UEX_ONLY','BOTH') AND NOT is_visible"
+# Expect 0 : the merge never hides a UEX row.
+```
 
 ### 3.5 Rollback (R3)
 
-TBD.
+The merge only adds Wiki-owned columns + new invisible rows, so the
+fastest rollback is to **disable the flag** (`KRT_SCWIKI_COMMODITY_SYNC_ENABLED=false`)
+— the trading UI is unaffected because Wiki-only rows were never visible.
+For a full revert:
+
+1. Set `KRT_SCWIKI_COMMODITY_SYNC_ENABLED=false`, revert the merge on `main`.
+2. Optionally clean up Wiki-only rows + cross-refs:
+   ```sql
+   DELETE FROM material WHERE source_systems = 'WIKI_ONLY';
+   UPDATE material SET source_systems = 'UEX_ONLY', scwiki_uuid = NULL,
+          scwiki_key = NULL, scwiki_slug = NULL, scwiki_synced_at = NULL,
+          scwiki_deleted_at = NULL, density_g_per_cc = NULL
+     WHERE source_systems = 'BOTH';
+   DROP TABLE IF EXISTS external_sync_report;   -- V113
+   DELETE FROM flyway_schema_history WHERE version = '113';
+   ```
+   Restart; `ddl-auto: validate` must pass against the R2 schema. The
+   logical backup is the fallback if the in-place cleanup misbehaves.
 
 ### 3.6 Monitoring during the soak window (R3)
 
-TBD.
+- Review `/admin/sync-reports/scwiki` after the first enabled run:
+  `MULTI_MATCH_AMBIGUOUS` events are the action items — add a
+  `material_external_alias` row for each, then the next run links them.
+- `CREATED_WIKI_ONLY` / `LOOKS_LIKE_ITEM` rows are invisible by design;
+  flip `is_visible` only after confirming the entry is a real commodity.
+- Watch for `SKIP_JUNK` spikes — a sudden jump means the Wiki added a new
+  junk-name variant; extend `HARDCODED_ATMOSPHERE_SET` via PR.
+- Confirm the trading / refinery UI is unchanged (Wiki-only rows invisible,
+  UEX names untouched). Escalate the schedule from weekly to 24h once the
+  report is clean (per plan §11 R3).
 
 ---
 

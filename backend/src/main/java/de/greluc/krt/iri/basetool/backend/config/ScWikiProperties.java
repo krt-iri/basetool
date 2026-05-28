@@ -70,10 +70,22 @@ public class ScWikiProperties {
   @NotBlank private String manufacturersEndpoint = "/api/manufacturers";
 
   /**
-   * Master switch for the {@code ScWikiScheduler}. Defaults to {@code false} in R1 — the scheduler
-   * skeleton exists but no sync services consume its tick yet. R3 flips this to {@code true}.
+   * Master switch for the {@code ScWikiScheduler}. R3 flips the default to {@code true} now that
+   * the scheduler drives a real implementation ({@code ScWikiCommoditySyncService}). The bean still
+   * does nothing harmful when the per-sync feature flags below are off — the scheduler ticks but
+   * each sync self-guards. Set to {@code false} to silence the scheduler entirely.
    */
-  @NotNull private Boolean schedulerEnabled = false;
+  @NotNull private Boolean schedulerEnabled = true;
+
+  /**
+   * Per-sync feature flag for the R3 Wiki commodity merge ({@code ScWikiCommoditySyncService}).
+   * Defaults to {@code false} so R3 ships "dark": the table, service and admin page all land, but
+   * no live Wiki traffic is generated until an operator flips this on per the deployment runbook §3
+   * (mirrors the R7 {@code krt.uex.item-price-sync-enabled} pattern). Decoupled from {@link
+   * #schedulerEnabled} so the scheduler can stay live for future syncs while the commodity merge is
+   * still being soaked.
+   */
+  @NotNull private Boolean commoditySyncEnabled = false;
 
   /**
    * Fixed delay between successive {@code ScWikiScheduler} ticks, in milliseconds. Default 24h (86

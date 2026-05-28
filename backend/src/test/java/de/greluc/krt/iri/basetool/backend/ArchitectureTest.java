@@ -1436,6 +1436,12 @@ class ArchitectureTest {
             new ArchCondition<JavaClass>("inject ScWikiClient") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
+                // Skip nested helper types (e.g. a private result record inside a sync service):
+                // the rule targets the top-level sync beans that actually talk to the Wiki, not
+                // their inner value holders.
+                if (javaClass.getEnclosingClass().isPresent()) {
+                  return;
+                }
                 boolean injectsClient =
                     javaClass.getFields().stream()
                         .map(f -> f.getRawType().getFullName())
