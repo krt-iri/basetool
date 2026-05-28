@@ -40,6 +40,17 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   Optional<GameItem> findByUexItemId(Integer uexItemId);
 
   /**
+   * Returns every non-null {@code external_uuid} in the table. Drives the R4 closure-mode Wiki item
+   * sync (§8.4 Mode A): it fetches Wiki detail for exactly the items UEX already placed in {@code
+   * game_item} (plus blueprint item references), never enumerating the full ~12 700-row Wiki item
+   * pool.
+   *
+   * @return all distinct non-null external UUIDs
+   */
+  @Query("SELECT DISTINCT g.externalUuid FROM GameItem g WHERE g.externalUuid IS NOT NULL")
+  java.util.List<java.util.UUID> findAllExternalUuids();
+
+  /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_item_id} is set, NOT included in
    * {@code seenIds}, and whose {@code uex_deleted_at} is currently NULL. Mirrors the {@code
    * MaterialPriceRepository.clearStalePrices} pattern: gated by a non-empty {@code seenIds} so a
