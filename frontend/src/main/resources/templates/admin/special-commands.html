@@ -52,10 +52,8 @@
         </p>
     </div>
 
-    <!-- Error / success toasts -->
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
-        <p th:text="#{${error}}" style="color: var(--color-danger);">Fehler beim Laden</p>
-    </div>
+    <!-- Error alert -->
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <!-- SK List Section -->
     <div class="hud-box data-section mt-2" id="specialcommands-box">

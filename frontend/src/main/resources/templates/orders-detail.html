@@ -173,8 +173,8 @@
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn" style="background-color: var(--color-primary); color: #000; min-height: 44px;" th:text="#{orders.detail.handover}" data-trigger="od-open-handover">Übergabe protokollieren</button>
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn" style="background-color: var(--color-gray-3); color: var(--color-text); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
+            <button type="button" class="btn" th:text="#{orders.detail.handover}" data-trigger="od-open-handover">Übergabe protokollieren</button>
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-secondary" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
         </div>
 
         <div th:if="${order.handovers != null and !order.handovers.isEmpty()}" class="mt-2">

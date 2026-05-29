@@ -53,9 +53,9 @@
         <p th:text="#{operations.description}">Manage and view operations.</p>
     </div>
 
-    <div th:if="${successMessage}" class="alert alert-success mt-2" th:text="#{${successMessage}}"></div>
-    <div th:if="${errorMessage}" class="alert alert-danger mt-2" th:text="#{${errorMessage}}"></div>
-    <div th:if="${error}" class="alert alert-danger mt-2" th:text="#{${error}}"></div>
+    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <div class="hud-box mt-2">
 

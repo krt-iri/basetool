@@ -111,7 +111,8 @@
             <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
                  th:text="#{admin.settings.squadron.promotion.empty}">Keine Staffeln gefunden.</div>
 
-            <table th:unless="${#lists.isEmpty(squadrons)}" class="data-table" style="max-width: 600px;">
+            <div th:unless="${#lists.isEmpty(squadrons)}" class="table-responsive">
+            <table class="krt-table" style="max-width: 600px;">
                 <thead>
                     <tr>
                         <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
@@ -135,6 +136,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 </main>
