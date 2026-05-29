@@ -1187,32 +1187,62 @@ The point of R8 is to prove the whole sync is healthy before the irreversible R9
 
 ---
 
-## 9. R9 - V116 destructive cleanup
-
-*(Stub - drops `material.is_manual_entry` and `ship_type.description`
-synthesized column. Tracked separately, similar to
-[`R8_DESTRUCTIVE_ROADMAP.md`](R8_DESTRUCTIVE_ROADMAP.md) for the SK work.)*
+## 9. R9 - V117 destructive cleanup
 
 ### 9.1 Scope summary
 
-TBD - will cross-link to a dedicated `R9_DESTRUCTIVE_ROADMAP.md` document
-when the destructive cleanup roadmap is written.
+R9 is the only **irreversible** phase: it drops `material.is_manual_entry` and the synthesized
+`ship_type.description` column. It is tracked as a separate, staged roadmap —
+[`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md) — which is the
+authoritative source; this section is the deploy-time summary.
+
+- **Both columns are still UI-consumed** (§13 #9): `is_manual_entry` backs the admin materials
+  "manual" badge / filter; `ship_type.description` is rendered by `ship-data.html` +
+  `admin/mission-data.html` via `ShipTypeDto`. So R9 is staged: migrate the readers to the
+  replacements (`source_systems = 'MANUAL'` and `description_en` / `description_de`) first, soak,
+  then drop.
+- **V-NUMBER:** V115 went to R7 (`game_item_price`), V116 to R8 (`is_manual_entry` backfill), so the
+  destructive drop is **V117**.
 
 ### 9.2 Pre-deployment checks (R9)
 
-TBD.
+- [ ] R8 (PR [#271](https://github.com/krt-iri/basetool/pull/271)) soaked clean for ~two weeks
+      (§8.6 exit criterion met).
+- [ ] Roadmap Steps 1–2 (reader migrations) shipped and soaked; `git grep -i
+      "isManualEntry\|ship_type.*description"` is clean in the `main` source set.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R9 (V117) branch.
+- [ ] Full DB backup taken immediately before merge — the drop is irreversible.
 
 ### 9.3 Deployment steps (production, R9)
 
-TBD.
+Follow `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` Step 4. In brief:
+
+1. **Backup** (`pg_dump … basetool-pre-r9-…dump`).
+2. **Merge the R9 (V117) PR** — it removes `Material.isManualEntry` + `ShipType.description` and
+   runs `ALTER TABLE … DROP COLUMN`. Watch for V117:
+   ```
+   Migrating schema "public" to version "117 - drop legacy material and ship_type columns"
+   ```
+3. **Confirm `ddl-auto=validate` boots green** (the entity fields were removed in the same PR).
 
 ### 9.4 Smoke tests (R9, post-deploy)
 
-TBD.
+```bash
+# 1. Columns are gone.
+psql -d basetool -c "SELECT column_name FROM information_schema.columns \
+  WHERE (table_name='material' AND column_name='is_manual_entry') \
+     OR (table_name='ship_type' AND column_name='description')"
+#   Expect zero rows.
+
+# 2. Admin materials "manual" badge/filter still works (now from source_systems='MANUAL').
+# 3. ship-data + admin/mission-data pages still render a description (from description_en/de).
+```
 
 ### 9.5 Rollback (R9)
 
-TBD.
+**Irreversible at the DB layer** — restore the pre-R9 backup. There is no `ADD COLUMN` that brings
+back the dropped per-row data. (Reverting the merge restores the Java fields, but they would then map
+columns that no longer exist; a code-only revert is not sufficient.)
 
 ---
 
