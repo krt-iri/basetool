@@ -136,6 +136,7 @@ class MaterialsPageControllerMvcTest {
             false,
             false,
             false,
+            true,
             0L);
     MaterialPriceDto priceDto =
         new MaterialPriceDto(

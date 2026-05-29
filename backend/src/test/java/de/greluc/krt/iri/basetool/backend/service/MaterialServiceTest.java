@@ -121,7 +121,7 @@ class MaterialServiceTest {
     mat2.setName("Bexalite");
     mat2.setIsJobOrder(true);
 
-    when(materialRepository.findAllByIsJobOrderTrueOrderByNameAsc())
+    when(materialRepository.findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc())
         .thenReturn(List.of(mat1, mat2));
 
     // When
@@ -131,7 +131,83 @@ class MaterialServiceTest {
     assertEquals(2, result.size());
     assertEquals("Agricium", result.get(0).getName());
     assertEquals("Bexalite", result.get(1).getName());
-    verify(materialRepository).findAllByIsJobOrderTrueOrderByNameAsc();
+    verify(materialRepository).findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
+  }
+
+  @Test
+  void getVisibleMaterials_delegatesToVisibleOnlyRepositoryQuery() {
+    // Given
+    PageRequest pageRequest = PageRequest.of(0, 10);
+    Material visible = new Material();
+    visible.setId(UUID.randomUUID());
+    visible.setName("Agricium");
+    Page<Material> expected = new PageImpl<>(List.of(visible));
+    when(materialRepository.findByIsVisibleTrue(pageRequest)).thenReturn(expected);
+
+    // When
+    Page<Material> result = materialService.getVisibleMaterials(pageRequest);
+
+    // Then — the trading catalog path must go through the is_visible-filtered query, never findAll
+    assertEquals(1, result.getTotalElements());
+    assertEquals("Agricium", result.getContent().get(0).getName());
+    verify(materialRepository).findByIsVisibleTrue(pageRequest);
+    verify(materialRepository, never()).findAll(any(PageRequest.class));
+  }
+
+  // ─── updateMaterial visibility toggle ──────────────────────────────────
+
+  @Test
+  void updateMaterial_appliesVisibilityToggle() {
+    // Given an existing visible material and an update flipping it to hidden
+    UUID id = UUID.randomUUID();
+    Material existing = new Material();
+    existing.setId(id);
+    existing.setName("Bluemoon Fungus");
+    existing.setType(MaterialType.RAW);
+    existing.setIsVisible(true);
+    existing.setVersion(3L);
+
+    Material update = new Material();
+    update.setName("Bluemoon Fungus");
+    update.setType(MaterialType.RAW);
+    update.setIsVisible(false);
+    update.setVersion(3L);
+
+    when(materialRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    Material saved = materialService.updateMaterial(id, update);
+
+    // Then
+    assertEquals(Boolean.FALSE, saved.getIsVisible(), "admin can hide a reviewed commodity");
+  }
+
+  @Test
+  void updateMaterial_nullVisibility_keepsExistingValue() {
+    // Given an existing hidden material and an update DTO that omits isVisible (null)
+    UUID id = UUID.randomUUID();
+    Material existing = new Material();
+    existing.setId(id);
+    existing.setName("Ace Interceptor Helmet");
+    existing.setType(MaterialType.NO_REFINE);
+    existing.setIsVisible(false);
+    existing.setVersion(1L);
+
+    Material update = new Material();
+    update.setName("Ace Interceptor Helmet");
+    update.setType(MaterialType.NO_REFINE);
+    update.setIsVisible(null); // unrelated edit (e.g. category) must not null the NOT NULL column
+    update.setVersion(1L);
+
+    when(materialRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    Material saved = materialService.updateMaterial(id, update);
+
+    // Then — the null-guard preserves the stored visibility
+    assertEquals(Boolean.FALSE, saved.getIsVisible(), "null isVisible must not overwrite the row");
   }
 
   // ─── createMaterial ─────────────────────────────────────────────────────

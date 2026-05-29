@@ -182,7 +182,11 @@ public class UexItemSyncService {
     }
 
     item.setName(dto.name());
-    item.setKind(deriveKind(category));
+    // §6.3.1 more-specific-wins: never downgrade a kind a previous (Wiki or UEX) pass already set
+    // to something specific. A cross-listed paint that Wiki filed as VEHICLE_ITEM must not become
+    // GENERIC just because UEX catalogues the same external_uuid under a Liveries category. New
+    // rows start at GENERIC, so the merge leaves the freshly-derived kind intact.
+    item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
     item.setManufacturer(resolveManufacturer(dto));
     item.setUexItemId(dto.id());
     item.setUexSlug(dto.slug());

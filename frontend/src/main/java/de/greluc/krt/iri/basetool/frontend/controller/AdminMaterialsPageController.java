@@ -61,9 +61,12 @@ public class AdminMaterialsPageController {
   @GetMapping
   public String listMaterials(Model model) {
     try {
+      // includeHidden=true: the admin catalog must show wiki-only commodities imported invisible
+      // (§4.3) so they can be reviewed and unhidden. Trading pages call the same endpoint without
+      // the flag and get only visible rows.
       PageResponse<MaterialDto> materialsPage =
           backendApiClient.get(
-              "/api/v1/materials?size=1000&sort=name,asc",
+              "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true",
               new ParameterizedTypeReference<PageResponse<MaterialDto>>() {});
 
       List<MaterialDto> materials = new ArrayList<>();
@@ -149,11 +152,13 @@ public class AdminMaterialsPageController {
   /**
    * AJAX endpoint that edits a single field on a material in place. The request's {@code
    * updateType} discriminator selects which field is being touched ({@code CATEGORY}, {@code
-   * REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}); every other field on
-   * the material is preserved from the freshly-fetched current record. A {@code MANUAL_RAW} or
-   * {@code JOB_ORDER} change additionally clears the frontend's static-data cache so dependent
-   * pages see the new flag without a full reload. Failures collapse to a generic 500 — the AJAX
-   * layer in the template renders a toast instead of relying on per-status semantics.
+   * REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}, {@code VISIBILITY});
+   * every other field on the material is preserved from the freshly-fetched current record. A
+   * {@code MANUAL_RAW}, {@code JOB_ORDER} or {@code VISIBILITY} change additionally clears the
+   * frontend's static-data cache so dependent pages (pickers, lookups) see the change without a
+   * full reload — unhiding a reviewed commodity must make it appear in trading flows immediately.
+   * Failures collapse to a generic 500 — the AJAX layer in the template renders a toast instead of
+   * relying on per-status semantics.
    *
    * @param id material id
    * @param request AJAX patch payload
@@ -173,6 +178,7 @@ public class AdminMaterialsPageController {
       String quantityType = currentMaterial.quantityType();
       Boolean isManualRawMaterial = currentMaterial.isManualRawMaterial();
       Boolean isJobOrder = currentMaterial.isJobOrder();
+      Boolean isVisible = currentMaterial.isVisible();
 
       if ("CATEGORY".equals(request.updateType())) {
         if (request.categoryId() != null) {
@@ -196,6 +202,8 @@ public class AdminMaterialsPageController {
         isManualRawMaterial = request.isManualRawMaterial();
       } else if ("JOB_ORDER".equals(request.updateType())) {
         isJobOrder = request.isJobOrder();
+      } else if ("VISIBILITY".equals(request.updateType())) {
+        isVisible = request.isVisible();
       } else {
         return ResponseEntity.badRequest().build();
       }
@@ -216,10 +224,13 @@ public class AdminMaterialsPageController {
               isManualRawMaterial,
               isJobOrder,
               currentMaterial.isManualEntry(),
+              isVisible,
               request.version());
 
       backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-      if ("JOB_ORDER".equals(request.updateType()) || "MANUAL_RAW".equals(request.updateType())) {
+      if ("JOB_ORDER".equals(request.updateType())
+          || "MANUAL_RAW".equals(request.updateType())
+          || "VISIBILITY".equals(request.updateType())) {
         backendApiClient.clearStaticDataCache();
       }
       MaterialDto updatedMaterial =

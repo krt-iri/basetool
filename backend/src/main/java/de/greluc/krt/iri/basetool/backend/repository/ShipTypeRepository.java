@@ -56,9 +56,16 @@ public interface ShipTypeRepository extends JpaRepository<ShipType, UUID> {
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
 
   /**
-   * Soft-deletes SC Wiki ownership of every ship_type row whose {@code external_uuid} is set, NOT
-   * in {@code seenExternalUuids}, and not already marked (R4 §8.6 / §8.7). Gated by the caller on a
-   * non-empty seen set so a failed / empty Wiki fetch never wipes the Wiki-side merge state.
+   * Soft-deletes SC Wiki ownership of every ship_type row the Wiki has actually written ({@code
+   * scwiki_synced_at IS NOT NULL}) that is NOT in {@code seenExternalUuids} and not already marked
+   * (R4 §8.6 / §8.7). Gated by the caller on a non-empty seen set so a failed / empty Wiki fetch
+   * never wipes the Wiki-side merge state.
+   *
+   * <p>Gating on {@code scwiki_synced_at} (not merely {@code external_uuid IS NOT NULL}) is
+   * deliberate and matches {@code GameItemRepository.markScwikiDeletedExcept}: a UEX-only vehicle
+   * also carries an {@code external_uuid} (stamped by the UEX vehicle sync), so the looser
+   * predicate would spuriously stamp {@code scwiki_deleted_at} — "missing from Wiki since …" — on a
+   * row the Wiki has never described (e.g. UEX-only capital ships like Idris-M / Polaris, §8.3.3).
    *
    * @param seenExternalUuids the external UUIDs the Wiki vehicle sync touched this run
    * @param now timestamp to stamp on the soft-deleted rows
@@ -67,7 +74,7 @@ public interface ShipTypeRepository extends JpaRepository<ShipType, UUID> {
   @Modifying
   @Query(
       "UPDATE ShipType s SET s.scwikiDeletedAt = :now "
-          + "WHERE s.externalUuid IS NOT NULL "
+          + "WHERE s.scwikiSyncedAt IS NOT NULL "
           + "AND s.externalUuid NOT IN :seenExternalUuids "
           + "AND s.scwikiDeletedAt IS NULL")
   int markScwikiDeletedExcept(

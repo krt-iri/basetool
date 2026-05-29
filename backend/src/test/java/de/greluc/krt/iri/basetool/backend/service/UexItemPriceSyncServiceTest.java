@@ -19,6 +19,7 @@ import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +43,7 @@ class UexItemPriceSyncServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private GameItemPriceRepository gameItemPriceRepository;
   @Mock private TerminalRepository terminalRepository;
+  @Mock private EntityManager entityManager;
 
   private UexProperties properties;
   private UexItemPriceSyncService service;
@@ -52,7 +54,12 @@ class UexItemPriceSyncServiceTest {
     properties.setItemPriceSyncEnabled(true);
     service =
         new UexItemPriceSyncService(
-            uexClient, properties, gameItemRepository, gameItemPriceRepository, terminalRepository);
+            uexClient,
+            properties,
+            gameItemRepository,
+            gameItemPriceRepository,
+            terminalRepository,
+            entityManager);
   }
 
   @Test
@@ -151,6 +158,23 @@ class UexItemPriceSyncServiceTest {
 
     verify(gameItemPriceRepository, never()).save(any());
     verify(gameItemPriceRepository, never()).clearStalePrices(any());
+  }
+
+  @Test
+  void flushAndClearIfBatchFull_flushesAndClearsAtTheBatchBoundary() {
+    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE);
+
+    verify(entityManager).flush();
+    verify(entityManager).clear();
+  }
+
+  @Test
+  void flushAndClearIfBatchFull_doesNothingBetweenBoundaries() {
+    service.flushAndClearIfBatchFull(0);
+    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE - 1);
+    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE + 1);
+
+    verifyNoInteractions(entityManager);
   }
 
   // ---- helpers ---------------------------------------------------------------------------------

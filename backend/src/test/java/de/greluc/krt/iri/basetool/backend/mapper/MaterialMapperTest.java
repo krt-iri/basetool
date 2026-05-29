@@ -30,6 +30,7 @@ class MaterialMapperTest {
     entity.setIsVolatileTime(0); // 0 → false
     entity.setIsManualRawMaterial(true);
     entity.setIsJobOrder(false);
+    entity.setIsVisible(false); // wiki-only invisible row → must surface on the DTO
     entity.setVersion(4L);
 
     // When
@@ -47,6 +48,7 @@ class MaterialMapperTest {
     assertFalse(dto.isVolatileTime());
     assertTrue(dto.isManualRawMaterial());
     assertFalse(dto.isJobOrder());
+    assertFalse(dto.isVisible(), "is_visible maps through to the DTO");
     assertEquals(4L, dto.version());
   }
 
@@ -88,6 +90,7 @@ class MaterialMapperTest {
             false,
             true,
             null,
+            false,
             1L);
 
     // When
@@ -104,6 +107,7 @@ class MaterialMapperTest {
     assertEquals(1, entity.getIsVolatileTime());
     assertEquals(Boolean.FALSE, entity.getIsManualRawMaterial());
     assertEquals(Boolean.TRUE, entity.getIsJobOrder());
+    assertEquals(Boolean.FALSE, entity.getIsVisible(), "is_visible maps back to the entity");
     assertEquals(1L, entity.getVersion());
   }
 
@@ -116,6 +120,7 @@ class MaterialMapperTest {
             "Tin",
             "RAW",
             "SCU",
+            null,
             null,
             null,
             null,

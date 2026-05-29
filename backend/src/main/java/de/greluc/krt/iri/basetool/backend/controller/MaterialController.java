@@ -54,20 +54,33 @@ public class MaterialController {
    * Paged material list. {@code hasTerminals=true} returns the heavier projection with terminal
    * prices eagerly loaded — used by views that show prices inline.
    *
+   * <p>By default only <b>visible</b> materials are returned ({@code is_visible = true}): wiki-only
+   * commodities imported invisible (§4.3) stay out of trading flows. The admin catalog passes
+   * {@code includeHidden=true} to see and review every row, including the hidden ones. The
+   * price-eager {@code hasTerminals} branch is already gated to materials that have a price row, so
+   * price-less wiki-only rows never surface there regardless of {@code includeHidden}.
+   *
+   * @param hasTerminals when true, return the price-eager projection
+   * @param includeHidden when true (admin), also return materials with {@code is_visible = false}
    * @return paged material DTOs
    */
   @GetMapping
   public PageResponse<MaterialDto> getAllMaterials(
       @RequestParam(required = false, defaultValue = "false") Boolean hasTerminals,
+      @RequestParam(required = false, defaultValue = "false") Boolean includeHidden,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "type", "id"), "name");
-    Page<Material> p =
-        Boolean.TRUE.equals(hasTerminals)
-            ? materialService.getAllMaterialsWithPrices(pageable)
-            : materialService.getAllMaterials(pageable);
+    Page<Material> p;
+    if (Boolean.TRUE.equals(hasTerminals)) {
+      p = materialService.getAllMaterialsWithPrices(pageable);
+    } else if (Boolean.TRUE.equals(includeHidden)) {
+      p = materialService.getAllMaterials(pageable);
+    } else {
+      p = materialService.getVisibleMaterials(pageable);
+    }
     List<MaterialDto> content = p.getContent().stream().map(materialMapper::toDto).toList();
     return new PageResponse<>(
         content,

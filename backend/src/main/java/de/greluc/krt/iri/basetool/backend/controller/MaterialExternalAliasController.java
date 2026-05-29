@@ -48,6 +48,13 @@ public class MaterialExternalAliasController {
   /**
    * Returns every alias sorted by external name. Drives the admin table view.
    *
+   * <p><b>Intentional deviation from the {@code Pageable} + {@code PageResponse} list
+   * convention:</b> {@code material_external_alias} is a small, hand-curated reference table (a few
+   * seed rows plus occasional admin additions) that the admin UI renders in full on one page.
+   * Paginating it would add an empty wrapper and a sort-field whitelist for no benefit, so the
+   * endpoint returns the whole list. Add pagination only if the table ever grows large enough to
+   * need it.
+   *
    * @return list of alias DTOs
    */
   @Operation(

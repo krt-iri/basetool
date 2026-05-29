@@ -9,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.integration.UexClient;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialPrice;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialPriceRepository;
@@ -238,6 +239,62 @@ class UexCommodityServiceTest {
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertEquals(Boolean.FALSE, cap.getValue().getIsManualEntry());
+  }
+
+  @Test
+  void commoditySync_promotesWikiOnlyMaterialToBothAndVisible_whenAdoptedByName() {
+    // A commodity the Wiki imported first: WIKI_ONLY + invisible (§4.3). UEX now sources it by
+    // name-match, which validates it as a real trade commodity — provenance must flip to BOTH and
+    // the row must become visible in trading flows (§6.1). This is the M1 regression: the commodity
+    // sync previously left adopted Wiki rows stuck at WIKI_ONLY (and hidden).
+    Material wikiOnly = new Material();
+    wikiOnly.setName("Bluemoon Fungus");
+    wikiOnly.setIdCommodity(null);
+    wikiOnly.setSourceSystems(MaterialSourceSystem.WIKI_ONLY);
+    wikiOnly.setIsVisible(false);
+
+    UexCommodityDto upstream = commodity(314, "Bluemoon Fungus", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(314)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Bluemoon Fungus")).thenReturn(Optional.of(wikiOnly));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertSame(wikiOnly, cap.getValue());
+    assertEquals(
+        MaterialSourceSystem.BOTH,
+        cap.getValue().getSourceSystems(),
+        "UEX adoption of a Wiki-only commodity flips provenance to BOTH");
+    assertEquals(
+        Boolean.TRUE,
+        cap.getValue().getIsVisible(),
+        "UEX validates the commodity — it becomes visible in trading flows");
+  }
+
+  @Test
+  void commoditySync_leavesManualProvenanceUntouched_whenAdoptedByName() {
+    // A MANUAL row adopted by name keeps its MANUAL provenance — only WIKI_ONLY is promoted here.
+    // The MANUAL → BOTH/UEX_ONLY migration is R9 Step 1's job (when is_manual_entry is dropped).
+    Material manual = new Material();
+    manual.setName("Admin Special");
+    manual.setIdCommodity(null);
+    manual.setSourceSystems(MaterialSourceSystem.MANUAL);
+    manual.setIsVisible(true);
+
+    UexCommodityDto upstream = commodity(315, "Admin Special", 0, 0);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(315)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Admin Special")).thenReturn(Optional.of(manual));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertEquals(MaterialSourceSystem.MANUAL, cap.getValue().getSourceSystems());
   }
 
   @Test

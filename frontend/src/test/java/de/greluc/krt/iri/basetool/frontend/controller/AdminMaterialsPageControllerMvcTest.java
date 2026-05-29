@@ -84,12 +84,14 @@ class AdminMaterialsPageControllerMvcTest {
             false,
             false,
             false,
+            true,
             0L);
     PageResponse<MaterialDto> materialsPage =
         new PageResponse<>(List.of(material), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"),
+            any(ParameterizedTypeReference.class)))
         .thenReturn(materialsPage);
     when(backendApiClient.get(
             eq("/api/v1/material-categories"), any(ParameterizedTypeReference.class)))
