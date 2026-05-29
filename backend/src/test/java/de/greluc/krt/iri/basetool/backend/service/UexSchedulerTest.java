@@ -34,6 +34,7 @@ class UexSchedulerTest {
   @Mock private UexRefinerySyncService uexRefinerySyncService;
   @Mock private UexCategoryRefService uexCategoryRefService;
   @Mock private UexItemSyncService uexItemSyncService;
+  @Mock private UexItemPriceSyncService uexItemPriceSyncService;
 
   @InjectMocks private UexScheduler scheduler;
 
@@ -61,6 +62,7 @@ class UexSchedulerTest {
 
     verify(uexCategoryRefService).syncCategories();
     verify(uexItemSyncService).syncItems();
+    verify(uexItemPriceSyncService).syncItemPrices();
 
     verify(uexRefinerySyncService).syncRefiningMethods();
     verify(uexRefinerySyncService).syncRefineryYields();
@@ -73,6 +75,7 @@ class UexSchedulerTest {
         uexVehicleService,
         uexCategoryRefService,
         uexItemSyncService,
+        uexItemPriceSyncService,
         uexRefinerySyncService);
   }
 
@@ -93,6 +96,7 @@ class UexSchedulerTest {
             uexVehicleService,
             uexCategoryRefService,
             uexItemSyncService,
+            uexItemPriceSyncService,
             uexRefinerySyncService);
 
     // Phase 1: universe basics in declared order
@@ -117,6 +121,7 @@ class UexSchedulerTest {
     // manufacturers + vehicles so the item upsert can resolve manufacturer + linked_ship_type FKs.
     order.verify(uexCategoryRefService).syncCategories();
     order.verify(uexItemSyncService).syncItems();
+    order.verify(uexItemPriceSyncService).syncItemPrices();
 
     // Phase 3: refineries last (depend on materials)
     order.verify(uexRefinerySyncService).syncRefiningMethods();

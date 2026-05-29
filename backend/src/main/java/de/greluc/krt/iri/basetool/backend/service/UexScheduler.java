@@ -26,6 +26,11 @@ import org.springframework.stereotype.Component;
  * upsert resolves the manufacturer FK); vehicles must land before items because vehicle-bound items
  * (paints, components) resolve {@code linked_ship_type_id} via {@code
  * ShipTypeRepository.findByUexVehicleId}.
+ *
+ * <p>R7 expansion: {@code UexItemPriceSyncService.syncItemPrices()} runs after the item catalogue
+ * (it resolves {@code game_item} + {@code terminal} FKs, both synced earlier in the tick), behind
+ * its own {@code krt.uex.item-price-sync-enabled} flag (default off) so it stays a no-op until an
+ * operator opts in.
  */
 @Slf4j
 @Component
@@ -45,6 +50,7 @@ public class UexScheduler {
   private final UexRefinerySyncService uexRefinerySyncService;
   private final UexCategoryRefService uexCategoryRefService;
   private final UexItemSyncService uexItemSyncService;
+  private final UexItemPriceSyncService uexItemPriceSyncService;
 
   /**
    * Runs the full UEX sync sweep on a fixed delay. Order matters — topology imports first so later
@@ -77,6 +83,11 @@ public class UexScheduler {
       // and linked ship types (also above), so the topological order is preserved.
       uexCategoryRefService.syncCategories();
       uexItemSyncService.syncItems();
+
+      // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
+      // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
+      // this is a no-op until an operator opts in.
+      uexItemPriceSyncService.syncItemPrices();
 
       uexRefinerySyncService.syncRefiningMethods();
       uexRefinerySyncService.syncRefineryYields();

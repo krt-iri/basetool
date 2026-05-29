@@ -27,9 +27,9 @@ Request; "Date" is the production deploy timestamp.
 | R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags |
 | R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | needs item-sync-enabled + sync-all-items both on; ~12 700 rows; NO migration |
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | needs manufacturer-sync-enabled; enriches scwiki_uuid/code on UEX rows; NO migration |
-| R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | feature-flagged; off by default |
-| R8 - Soak + V115 cleanup | TBD | TBD | TBD | TBD | TBD | flips is_manual_entry -> source_systems=MANUAL |
-| R9 - V116 destructive cleanup | TBD | TBD | TBD | TBD | TBD | drops is_manual_entry + ship_type.description |
+| R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | needs item-price-sync-enabled; V115 game_item_price (~24k rows); display-only |
+| R8 - Soak + V116 cleanup | TBD | TBD | TBD | TBD | TBD | flips is_manual_entry -> source_systems=MANUAL (was V115, shifted by R7) |
+| R9 - V117 destructive cleanup | TBD | TBD | TBD | TBD | TBD | drops is_manual_entry + ship_type.description (was V116, shifted by R7) |
 
 ---
 
@@ -968,32 +968,122 @@ No migration to revert. The backup is the fallback.
 
 ## 7. R7 - UEX item prices
 
-*(Stub - V114 adds `game_item_price`. Sync service is feature-flagged and
-off by default; enabled only once a UI surface needs the data.)*
-
 ### 7.1 Scope summary
 
-TBD.
+R7 adds the UEX item-price matrix: a new `game_item_price` table (migration **V115**) and a
+`UexItemPriceSyncService` that fills it from UEX `/items_prices_all`. Display-only and gated behind
+`krt.uex.item-price-sync-enabled` (default `false`), so the table stays inert until an operator opts
+in. This is the only R5-R7 phase that **carries a migration**.
+
+- **V-NUMBER DRIFT.** The plan §7 table pencilled `game_item_price` in as V114, but V113 went to
+  R3's `external_sync_report` and V114 to R4's blueprint tables, so R7 takes the next free number,
+  **V115**. The R8 `is_manual_entry` cleanup and the R9 destructive drop therefore shift to
+  **V116 / V117**.
+- `UexItemPriceSyncService` (UEX scheduler, fifth step after the item catalogue) walks
+  `/items_prices_all` (~24 000 rows — the largest UEX payload, covered by the 16 MB WebClient
+  buffer) and upserts one `game_item_price` per (item, terminal) pair: `id_item → game_item` via
+  `uex_item_id`, `id_terminal → terminal` via `id_terminal`. A price for an **item not yet in
+  `game_item` is skipped** (the item catalogue owns row creation and runs earlier in the same tick;
+  it resolves next cycle); unknown terminals are skipped too.
+- Same `clearStalePrices` orphan handling as `material_price`: touched-row ids are collected and
+  pairs UEX no longer returns have their price columns nulled — gated on a non-empty touched-set so
+  a total-failure run never wipes the matrix. An empty feed short-circuits before the sweep.
+- **Live-feed note (probed `/items_prices_all`, game 4.8.0):** the endpoint returns only
+  `id_item` / `id_terminal` / `price_buy` / `price_sell` / `date_modified`. The §6.7 columns
+  `price_rent`, `status_buy`, `status_sell`, `game_version` are created but stay `NULL` under this
+  feed (reserved for a future richer source).
 
 ### 7.2 Pre-deployment checks (R7)
 
-TBD.
+- [ ] R6 (PR [#269](https://github.com/krt-iri/basetool/pull/269)) deployed.
+- [ ] `game_item` is populated and terminals are synced (the price upsert resolves both):
+      ```bash
+      psql -d basetool -c "SELECT (SELECT count(*) FROM game_item WHERE uex_item_id IS NOT NULL) AS items, \
+                                  (SELECT count(*) FROM terminal) AS terminals"
+      # Expect items in the thousands and terminals > 0; 0 items means every price row would be skipped.
+      ```
+- [ ] `krt.uex.item-price-sync-enabled` unset / `false` in prod `.env` for the merge.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R7 branch.
+- [ ] Logical backup taken (a new table + a large data load).
 
 ### 7.3 Deployment steps (production, R7)
 
-TBD.
+1. **Backup**:
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r7-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R7 PR.** Watch for V115:
+   ```
+   Migrating schema "public" to version "115 - create game item price"
+   ```
+3. **Confirm the dark state** — the next UEX tick logs the skip line:
+   ```
+   UEX item-price sync invoked but disabled … skipping.
+   ```
+4. **Enable** with `KRT_UEX_ITEM_PRICE_SYNC_ENABLED=true`, restart, and watch the first run — it is
+   the heaviest UEX feed, so confirm it completes inside the hourly cadence:
+   ```
+   Starting synchronization of UEX item prices...
+   Finished UEX item-price sync: N processed, M skipped (unknown item / terminal).
+   ```
 
 ### 7.4 Smoke tests (R7, post-deploy)
 
-TBD.
+```bash
+# 1. Table exists (V115).
+psql -d basetool -c "\d game_item_price" | grep -E 'game_item_id|terminal_id|price_buy'
+
+# --- after enabling item-price-sync + one tick: ---
+
+# 2. Rows landed (one per item×terminal pair UEX returned; up to ~24 000).
+psql -d basetool -c "SELECT count(*) AS rows, count(DISTINCT game_item_id) AS items, \
+                            count(DISTINCT terminal_id) AS terminals FROM game_item_price"
+#   rows in the tens of thousands; a count of 0 with a non-empty feed means every item was skipped
+#   (game_item not populated — re-check the item catalogue sync).
+
+# 3. A known item has prices (spot-check, e.g. Omnisky III Cannon).
+psql -d basetool -c "SELECT t.name, p.price_buy, p.price_sell FROM game_item_price p \
+                     JOIN game_item g ON g.id = p.game_item_id JOIN terminal t ON t.id = p.terminal_id \
+                     WHERE g.uex_item_id = 1 LIMIT 5"
+
+# 4. Trading / refinery / hangar UI unaffected — game_item_price is display-only and nothing reads
+#    it yet, so no surface should change.
+```
 
 ### 7.5 Rollback (R7)
 
-TBD.
+Fastest: set `KRT_UEX_ITEM_PRICE_SYNC_ENABLED=false` and restart — the sync stops; the table simply
+stops being updated (nothing reads it). To clear the data without dropping the table:
+
+```sql
+TRUNCATE game_item_price;
+```
+
+For a full revert (drop the table), flags off, revert the merge on `main`, then:
+
+```sql
+DROP TABLE IF EXISTS game_item_price;
+DELETE FROM flyway_schema_history WHERE version = '115';
+```
+
+Restart; `ddl-auto: validate` must pass against the R6 schema (the `GameItemPrice` entity is removed
+with the revert). The backup is the fallback.
 
 ### 7.6 Monitoring during the soak window (R7)
 
-TBD.
+- **Runtime.** `/items_prices_all` is the largest UEX feed (~24 000 rows). Confirm the
+  `Finished UEX item-price sync …` line lands well inside the 1 h scheduler delay; if it crowds the
+  window, this sync is the first candidate to move to a slower cadence.
+- **Buffer headroom.** The payload is >1 MB; the shared 16 MB WebClient buffer covers it.
+  A decode error in the logs (truncation) means the catalogue outgrew the buffer — raise
+  `maxInMemorySize` in `UexClient`.
+- **Skipped count.** A high `skipped` count = many prices reference items not yet in `game_item`.
+  Expected right after enabling (before the item catalogue has fully populated); it should fall to a
+  small residual once the item sync has caught up.
+- **DB growth.** `game_item_price` grows to ~the feed size on the first full run, then stays flat
+  (steady-state upserts in place; `clearStalePrices` nulls dropped pairs without inserting).
 
 ---
 
