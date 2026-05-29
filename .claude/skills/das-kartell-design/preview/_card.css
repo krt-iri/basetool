@@ -1,0 +1,25 @@
+/* Preview-card frame — only used by the Design System tab cards. */
+@import url('../colors_and_type.css');
+@import url('../krt-components.css');
+
+html, body { margin: 0; }
+body {
+    background: var(--color-bg-black);
+    padding: 22px 26px;
+    /* faint honeycomb wash so cards read as "in product" */
+    background-image: url('../assets/honeycomb-bg.svg');
+    background-repeat: repeat;
+    background-size: 40px 23.1px;
+}
+.pv-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.pv-col { display: flex; flex-direction: column; gap: 12px; }
+.pv-label {
+    font-family: var(--font-body); font-weight: 700; font-size: 0.62rem;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-gray-2);
+    margin: 0 0 2px;
+}
+.pv-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; font-size: 0.68rem; color: var(--color-gray-2); }
+.swatch { width: 100%; height: 56px; border: 1px solid rgba(255,255,255,0.08); }
+.swatch-wrap { width: 150px; }
+.swatch-meta { display: flex; justify-content: space-between; margin-top: 5px; gap: 6px; }
+.swatch-name { font-family: var(--font-body); font-weight: 700; font-size: 0.72rem; color: var(--color-gray-1); }
