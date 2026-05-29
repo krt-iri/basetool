@@ -113,6 +113,15 @@ public class ScWikiProperties {
   @NotNull private Boolean vehicleSyncEnabled = false;
 
   /**
+   * Per-sync feature flag for the R6 Wiki manufacturer reconciliation ({@code
+   * ScWikiManufacturerSyncService}). Default {@code false} — ships dark; flip on per runbook §6.
+   * When on, walks {@code /api/manufacturers} and stamps {@code scwiki_uuid} / {@code scwiki_code}
+   * onto the manufacturer rows the UEX sync already created — it never inserts new rows and never
+   * overwrites the UEX-canonical {@code name} / {@code abbreviation} / {@code industry}.
+   */
+  @NotNull private Boolean manufacturerSyncEnabled = false;
+
+  /**
    * Fixed delay between successive {@code ScWikiScheduler} ticks, in milliseconds. Default 24h (86
    * 400 000 ms); Wiki data changes only on game patches (every 2-6 weeks) so the cadence is much
    * slower than the UEX hourly schedule.

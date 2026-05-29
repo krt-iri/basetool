@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
  * item fill and the blueprint graph. The scheduler checks the {@code krt.scwiki.scheduler-enabled}
  * master switch, then delegates to each sync in dependency order; every sync <b>itself</b>
  * self-guards on its own per-sync feature flag (all default {@code false}) so each stays dark until
- * an operator opts in per the deployment runbook. Later phases (R6 manufacturers) add their calls
- * to this body behind their own flags.
+ * an operator opts in per the deployment runbook. R6 adds the manufacturer reconciliation, likewise
+ * behind its own flag.
  *
  * <p>Per-sync exceptions are swallowed per step ({@link #runStep}) — same fail-one-succeed-others
  * contract as {@code UexScheduler} — so one failing sync never aborts the others or suppresses the
@@ -37,6 +37,7 @@ public class ScWikiScheduler {
   private final ScWikiBlueprintSyncService blueprintSyncService;
   private final ScWikiItemSyncService itemSyncService;
   private final ScWikiVehicleSyncService vehicleSyncService;
+  private final ScWikiManufacturerSyncService manufacturerSyncService;
 
   /**
    * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
@@ -44,9 +45,10 @@ public class ScWikiScheduler {
    *
    * <p>If the master switch is off, logs and returns. Otherwise runs each sync in dependency order
    * — commodities (R3) and vehicles fill cross-source rows first, then the closure-mode item fill,
-   * then blueprints (whose ingredients resolve against {@code game_item} / {@code material}). Each
-   * sync self-guards on its per-sync flag. The {@link ScWikiClient} field is referenced here so the
-   * {@code scWikiIntegrationClassesMustWireScWikiClient} ArchUnit rule is satisfied.
+   * then blueprints (whose ingredients resolve against {@code game_item} / {@code material}), then
+   * the R6 manufacturer reconciliation. Each sync self-guards on its per-sync flag. The {@link
+   * ScWikiClient} field is referenced here so the {@code
+   * scWikiIntegrationClassesMustWireScWikiClient} ArchUnit rule is satisfied.
    */
   @Async(AsyncConfig.SCWIKI_EXECUTOR)
   @Scheduled(fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}")
@@ -60,6 +62,7 @@ public class ScWikiScheduler {
     runStep("vehicle", vehicleSyncService::syncVehicles);
     runStep("item", itemSyncService::syncItems);
     runStep("blueprint", blueprintSyncService::syncBlueprints);
+    runStep("manufacturer", manufacturerSyncService::syncManufacturers);
   }
 
   /**
