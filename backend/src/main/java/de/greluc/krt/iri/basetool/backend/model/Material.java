@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -130,6 +131,67 @@ public class Material extends AbstractEntity<UUID> {
 
   @Column(name = "is_manual_entry", nullable = false)
   private Boolean isManualEntry = false;
+
+  /**
+   * SC Wiki commodity UUID. Populated by the R3 Wiki commodity sync when a UEX commodity is matched
+   * against a Wiki entry (or a stand-alone Wiki row is inserted). {@code null} on every R1 row;
+   * UNIQUE at the DB level so a Wiki UUID can be paired with at most one local material.
+   */
+  @Column(name = "scwiki_uuid", unique = true)
+  private UUID scwikiUuid;
+
+  /** SC Wiki internal key (e.g. {@code "Agricium"}). Used as a debug aid and audit log field. */
+  @Column(name = "scwiki_key")
+  private String scwikiKey;
+
+  /** SC Wiki URL slug (e.g. {@code "agricium"}). Used in admin UI deep-links to the Wiki page. */
+  @Column(name = "scwiki_slug")
+  private String scwikiSlug;
+
+  /**
+   * Timestamp of the most recent successful SC Wiki sync touch on this row. {@code null} until the
+   * R3 Wiki commodity sync writes the row for the first time.
+   */
+  @Column(name = "scwiki_synced_at")
+  private Instant scwikiSyncedAt;
+
+  /**
+   * Timestamp of the first sync run in which the SC Wiki catalogue no longer returned this row. Set
+   * instead of {@code DELETE} so other FKs (orders, inventory) remain valid; cleared on the next
+   * sync that sees the row again.
+   */
+  @Column(name = "scwiki_deleted_at")
+  private Instant scwikiDeletedAt;
+
+  /** Physical density in g/cc. Sourced from SC Wiki only — UEX does not expose density. */
+  @Column(name = "density_g_per_cc")
+  private Double densityGramPerCc;
+
+  /** Refining instability factor (Wiki-only refining hint, not yet consumed by the UI). */
+  @Column(name = "instability")
+  private Double instability;
+
+  /** Refining resistance factor (Wiki-only refining hint, not yet consumed by the UI). */
+  @Column(name = "resistance")
+  private Double resistance;
+
+  /**
+   * Catalog-visibility flag. {@code true} for every pre-R3 row (UEX catalogue is visible by
+   * default); the R3 Wiki commodity sync inserts Wiki-only rows with {@code false} so they stay out
+   * of trading flows until an admin reviews them (see SC_WIKI_SYNC_PLAN.md §4.3 and §6.1).
+   */
+  @Column(name = "is_visible", nullable = false)
+  private Boolean isVisible = true;
+
+  /**
+   * Which external catalogues have seen this row. Defaults to {@link MaterialSourceSystem#UEX_ONLY}
+   * to match the post-V106 state of every existing material row. The R3 Wiki commodity sync flips
+   * {@code UEX_ONLY → BOTH} (or inserts new rows as {@link MaterialSourceSystem#WIKI_ONLY}); the R8
+   * backfill maps {@code is_manual_entry=true → MANUAL}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source_systems", nullable = false)
+  private MaterialSourceSystem sourceSystems = MaterialSourceSystem.UEX_ONLY;
 
   @ManyToOne
   @JoinColumn(name = "refined_material_id")
