@@ -54,19 +54,31 @@
     --color-gray-4: #1C1C1C;
     --color-gray-5: #141414;
     
-    /* Departments */
-    --color-dept-combat: #A3000A;
-    --color-dept-sub-radar: #355DDC;
-    --color-dept-research: #37BBC0;
-    --color-dept-profit: #239E33;
-    --color-dept-search-rescue: #FFD23F;
-    --color-dept-marine: #7A5E96;
+    /* Departments - Bereichsfarben (Corporate Design Manual V2, p.14).
+       Names and hex are authoritative per the manual; the values must
+       never be altered and never used for the logo. Prefer the semantic
+       aliases below in generic UI - department hues are functional, not
+       decorative. */
+    --color-dept-raumueberlegenheit: #37BBC0; /* Raumueberlegenheit / Space Superiority (teal) */
+    --color-dept-forschung: #355DDC;          /* Forschung / Research (blue) */
+    --color-dept-sub-radar: #A3000A;          /* Sub-Radar / covert (red) */
+    --color-dept-marinekorps: #7A5E96;        /* Marinekorps / Marine Corps (purple) */
+    --color-dept-profit: #239E33;             /* Profit (green) */
+    --color-dept-search-rescue: #FFD23F;      /* Search and Rescue (yellow) */
+
+    /* Legacy aliases - previously shipped (mis-)names, kept so existing
+       code and templates still resolve. Prefer the official names above. */
+    --color-dept-combat: var(--color-dept-raumueberlegenheit);
+    --color-dept-research: var(--color-dept-forschung);
+    --color-dept-marine: var(--color-dept-marinekorps);
     
-    /* Semantic Colors */
-    --color-danger: var(--color-dept-combat);
-    --color-success: var(--color-dept-profit);
-    --color-warning: var(--color-dept-search-rescue);
-    --color-info: var(--color-dept-sub-radar);
+    /* Semantic Colors - status meaning, decoupled from the department
+       tokens so renaming a Bereichsfarbe can never shift a status colour.
+       Values reuse Bereichsfarben hues by appearance. */
+    --color-danger:  #A3000A; /* same value as Sub-Radar */
+    --color-success: #239E33; /* same value as Profit */
+    --color-warning: #FFD23F; /* same value as Search and Rescue */
+    --color-info:    #355DDC; /* same value as Forschung */
     
     /* Typography */
     --font-headline: 'Ethnocentric', sans-serif;

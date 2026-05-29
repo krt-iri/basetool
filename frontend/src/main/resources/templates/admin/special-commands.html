@@ -53,8 +53,8 @@
     </div>
 
     <!-- Error / success toasts -->
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-dept-combat);">
-        <p th:text="#{${error}}" style="color: var(--color-dept-combat);">Fehler beim Laden</p>
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+        <p th:text="#{${error}}" style="color: var(--color-danger);">Fehler beim Laden</p>
     </div>
 
     <!-- SK List Section -->
@@ -128,17 +128,17 @@
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.name}">Name</label>
                 <input type="text" name="name" id="sc-name" th:value="*{name}" required>
-                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.shorthand}">Kürzel</label>
                 <input type="text" name="shorthand" id="sc-shorthand" th:value="*{shorthand}" required>
-                <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.description}">Beschreibung</label>
                 <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
         </form>

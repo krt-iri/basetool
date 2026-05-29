@@ -48,7 +48,7 @@
              
              <div class="flex-between">
                  <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
-                 <button type="button" id="trigger-delete-confirm" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                 <button type="button" id="trigger-delete-confirm" class="btn" style="background-color: var(--color-danger);" th:text="#{info.delete}">Löschen</button>
              </div>
         </form>
     </div>
@@ -61,7 +61,7 @@
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form th:action="@{/admin/announcement/delete}" method="post" style="margin:0;">
-                    <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                    <button type="submit" class="btn" style="background-color: var(--color-danger);" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
         </div>

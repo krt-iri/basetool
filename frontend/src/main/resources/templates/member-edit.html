@@ -77,19 +77,19 @@
                             th:selected="${i == memberEditForm.rank}">
                     </option>
                 </select>
-                <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
 
             <div class="form-group">
                 <label th:text="#{profile.display_name}">Anzeigename</label>
                 <input type="text" name="displayName" th:value="*{displayName}" />
-                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-group">
                 <label th:text="#{profile.description}">Beschreibung</label>
                 <textarea name="description" rows="5" th:text="*{description}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-group">

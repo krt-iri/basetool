@@ -298,14 +298,14 @@
                 <label th:text="#{mission.name}">Name</label>
                 <input type="text" name="name" th:value="*{name}" required 
                        th:disabled="${!isNew and !mission.canEdit}">
-                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-group" sec:authorize="isAuthenticated()">
                 <label th:text="#{mission.description}">Description</label>
                 <textarea name="description" rows="5" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
 
             <div class="form-group">
@@ -317,7 +317,7 @@
                        th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer" 
                        class="btn btn-secondary" style="white-space: nowrap;" th:text="#{mission.calendar_link_open}">Öffnen</a>
                 </div>
-                <div th:if="${#fields.hasErrors('calendarLink')}" th:errors="*{calendarLink}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('calendarLink')}" th:errors="*{calendarLink}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-row">
@@ -329,7 +329,7 @@
                     <option value="COMPLETED" th:selected="*{status == 'COMPLETED'}">COMPLETED</option>
                     <option value="CANCELLED" th:selected="*{status == 'CANCELLED'}">CANCELLED</option>
                 </select>
-                <div th:if="${#fields.hasErrors('status')}" th:errors="*{status}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('status')}" th:errors="*{status}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-group">
@@ -338,7 +338,7 @@
                     <option value="" th:text="#{general.none}">-- Keine --</option>
                     <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>
                 </select>
-                <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             </div>
 
@@ -362,7 +362,7 @@
                     <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
                     <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                 </div>
-                <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             </div>
             
@@ -374,7 +374,7 @@
                     <input type="date" class="date-part" required th:disabled="${!isNew and !mission.canEdit}">
                     <input type="time" class="time-part" required th:disabled="${!isNew and !mission.canEdit}">
                 </div>
-                <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             
             <div class="form-group datetime-split-group" th:attr="data-validate-after='plannedStartTime', data-error-after=#{validation.datetime.after}">
@@ -384,7 +384,7 @@
                     <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
                     <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
                 </div>
-                <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             </div>
             
@@ -401,7 +401,7 @@
                             data-trigger="mission-set-now" data-input-id="actualStartTime"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
                 </div>
-                <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('actualStartTime')}" th:errors="*{actualStartTime}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
 
             <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
@@ -416,14 +416,14 @@
                             data-trigger="mission-set-now" data-input-id="actualEndTime"
                             th:if="${!isNew and mission.canEdit}">Jetzt</button>
                 </div>
-                <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
             </div>
             </div>
                     </form>
                 </div>
                 <!-- Buttons Box inside Details Column -->
                 <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
-                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn delete-mission-btn" style="background-color: var(--color-dept-combat); margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
+                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn delete-mission-btn" style="background-color: var(--color-danger); margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
                     <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn" th:text="#{mission.save}">Save</button>
                     <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
                 </div>
@@ -453,7 +453,7 @@
                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
                             <div th:each="manager : ${mission.managers}" style="display: flex; align-items: center; background: var(--color-gray-4); border: 1px solid var(--color-primary); padding: 0.2rem 0.5rem;">
                                 <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1); margin-right: 0.5rem;">Manager Name</span>
-                                <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-dept-combat);" 
+                                <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-danger);" 
                                         th:data-manager-id="${manager.id}"
                                         data-trigger="mission-remove-manager">&times;</button>
                             </div>
@@ -942,14 +942,14 @@
                 <div class="form-group" sec:authorize="isAnonymous()">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" name="guestName" th:value="*{guestName}" required>
-                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group" style="position: relative;" sec:authorize="isAuthenticated()">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.guest_name_placeholder}">
                     <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
                     <div id="participant-search-results" class="autocomplete-items"></div>
-                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -972,7 +972,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.participant.comment}">Kommentar</label>
                     <textarea name="comment" rows="3" th:text="*{comment}"></textarea>
-                    <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
@@ -1059,7 +1059,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.unit.name}">Name</label>
                     <input type="text" name="name" th:value="*{name}" required>
-                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group">
                     <label>Schiffstyp</label>
@@ -1082,7 +1082,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
-                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
@@ -1120,7 +1120,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.unit.name}">Name</label>
                     <input type="text" name="name" id="edit-unit-name" th:value="*{name}" required>
-                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group">
                     <label>Schiffstyp</label>
@@ -1143,7 +1143,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
-                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
@@ -1168,7 +1168,7 @@
                                 th:value="${p?.id}"
                                 th:text="${p?.user != null ? (!#strings.isEmpty(p.user.displayName) ? p.user.displayName : p.user.username) : p?.guestName}" th:selected="${crewForm.participantId == p?.id}">User</option>
                     </select>
-                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <div class="form-group">
                     <label th:text="#{admin.mission_data.job_types}">Aufgaben</label>
@@ -1176,7 +1176,7 @@
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
                     <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
-                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
             </form>
@@ -1195,7 +1195,7 @@
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
                     <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
-                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
             </form>
@@ -1217,7 +1217,7 @@
                                 th:text="${p.user != null ? p.user.effectiveName : p.guestName}"
                                 th:selected="${financeForm.participantId != null and financeForm.participantId.toString() == p.id.toString()}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -1231,7 +1231,7 @@
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
                     <input type="number" step="0.01" min="0" name="amount" th:value="*{amount}" required>
-                    <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                    <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" style="color:var(--color-danger); font-size: 0.8rem;"></div>
                 </div>
                 
                 <div class="form-group">
@@ -1283,7 +1283,7 @@
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/missions}" method="post" style="margin:0;">
-                    <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                    <button type="submit" class="btn" style="background-color: var(--color-danger);" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
         </div>

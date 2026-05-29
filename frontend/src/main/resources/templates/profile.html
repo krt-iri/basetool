@@ -87,12 +87,12 @@
                     <div class="mb-1">
                         <label for="displayName" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.display_name}">Display Name</label>
                         <input type="text" id="displayName" name="displayName" th:field="*{displayName}" style="width: 100%; max-width: 400px; padding: 0.5rem;" />
-                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-dept-combat); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-danger); font-size: 0.8rem; margin-top: 0.5rem;"></div>
                     </div>
                     <div>
                         <label for="description" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.description}">Description</label>
                         <textarea id="description" name="description" rows="5" th:text="*{description}"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem; margin-top: 0.5rem;"></div>
                     </div>
                     <div class="mt-1">
                         <button type="submit" class="btn" th:text="#{profile.save_custom_data}">Save</button>

@@ -34,7 +34,7 @@
                 }
             }
             /* UEX refinery yield bonus/malus next to the output-quantity label.
-               Positive = green (Profit department color), negative = red (Combat),
+               Positive = green (Profit department color), negative = red (danger),
                zero = muted. Matches the semantic-color palette in styles.css. */
             .yield-bonus-badge {
                 display: inline-block;
@@ -53,9 +53,9 @@
                 border: 1px solid var(--color-dept-profit);
             }
             .yield-bonus-badge.yield-negative {
-                color: var(--color-dept-combat);
+                color: var(--color-danger);
                 background-color: rgba(163, 0, 10, 0.12);
-                border: 1px solid var(--color-dept-combat);
+                border: 1px solid var(--color-danger);
             }
             .yield-bonus-badge.yield-zero {
                 color: var(--color-gray-2);
@@ -361,7 +361,7 @@
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
                     <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" style="margin: 0;">
-                        <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
+                        <button type="submit" class="btn" style="background-color: var(--color-danger);" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
                     </form>
                 </th:block>
                 <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{profile.back}">Zurück</a>

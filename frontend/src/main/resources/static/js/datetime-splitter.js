@@ -84,7 +84,7 @@
             if (!hidden || !datePart || !timePart) return;
 
             const errorDiv = document.createElement('div');
-            errorDiv.style.color = 'var(--color-dept-combat)';
+            errorDiv.style.color = 'var(--color-danger)';
             errorDiv.style.fontSize = '0.8rem';
             errorDiv.style.marginTop = '0.2rem';
             errorDiv.style.display = 'none';
