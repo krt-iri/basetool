@@ -11,11 +11,11 @@ import org.springframework.stereotype.Component;
 /**
  * Single scheduler bean that drives the periodic UEX-data refresh.
  *
- * <p>{@code @Scheduled} fixed-delay of {@code krt.uex.scheduler-delay} (default 3600000 ms = 1 h).
- * The {@code @Async(AsyncConfig.UEX_EXECUTOR)} pulls execution off the scheduler thread onto the
- * dedicated bounded executor declared in {@link AsyncConfig#uexExecutor()}, so a slow UEX response
- * cannot delay other scheduled tasks AND cannot spawn unbounded threads (the previous unqualified
- * {@code @Async} fell back to the unbounded {@code SimpleAsyncTaskExecutor}).
+ * <p>{@code @Scheduled} fixed-delay of {@code krt.uex.scheduler-delay} (default 86400000 ms = 24
+ * h). The {@code @Async(AsyncConfig.UEX_EXECUTOR)} pulls execution off the scheduler thread onto
+ * the dedicated bounded executor declared in {@link AsyncConfig#uexExecutor()}, so a slow UEX
+ * response cannot delay other scheduled tasks AND cannot spawn unbounded threads (the previous
+ * unqualified {@code @Async} fell back to the unbounded {@code SimpleAsyncTaskExecutor}).
  * {@code @ConditionalOnProperty(matchIfMissing = true)} keeps the bean active by default but lets
  * the {@code test} profile disable it without touching the rest of the wiring.
  *
@@ -58,7 +58,7 @@ public class UexScheduler {
    * failing service does not abort the remaining ones.
    */
   @Async(AsyncConfig.UEX_EXECUTOR)
-  @Scheduled(fixedDelayString = "${krt.uex.scheduler-delay:3600000}")
+  @Scheduled(fixedDelayString = "${krt.uex.scheduler-delay:86400000}")
   public void scheduleCommodityPriceUpdate() {
     log.info("Running scheduled task to update UEX data...");
     try {

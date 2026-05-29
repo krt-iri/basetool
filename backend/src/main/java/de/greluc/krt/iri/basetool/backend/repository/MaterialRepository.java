@@ -20,19 +20,32 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every material,
-   * ordered by name. Used to populate material pickers without pulling the full Material aggregate.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every <b>visible</b>
+   * material, ordered by name. Used to populate material pickers (inventory, alias targets) without
+   * pulling the full Material aggregate. Wiki-only commodities imported {@code is_visible = false}
+   * (§4.3) are excluded so unreviewed entries never appear in a picker — see {@code isVisible} on
+   * {@link Material}.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name,"
-          + " m.quantityType) FROM Material m ORDER BY m.name")
+          + " m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
 
   /**
-   * Returns every entity matching the derived {@code findAllByIsJobOrderTrueOrderByNameAsc}
-   * criteria.
+   * Paged list of materials with {@code is_visible = true}, used for the public/trading catalog
+   * list. Wiki-only commodities inserted invisible (§4.3) are filtered out here; the admin catalog
+   * uses the unfiltered {@link #findAll(Pageable)} instead so it can review and unhide them.
+   *
+   * @param pageable page request
+   * @return paged visible materials
    */
-  List<Material> findAllByIsJobOrderTrueOrderByNameAsc();
+  Page<Material> findByIsVisibleTrue(Pageable pageable);
+
+  /**
+   * Returns every <b>visible</b> material flagged {@code isJobOrder=true}, ordered by name. The
+   * {@code isVisible} clause keeps unreviewed wiki-only rows out of the job-order material picker.
+   */
+  List<Material> findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
 
   /** Derived Spring-Data query - returns entities matching {@code IdCommodity}. */
   Optional<Material> findByIdCommodity(Integer idCommodity);

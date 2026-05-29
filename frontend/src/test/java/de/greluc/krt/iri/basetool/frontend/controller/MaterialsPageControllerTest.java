@@ -117,6 +117,7 @@ class MaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L);
     when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
         .thenReturn(materialDto);

@@ -37,8 +37,9 @@ import org.springframework.util.StringUtils;
  *   <li>create a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
  * </ol>
  *
- * <p>The legacy synthesized {@code description} text is still written so pre-R2 UIs render
- * something while consumers migrate to {@code description_en}.
+ * <p>R9 Step 2: the legacy synthesized {@code description} column is no longer written — readers
+ * source the ship-type description from {@code descriptionEn} / {@code descriptionDe} instead (the
+ * column is dropped in R9 Step 4).
  *
  * <p>Empty UEX response short-circuits without wiping local data. Orphan handling via {@link
  * ShipTypeRepository#markUexDeletedExcept(java.util.Collection, Instant)} gated on a non-empty
@@ -148,10 +149,6 @@ public class UexVehicleService {
 
     applyVehicleFields(shipType, dto);
 
-    // Synthesised description for back-compat with pre-R2 UI consumers; description_en
-    // becomes the authoritative source from R2 onwards.
-    shipType.setDescription(buildLegacyDescription(dto));
-
     shipType.setUexSyncedAt(now);
     shipType.setUexDeletedAt(null);
     // Promote UEX_ONLY -> BOTH when Wiki already wrote this row (R4+).
@@ -250,33 +247,6 @@ public class UexVehicleService {
       return null;
     }
     return manufacturerRepository.findByNameIgnoreCase(dto.companyName()).orElse(null);
-  }
-
-  /**
-   * Synthesises the legacy multi-line {@code description} (name_full / SCU / crew / wiki|store).
-   * Kept for back-compat with pre-R2 UIs; consumers migrate to {@code description_en} over R2's
-   * soak window and the column is dropped in R9.
-   *
-   * @param dto inbound vehicle row
-   * @return synthesised text, or {@code null} when no field was usable
-   */
-  private static String buildLegacyDescription(UexVehicleDto dto) {
-    StringBuilder description = new StringBuilder();
-    if (StringUtils.hasText(dto.nameFull())) {
-      description.append("Full Name: ").append(dto.nameFull()).append("\n");
-    }
-    if (dto.scu() != null) {
-      description.append("SCU: ").append(dto.scu()).append("\n");
-    }
-    if (StringUtils.hasText(dto.crew())) {
-      description.append("Crew: ").append(dto.crew()).append("\n");
-    }
-    if (StringUtils.hasText(dto.urlWiki())) {
-      description.append("Wiki: ").append(dto.urlWiki()).append("\n");
-    } else if (StringUtils.hasText(dto.urlStore())) {
-      description.append("Store: ").append(dto.urlStore()).append("\n");
-    }
-    return description.isEmpty() ? null : description.toString().trim();
   }
 
   /**

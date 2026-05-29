@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,12 +71,20 @@ public class ScWikiItemSyncService {
   private static final ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>> ITEM_PAGE_TYPE =
       new ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>>() {};
 
+  /**
+   * Flush/clear the persistence context every this-many upserts during the Mode-B backfill so the
+   * ~12 700-row pool never accumulates in one context (§ M2 hardening). See {@link
+   * #flushAndClearIfBatchFull(int)}.
+   */
+  static final int FLUSH_BATCH_SIZE = 500;
+
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final GameItemRepository gameItemRepository;
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
+  private final EntityManager entityManager;
 
   /**
    * Entry point invoked by {@link ScWikiScheduler}. No-op (with an INFO line) when {@code
@@ -301,6 +310,8 @@ public class ScWikiItemSyncService {
       }
       try {
         upsertItem(dto, pass.kind(), ctx);
+        ctx.processed++;
+        flushAndClearIfBatchFull(ctx.processed);
       } catch (Exception e) {
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
@@ -309,11 +320,33 @@ public class ScWikiItemSyncService {
   }
 
   /**
+   * Flushes and clears the persistence context every {@link #FLUSH_BATCH_SIZE} upserts so the full
+   * backfill (~12 700 {@code game_item} rows) never accumulates the whole pool in one context.
+   * Without this, Hibernate's auto-flush re-dirty-checks every managed entity before each {@code
+   * findByExternalUuid} query — O(n²) over the run — and the heap holds every row for the
+   * transaction's lifetime. {@code flush()} writes all pending inserts/updates first (so no dirty
+   * state is lost), then {@code clear()} detaches them.
+   *
+   * <p>Safe against the detach traps in CLAUDE.md: the cross-kind {@code seen} set holds UUIDs (not
+   * entities) so it is unaffected, and the orphan sweep runs on those business keys after the loop;
+   * the {@link BackfillContext} manufacturer cache survives as detached references, which is fine
+   * because they are only read for their id to set the {@code manufacturer_id} FK on new rows.
+   *
+   * @param processedSoFar count of items upserted so far this run
+   */
+  void flushAndClearIfBatchFull(int processedSoFar) {
+    if (processedSoFar > 0 && processedSoFar % FLUSH_BATCH_SIZE == 0) {
+      entityManager.flush();
+      entityManager.clear();
+    }
+  }
+
+  /**
    * Upserts a single Wiki item under the given kind. A brand-new row is created {@code WIKI_ONLY}
    * (its name screened by {@link #shouldSkipNewItem(ScWikiItemDto)}; manufacturer resolved against
    * existing rows only) and logs {@link SyncEventType#CREATED_WIKI_ONLY}. An existing row has its
-   * Wiki columns filled, its kind merged via {@link #mergeKind(GameItemKind, GameItemKind)} and its
-   * {@code source_systems} flipped {@code UEX_ONLY → BOTH}; the UEX-canonical {@code name} and (on
+   * Wiki columns filled, its kind merged via {@link GameItemKind#mergeMoreSpecific} and its {@code
+   * source_systems} flipped {@code UEX_ONLY → BOTH}; the UEX-canonical {@code name} and (on
    * existing rows) {@code manufacturer} are never touched.
    *
    * @param dto the Wiki item payload
@@ -354,7 +387,7 @@ public class ScWikiItemSyncService {
       return;
     }
 
-    item.setKind(mergeKind(item.getKind(), passKind));
+    item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), passKind));
     applyWikiFields(item, dto, ctx.now);
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
@@ -369,6 +402,13 @@ public class ScWikiItemSyncService {
    * on existing rows, {@code manufacturer} (sticky on UEX — R6 reconciles). Multi-language {@code
    * description} is read for {@code en_EN} / {@code de_DE}; {@code size} is parsed defensively into
    * the integer size class.
+   *
+   * <p><b>Deliberate deviation from §6.3.5:</b> the plan's length-based name-preference (prefer the
+   * longer, better-cased Wiki name when {@code wiki.name.length > existing.name.length}) is
+   * intentionally NOT implemented. Keeping the UEX {@code name} unconditionally removes every path
+   * for a Wiki sync to overwrite a UEX-canonical field — safer than the literal rule, at the cost
+   * of occasionally surfacing UEX's terser name. Revisit only if a concrete UI need for the longer
+   * Wiki name emerges.
    *
    * @param item the game item to update
    * @param dto the Wiki item payload
@@ -445,33 +485,6 @@ public class ScWikiItemSyncService {
   }
 
   /**
-   * Resolves a {@code game_item} kind conflict by the §6.3.1 "more specific wins, never downgrade
-   * to {@code GENERIC}" rule: an existing {@code GENERIC} (or null) yields to the incoming kind; an
-   * incoming {@code GENERIC} never overrides an existing specific kind; {@code WEAPON_ATTACHMENT}
-   * refines {@code WEAPON} and {@code VEHICLE_WEAPON} refines {@code VEHICLE_ITEM}; otherwise the
-   * existing kind is kept (already specific, or an unrelated kind — never cross-flipped).
-   *
-   * @param existing the kind currently on the row (may be {@code null})
-   * @param incoming the kind derived from the current pass's endpoint
-   * @return the kind to persist
-   */
-  private static GameItemKind mergeKind(GameItemKind existing, GameItemKind incoming) {
-    if (existing == null || existing == GameItemKind.GENERIC) {
-      return incoming;
-    }
-    if (incoming == GameItemKind.GENERIC || existing == incoming) {
-      return existing;
-    }
-    if (existing == GameItemKind.WEAPON && incoming == GameItemKind.WEAPON_ATTACHMENT) {
-      return incoming;
-    }
-    if (existing == GameItemKind.VEHICLE_ITEM && incoming == GameItemKind.VEHICLE_WEAPON) {
-      return incoming;
-    }
-    return existing;
-  }
-
-  /**
    * One Mode-B endpoint pass: the Wiki list endpoint, the {@link GameItemKind} every row from it
    * receives, the optional {@code filter[classification]} value, and whether the §3.4 sanity cap
    * applies (true for the seven kind endpoints, false for the residual {@code /api/items} pass).
@@ -500,6 +513,7 @@ public class ScWikiItemSyncService {
     private int linked;
     private int skipped;
     private int failedPasses;
+    private int processed;
 
     /**
      * Captures the run id and timestamp and indexes the manufacturer table by Wiki UUID and by

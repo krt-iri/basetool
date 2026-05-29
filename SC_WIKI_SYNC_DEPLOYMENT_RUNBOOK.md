@@ -1104,7 +1104,7 @@ small **data migration** that prepares the destructive R9 cleanup.
   backfill is **V116** and the R9 destructive drop (`material.is_manual_entry` +
   `ship_type.description`) shifts to **V117**.
 - **Soak (operational, no code).** With R1-R7 deployed, turn every sync flag on and run the full
-  cadence (UEX hourly, Wiki 24 h) for ~two weeks, watching the signals in §8.6 before committing to
+  cadence (UEX and Wiki both 24 h) for ~two weeks, watching the signals in §8.6 before committing to
   the R9 destructive drop. The flags stay operator-controlled — R8 ships **no** default-on change.
 
 ### 8.2 Pre-deployment checks (R8)
@@ -1173,9 +1173,9 @@ The point of R8 is to prove the whole sync is healthy before the irreversible R9
 - **DB growth.** `game_item`, `game_item_price`, `blueprint` / `blueprint_ingredient`, `material`
   should plateau after the first full cycle of each sync — continued growth means an upsert key is
   missing and rows are duplicating.
-- **Scheduler runtimes.** Every `Finished … sync` line must land inside its cadence (UEX 1 h, Wiki
-  24 h). The item-price sync (~24 k rows) and the full Wiki backfill (~12 700 rows) are the two to
-  watch.
+- **Scheduler runtimes.** Every `Finished … sync` line must land inside its cadence (UEX and Wiki
+  both 24 h). The item-price sync (~24 k rows) and the full Wiki backfill (~12 700 rows) are the two
+  to watch.
 - **Sync-report event mix** (`/admin/sync-reports`). `UNRESOLVED_INGREDIENT`, `WIKI_MISSING`,
   `MANUFACTURER_MISMATCH` and `MULTI_MATCH_AMBIGUOUS` are the action items; a steady or shrinking
   count is healthy, a growing one points at a catalogue gap.

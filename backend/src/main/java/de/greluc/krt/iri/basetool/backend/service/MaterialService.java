@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
@@ -44,14 +45,33 @@ public class MaterialService {
   private final MaterialCategoryRepository materialCategoryRepository;
 
   /**
-   * Returns cached paged list of all materials.
+   * Returns cached paged list of all materials. Distinct cache key prefix ({@code all-}) so this
+   * admin/full view never collides with {@link #getVisibleMaterials(Pageable)} — both share {@code
+   * MATERIALS_CACHE} and the default {@code SimpleKeyGenerator} keys solely on the {@code Pageable}
+   * argument, which would otherwise serve one method's result for the other.
    *
    * @param pageable page request
    * @return cached paged list of all materials
    */
-  @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE)
+  @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'all-' + #pageable")
   public Page<Material> getAllMaterials(@NotNull Pageable pageable) {
     return materialRepository.findAll(pageable);
+  }
+
+  /**
+   * Returns the cached paged list of <b>visible</b> materials only ({@code is_visible = true}).
+   * Drives the public/trading catalog list: wiki-only commodities imported invisible (§4.3) are
+   * excluded so they don't pollute trading flows until an admin reviews them. The admin catalog
+   * passes {@code includeHidden=true} and goes through {@link #getAllMaterials(Pageable)} instead.
+   * The {@code visible-} key prefix keeps it from colliding with {@code getAllMaterials} in the
+   * shared cache.
+   *
+   * @param pageable page request
+   * @return cached paged list of visible materials
+   */
+  @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'visible-' + #pageable")
+  public Page<Material> getVisibleMaterials(@NotNull Pageable pageable) {
+    return materialRepository.findByIsVisibleTrue(pageable);
   }
 
   /**
@@ -145,15 +165,16 @@ public class MaterialService {
    * @return job-order materials in alphabetical order
    */
   public List<Material> getAllJobOrderMaterials() {
-    return materialRepository.findAllByIsJobOrderTrueOrderByNameAsc();
+    return materialRepository.findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
   }
 
   /**
    * Persists a manually-entered material from the admin UI. Used when UEX has not (yet) published a
    * commodity that the squadron needs — e.g. a refinery raw input that exists in-game but is
    * missing from {@code get_commodities_prices_all/}. The server unconditionally stamps {@code
-   * isManualEntry=true} on the persisted row (Audit + UI badge); the next UEX sync clears the flag
-   * automatically once UEX picks the commodity up (see {@code UexCommodityService}).
+   * sourceSystems=MANUAL} on the persisted row (Audit + UI badge, surfaced via the derived {@code
+   * isManualEntry} wire field); the next UEX sync flips it off {@code MANUAL} automatically once
+   * UEX picks the commodity up (see {@code UexCommodityService}).
    *
    * <p>UEX-imported columns ({@code idCommodity}, {@code code}, {@code slug}, {@code priceBuy} …)
    * are left {@code null} — they get populated by the sync's name-match fallback once UEX exposes
@@ -203,7 +224,7 @@ public class MaterialService {
     material.setIsIllegal(Boolean.TRUE.equals(dto.isIllegal()) ? 1 : 0);
     material.setIsVolatileQt(Boolean.TRUE.equals(dto.isVolatileQt()) ? 1 : 0);
     material.setIsVolatileTime(Boolean.TRUE.equals(dto.isVolatileTime()) ? 1 : 0);
-    material.setIsManualEntry(true);
+    material.setSourceSystems(MaterialSourceSystem.MANUAL);
 
     if (dto.refinedMaterialId() != null) {
       Material refined =
@@ -226,8 +247,8 @@ public class MaterialService {
 
   /**
    * Updates the admin-maintained fields on a material (name, type, description, quantity type,
-   * manual flags, refined-material link, category). UEX-imported fields are NOT mutable here —
-   * those come from {@link UexCommodityService} and any manual override would be silently
+   * manual flags, visibility, refined-material link, category). UEX-imported fields are NOT mutable
+   * here — those come from {@link UexCommodityService} and any manual override would be silently
    * overwritten on the next sync.
    *
    * <p>Refined-material and category references are resolved by id; unknown ids fall back to {@code
@@ -255,6 +276,11 @@ public class MaterialService {
     material.setQuantityType(materialDetails.getQuantityType());
     material.setIsManualRawMaterial(materialDetails.getIsManualRawMaterial());
     material.setIsJobOrder(materialDetails.getIsJobOrder());
+    // Visibility is admin-toggleable (§4.3 review of wiki-only commodities). Null-guarded so a DTO
+    // that omits the field cannot null the NOT NULL column on an unrelated edit.
+    if (materialDetails.getIsVisible() != null) {
+      material.setIsVisible(materialDetails.getIsVisible());
+    }
 
     if (materialDetails.getRefinedMaterial() != null
         && materialDetails.getRefinedMaterial().getId() != null) {
