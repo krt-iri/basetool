@@ -142,6 +142,17 @@
 
 body {
     background-color: var(--color-bg-black);
+    /*
+     * Faint ambient honeycomb (Wabenmuster) over the black page background, per the
+     * design-system UI kit. The SVG ships its #E77E23 strokes at 0.1 opacity, so it
+     * reads as a subtle texture (and shows through the translucent .hud-box surfaces)
+     * rather than decoration. background-attachment: fixed keeps the texture still
+     * while content scrolls; the 46x26.56px tile preserves the SVG's 72:41.57 ratio.
+     */
+    background-image: url("../images/honeycomb-bg.svg");
+    background-repeat: repeat;
+    background-size: 46px 26.56px;
+    background-attachment: fixed;
     color: var(--color-gray-1);
     font-family: var(--font-body);
     font-weight: 300;
