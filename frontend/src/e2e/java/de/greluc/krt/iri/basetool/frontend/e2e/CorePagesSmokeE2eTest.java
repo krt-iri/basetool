@@ -46,7 +46,7 @@ class CorePagesSmokeE2eTest {
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
-    browser = E2eSupport.launchChromium(playwright, STACK.managesStack());
+    browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }

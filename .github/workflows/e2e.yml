@@ -1,6 +1,7 @@
 name: E2E
 
-# Two Playwright suites, one workflow:
+# Two Playwright suites, one workflow, each fanned out over three browser
+# engines (Chromium, Firefox, WebKit) as a matrix:
 #   * e2e   — the destructive functional flows (@Tag("e2e")) against an
 #             ephemeral full stack (Postgres x2 + Keycloak + Redis + backend +
 #             frontend), built and torn down by E2eStackExtension via
@@ -26,13 +27,19 @@ permissions:
 
 jobs:
   e2e:
-    name: E2E flows (ephemeral stack)
+    name: E2E flows (${{ matrix.browser }})
     # PRs: only when labelled `e2e`. schedule / workflow_dispatch: always.
     if: >-
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      # Run all three engines even if one fails, so a Chromium-only regression
+      # doesn't hide a Firefox/WebKit pass (and vice versa).
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
       - name: Checkout
@@ -49,7 +56,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Cache the Playwright-managed Chromium (~/.cache/ms-playwright) so the
+      # Cache the Playwright-managed browsers (~/.cache/ms-playwright) so the
       # playwrightInstall task is a no-op on a hit. Keyed on the version catalog,
       # so a Playwright bump (gradle/libs.versions.toml) invalidates the cache.
       - name: Cache Playwright browsers
@@ -63,11 +70,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # WebKit has no launch-level DNS override, so the ephemeral stack's Keycloak
+      # issuer host must be mapped to the loopback at the OS level. Chromium (a
+      # resolver arg) and Firefox (a profile pref) remap it themselves, but the
+      # entry is harmless for them.
+      - name: Map host.docker.internal to the loopback (needed by WebKit)
+        run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+
       # E2eStackExtension builds the images and brings the stack up itself (no
       # E2E_BASE_URL => ephemeral mode); the Dockerfiles are multi-stage, so no
       # separate bootJar step is needed. Docker + compose v2 ship on the runner.
       - name: Run e2e flows
-        run: ./gradlew :frontend:e2eTest --stacktrace
+        run: ./gradlew :frontend:e2eTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
 
       # Playwright traces, failure screenshots/HTML dumps and the docker compose
       # build/boot logs all land under frontend/build/e2e.
@@ -75,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-artifacts
+          name: e2e-artifacts-${{ matrix.browser }}
           path: |
             frontend/build/e2e/**
             frontend/build/test-results/e2eTest/**
@@ -84,7 +98,7 @@ jobs:
           if-no-files-found: ignore
 
   smoke:
-    name: Smoke (staging)
+    name: Smoke (${{ matrix.browser }}, staging)
     # Dormant until a staging host exists: gated on the E2E_BASE_URL repo
     # variable (a hostname, readable in `if:` — unlike a secret). Credentials
     # come from secrets, passed via the environment. Never runs per-PR.
@@ -93,6 +107,10 @@ jobs:
       github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
       - name: Checkout
@@ -121,21 +139,22 @@ jobs:
         run: chmod +x ./gradlew
 
       # E2E_BASE_URL set => E2eStackExtension targets the external deployment and
-      # does not manage Docker. Credentials travel via the environment (masked in
-      # logs); the smokeTest task maps E2E_USERNAME / E2E_PASSWORD to the e2e.*
-      # system properties the tests read.
+      # does not manage Docker (no host.docker.internal remap needed — staging has
+      # a real hostname every engine resolves natively). Credentials travel via
+      # the environment (masked in logs); the smokeTest task maps E2E_USERNAME /
+      # E2E_PASSWORD to the e2e.* system properties the tests read.
       - name: Run smoke checks against staging
         env:
           E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: ./gradlew :frontend:smokeTest --stacktrace
+        run: ./gradlew :frontend:smokeTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
 
       - name: Upload smoke artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: smoke-artifacts
+          name: smoke-artifacts-${{ matrix.browser }}
           path: |
             frontend/build/e2e/**
             frontend/build/test-results/smokeTest/**

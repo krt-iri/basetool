@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Tracing;
@@ -50,24 +49,11 @@ class LoginSmokeE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** Boots a single headless Chromium shared by every test method in this class. */
+  /** Boots a single headless browser (the configured {@code e2e.browser}) shared by every test. */
   @BeforeAll
   static void launchBrowser() {
     playwright = Playwright.create();
-    BrowserType.LaunchOptions options = new BrowserType.LaunchOptions().setHeadless(true);
-    // Only the ephemeral local stack needs the host.docker.internal -> loopback remap: Keycloak is
-    // published on 127.0.0.1 but the OIDC issuer host is host.docker.internal, which may not
-    // resolve
-    // to the loopback on the host. Against an external deployment the issuer host is already
-    // reachable, so the remap is disabled there (override with -De2e.hostResolverRules).
-    String resolverRules =
-        System.getProperty(
-            "e2e.hostResolverRules",
-            STACK.managesStack() ? "MAP host.docker.internal 127.0.0.1" : "");
-    if (!resolverRules.isBlank()) {
-      options.setArgs(List.of("--host-resolver-rules=" + resolverRules));
-    }
-    browser = playwright.chromium().launch(options);
+    browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
   }
 
   /** Releases the browser and the Playwright driver process. */

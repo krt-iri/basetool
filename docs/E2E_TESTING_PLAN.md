@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt — offen bleiben nur der erste echte CI-Lauf und ein realer Staging-Host. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt + Cross-Browser-Matrix (Chromium/Firefox/WebKit) ergänzt — offen bleiben nur der erste echte CI-Lauf und ein realer Staging-Host. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 
@@ -136,6 +136,19 @@ Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
 **README-Abschnitt „4.7 End-to-end (E2E) tests" ergänzt:** lokales Ausführen (`e2eTest` / `smokeTest`), ephemerer-Stack-Default vs. `E2E_BASE_URL`-Staging-Modus, CI-Verhalten und Verweis auf diesen Plan. Javadoc liegt auf allen neuen e2e-Klassen und -Methoden vor; `spotlessApply` lief auf jeder neuen Java-Datei.
 
 **Kein CHANGELOG-Eintrag (bewusst, abweichend vom ursprünglichen Phase-6-Punkt):** `CHANGELOG.md` ist gemäß CLAUDE.md für **nutzersichtbare** Änderungen (Features, Fixes, Env-Vars) reserviert und nach Keep-a-Changelog (`Added`/`Changed`/`Fixed`) gegliedert. Die E2E-Test-/CI-Infrastruktur ist Entwickler-/CI-Tooling ohne nutzersichtbaren Effekt — konsistent dazu trugen bereits die Phase-0–5-Commits keinen CHANGELOG-Eintrag.
+
+## Cross-Browser-Matrix (Chromium / Firefox / WebKit) — Stand (2026-05-29)
+
+**Nachtrag nach Phase 6.** Die Suite läuft jetzt gegen alle drei Playwright-Engines, gesteuert über `-Pe2e.browser` (`chromium` Default, `firefox`, `webkit`). `E2eSupport.launchBrowser` ist der einzige Launch-Seam; jede Testklasse wählt eine Engine pro JVM, die CI fächert die drei per Matrix parallel auf (`e2e`- **und** `smoke`-Job).
+
+**Der Knackpunkt: `host.docker.internal` für den Keycloak-Redirect.** Gegen den ephemeren Stack muss der Issuer-Host auf den Loopback zeigen (Keycloak ist auf 127.0.0.1 published, der Issuer-String ist aber `host.docker.internal:18080` — identisch für Browser und In-Docker-Services, daher nicht einfach auf `localhost` umstellbar). Jede Engine löst das anders:
+- **Chromium** — `--host-resolver-rules=MAP host.docker.internal 127.0.0.1` (Launch-Arg, kein Setup).
+- **Firefox** — `network.dns.localDomains`-Preference (Profil-Pref, kein Setup). Lokal verifiziert.
+- **WebKit** — **kein** Launch-Level-Override vorhanden; greift auf die OS-Hosts-Datei zurück. Die CI fügt `127.0.0.1 host.docker.internal` per `sudo` zu `/etc/hosts` hinzu; lokal braucht WebKit denselben Eintrag (oder den Staging-Modus via `E2E_BASE_URL`). `launchWebkit` prüft die Auflösung vorab (`InetAddress.getByName(...).isLoopbackAddress()`) und wirft einen klaren, handlungsweisenden Fehler statt eines undurchsichtigen „Could not connect to server".
+
+**Validierungsstand (lokal, Windows):** Chromium — alle sechs Flows grün (Regressionslauf nach dem Refactor); Firefox — Smoke grün (localDomains löst `host.docker.internal` korrekt auf); WebKit — schlägt lokal ohne Hosts-Eintrag erwartungsgemäß fehl (`host.docker.internal` → 10.1.0.30, Fail-Fast-Guard greift), läuft auf CI (Hosts-Eintrag) und gegen Staging (native Auflösung). Im Staging-Modus brauchen alle drei Engines keinerlei Remap.
+
+**Kostennote:** Die Matrix verdreifacht die e2e-Job-Laufzeit (drei parallele Runner bauen je den Stack frisch); für die Label-/Nightly-Gating-Strategie vertretbar.
 
 ## Warum dieser Stack zu diesem Projekt passt
 

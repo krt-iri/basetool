@@ -517,12 +517,13 @@ warning fails CI immediately.
 
 Playwright-Java drives the real frontend through a browser. The suite lives in
 the `frontend` module's `e2e` source set and is **not** wired into `check` — it
-needs Docker and a downloaded Chromium, so it runs only on explicit tasks:
+needs Docker and a downloaded browser, so it runs only on explicit tasks:
 
 ```bash
 ./gradlew :frontend:e2eTest                              # full destructive flows (@Tag("e2e"))
 ./gradlew :frontend:smokeTest                            # non-destructive page-load checks (@Tag("smoke"))
 ./gradlew :frontend:e2eTest --tests "*MissionCreate*"    # a single flow
+./gradlew :frontend:e2eTest -Pe2e.browser=firefox        # engine: chromium (default), firefox, webkit
 ```
 
 By default, `E2eStackExtension` builds the app images and brings up an
@@ -530,8 +531,9 @@ By default, `E2eStackExtension` builds the app images and brings up an
 `docker compose`, seeds the minimal data each flow needs, runs the tests, and
 tears the stack down (`down --volumes`) afterwards — all with throwaway
 credentials generated on the fly (never the production `.env` / keystore /
-realm). The first run downloads Chromium (the `playwrightInstall` task); Docker
-plus a recent `docker compose` v2 must be available.
+realm). The first run downloads the Playwright browsers — Chromium, Firefox and
+WebKit (the `playwrightInstall` task); Docker plus a recent `docker compose` v2
+must be available.
 
 Point the suite at an already-running deployment (e.g. staging) instead by
 setting `E2E_BASE_URL`; the extension then skips Docker entirely and only logs
@@ -542,10 +544,20 @@ E2E_BASE_URL=https://staging.example E2E_USERNAME=<user> E2E_PASSWORD=<pw> \
     ./gradlew :frontend:smokeTest
 ```
 
-CI runs both in [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml): the
-`e2e` job on an `e2e` PR label, a nightly schedule, or manual dispatch; the
-`smoke` job against staging once the repo defines an `E2E_BASE_URL` variable.
-The full design and per-phase status live in
+**Cross-browser.** `-Pe2e.browser` selects the engine (`chromium` default,
+`firefox`, `webkit`); CI runs all three as a matrix. Against the ephemeral stack
+the Keycloak issuer host `host.docker.internal` must resolve to the loopback, and
+each engine gets there differently: Chromium via a resolver arg and Firefox via a
+profile pref (both automatic), but **WebKit** has no launch-level override and
+relies on the OS hosts file. CI adds the entry; on a workstation add `127.0.0.1
+host.docker.internal` to your hosts file to run WebKit against the local stack (or
+just run WebKit against staging via `E2E_BASE_URL`). The suite fails fast with
+this hint if WebKit is selected without the mapping.
+
+CI runs both in [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml), each as
+a Chromium/Firefox/WebKit matrix: the `e2e` job on an `e2e` PR label, a nightly
+schedule, or manual dispatch; the `smoke` job against staging once the repo
+defines an `E2E_BASE_URL` variable. The full design and per-phase status live in
 [`docs/E2E_TESTING_PLAN.md`](docs/E2E_TESTING_PLAN.md).
 
 ---

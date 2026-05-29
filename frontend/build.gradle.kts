@@ -278,10 +278,10 @@ tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 // (~/.cache/ms-playwright). Cached in CI; a no-op once present.
 val playwrightInstall by tasks.registering(JavaExec::class) {
   group = "verification"
-  description = "Installs the Playwright Chromium browser used by e2eTest."
+  description = "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
   classpath = sourceSets["e2e"].runtimeClasspath
   mainClass.set("com.microsoft.playwright.CLI")
-  args("install", "chromium")
+  args("install", "chromium", "firefox", "webkit")
 }
 
 // Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
@@ -303,9 +303,8 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
-  listOf("e2e.baseUrl", "e2e.username", "e2e.password", "e2e.hostResolverRules").forEach { key ->
-    (findProperty(key) as String?)?.let { systemProperty(key, it) }
-  }
+  listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
+      .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }
 
 // Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).

@@ -40,7 +40,7 @@ class MissionCreateE2eTest {
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
-    browser = E2eSupport.launchChromium(playwright, STACK.managesStack());
+    browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
       new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
     }
