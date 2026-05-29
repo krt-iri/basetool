@@ -68,4 +68,30 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
           + "AND g.uexDeletedAt IS NULL")
   int markUexDeletedExcept(
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
+
+  /**
+   * Soft-deletes SC Wiki ownership of every <em>Wiki-written</em> row whose {@code external_uuid}
+   * is NOT in {@code seenExternalUuids} and that is not already marked. Drives the R5 Mode-B
+   * cross-kind orphan sweep (SC_WIKI_SYNC_PLAN.md §8.4 / §8.7). The caller gates this on a
+   * non-empty seen set AND on every kind endpoint having fetched successfully, so a transient Wiki
+   * outage never wipes the Wiki-side merge state.
+   *
+   * <p>Unlike {@link de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository}'s vehicle
+   * sweep, the gate is {@code scwiki_synced_at IS NOT NULL} (the Wiki actually wrote this row) and
+   * NOT {@code external_uuid IS NOT NULL}: a {@code game_item} row created by the UEX item sync
+   * also carries an {@code external_uuid}, so gating on its mere presence would wrongly stamp
+   * {@code scwiki_deleted_at} on UEX-only items the Wiki has never described.
+   *
+   * @param seenExternalUuids the external UUIDs the Wiki item backfill touched this run
+   * @param now timestamp to stamp on the soft-deleted rows
+   * @return number of rows marked deleted
+   */
+  @Modifying
+  @Query(
+      "UPDATE GameItem g SET g.scwikiDeletedAt = :now "
+          + "WHERE g.scwikiSyncedAt IS NOT NULL "
+          + "AND g.externalUuid NOT IN :seenExternalUuids "
+          + "AND g.scwikiDeletedAt IS NULL")
+  int markScwikiDeletedExcept(
+      @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 }

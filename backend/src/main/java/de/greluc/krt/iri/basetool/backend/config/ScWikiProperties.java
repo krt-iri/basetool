@@ -151,4 +151,73 @@ public class ScWikiProperties {
    * ~12 700 rows, ~10-15 min per cycle at the default 5 req/s pacing.
    */
   @NotNull private Boolean syncAllItems = false;
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/armor}. <b>Must stay non-blank.</b>
+   * The live Wiki {@code /api/armor} endpoint returns the FULL {@code /api/items} pool (~12 700
+   * rows) when no classification filter is set (SC_WIKI_SYNC_PLAN.md §3.4 quirk #1, §13 open
+   * question #3). The probed default {@code "FPS.Armor"} prefix-matches all six {@code FPS.Armor.*}
+   * sub-classes (2 318 rows on game version 4.8.0). If this is cleared the {@link
+   * #backfillKindSanityCap} guard refuses the resulting full-pool dump rather than mis-filing 12
+   * 700 rows under {@code ARMOR}.
+   */
+  private String armorFilter = "FPS.Armor";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/clothes}. Defaults to the probed
+   * {@code "FPS.Clothing"} prefix (1 826 rows on 4.8.0, identical to the endpoint's native total —
+   * the explicit filter just makes the intent visible and survives a future armor-style quirk on
+   * this endpoint). Blank disables the filter and relies on the endpoint's native behaviour.
+   */
+  private String clothesFilter = "FPS.Clothing";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/food}. Defaults to the probed
+   * {@code "FPS.Consumable.Food"} prefix (221 rows on 4.8.0 = Bottle + Drink + Food, identical to
+   * the endpoint's native total). Blank disables the filter.
+   */
+  private String foodFilter = "FPS.Consumable.Food";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/vehicle-items}. Blank by default:
+   * the endpoint already returns only ship components (3 211 rows on 4.8.0, paints under {@code
+   * Ship.Paints} included by design — they enter as {@code VEHICLE_ITEM}). Set a value only to
+   * narrow the pass.
+   */
+  private String vehicleItemsFilter = "";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/vehicle-weapons}. Blank by default:
+   * the endpoint natively returns only mounted ship weapons (168 rows on 4.8.0 = {@code
+   * Ship.Weapon.*}).
+   */
+  private String vehicleWeaponsFilter = "";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/weapons}. Blank by default: the
+   * endpoint natively returns only hand-held FPS weapons (391 rows on 4.8.0). A {@code FPS.Weapon}
+   * prefix is deliberately NOT defaulted because the endpoint and the prefix disagree slightly.
+   */
+  private String weaponsFilter = "";
+
+  /**
+   * Mode-B {@code filter[classification]} value for {@code /api/weapon-attachments}. Blank by
+   * default: the endpoint natively returns only attachments (104 rows on 4.8.0); the {@code
+   * FPS.WeaponAttachment} prefix is broader (163) so it is deliberately NOT defaulted here.
+   */
+  private String weaponAttachmentsFilter = "";
+
+  /**
+   * Mode-B safety cap on the row count of a single <em>kind</em> endpoint pass (armor, clothes,
+   * food, weapons, weapon-attachments, vehicle-items, vehicle-weapons). A pass that returns more
+   * than this many rows is assumed to have hit the §3.4 full-pool quirk (e.g. a cleared {@link
+   * #armorFilter}) and is <b>skipped</b> — its rows are not ingested and the cross-kind orphan
+   * sweep is suppressed for the run. The default 9 000 sits comfortably above the largest
+   * legitimate kind (vehicle-items, 3 211) and well below the full pool (~12 700). The residual
+   * {@code /api/items} {@code GENERIC} catch-all pass is exempt — it legitimately returns the whole
+   * pool.
+   */
+  @NotNull
+  @Min(100)
+  private Integer backfillKindSanityCap = 9000;
 }

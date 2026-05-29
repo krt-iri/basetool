@@ -25,7 +25,7 @@ Request; "Date" is the production deploy timestamp.
 | R2 - UEX items + vehicle hardening | TBD | TBD | TBD | TBD | TBD | game_item table + 47 ship_type flags; no Wiki traffic |
 | R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on |
 | R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags |
-| R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | feature-flagged backfill (~12 700 rows) |
+| R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | needs item-sync-enabled + sync-all-items both on; ~12 700 rows; NO migration |
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | |
 | R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | feature-flagged; off by default |
 | R8 - Soak + V115 cleanup | TBD | TBD | TBD | TBD | TBD | flips is_manual_entry -> source_systems=MANUAL |
@@ -713,32 +713,148 @@ Fastest: set all three flags to `false`. For a full revert:
 
 ## 5. R5 - Full Wiki item backfill
 
-*(Stub - flips `krt.scwiki.sync-all-items=true` on a single environment
-first. ~12 700 Wiki items get paged in; ~5000 already exist via UEX seed.)*
-
 ### 5.1 Scope summary
 
-TBD.
+R5 adds **Mode B (full backfill)** to `ScWikiItemSyncService`. It is **purely
+additive sync logic — there is NO Flyway migration** (it writes the same
+`game_item` columns R2/R4 already created). The mode is selected when BOTH
+`krt.scwiki.item-sync-enabled=true` AND `krt.scwiki.sync-all-items=true`; with
+`sync-all-items=false` (the default) the R4 closure mode runs unchanged, so R5
+ships dark — merging it generates no new Wiki traffic on its own.
+
+- Mode B pages the seven per-kind Wiki list endpoints, deriving `GameItemKind`
+  from the source endpoint (plan §6.3.1), then a residual `/api/items`
+  `GENERIC` catch-all so the whole ~12 700-row pool is covered (the §6.3.1
+  "everything else → GENERIC" row; the seven kind endpoints alone cover
+  ~8 200). New items are inserted `WIKI_ONLY`; existing rows have their Wiki
+  columns filled and `source_systems` flipped `UEX_ONLY → BOTH`. The
+  UEX-canonical `name` / capability flags are never overwritten; `manufacturer`
+  is resolved for new rows against the existing manufacturer table only (no
+  stubs — R6 reconciles) and stays sticky on existing rows.
+- **Filter values (plan §13 open question #3, resolved by live probe of
+  `GET /api/items/filters` on game 4.8.0).** The probe confirmed `/api/armor`
+  is the one endpoint that returns the full ~12 700-row pool with no filter
+  (§3.4 quirk #1) — the other six already return their kind. `filter[...]` is
+  configurable per endpoint; defaults: `krt.scwiki.armor-filter=FPS.Armor`
+  (required; `filter[classification]` prefix-matches, → 2 318),
+  `clothes-filter=FPS.Clothing` (1 826), `food-filter=FPS.Consumable.Food`
+  (221), the rest blank (endpoint-native: weapons 391, weapon-attachments 104,
+  vehicle-items 3 211 incl. 947 paints, vehicle-weapons 168). A
+  `krt.scwiki.backfill-kind-sanity-cap` (default 9 000) refuses any kind pass
+  that still comes back pool-sized (e.g. a cleared `armor-filter`) — that kind
+  is skipped and the orphan sweep is suppressed for the run.
+- **Orphan handling (§8.4 / §8.7).** One cross-kind seen set; the soft-delete
+  sweep (`game_item.scwiki_deleted_at`, Wiki-written rows only) fires **only**
+  when every pass — all seven kinds and the residual — returned data. A partial
+  failure, a 304, an empty feed or a sanity-cap trip suppresses the sweep so a
+  transient outage never wipes Wiki-side state.
 
 ### 5.2 Pre-deployment checks (R5)
 
-TBD.
+- [ ] R4 (PR [#267](https://github.com/krt-iri/basetool/pull/267)) deployed and
+      its closure item fill (`item-sync-enabled`) has run at least once.
+- [ ] `krt.scwiki.sync-all-items` unset / `false` in prod `.env` for the merge.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R5 branch.
+- [ ] Confirm the probed filter values still hold (Wiki schema can drift between
+      game patches):
+      ```bash
+      curl -gs "https://api.star-citizen.wiki/api/armor?filter[classification]=FPS.Armor&page[size]=1" \
+        | python3 -c "import sys,json;print('armor filtered total =', json.load(sys.stdin)['meta']['total'])"
+      # Expect ~2300, NOT ~12700. A ~12700 here means the filter no longer works —
+      # re-probe /api/items/filters and update krt.scwiki.armor-filter before enabling.
+      ```
+- [ ] Logical backup taken (this is a large data change — see §0.3 R5 note).
 
 ### 5.3 Deployment steps (production, R5)
 
-TBD.
+1. **Backup** (Mode B inserts ~7 000 rows and flips ~5 000):
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r5-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R5 PR.** There is **no migration** — do NOT expect a Flyway
+   `Migrating schema …` line; `flyway_schema_history` stays at V114.
+3. **Confirm the dark state** — with `sync-all-items` still `false`, the next
+   tick logs the unchanged closure-mode line (`Starting SC Wiki item sync
+   (closure mode) …`), not the backfill line.
+4. **Enable on ONE environment first** (staging, or a low-traffic window):
+   set `KRT_SCWIKI_SYNC_ALL_ITEMS=true` (leave `item-sync-enabled=true`),
+   restart, let one tick run, then **measure runtime and DB growth before
+   promoting** to the other environments. Look for the start/finish lines:
+   ```
+   Starting SC Wiki item sync (FULL BACKFILL mode) …
+   Finished SC Wiki item sync (full backfill): N created WIKI_ONLY, M linked …
+   ```
 
 ### 5.4 Smoke tests (R5, post-deploy)
 
-TBD.
+```bash
+# --- after enabling sync-all-items + one tick: ---
+
+# 1. game_item grew toward the full pool (~12 700 Wiki-known rows).
+psql -d basetool -c "SELECT count(*) FILTER (WHERE scwiki_synced_at IS NOT NULL) AS wiki_filled, \
+                            count(*) AS total FROM game_item"
+#   expect wiki_filled in the ~12 000-12 700 range.
+
+# 2. source_systems distribution: a big WIKI_ONLY block appeared.
+psql -d basetool -c "SELECT source_systems, count(*) FROM game_item GROUP BY source_systems ORDER BY 1"
+#   expect BOTH ~5 000 (UEX∩Wiki), WIKI_ONLY ~7 000 (paints/variants/cargo UEX
+#   never tracked), UEX_ONLY small (items the Wiki lacks).
+
+# 3. per-kind counts look sane (kind derived from the source endpoint).
+psql -d basetool -c "SELECT kind, count(*) FROM game_item WHERE scwiki_synced_at IS NOT NULL \
+                     GROUP BY kind ORDER BY kind"
+#   expect roughly ARMOR ~2300, CLOTHING ~1800, FOOD ~220, WEAPON ~390,
+#   WEAPON_ATTACHMENT ~100, VEHICLE_ITEM ~3200, VEHICLE_WEAPON ~170,
+#   GENERIC the residual ~4400. ARMOR near 12 700 means the filter broke
+#   (see §5.2) — roll the flag back.
+
+# 4. CRITICAL — Wiki-only rows did NOT leak into trading/refinery UI.
+#    game_item is a static catalogue (not OrgUnit-scoped); confirm no trading
+#    surface began listing the new rows. Spot-check a Lager / refinery page.
+
+# 5. sync-report recorded the backfill deltas (ADMIN session).
+psql -d basetool -c "SELECT event_type, count(*) FROM external_sync_report \
+                     WHERE source='SCWIKI' GROUP BY event_type ORDER BY 2 DESC"
+#   expect a large CREATED_WIKI_ONLY count (one per new row, first run only) and
+#   some SKIP_JUNK (placeholder/markup/NOITEM_Vehicle names dropped).
+```
 
 ### 5.5 Rollback (R5)
 
-TBD.
+Fastest: set `KRT_SCWIKI_SYNC_ALL_ITEMS=false` and restart — the item sync
+reverts to R4 closure mode immediately; no data is removed (the backfilled
+`WIKI_ONLY` rows are invisible to trading anyway, being a static catalogue).
+To also remove the backfilled data:
+
+```sql
+-- Drop the Wiki-only rows Mode B created …
+DELETE FROM game_item WHERE source_systems = 'WIKI_ONLY';
+-- … and revert the BOTH flips back to UEX_ONLY (closure mode will re-fill the
+-- closure subset on its next run):
+UPDATE game_item SET source_systems = 'UEX_ONLY', scwiki_synced_at = NULL,
+       scwiki_deleted_at = NULL
+ WHERE source_systems = 'BOTH';
+```
+
+No migration to revert. The backup is the fallback.
 
 ### 5.6 Monitoring during the soak window (R5)
 
-TBD.
+- **Runtime.** Mode B is page-based (page-size 200), so it is fast despite the
+  pool size — ~106 pages across the eight passes at 5 req/s. If a run overruns
+  the scheduler delay, raise `krt.scwiki.requests-per-second` cautiously or
+  lower the page count via filters.
+- **DB growth.** `game_item` grows by ~7 000 rows on the first backfill, then
+  stays flat (steady-state runs create ~0). `external_sync_report` spikes by
+  ~#new-rows on the first run (one `CREATED_WIKI_ONLY` each); `pruneRuns` trims
+  it to the last few runs over subsequent cycles.
+- **Orphan sweep.** A `Skipping cross-kind orphan sweep …` WARN line means at
+  least one pass returned empty/304/capped — expected on unchanged feeds, but a
+  persistent skip plus a missing kind points at a broken filter or endpoint.
+- **Sanity cap.** An `exceeding the sanity cap` ERROR line is the §3.4 quirk
+  firing — re-probe the filter (§5.2) and correct the offending `*-filter`.
 
 ---
 
