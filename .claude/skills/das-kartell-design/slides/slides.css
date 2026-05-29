@@ -1,0 +1,127 @@
+/* ============================================================================
+   DAS KARTELL — Profit Basetool · Slide template
+   Design size 1280×720. Layered on ../colors_and_type.css + ../krt-components.css
+   ============================================================================ */
+
+deck-stage:not(:defined) { visibility: hidden; }
+deck-stage { background: #000; }
+
+/* Every slide: black canvas + faint honeycomb wash. */
+.slide {
+    width: 100%; height: 100%;
+    box-sizing: border-box;
+    padding: 72px 88px;
+    background-color: var(--color-bg-black);
+    background-image: url('../assets/honeycomb-bg.svg');
+    background-repeat: repeat;
+    background-size: 40px 23.1px;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Top-right standing logo mark + corner ticks shared by content slides */
+.slide .corner-mark {
+    position: absolute; top: 40px; right: 48px;
+    display: flex; align-items: center; gap: 12px;
+    color: var(--color-gray-2);
+    font-family: var(--font-headline); text-transform: uppercase;
+    letter-spacing: 0.14em; font-size: 12px;
+}
+.slide .corner-mark img { height: 26px; }
+
+/* thin HUD frame ticks (top-left + bottom-right) on content slides */
+.slide.framed::before, .slide.framed::after {
+    content: ''; position: absolute; width: 26px; height: 26px;
+}
+.slide.framed::before { top: 34px; left: 40px; border-top: 2px solid var(--color-primary); border-left: 2px solid var(--color-primary); }
+.slide.framed::after  { bottom: 34px; right: 40px; border-bottom: 2px solid var(--color-primary); border-right: 2px solid var(--color-primary); }
+
+/* Headlines */
+.slide h1, .slide h2, .slide h3 {
+    font-family: var(--font-headline);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+    line-height: 1.05;
+}
+.eyebrow {
+    font-family: var(--font-body); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.22em;
+    font-size: 14px; color: var(--color-gray-2);
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+}
+.eyebrow::before { content: ''; width: 34px; height: 2px; background: var(--color-primary); }
+
+/* ---- TITLE slide ---------------------------------------------------------- */
+.slide-title { align-items: flex-start; justify-content: center; }
+.slide-title .logo { height: 96px; margin-bottom: 36px; }
+.slide-title h1 { font-size: 76px; }
+.slide-title .tagline { color: var(--color-gray-1); font-size: 22px; font-weight: 300; margin-top: 22px; max-width: 760px; }
+.slide-title .meta {
+    position: absolute; left: 88px; bottom: 64px;
+    display: flex; gap: 28px; align-items: center;
+    color: var(--color-gray-2); font-size: 14px;
+    font-family: var(--font-mono);
+}
+.slide-title .meta .badge {
+    border: 1px solid var(--color-primary); color: var(--color-primary);
+    border-radius: 999px; padding: 4px 14px; font-family: var(--font-body);
+    font-weight: 700; letter-spacing: 0.05em;
+}
+
+/* ---- SECTION divider ------------------------------------------------------ */
+.slide-section { justify-content: center; }
+.slide-section .num {
+    font-family: var(--font-headline); color: var(--color-accent-dark);
+    font-size: 120px; line-height: 1; opacity: 0.6; margin-bottom: 8px;
+}
+.slide-section h1 { font-size: 64px; max-width: 900px; }
+.slide-section .rule { width: 120px; height: 3px; background: var(--color-primary); margin-top: 28px; }
+
+/* ---- CONTENT / agenda ----------------------------------------------------- */
+.slide h2.title { font-size: 40px; margin-bottom: 36px; }
+.bullets { display: flex; flex-direction: column; gap: 18px; max-width: 920px; }
+.bullets .item { display: flex; gap: 18px; align-items: flex-start; }
+.bullets .k {
+    font-family: var(--font-headline); color: var(--color-primary);
+    font-size: 18px; min-width: 44px; padding-top: 2px;
+}
+.bullets .b { font-size: 22px; font-weight: 300; color: var(--color-gray-1); }
+.bullets .b strong { color: var(--color-white); font-weight: 700; }
+
+/* ---- COMPARISON ----------------------------------------------------------- */
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; flex: 1; }
+.col { padding: 28px 30px; display: flex; flex-direction: column; }
+.col h3 { font-size: 24px; margin-bottom: 18px; }
+.col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.col li { font-size: 19px; font-weight: 300; color: var(--color-gray-1); display: flex; gap: 12px; align-items: flex-start; }
+.col li::before { content: ''; width: 8px; height: 8px; background: var(--color-primary); margin-top: 9px; flex: none; }
+.col.muted li::before { background: var(--color-gray-2); }
+
+/* ---- STATS ---------------------------------------------------------------- */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; flex: 1; align-content: center; }
+.stat-card { padding: 30px 32px; }
+.stat-card .n { font-family: var(--font-headline); color: var(--color-primary); font-size: 58px; line-height: 1; }
+.stat-card .n.green { color: var(--color-success); }
+.stat-card .k { color: var(--color-gray-2); text-transform: uppercase; letter-spacing: 0.1em; font-size: 14px; margin-top: 14px; }
+
+/* ---- QUOTE ---------------------------------------------------------------- */
+.slide-quote { justify-content: center; }
+.slide-quote blockquote {
+    margin: 0; font-family: var(--font-headline); color: var(--color-white);
+    text-transform: uppercase; letter-spacing: 0.03em;
+    font-size: 46px; line-height: 1.2; max-width: 1000px;
+}
+.slide-quote blockquote .accent { color: var(--color-primary); }
+.slide-quote .cite { margin-top: 32px; color: var(--color-gray-2); font-size: 18px; font-family: var(--font-mono); }
+
+/* ---- CLOSING -------------------------------------------------------------- */
+.slide-close { align-items: center; justify-content: center; text-align: center; }
+.slide-close img { height: 88px; margin-bottom: 30px; }
+.slide-close h1 { font-size: 56px; }
+.slide-close .url { margin-top: 22px; color: var(--color-primary); font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.05em; }

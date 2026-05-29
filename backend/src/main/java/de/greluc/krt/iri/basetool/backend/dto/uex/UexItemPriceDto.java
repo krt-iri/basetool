@@ -14,11 +14,10 @@ import lombok.Builder;
  * item_uuid} / {@code terminal_name}, which the lenient UEX codec mapper ignores. There is no rent
  * or buy/sell-status field in this feed (see the reserved-null columns on {@code GameItemPrice}).
  *
- * @param idItem UEX integer item id (joins to {@code game_item.uex_item_id})
- * @param idTerminal UEX integer terminal id (joins to {@code terminal.id_terminal})
- * @param priceBuy buy price in credits, or {@code null}
- * @param priceSell sell price in credits, or {@code null}
- * @param dateModified UEX unix timestamp (seconds) of the last price change, or {@code null}
+ * <p>Component {@code idItem} is the UEX integer item id (joins to {@code game_item.uex_item_id});
+ * {@code idTerminal} is the UEX integer terminal id (joins to {@code terminal.id_terminal}); {@code
+ * priceBuy} and {@code priceSell} are buy/sell prices in credits or {@code null}; {@code
+ * dateModified} is the UEX unix timestamp (seconds) of the last price change, or {@code null}.
  */
 @Builder
 public record UexItemPriceDto(

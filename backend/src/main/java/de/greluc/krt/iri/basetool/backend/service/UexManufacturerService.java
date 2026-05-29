@@ -22,9 +22,15 @@ import org.springframework.util.StringUtils;
  * is_item_manufacturer} / {@code is_vehicle_manufacturer} flags telling consumers which surface(s)
  * it serves.
  *
- * <p>Match chain (R2): {@code byUexCompanyId(dto.id)} → {@code byNameIgnoreCase} fallback for the
- * legacy rows created before V107 added the {@code uex_company_id} column. Once a row's {@code
- * uex_company_id} is populated the fallback never fires on subsequent syncs.
+ * <p>Match chain: {@code byUexCompanyId(dto.id)} → {@code byNameIgnoreCase(dto.name)} → {@code
+ * byAbbreviationIgnoreCase(nickname)}. The abbreviation step is load-bearing, not cosmetic: {@code
+ * abbreviation} is UNIQUE, and the vehicle-manufacturer rows seeded before this sync persisted
+ * every company store the short nickname as their {@code name} — local {@code "Esperia"} vs UEX
+ * {@code name="Esperia Incorporation"}, {@code nickname="Esperia"}. Such a row misses the id and
+ * name lookups, so without the abbreviation fallback the insert collides on {@code
+ * manufacturer_abbreviation_key}. Probing all three unique keys before insert also guarantees no
+ * upsert can violate a unique constraint and poison the single-transaction sweep. Once a row's
+ * {@code uex_company_id} is populated the fallbacks never fire on subsequent syncs.
  *
  * <p>Empty UEX response short-circuits without wiping local data.
  */
@@ -80,13 +86,18 @@ public class UexManufacturerService {
   }
 
   /**
-   * Upserts a single UEX company DTO. {@code true} return = a new row was inserted.
+   * Upserts a single UEX company DTO via the {@code uexCompanyId → name → abbreviation} match
+   * chain, adopting a pre-existing row (e.g. a legacy short-named vehicle manufacturer) instead of
+   * inserting a duplicate that would violate the UNIQUE {@code abbreviation} and abort the whole
+   * sweep. {@code true} return = a new row was inserted.
    *
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row
    * @return {@code true} when the row was newly inserted
    */
   private boolean upsertCompany(UexCompanyDto dto, Instant now) {
+    String abbreviation = StringUtils.hasText(dto.nickname()) ? dto.nickname() : dto.name();
+
     Optional<Manufacturer> existingOpt = Optional.empty();
     if (dto.id() != null) {
       existingOpt = manufacturerRepository.findByUexCompanyId(dto.id());
@@ -94,13 +105,18 @@ public class UexManufacturerService {
     if (existingOpt.isEmpty()) {
       existingOpt = manufacturerRepository.findByNameIgnoreCase(dto.name());
     }
+    if (existingOpt.isEmpty()) {
+      // The UNIQUE key is abbreviation, so a miss on both id and name still has to reconcile here
+      // before inserting — otherwise a legacy row whose name is the short nickname (Esperia,
+      // Banu, Vanduul) collides on manufacturer_abbreviation_key.
+      existingOpt = manufacturerRepository.findByAbbreviationIgnoreCase(abbreviation);
+    }
 
     final boolean isNew = existingOpt.isEmpty();
     Manufacturer manufacturer = existingOpt.orElseGet(Manufacturer::new);
 
     manufacturer.setName(dto.name());
-    String abbr = StringUtils.hasText(dto.nickname()) ? dto.nickname() : dto.name();
-    manufacturer.setAbbreviation(abbr);
+    manufacturer.setAbbreviation(abbreviation);
     if (StringUtils.hasText(dto.nickname())) {
       manufacturer.setNickname(dto.nickname());
     }

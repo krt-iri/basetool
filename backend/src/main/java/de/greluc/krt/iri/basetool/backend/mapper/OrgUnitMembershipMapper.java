@@ -8,8 +8,9 @@ import org.mapstruct.Mapping;
 /**
  * MapStruct mapper from {@link OrgUnitMembership} entities to their wire shape. Unpacks the
  * embedded {@link de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId} composite key into
- * two flat UUID fields and reads {@code user.displayName} through the LAZY association so the admin
- * roster page can render member chips without a per-row join.
+ * two flat UUID fields and reads {@code user.effectiveName} (display name with username fallback)
+ * through the LAZY association so the admin roster page can render member chips without a per-row
+ * join.
  *
  * <p>Inverse mapping (DTO → entity) is intentionally absent — memberships are created through the
  * service's {@code addMember(orgUnitId, userId)} helper which constructs the embedded id from the
@@ -25,17 +26,19 @@ public interface OrgUnitMembershipMapper {
    * Maps a persisted {@link OrgUnitMembership} to its wire shape. The {@code userId} / {@code
    * orgUnitId} fields come from the embedded {@link OrgUnitMembership#getId()}; the discriminator
    * and timestamps come straight from the entity. {@code userDisplayName} reads {@code
-   * user.displayName} through the LAZY association — callers that already hold a Hibernate session
-   * see it materialised, callers that hold a detached entity will get the value if the entity's
-   * display name was eagerly accessed before detach (the admin roster code path always reads it
-   * during the same transaction).
+   * user.effectiveName} through the LAZY association — that helper returns the display name when
+   * set and falls back to {@code username} when it is {@code null}/blank, so the admin roster never
+   * shows an empty cell for users who have not configured a display name. Callers that already hold
+   * a Hibernate session see it materialised; callers that hold a detached entity will get the value
+   * if the user fields were eagerly accessed before detach (the admin roster code path always reads
+   * it during the same transaction).
    *
    * @param entity the membership row; never {@code null}.
    * @return the wire-shape DTO, never {@code null}.
    */
   @Mapping(target = "userId", source = "id.userId")
   @Mapping(target = "orgUnitId", source = "id.orgUnitId")
-  @Mapping(target = "userDisplayName", source = "user.displayName")
+  @Mapping(target = "userDisplayName", source = "user.effectiveName")
   @Mapping(target = "isLogistician", source = "logistician")
   @Mapping(target = "isMissionManager", source = "missionManager")
   @Mapping(target = "isLead", source = "lead")
