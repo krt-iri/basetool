@@ -28,6 +28,13 @@ public class AsyncConfig {
   public static final String UEX_EXECUTOR = "uexExecutor";
 
   /**
+   * Spring-bean name of the SC Wiki executor, referenced from {@code @Async("scWikiExecutor")}.
+   * Distinct from {@link #UEX_EXECUTOR} so a slow Wiki response cannot starve the UEX sync (and
+   * vice-versa).
+   */
+  public static final String SCWIKI_EXECUTOR = "scWikiExecutor";
+
+  /**
    * Bounded executor for the periodic UEX sync sweep dispatched by {@link
    * de.greluc.krt.iri.basetool.backend.service.UexScheduler}.
    *
@@ -67,6 +74,40 @@ public class AsyncConfig {
     executor.setMaxPoolSize(4);
     executor.setQueueCapacity(100);
     executor.setThreadNamePrefix("uex-async-");
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(20);
+    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
+    executor.initialize();
+    return executor;
+  }
+
+  /**
+   * Bounded executor for the periodic SC Wiki sync dispatched by {@code ScWikiScheduler}.
+   *
+   * <p>Sizing rationale: the Wiki tick fires at most once every 24 hours (default {@code
+   * krt.scwiki.scheduler-delay = 86 400 000 ms}) and chains a small fan-out of paginated HTTP calls
+   * against the Wiki API. A core pool of two threads covers the normal single-active-sync case plus
+   * head-room for an admin-triggered re-sync overlapping with the scheduler; the queue is
+   * intentionally narrow (size 0) so an unhealthy Wiki backend cannot pile up multiple ticks
+   * waiting silently — instead, the second submission is rejected and surfaces in logs as a {@link
+   * java.util.concurrent.RejectedExecutionException}.
+   *
+   * <p>{@link #MdcPropagatingTaskDecorator} mirrors the UEX executor: classic {@code ThreadLocal}
+   * holders (including SLF4J's MDC) do not flow across thread boundaries automatically. Without the
+   * decorator, every Wiki-sync log line would lose its correlation id / user id / org-unit id
+   * because the {@code @Scheduled}-triggered task hands off to a fresh thread that has never seen
+   * the request filter chain.
+   *
+   * @return configured SC Wiki async executor
+   */
+  @Bean(name = SCWIKI_EXECUTOR)
+  public Executor scWikiExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(2);
+    executor.setQueueCapacity(0);
+    executor.setThreadNamePrefix("scwiki-async-");
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(20);

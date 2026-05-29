@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:b18392b3-1bfb-4b98-9d5e-a7b561b9c181",
+  "serialNumber" : "urn:uuid:84b4e3c9-7147-40c2-949d-82edf3a9cca8",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-26T07:32:36Z",
+    "timestamp" : "2026-05-27T19:49:31Z",
     "tools" : {
       "components" : [
         {
@@ -3592,6 +3592,63 @@
           "url" : "https://github.com/redis/lettuce"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
+      "group" : "io.micrometer",
+      "name" : "context-propagation",
+      "version" : "1.2.1",
+      "description" : "A library that assists with context propagation across different types of context mechanisms such as ThreadLocal, Reactor Context etc.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "1e6bffb919609d309626ad653b00e287"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "8951419f78e7bc7e0db246cd9d987d254b014e29"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "5b69e2100640879ccf4b20673ced86de560b8e217b55542f85a53d3563b72aaa"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "372ce3a235fb92bfc5993c621644fa0678accddd0b14c51c05834d1d6538d174f35abc0234c760fee728313d85593f12032fc6f208c47e65ade6d6f886812158"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "f658fe5608b456dac01a28666530e55f0fb0fdcab87eb16f50e3f645505f4231f03ec7f18c26ebadc5f4ed8b97b46e3e"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "bb986fa3082570f167c1f292c85bba80fac9809f85b091c6af52026bf6038b5319265a7c37fb90b0d80ac22611a59513"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "43ab14fd64bd5995eb46fc405769263d674aff07823e8e32e9e78c2b29a9b1c3"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "4a441d207151015671419ac9345d0e7fdc2f321a2fe51fdedd45a2ec9747e47953a53005a95489f4bca88c8ef6ad8ffe93f12854a2b18ba2fcafc77f7ce230c6"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -17826,6 +17883,7 @@
         "pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
+        "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
@@ -17981,6 +18039,12 @@
         "pkg:maven/io.netty/netty-transport@4.2.13.Final?type=jar",
         "pkg:maven/io.projectreactor/reactor-core@3.8.5?type=jar",
         "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
       ]
     },
     {
