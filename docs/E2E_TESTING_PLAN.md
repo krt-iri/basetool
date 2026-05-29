@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett. Phasen 4–6 offen. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen. Phasen 5–6 offen. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 
@@ -113,6 +113,14 @@ Refinery-Standorte und ShipTypes sind normalerweise UEX-synced und über die Adm
 **JobOrder-Handover (umgesetzt):** der zuvor vertagte Concurrency-Flow. Vorbedingung wird komplett per REST geseedet: Auftrag (`POST /api/v1/orders`) + verknüpfter Lagereintrag (`POST /api/v1/inventory` mit `jobOrderId`, gleiches Material, Qualität ≥ `minQuality`). Im Test öffnet `JobOrderHandoverE2eTest` das Handover-Modal; dieses lädt das verknüpfte Inventar pro Material **lazy per `fetch`** und snapshottet es beim „Material auswählen"-Klick in das Dropdown — der Test muss also vor dem Hinzufügen einer Zeile per `waitForResponse` auf die `…/materials/{matId}/inventory`-Antwort warten (Snapshot füllt sich sonst leer und bleibt leer). Die Übergabezeit nutzt denselben `datetime-split-group`-Mechanismus wie Mission, hier aber ohne Race (das Modal öffnet lange nach dem Page-Load, der Splitter ist bereits initialisiert) und mit `data-validate-not-past='false'`.
 
 Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
+
+## Phase 4 — Stand (2026-05-29)
+
+**Smoke-Subset grün.** `CorePagesSmokeE2eTest` (`@Tag("smoke")`) loggt einmal ein und lädt die Kernseiten (`/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar`) — je als parametrisierter, **nicht-destruktiver** Check, der nur prüft, dass die authentifizierte App-Shell rendert (Sidebar-Link `nav-orders`, hinter `isAuthenticated()` gegated, daher ein stärkeres Login-Signal als das auch anonym sichtbare `nav-missions`). Erzeugt/ändert nichts → gefahrlos gegen Staging.
+
+**Tag-Trennung in Gradle:** `e2eTest` filtert jetzt auf `@Tag("e2e")` (die sechs destruktiven Flows), die neue `smokeTest`-Task auf `@Tag("smoke")`. Beide teilen sich dieselbe Verdrahtung (`playwrightSuiteConfig`): `e2e`-Source-Set, provisioniertes Chromium, `e2e.*`-Property-Forwarding. Dass `smokeTest` exakt die fünf Smoke-Checks und keinen der sechs e2e-Flows ausführt, belegt die Tag-Filterung in beide Richtungen.
+
+**Ziel-Agnostik:** Ohne `E2E_BASE_URL` fährt `E2eStackExtension` den ephemeren Stack hoch (hier verifiziert). Mit gesetztem `E2E_BASE_URL` (+ `-Pe2e.username`/`-Pe2e.password` aus CI-Secrets) überspringt die Extension Docker komplett und läuft gegen das externe Deployment — dann kostet die Suite nur Login + fünf Seitenaufrufe statt eines Stack-Boots.
 
 ## Warum dieser Stack zu diesem Projekt passt
 

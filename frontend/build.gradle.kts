@@ -284,20 +284,36 @@ val playwrightInstall by tasks.registering(JavaExec::class) {
   args("install", "chromium")
 }
 
-tasks.register<Test>("e2eTest") {
+// Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
+// provisioned Chromium and forward the same `e2e.*` knobs; they differ only in the JUnit tag they
+// select (and therefore the target they assume). E2E_BASE_URL is read straight from the inherited
+// environment by E2eStackExtension, so it needs no forwarding; -Pe2e.baseUrl switches to
+// external/staging mode.
+val playwrightSuiteConfig: Test.() -> Unit = {
   group = "verification"
-  description = "Runs the Playwright end-to-end suite against a running stack (Phase 0 spike)."
   testClassesDirs = sourceSets["e2e"].output.classesDirs
   classpath = sourceSets["e2e"].runtimeClasspath
   dependsOn(playwrightInstall)
   // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
   // the full browser set (Firefox + WebKit) on first run.
   environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
-  // Forward E2E knobs only when explicitly provided via -P, so a plain run lets E2eStackExtension
-  // manage an ephemeral stack. E2E_BASE_URL is read straight from the inherited environment by the
-  // extension, so it needs no forwarding; -Pe2e.baseUrl switches to external/staging mode.
   listOf("e2e.baseUrl", "e2e.username", "e2e.password", "e2e.hostResolverRules").forEach { key ->
     (findProperty(key) as String?)?.let { systemProperty(key, it) }
   }
+}
+
+// Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).
+tasks.register<Test>("e2eTest") {
+  description = "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("e2e") }
+}
+
+// Non-destructive login + core-page checks; target-agnostic, safe to run against staging.
+tasks.register<Test>("smokeTest") {
+  description =
+    "Runs the non-destructive Playwright smoke checks (JUnit tag: smoke); set E2E_BASE_URL for staging."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("smoke") }
 }
 
