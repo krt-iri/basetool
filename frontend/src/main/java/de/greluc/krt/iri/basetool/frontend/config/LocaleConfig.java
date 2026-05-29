@@ -16,13 +16,13 @@ public class LocaleConfig implements WebMvcConfigurer {
 
   /**
    * Cookie-based {@link LocaleResolver}: persists the user's locale in the {@code KRT_LOCALE}
-   * cookie (default German, 365-day max-age, path {@code /}).
+   * cookie (default German, 90-day (3-month) max-age, path {@code /}).
    */
   @Bean
   public LocaleResolver localeResolver() {
     CookieLocaleResolver clr = new CookieLocaleResolver("KRT_LOCALE");
     clr.setDefaultLocale(Locale.GERMAN);
-    clr.setCookieMaxAge(Duration.ofDays(365));
+    clr.setCookieMaxAge(Duration.ofDays(90));
     clr.setCookiePath("/");
     return clr;
   }

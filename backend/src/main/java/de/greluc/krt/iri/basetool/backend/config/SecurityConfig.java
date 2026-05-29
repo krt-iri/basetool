@@ -304,6 +304,19 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole("ADMIN")
+                    // GET .../memberships ist die Picker-Read-Variante (SPEZIALKOMMANDO_PLAN.md
+                    // §7.4) — gibt nur OrgUnit-Names + Shorthands zurueck, keine PII. Wird vom
+                    // Frontend SquadronContextAdvice (Sidebar-Switcher + Bereichskontext-Chip)
+                    // sowie von den R5.d Owner-Picker-Fragments fuer jeden authenticated Caller
+                    // gelesen. Ohne diese explizite Regel faellt die URL in die catch-all
+                    // `/api/v1/users/**` darunter — die ist `hasRole("ADMIN")` und verursachte
+                    // einen 403 fuer Non-Admins beim eigenen Memberships-Lookup (Sidebar-Chip
+                    // zeigte dann "Kein Bereichskontext"). Der Method-Level @PreAuthorize auf
+                    // UserController#getUserMemberships ist die zweite Verteidigungslinie
+                    // (defense in depth) und bleibt das Source-of-truth fuer die zulaessigen
+                    // Rollen — die URL-Regel oeffnet nur das Tor.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
+                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
                     .requestMatchers("/api/v1/users/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
