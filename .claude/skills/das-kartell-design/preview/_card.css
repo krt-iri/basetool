@@ -18,7 +18,7 @@ body {
     text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-gray-2);
     margin: 0 0 2px;
 }
-.pv-mono { font-family: var(--font-mono); font-size: 0.66rem; color: var(--color-gray-2); }
+.pv-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; font-size: 0.68rem; color: var(--color-gray-2); }
 .swatch { width: 100%; height: 56px; border: 1px solid rgba(255,255,255,0.08); }
 .swatch-wrap { width: 150px; }
 .swatch-meta { display: flex; justify-content: space-between; margin-top: 5px; gap: 6px; }

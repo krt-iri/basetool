@@ -264,7 +264,7 @@ Root manifest:
 | `SKILL.md` | Agent-Skills entry point (for use in Claude Code). |
 | `colors_and_type.css` | `@font-face` declarations + all color/type/shape tokens. |
 | `krt-components.css` | Component CSS layer built on the tokens. |
-| `fonts/` | Ethnocentric (Regular/Italic) + Lato (Thin→Black, each + italic). |
+| `fonts/` | Ethnocentric (Regular/Italic) + Lato (Thin→Black, each + italic) — self-hosted WOFF2 with OTF/TTF fallback. |
 | `assets/` | `krt.webp` (mark), `krt-favicon.webp`, `Kartelllogo.jpg` (lockup), `honeycomb.svg` + `honeycomb-bg.svg` (Wabenmuster). |
 | `preview/` | 22 Design System specimen cards (type, color, spacing, components, brand — incl. the rank ladder, honeycomb pattern and background/texture treatments). |
 | `slides/` | HUD slide template (deck-stage) — title, section, content, stats, comparison, quote, closing. |
