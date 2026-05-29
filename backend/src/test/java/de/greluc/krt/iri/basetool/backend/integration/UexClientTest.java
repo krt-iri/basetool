@@ -2,6 +2,10 @@ package de.greluc.krt.iri.basetool.backend.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.iri.basetool.backend.config.UexProperties;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
@@ -15,6 +19,7 @@ import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -136,6 +141,29 @@ class UexClientTest {
     // Then
     assertNotNull(commodities);
     assertTrue(commodities.isEmpty());
+  }
+
+  @Test
+  void getCommodities_nullDataEnvelope_returnsEmptyListWithoutLoggingAnError() {
+    // UEX sometimes returns {"status":"ok","data":null} for an empty category; the old
+    // .map(UexResponseDto::data) emitted null and Reactor rejected it with a logged NPE.
+    Logger uexLog = (Logger) LoggerFactory.getLogger(UexClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    uexLog.addAppender(appender);
+    try {
+      server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null}"));
+
+      List<UexCommodityDto> commodities = client.getCommodities();
+
+      assertNotNull(commodities, "null data must surface as an empty list, not null");
+      assertTrue(commodities.isEmpty());
+      assertTrue(
+          appender.list.stream().noneMatch(e -> e.getLevel() == Level.ERROR),
+          "null data is not a fetch failure — it must not be logged as ERROR");
+    } finally {
+      uexLog.detachAppender(appender);
+    }
   }
 
   // ─── getCommoditiesPricesAll ────────────────────────────────────────────

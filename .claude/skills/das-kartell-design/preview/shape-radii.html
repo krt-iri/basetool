@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="_card.css">
+<style>
+  .demo { display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
+  .box { width:90px; height:64px; background:var(--color-gray-3); border:1px solid var(--color-primary); display:flex; align-items:center; justify-content:center; color:var(--color-gray-1); font-size:.7rem; }
+  .pill { width:auto; padding:0 18px; border-radius:999px; height:30px; }
+</style>
+</head>
+<body>
+  <p class="pv-label">Shape — square-first, pills are the exception</p>
+  <div class="demo">
+    <div style="text-align:center;"><div class="box">0</div><p class="pv-mono" style="margin-top:7px;">cards · inputs<br>buttons · modals</p></div>
+    <div style="text-align:center;"><div class="box pill">PILL</div><p class="pv-mono" style="margin-top:7px;">badges &amp; chips<br>radius 999px</p></div>
+    <div style="text-align:center;"><div class="box" style="border-radius:50%; width:64px;">○</div><p class="pv-mono" style="margin-top:7px;">radio only</p></div>
+  </div>
+  <p class="pv-mono" style="margin-top:16px;">No soft corners anywhere else. Geometry is built from rings (planets) &amp; triangles (ships).</p>
+</body>
+</html>

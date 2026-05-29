@@ -16,8 +16,10 @@ import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -102,6 +104,8 @@ public class Blueprint extends AbstractEntity<UUID> {
   private Instant scwikiDeletedAt;
 
   /** Ordered ingredient lines (RESOURCE or ITEM). Owned with cascade + orphan removal. */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
   @OneToMany(
       mappedBy = "blueprint",
       cascade = CascadeType.ALL,
@@ -111,6 +115,8 @@ public class Blueprint extends AbstractEntity<UUID> {
   private List<BlueprintIngredient> ingredients = new ArrayList<>();
 
   /** Ordered dismantle-return lines (RESOURCE only). Owned with cascade + orphan removal. */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
   @OneToMany(
       mappedBy = "blueprint",
       cascade = CascadeType.ALL,
@@ -118,4 +124,55 @@ public class Blueprint extends AbstractEntity<UUID> {
       fetch = FetchType.LAZY)
   @OrderBy("orderIndex ASC")
   private List<BlueprintDismantleReturn> dismantleReturns = new ArrayList<>();
+
+  /**
+   * Returns the ordered ingredient lines as an unmodifiable view. Mutate the recipe through {@link
+   * #addIngredient} / {@link #removeLastIngredient} so the managed collection (and its
+   * orphan-removal semantics) stays under the entity's control.
+   *
+   * @return an unmodifiable view of the ingredient lines
+   */
+  public List<BlueprintIngredient> getIngredients() {
+    return Collections.unmodifiableList(ingredients);
+  }
+
+  /**
+   * Appends an ingredient line and sets its back-reference to this blueprint.
+   *
+   * @param ingredient the line to add
+   */
+  public void addIngredient(BlueprintIngredient ingredient) {
+    ingredient.setBlueprint(this);
+    ingredients.add(ingredient);
+  }
+
+  /** Removes the last ingredient line; orphan removal deletes it on flush. */
+  public void removeLastIngredient() {
+    ingredients.removeLast();
+  }
+
+  /**
+   * Returns the ordered dismantle-return lines as an unmodifiable view. Mutate through {@link
+   * #addDismantleReturn} / {@link #removeLastDismantleReturn}.
+   *
+   * @return an unmodifiable view of the dismantle-return lines
+   */
+  public List<BlueprintDismantleReturn> getDismantleReturns() {
+    return Collections.unmodifiableList(dismantleReturns);
+  }
+
+  /**
+   * Appends a dismantle-return line and sets its back-reference to this blueprint.
+   *
+   * @param dismantleReturn the line to add
+   */
+  public void addDismantleReturn(BlueprintDismantleReturn dismantleReturn) {
+    dismantleReturn.setBlueprint(this);
+    dismantleReturns.add(dismantleReturn);
+  }
+
+  /** Removes the last dismantle-return line; orphan removal deletes it on flush. */
+  public void removeLastDismantleReturn() {
+    dismantleReturns.removeLast();
+  }
 }

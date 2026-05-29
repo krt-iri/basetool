@@ -33,6 +33,18 @@
                     align-items: stretch;
                 }
             }
+            /*
+             * The owner-picker fragment renders `.form-group.owner-picker` without
+             * the inline `flex: X; margin-bottom: 0;` reset that every sibling field
+             * in `.material-row` carries. Without these overrides the picker inherits
+             * the global `.form-group { margin-bottom: 1.25rem; }` from styles.css and
+             * floats above the row baseline under `align-items: flex-end`. `flex: 2`
+             * matches the Besitzer select that sits next to it on the first row.
+             */
+            .material-row > .owner-picker {
+                flex: 2;
+                margin-bottom: 0;
+            }
             /* UEX refinery yield bonus/malus next to the output-quantity label.
                Positive = green (Profit department color), negative = red (Combat),
                zero = muted. Matches the semantic-color palette in styles.css. */
