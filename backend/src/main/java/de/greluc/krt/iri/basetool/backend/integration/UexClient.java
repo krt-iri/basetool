@@ -1,11 +1,13 @@
 package de.greluc.krt.iri.basetool.backend.integration;
 
 import de.greluc.krt.iri.basetool.backend.config.UexProperties;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCityDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCompanyDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexFactionDto;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexJurisdictionDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexMoonDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexOrbitDto;
@@ -288,6 +290,36 @@ public class UexClient {
         uexProperties.getRefineriesYieldsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "refineries yields");
+  }
+
+  /**
+   * Fetches the UEX category reference table (R2). The list drives {@code UexItemSyncService}'s
+   * 98-iteration walk through {@code /items?id_category=<n>}.
+   *
+   * @return all categories, or an empty list on error / 304
+   */
+  public List<UexCategoryDto> getCategories() {
+    return fetchList(
+        uexProperties.getCategoriesEndpoint(), new ParameterizedTypeReference<>() {}, "categories");
+  }
+
+  /**
+   * Fetches every UEX item in a single category (R2). UEX rejects {@code /items} without a filter
+   * parameter; the {@code UexItemSyncService} drives this method from the {@code uex_category}
+   * reference table.
+   *
+   * <p>ETag storage is keyed by the full URL including the {@code id_category} query so each
+   * category's response is conditionally cached independently — a category whose roster has not
+   * changed between sync runs short-circuits via {@code 304 Not Modified} without re-parsing the
+   * payload.
+   *
+   * @param categoryId UEX integer category id (from {@code /categories[].id})
+   * @return items in this category, or an empty list on error / 304
+   */
+  public List<UexItemDto> getItemsForCategory(int categoryId) {
+    String endpoint = uexProperties.getItemsEndpoint() + "?id_category=" + categoryId;
+    return fetchList(
+        endpoint, new ParameterizedTypeReference<>() {}, "items (category=" + categoryId + ")");
   }
 
   /**

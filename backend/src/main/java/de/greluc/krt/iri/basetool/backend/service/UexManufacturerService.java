@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexCompanyDto;
 import de.greluc.krt.iri.basetool.backend.integration.UexClient;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -13,13 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * Imports the UEX company catalog filtered to vehicle manufacturers.
+ * Imports UEX Corp's {@code /companies} catalogue into the local {@code manufacturer} table.
  *
- * <p>UEX's {@code /companies} endpoint covers every in-universe company; this service only persists
- * rows where {@code isVehicleManufacturerFlag = true}, since the local {@code manufacturer} table
- * is exclusively used for ship-type manufacturer references. Match is by case-insensitive name so
- * the same manufacturer never gets duplicated even if UEX changes its canonical capitalization.
- * Empty UEX response short-circuits without wiping local data.
+ * <p>R2 expansion: previously only persisted vehicle manufacturers (the manufacturer table served
+ * the ship picker exclusively). R2 ships the UEX item catalogue, so item manufacturers are also
+ * needed — every company UEX returns now gets a {@code manufacturer} row, with the new {@code
+ * is_item_manufacturer} / {@code is_vehicle_manufacturer} flags telling consumers which surface(s)
+ * it serves.
+ *
+ * <p>Match chain (R2): {@code byUexCompanyId(dto.id)} → {@code byNameIgnoreCase} fallback for the
+ * legacy rows created before V107 added the {@code uex_company_id} column. Once a row's {@code
+ * uex_company_id} is populated the fallback never fires on subsequent syncs.
+ *
+ * <p>Empty UEX response short-circuits without wiping local data.
  */
 @Slf4j
 @Service
@@ -31,72 +38,75 @@ public class UexManufacturerService {
   private final ManufacturerRepository manufacturerRepository;
 
   /**
-   * Pulls the company catalog and upserts the vehicle-manufacturer subset. Single transaction for
-   * the entire sweep; counters are emitted as INFO-level summary at the end.
+   * Pulls the company catalogue and upserts every row. Single transaction for the full sweep;
+   * counter summary at INFO when done.
    */
   @Transactional
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
     List<UexCompanyDto> companies = uexClient.getCompanies();
-
     if (companies.isEmpty()) {
       log.warn("No companies received from UEX API. Aborting synchronization.");
       return;
     }
 
+    Instant now = Instant.now();
     int added = 0;
     int updated = 0;
-
+    int skipped = 0;
     for (UexCompanyDto dto : companies) {
-      if (Boolean.TRUE.equals(dto.isVehicleManufacturerFlag())) {
-        boolean isNew = processSingleCompany(dto);
+      if (!StringUtils.hasText(dto.name())) {
+        log.debug("Skipping company with missing name: {}", dto);
+        skipped++;
+        continue;
+      }
+      try {
+        boolean isNew = upsertCompany(dto, now);
         if (isNew) {
           added++;
         } else {
           updated++;
         }
+      } catch (Exception e) {
+        log.error("Failed to process UEX company dto: {}", dto, e);
+        skipped++;
       }
     }
-
-    log.info("Finished UEX manufacturer sync: {} added, {} updated", added, updated);
+    log.info(
+        "Finished UEX manufacturer sync: {} added, {} updated, {} skipped",
+        added,
+        updated,
+        skipped);
   }
 
-  private boolean processSingleCompany(UexCompanyDto dto) {
-    if (!StringUtils.hasText(dto.name())) {
-      log.debug("Skipping company with missing name: {}", dto);
-      return false;
+  /**
+   * Upserts a single UEX company DTO. {@code true} return = a new row was inserted.
+   *
+   * @param dto inbound UEX row
+   * @param now timestamp to stamp on the row
+   * @return {@code true} when the row was newly inserted
+   */
+  private boolean upsertCompany(UexCompanyDto dto, Instant now) {
+    Optional<Manufacturer> existingOpt = Optional.empty();
+    if (dto.id() != null) {
+      existingOpt = manufacturerRepository.findByUexCompanyId(dto.id());
+    }
+    if (existingOpt.isEmpty()) {
+      existingOpt = manufacturerRepository.findByNameIgnoreCase(dto.name());
     }
 
-    Optional<Manufacturer> existingOpt = manufacturerRepository.findByNameIgnoreCase(dto.name());
+    final boolean isNew = existingOpt.isEmpty();
+    Manufacturer manufacturer = existingOpt.orElseGet(Manufacturer::new);
 
-    if (existingOpt.isPresent()) {
-      Manufacturer existing = existingOpt.orElseThrow();
-      updateManufacturer(existing, dto);
-      manufacturerRepository.save(existing);
-      return false;
-    } else {
-      Manufacturer newManufacturer = new Manufacturer();
-      newManufacturer.setName(dto.name());
-      updateManufacturer(newManufacturer, dto);
-      manufacturerRepository.save(newManufacturer);
-      return true;
-    }
-  }
-
-  private void updateManufacturer(Manufacturer manufacturer, UexCompanyDto dto) {
+    manufacturer.setName(dto.name());
     String abbr = StringUtils.hasText(dto.nickname()) ? dto.nickname() : dto.name();
-    // Fallback for abbreviation if it's too long or if we want to ensure some consistency?
-    // Let's just use what UEX provides.
     manufacturer.setAbbreviation(abbr);
-
     if (StringUtils.hasText(dto.nickname())) {
       manufacturer.setNickname(dto.nickname());
     }
-
     if (StringUtils.hasText(dto.wiki())) {
       manufacturer.setWiki(dto.wiki());
     }
-
     StringBuilder description = new StringBuilder();
     if (StringUtils.hasText(dto.industry())) {
       description.append("Industry: ").append(dto.industry()).append("\n");
@@ -107,5 +117,26 @@ public class UexManufacturerService {
     if (!description.isEmpty()) {
       manufacturer.setDescription(description.toString().trim());
     }
+
+    // R2 cross-ref column writes
+    manufacturer.setUexCompanyId(dto.id());
+    manufacturer.setIndustry(dto.industry());
+    manufacturer.setIsItemManufacturer(asBoolean(dto.isItemManufacturer()));
+    manufacturer.setIsVehicleManufacturer(asBoolean(dto.isVehicleManufacturer()));
+    manufacturer.setUexSyncedAt(now);
+    manufacturer.setUexDeletedAt(null);
+
+    manufacturerRepository.save(manufacturer);
+    return isNew;
+  }
+
+  /**
+   * Normalises UEX's 0/1 integer flag into a {@link Boolean}.
+   *
+   * @param flag UEX-style integer
+   * @return {@code true} when {@code flag == 1}, {@code false} otherwise (including {@code null})
+   */
+  private static Boolean asBoolean(Integer flag) {
+    return flag != null && flag == 1;
   }
 }
