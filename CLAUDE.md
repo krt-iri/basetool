@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — **edit `versions.properties`, not `build.gradle.kts`**. Run `./gradlew refreshVersions` to discover updates.
 
+## Design system
+Befolge das Design-System unter `.claude/skills/das-kartell-design/`.
+README.md = Quelle der Wahrheit für Farben, Typo, Komponenten.
+Wichtig: Bereichsfarben nach offiziellem Manual benennen
+(#A3000A = Sub-Radar, #355DDC = Forschung, #37BBC0 = Raumüberlegenheit).
+
 ## Build, run, test
 
 Always use the Gradle wrapper. **Never** use the IDE test runner or the harness `run_test` tool — Gradle is the only sanctioned test path. This is a hard project rule and applies even when iterating on a single test.

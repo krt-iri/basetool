@@ -154,10 +154,9 @@ class ScWikiBlueprintSyncServiceTest {
     existing.setScwikiUuid(bpUuid);
     for (int i = 0; i < 3; i++) {
       BlueprintIngredient line = new BlueprintIngredient();
-      line.setBlueprint(existing);
       line.setOrderIndex(i);
       line.setKind(BlueprintIngredientKind.RESOURCE);
-      existing.getIngredients().add(line);
+      existing.addIngredient(line);
     }
     // Incoming DTO has only 1 ingredient.
     ScWikiBlueprintIngredientDto one =
