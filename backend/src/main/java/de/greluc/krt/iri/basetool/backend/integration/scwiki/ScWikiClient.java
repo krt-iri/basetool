@@ -1,5 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import jakarta.annotation.PostConstruct;
@@ -76,6 +78,15 @@ public class ScWikiClient {
    * Wiki sync runs may overlap if the previous one is long-running.
    */
   private final Map<String, String> etagByFirstPageUri = new ConcurrentHashMap<>();
+
+  /**
+   * Jackson mapper used by {@link #fetchOne} to unwrap the optional single-resource {@code {data:
+   * …}} envelope and bind the payload. A plain instance is sufficient: the SC Wiki DTOs use only
+   * core types (UUID / String / Double / Boolean / Map / nested records), so no extra modules are
+   * needed. Declared {@code final} with an initializer so Lombok keeps it off the generated
+   * constructor — existing unit tests that build the client directly stay source-compatible.
+   */
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   /**
    * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
@@ -184,6 +195,61 @@ public class ScWikiClient {
         resourceLabel,
         Math.max(lastPage, 1));
     return accumulated;
+  }
+
+  /**
+   * Fetches a single Wiki resource (e.g. {@code GET /api/items/{uuid}}) and binds it to {@code
+   * type}. Used by the R4 closure-mode item sync, which resolves items one UUID at a time rather
+   * than walking a list.
+   *
+   * <p>Envelope-tolerant: the Wiki wraps some single-resource responses in {@code {"data": {…}}}
+   * and returns others flat. The method reads the body as a tree, unwraps a top-level {@code data}
+   * node when present, then binds. A {@code 404} (the item is not on the Wiki) and any error /
+   * timeout resolve to {@code null} — the caller treats {@code null} as "Wiki doesn't know this
+   * one" and logs a {@code WIKI_MISSING} event. No ETag caching here (per-UUID fetches are one-shot
+   * within a closure run).
+   *
+   * @param <T> the target DTO type
+   * @param uri the relative request URI (e.g. {@code "/api/items/" + uuid})
+   * @param type the DTO class to bind the payload to
+   * @param resourceLabel human-readable label for log lines
+   * @return the parsed DTO, or {@code null} on 404 / error / unparseable body
+   */
+  public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
+    log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
+    JsonNode body =
+        client
+            .get()
+            .uri(uri)
+            .exchangeToMono(
+                response -> {
+                  int status = response.statusCode().value();
+                  if (status == 404 || status == 304) {
+                    return Mono.<JsonNode>empty();
+                  }
+                  if (!response.statusCode().is2xxSuccessful()) {
+                    return response.createError();
+                  }
+                  return response.bodyToMono(JsonNode.class);
+                })
+            .timeout(CALL_TIMEOUT)
+            .onErrorResume(
+                e -> {
+                  log.error("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
+                  return Mono.empty();
+                })
+            .blockOptional()
+            .orElse(null);
+    if (body == null) {
+      return null;
+    }
+    JsonNode payload = body.has("data") ? body.get("data") : body;
+    try {
+      return objectMapper.treeToValue(payload, type);
+    } catch (Exception e) {
+      log.error("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
+      return null;
+    }
   }
 
   /**

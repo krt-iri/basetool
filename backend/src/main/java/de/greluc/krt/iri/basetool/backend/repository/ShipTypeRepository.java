@@ -56,6 +56,24 @@ public interface ShipTypeRepository extends JpaRepository<ShipType, UUID> {
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
 
   /**
+   * Soft-deletes SC Wiki ownership of every ship_type row whose {@code external_uuid} is set, NOT
+   * in {@code seenExternalUuids}, and not already marked (R4 §8.6 / §8.7). Gated by the caller on a
+   * non-empty seen set so a failed / empty Wiki fetch never wipes the Wiki-side merge state.
+   *
+   * @param seenExternalUuids the external UUIDs the Wiki vehicle sync touched this run
+   * @param now timestamp to stamp on the soft-deleted rows
+   * @return number of rows marked deleted
+   */
+  @Modifying
+  @Query(
+      "UPDATE ShipType s SET s.scwikiDeletedAt = :now "
+          + "WHERE s.externalUuid IS NOT NULL "
+          + "AND s.externalUuid NOT IN :seenExternalUuids "
+          + "AND s.scwikiDeletedAt IS NULL")
+  int markScwikiDeletedExcept(
+      @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
+
+  /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * NameIgnoreCase}.
    */
