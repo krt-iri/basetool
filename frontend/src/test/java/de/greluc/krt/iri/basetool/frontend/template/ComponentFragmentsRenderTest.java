@@ -14,13 +14,13 @@ import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 /**
- * Renders the reusable design-system component fragments ({@code fragments/components.html}) through
- * the Spring Thymeleaf engine and asserts the produced markup matches the krt-components.css /
- * preview spec. Thymeleaf fragment errors surface only at render time (never at compile/build time),
- * so this test pins button/alert/table down the same way {@code OperationPageControllerMvcTest}
- * happens to cover the alert fragment via the operations list — but here every fragment, including
- * the otherwise-unexercised {@code dataTable} shell and the {@code null}-message self-gating, is
- * driven directly through a test-only harness template.
+ * Renders the reusable design-system component fragments ({@code fragments/components.html})
+ * through the Spring Thymeleaf engine and asserts the produced markup matches the
+ * krt-components.css / preview spec. Thymeleaf fragment errors surface only at render time (never
+ * at compile/build time), so this test pins button/alert/table down the same way {@code
+ * OperationPageControllerMvcTest} happens to cover the alert fragment via the operations list — but
+ * here every fragment, including the otherwise-unexercised {@code dataTable} shell and the {@code
+ * null}-message self-gating, is driven directly through a test-only harness template.
  */
 @SpringBootTest
 class ComponentFragmentsRenderTest {
@@ -35,10 +35,10 @@ class ComponentFragmentsRenderTest {
 
   /**
    * Drives the harness template and asserts each fragment emits its canonical classes/structure:
-   * the button carries {@code btn btn-danger} + a submit type, the alert carries the tinted
-   * {@code alert alert-danger} with its extra class, an alert fed a {@code null} message renders
-   * nothing (no stray {@code alert-success}), and the data table is wrapped responsively with the
-   * {@code krt-table} class plus the injected header cells and body rows.
+   * the button carries {@code btn btn-danger} + a submit type, the alert carries the tinted {@code
+   * alert alert-danger} with its extra class, an alert fed a {@code null} message renders nothing
+   * (no stray {@code alert-success}), and the data table is wrapped responsively with the {@code
+   * krt-table} class plus the injected header cells and body rows.
    */
   @Test
   void rendersButtonAlertAndDataTableFragmentsToSpec() {
