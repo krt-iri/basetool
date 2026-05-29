@@ -72,7 +72,6 @@ public class ScWikiVehicleSyncService {
       return;
     }
 
-    UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
     Set<UUID> seen = new HashSet<>();
     int linked = 0;
