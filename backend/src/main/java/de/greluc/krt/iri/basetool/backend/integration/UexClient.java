@@ -371,7 +371,9 @@ public class UexClient {
               if (etag != null && !etag.isBlank()) {
                 etagByEndpoint.put(endpoint, etag);
               }
-              return response.bodyToMono(typeRef).map(UexResponseDto::data);
+              return response
+                  .bodyToMono(typeRef)
+                  .map(body -> body.data() == null ? Collections.<T>emptyList() : body.data());
             })
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
