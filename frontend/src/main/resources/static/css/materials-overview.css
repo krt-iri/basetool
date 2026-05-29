@@ -31,7 +31,7 @@
     font-family: var(--font-body);
     font-size: 0.9rem;
     position: sticky;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     z-index: 20;
     background-clip: padding-box;
 }
@@ -130,7 +130,7 @@
 .matrix-table td:first-child {
     position: sticky;
     left: 0;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     z-index: 11;
     font-weight: bold;
     color: var(--color-primary);
@@ -188,7 +188,7 @@
 .materials-overview-main .form-group select {
     width: 100%;
     padding: 0.5rem;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     border: 1px solid var(--color-gray-3);
     color: var(--color-gray-1);
     font-family: var(--font-body);

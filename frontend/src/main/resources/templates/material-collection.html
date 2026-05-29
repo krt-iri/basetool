@@ -51,7 +51,7 @@
                     <td>
                         <select class="owner-select krt-select"
                                 th:data-inventory-id="${entry.inventoryEntryId}"
-                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
+                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
                             <option th:each="u : ${users}"
                                     th:value="${u.id}"
                                     th:text="${u.effectiveName}"
@@ -61,7 +61,7 @@
                     <td>
                         <select class="location-select krt-select"
                                 th:data-inventory-id="${entry.inventoryEntryId}"
-                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
+                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-text); padding: 0.4rem 0.5rem;">
                             <option th:each="loc : ${locations}"
                                     th:value="${loc.id}"
                                     th:text="${loc.name}"
@@ -94,7 +94,7 @@
         outline-offset: 1px;
     }
     .krt-toast {
-        background: var(--color-gray-4, #1C1C1C);
+        background: var(--color-surface-input, #1C1C1C);
         border-left: 4px solid var(--color-primary, #E77E23);
         color: var(--color-gray-1, #D2D2D2);
         font-family: 'Lato', sans-serif;

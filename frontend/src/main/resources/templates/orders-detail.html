@@ -84,7 +84,7 @@
                             data-trigger="od-update-status"
                             th:data-order-id="${order.id}"
                             th:data-version="${order.version}"
-                            style="background-color: var(--color-gray-4); color: white; border: 1px solid var(--color-gray-3);">
+                            style="background-color: var(--color-surface-input); color: white; border: 1px solid var(--color-gray-3);">
                         <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
                         <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
                         <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
@@ -136,7 +136,7 @@
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 1rem;">
-                <li th:each="user : ${order.assignees}" style="background-color: var(--color-gray-4); padding: 0.5rem 1rem; border: 1px solid var(--color-gray-3); border-radius: 4px; display: flex; align-items: center; gap: 1rem;">
+                <li th:each="user : ${order.assignees}" style="background-color: var(--color-surface-input); padding: 0.5rem 1rem; border: 1px solid var(--color-gray-3); border-radius: 4px; display: flex; align-items: center; gap: 1rem;">
                     <span th:text="${user.effectiveName}"></span>
                     
                     <form th:if="${currentUserId != null and currentUserId.equals(user.id)} or ${#authorization.expression('hasAnyRole(''ADMIN'', ''OFFICER'')')}"
@@ -159,7 +159,7 @@
 
                 <form sec:authorize="hasRole('LOGISTICIAN')" th:if="${users != null and !users.isEmpty()}"
                       th:action="@{/orders/{id}/assignees(id=${order.id})}" method="post" style="margin: 0; display: flex; gap: 0.5rem; align-items: center;">
-                    <select name="userId" style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" required>
+                    <select name="userId" style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" required>
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
                         <th:block th:each="u : ${users}">
                             <option th:if="${order.assignees == null or !#lists.contains(order.assignees.![id], u.id)}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
@@ -234,7 +234,7 @@
             
             <div class="form-group mb-1">
                 <label for="requestingOrgUnitId" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
-                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                     <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
                     <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
                         <option th:each="o : ${ownerOptions}"
@@ -270,12 +270,12 @@
 
             <div class="form-group mb-1">
                 <label for="handle" th:text="#{orders.detail.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Handle (Ingame-Name)</label>
-                <input type="text" id="handle" th:field="*{handle}" style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <input type="text" id="handle" th:field="*{handle}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
             </div>
 
             <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Materialien</h3>
             <div id="materials-container">
-                <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-gray-4); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
                     <div>
                         <label th:text="#{orders.material.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Material</label>
                         <select th:field="*{materials[__${stat.index}__].materialId}" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
@@ -340,19 +340,19 @@
                 <label for="handoverTime" th:text="#{orders.handover.time}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
-                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                 </div>
             </div>
 
             <div class="form-group mb-1">
                 <label for="recipientHandle" th:text="#{orders.handover.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Empfänger (Handle)</label>
-                <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
             </div>
 
             <div class="form-group mb-1">
                 <label for="recipientSquadron" th:text="#{orders.handover.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Staffel des Empfängers</label>
-                <select id="recipientSquadron" th:field="*{recipientSquadron}" style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <select id="recipientSquadron" th:field="*{recipientSquadron}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                     <option value="" th:text="#{orders.handover.selectSquadron}">-- Optional --</option>
                     <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
                 </select>
@@ -419,7 +419,7 @@
         row.style.gap = '1rem';
         row.style.alignItems = 'end';
         row.style.marginBottom = '1rem';
-        row.style.background = 'var(--color-gray-4)';
+        row.style.background = 'var(--color-surface-input)';
         row.style.padding = '1rem';
         row.style.border = '1px solid var(--color-gray-3)';
 
@@ -438,13 +438,13 @@
         row.innerHTML = `
             <div>
                 <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Lagereintrag</label>
-                <select name="items[${index}].inventoryItemId" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <select name="items[${index}].inventoryItemId" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                     ${options}
                 </select>
             </div>
             <div>
                 <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Menge (SCU)</label>
-                <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: white;">
+                <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
             </div>
             <div>
                 <button type="button" class="btn btn-outline-danger" style="padding: 0.5rem;" data-trigger="od-remove-handover-row">Entfernen</button>
@@ -897,7 +897,7 @@
         const detailsRow = document.createElement('tr');
         detailsRow.classList.add('inventory-details-row');
         detailsRow.innerHTML = `
-            <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+            <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
                 <div style="font-style: italic; color: var(--color-gray-2);">${MSG_LOADING_INVENTORY}</div>
             </td>
         `;
@@ -910,28 +910,28 @@
             
             if (items.length === 0) {
                 detailsRow.innerHTML = `
-                    <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+                    <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
                         <div style="font-style: italic; color: var(--color-gray-2);">${MSG_EMPTY_INVENTORY}</div>
                     </td>
                 `;
                 return;
             }
 
-            const unlinkColHeader = IS_LOGISTICIAN ? `<th style="background: var(--color-gray-5); font-size: 0.85rem;"></th>` : '';
+            const unlinkColHeader = IS_LOGISTICIAN ? `<th style="background: var(--color-gray-4); font-size: 0.85rem;"></th>` : '';
             const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
             let html = `
                 <td colspan="${subColspan}" style="padding: 0;">
-                    <div style="background: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-top: none;">
+                    <div style="background: var(--color-surface-input); border: 1px solid var(--color-gray-3); border-top: none;">
                         <div class="table-responsive">
                             <table class="data-table" style="margin: 0; border: none; background: transparent;">
                                 <thead>
                                     <tr>
-                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_OWNER}</th>
-                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_SQUADRON}</th>
-                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_LOCATION}</th>
-                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_QUALITY}</th>
-                                        <th style="background: var(--color-gray-5); font-size: 0.85rem;">${MSG_QUANTITY}</th>
+                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_OWNER}</th>
+                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_SQUADRON}</th>
+                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_LOCATION}</th>
+                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_QUALITY}</th>
+                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_QUANTITY}</th>
                                         ${unlinkColHeader}
                                     </tr>
                                 </thead>
@@ -993,7 +993,7 @@
         } catch (error) {
             console.error('Error fetching inventory items:', error);
             detailsRow.innerHTML = `
-                <td colspan="5" style="padding: 1rem; background: var(--color-gray-4);">
+                <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
                     <div style="color: var(--color-danger);">Fehler beim Laden der Lagereinträge.</div>
                 </td>
             `;

@@ -6,7 +6,7 @@
 <script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
     <style th:attr="nonce=${cspNonce}">
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
-        input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
+        input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
         .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
         .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
@@ -127,7 +127,7 @@
             box-sizing: border-box;
             width: 100%;
             min-height: 44px; /* Touch target minimum per AGENTS.md */
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             padding: 0.8rem 1rem;
             border: 1px solid var(--color-primary);
             cursor: pointer;
@@ -435,7 +435,7 @@
                     <div class="form-group">
                         <label th:text="#{mission.owner}">Besitzer</label>
                         <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                            <div style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.5rem; border: 1px solid var(--color-gray-3);">
+                            <div style="color: var(--color-accent-light); font-weight: bold; background: var(--color-surface-input); padding: 0.5rem; border: 1px solid var(--color-gray-3);">
                                 <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                             </div>
                             <div th:if="${mission.canEdit}" class="flex-gap-xs">
@@ -451,7 +451,7 @@
                     <div class="form-group">
                         <label th:text="#{mission.managers}">Co-Manager</label>
                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-                            <div th:each="manager : ${mission.managers}" style="display: flex; align-items: center; background: var(--color-gray-4); border: 1px solid var(--color-primary); padding: 0.2rem 0.5rem;">
+                            <div th:each="manager : ${mission.managers}" style="display: flex; align-items: center; background: var(--color-surface-input); border: 1px solid var(--color-primary); padding: 0.2rem 0.5rem;">
                                 <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1); margin-right: 0.5rem;">Manager Name</span>
                                 <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-danger);" 
                                         th:data-manager-id="${manager.id}"
@@ -484,21 +484,21 @@
                 <div class="hud-box">
                     <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Führungspositionen</h3>
                     <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
-                        <div th:each="leadType : ${missionLeadTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
+                        <div th:each="leadType : ${missionLeadTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
                             <div>
                                 <strong th:text="${leadType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Role</strong>
                             </div>
                             <div class="flex-gap-sm">
                                 <span th:each="p : ${participantsByLeadType[#strings.toString(leadType.id)]}"
                                 th:text="${p['user'] != null ? p['user']['effectiveName'] : p['guestName']}"
-                                      style="color: var(--color-accent-light); font-weight: bold; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
+                                      style="color: var(--color-accent-light); font-weight: bold; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
                             </div>
                         </div>
                     </div>
 
                     <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Frequenzübersicht</h3>
                     <div class="flex-col-gap">
-                        <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-gray-4); padding-bottom: 0.5rem;">
+                        <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
                             <div>
                                 <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Freq</strong>
                             </div>
@@ -508,7 +508,7 @@
                                 <span class="freq-value-display"
                                       th:attr="data-freq-type-id=${freqType.id}"
                                       th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
-                                      th:style="${f != null ? 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;' : 'display:none;'}">123.45</span>
+                                      th:style="${f != null ? 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;' : 'display:none;'}">123.45</span>
 
                                 <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-secondary set-freq-btn"
                                         th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
@@ -1566,7 +1566,7 @@
                             if (display && match) {
                                 const formatted = Number(match.value).toFixed(2);
                                 display.textContent = formatted;
-                                display.style.cssText = 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-gray-4); padding: 0.2rem 0.5rem; border-radius: 4px;';
+                                display.style.cssText = 'color: var(--color-accent-light); font-weight: bold; font-family: monospace; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;';
                             }
                             if (editBtn && match) {
                                 editBtn.setAttribute('data-current-value', String(match.value));

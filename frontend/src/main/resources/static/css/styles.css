@@ -48,11 +48,15 @@
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
     
-    --color-gray-1: #D2D2D2;
-    --color-gray-2: #646464;
-    --color-gray-3: #282828;
-    --color-gray-4: #1C1C1C;
-    --color-gray-5: #141414;
+    --color-gray-1: #D2D2D2;       /* primary body text on dark */
+    --color-gray-2: #646464;       /* muted text, placeholders, disabled */
+    --color-gray-3: #282828;       /* hairline borders, hover-row fill */
+    --color-gray-4: #141414;       /* darkest standard surface (alias: --color-bg-dark-gray) */
+
+    /* Half-step between Grau 4 (#141414) and Grau 3 (#282828); NOT part of the
+       official 4-step manual grayscale. Used for input + table-head fills so
+       controls read slightly above the surface. */
+    --color-surface-input: #1C1C1C;
     
     /* Departments - Bereichsfarben (Corporate Design Manual V2, p.14).
        Names and hex are authoritative per the manual; the values must
@@ -285,7 +289,7 @@ th, td {
 }
 
 th {
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     color: var(--color-primary);
     font-family: var(--font-body);
     font-size: 0.9rem;
@@ -422,7 +426,7 @@ input[type="time"],
 input[type="datetime-local"],
 select,
 textarea {
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     color: var(--color-gray-1);
     border: 1px solid var(--color-gray-3);
     padding: 0.5rem 0.75rem;
@@ -862,7 +866,7 @@ input[type="checkbox"],
 input[type="radio"] {
     appearance: none;
     -webkit-appearance: none;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     border: 1px solid var(--color-gray-3);
     width: 1.2rem;
     height: 1.2rem;
@@ -2080,7 +2084,7 @@ textarea:focus-visible,
 }
 .multi-select-header {
     padding: 0.5rem;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     border: 1px solid var(--color-gray-3);
     color: var(--color-gray-1);
     cursor: pointer;
@@ -2107,7 +2111,7 @@ textarea:focus-visible,
     top: 100%;
     left: 0;
     right: 0;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     border: 1px solid var(--color-primary);
     border-top: none;
     max-height: 300px;

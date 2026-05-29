@@ -17,7 +17,7 @@
             .form-group input, .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.5rem;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 border: 1px solid var(--color-gray-3);
                 color: var(--color-gray-1);
                 font-family: var(--font-body);
@@ -88,7 +88,7 @@
                         <tr th:each="sc : ${specialCommands}" th:style="${!sc.active} ? 'opacity: 0.6;' : ''">
                             <td>
                                 <span th:text="${sc.name}">Name</span>
-                                <span th:if="${!sc.active}" style="font-size: 0.7rem; background-color: var(--color-gray-4); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
+                                <span th:if="${!sc.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
                             </td>
                             <td th:text="${sc.shorthand}">Kürzel</td>
                             <td th:text="${sc.description}">Desc</td>

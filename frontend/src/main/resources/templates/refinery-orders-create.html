@@ -15,7 +15,7 @@
             .form-group input, .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.75rem;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 border: 1px solid var(--color-gray-3);
                 color: var(--color-gray-1);
                 font-family: var(--font-body);
@@ -71,7 +71,7 @@
             }
             .yield-bonus-badge.yield-zero {
                 color: var(--color-gray-2);
-                background-color: var(--color-gray-5);
+                background-color: var(--color-gray-4);
                 border: 1px solid var(--color-gray-3);
             }
             /*
@@ -216,7 +216,7 @@
                         <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
                         <input type="text" id="profitPreview" readonly tabindex="-1"
                                th:title="#{refineryorder.form.profit.help}"
-                               style="background-color: var(--color-gray-5); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
+                               style="background-color: var(--color-gray-4); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
                     </div>
                 </div>
 
@@ -245,7 +245,7 @@
 
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
-                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
                             <span>-</span>
                         </div>
                     </div>
@@ -289,7 +289,7 @@
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
                         </select>
                     </div>
-                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); border-radius: 4px; min-height: 44px;">
+                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: 4px; min-height: 44px;">
                         <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
                             <span id="ratingYieldVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
@@ -310,7 +310,7 @@
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-5); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
@@ -339,7 +339,7 @@
                         <div class="material-row mt-1-5">
                             <div class="form-group" style="flex: 2; margin-bottom: 0;">
                                 <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
-                                <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                                <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
                                     <span th:id="'outputMaterialDisplay_' + ${stat.index}" style="opacity: 0.7;">-</span>
                                 </div>
                             </div>
@@ -353,7 +353,7 @@
 
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
-                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-5); cursor: not-allowed;">
+                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-4); cursor: not-allowed;">
                             </div>
                         </div>
                     </div>
