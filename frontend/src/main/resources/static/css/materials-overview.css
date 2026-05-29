@@ -149,7 +149,8 @@
 
 .matrix-table td {
     color: var(--color-gray-1);
-    font-family: monospace;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     text-align: right;
     font-size: 0.9rem;
 }

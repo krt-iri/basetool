@@ -91,7 +91,10 @@
     /* Typography */
     --font-headline: 'Ethnocentric', sans-serif;
     --font-body: 'Lato', sans-serif;
-    --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace; /* version strings, IDs, code */
+    /* The brand ships no monospace face, so "mono" contexts (version strings,
+       IDs, hex codes, code) use the house font Lato with tabular figures for
+       column alignment. No system/substitute font is referenced. */
+    --font-mono: 'Lato', sans-serif;
 
     /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
     --fs-h1: 2rem;
@@ -188,6 +191,14 @@ a {
 
 a:hover {
     color: var(--color-accent-light);
+}
+
+/* "Mono" data contexts use Lato with tabular figures (the brand has no monospace
+   face) — see --font-mono. Aligned with the design-system update (#274). */
+code, kbd, samp {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
 }
 
 header {
@@ -426,7 +437,8 @@ tr:hover {
 }
 .krt-footer-version {
     color: var(--color-gray-2);
-    font-family: monospace;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
 }
 @media (max-width: 768px) {
