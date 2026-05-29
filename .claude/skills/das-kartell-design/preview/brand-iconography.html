@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="_card.css">
+<style>
+  .icons { display:flex; gap:20px; flex-wrap:wrap; color:var(--color-primary); }
+  .icons .i { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .icons .krt-icon { width:26px; height:26px; }
+  .icons .lbl { font-family:var(--font-mono); font-size:.58rem; color:var(--color-gray-2); }
+</style>
+</head>
+<body>
+  <p class="pv-label">Iconography — hand-curated 24px line sprite, currentColor</p>
+  <svg class="krt-icon-sprite" aria-hidden="true">
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/><path d="M12 10v5M12 18v0.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 11v6M12 7v0.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 8v6l-4-2v-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M14 4l6 6-11 11H3v-6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M7 7l1 14h8l1-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  </svg>
+  <div class="icons">
+    <div class="i"><svg class="krt-icon"><use href="#i-search"/></svg><span class="lbl">search</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-filter"/></svg><span class="lbl">filter</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-plus"/></svg><span class="lbl">plus</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-edit"/></svg><span class="lbl">edit</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-trash"/></svg><span class="lbl">trash</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-chev"/></svg><span class="lbl">chevron</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-warn"/></svg><span class="lbl">warning</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-ok"/></svg><span class="lbl">success</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-info"/></svg><span class="lbl">info</span></div>
+    <div class="i"><svg class="krt-icon"><use href="#i-close"/></svg><span class="lbl">close</span></div>
+  </div>
+  <p class="pv-mono" style="margin-top:16px;">No icon library — a small in-house sprite (CSP forbids CDNs). 2px stroke, square caps, inherits text color.</p>
+</body>
+</html>
