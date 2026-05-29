@@ -262,6 +262,86 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a Job Order via {@code POST /api/v1/orders} with a single material line and returns its
+   * id, so the handover flow has an order to record a handover against. The material line's {@code
+   * minQuality} must be at least 700 ({@code CreateJobOrderMaterialDto} constraint).
+   *
+   * @param username the Keycloak username of the test user
+   * @param password the Keycloak password of the test user
+   * @param requestingOrgUnitId the org unit the order is requested for (the IRIDIUM Squadron here);
+   *     also sent as {@code creatingSquadronId} because an admin in "all squadrons" mode (no active
+   *     pin, as the seeder's bearer token has) must name the creating squadron explicitly
+   * @param handle the free-text contact handle of the order
+   * @param materialId the id of the (job-order) material to request
+   * @param minQuality the minimum acceptable quality of the requested material ({@code >= 700})
+   * @param amount the requested amount of the material
+   * @return the created job order's id
+   */
+  public String createJobOrder(
+      String username,
+      String password,
+      String requestingOrgUnitId,
+      String handle,
+      String materialId,
+      int minQuality,
+      double amount) {
+    String body =
+        "{\"creatingSquadronId\":\""
+            + requestingOrgUnitId
+            + "\",\"requestingOrgUnitId\":\""
+            + requestingOrgUnitId
+            + "\",\"handle\":\""
+            + handle
+            + "\",\"materials\":[{\"materialId\":\""
+            + materialId
+            + "\",\"minQuality\":"
+            + minQuality
+            + ",\"amount\":"
+            + amount
+            + "}]}";
+    return seedEntity(username, password, "/api/v1/orders", body);
+  }
+
+  /**
+   * Creates an inventory item linked to a job order via {@code POST /api/v1/inventory} and returns
+   * its id, so it surfaces in the order's handover item dropdown (populated from {@code
+   * findByJobOrderIdOrdered}). The item is non-personal (personal items may not carry a job-order
+   * link) and stored at the given location; its quality should meet the order material's {@code
+   * minQuality} to be a valid fulfillment.
+   *
+   * @param username the Keycloak username of the test user
+   * @param password the Keycloak password of the test user
+   * @param materialId the id of the material the item holds (matching the order's material)
+   * @param locationId the id of the storage location of the item
+   * @param jobOrderId the id of the job order to link the item to
+   * @param quality the quality of the held material ({@code 0..1000})
+   * @param amount the amount held (available for handover)
+   * @return the created inventory item's id
+   */
+  public String createInventoryItemForJobOrder(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      String jobOrderId,
+      int quality,
+      double amount) {
+    String body =
+        "{\"materialId\":\""
+            + materialId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"quality\":"
+            + quality
+            + ",\"amount\":"
+            + amount
+            + ",\"jobOrderId\":\""
+            + jobOrderId
+            + "\",\"personal\":false}";
+    return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
    * Performs a Keycloak Resource-Owner-Password-Credentials grant on the public {@code
    * basetool-frontend} client and returns the access token.
    *

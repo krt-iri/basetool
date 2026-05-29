@@ -191,7 +191,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="ho : ${order.handovers}">
+                    <tr th:each="ho : ${order.handovers}" data-testid="order-handover-row">
                         <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
                         <td th:text="${ho.recipientHandle}"></td>
                         <td th:text="${ho.recipientSquadron != null ? ho.recipientSquadron : '-'}"></td>
