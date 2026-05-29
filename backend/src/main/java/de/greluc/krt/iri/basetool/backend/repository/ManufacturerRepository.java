@@ -50,4 +50,16 @@ public interface ManufacturerRepository extends JpaRepository<Manufacturer, UUID
 
   /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
   Page<Manufacturer> findByHiddenFalse(Pageable pageable);
+
+  /**
+   * Resolution-chain step 1 for the R5 Wiki item backfill: match an inbound Wiki item's nested
+   * manufacturer by the Wiki manufacturer UUID stored on the local row. Used only to attach a
+   * manufacturer to a freshly created {@code WIKI_ONLY} {@code game_item}; existing rows keep their
+   * (sticky) UEX manufacturer. Never creates a row — an unmatched manufacturer is left {@code null}
+   * for the dedicated R6 reconciliation.
+   *
+   * @param scwikiUuid Wiki manufacturer UUID (from the item payload's {@code manufacturer.uuid})
+   * @return matching manufacturer if present
+   */
+  Optional<Manufacturer> findByScwikiUuid(UUID scwikiUuid);
 }

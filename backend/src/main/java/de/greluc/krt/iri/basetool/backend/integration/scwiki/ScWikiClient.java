@@ -123,6 +123,27 @@ public class ScWikiClient {
   }
 
   /**
+   * Convenience overload of {@link #fetchAllPages(String, ParameterizedTypeReference, String,
+   * String, Map)} with no query filters. R3 commodity / blueprint / vehicle list calls use this —
+   * they never need a {@code filter[...]} parameter.
+   *
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log lines (singular / plural to taste)
+   * @param include optional value for the {@code ?include=…} parameter (e.g. {@code
+   *     "blueprints,items"}); {@code null} or blank means no include
+   * @return merged list of rows across all pages, or an empty list on 304 / error
+   */
+  public <T> List<T> fetchAllPages(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      String include) {
+    return fetchAllPages(endpoint, typeRef, resourceLabel, include, null);
+  }
+
+  /**
    * Walks every page of a paginated Wiki endpoint and returns the concatenated {@code data[]}
    * across all pages. Behaviour:
    *
@@ -139,22 +160,32 @@ public class ScWikiClient {
    *       matching the {@code UexClient} contract.
    * </ol>
    *
+   * <p>Each non-blank {@code filters} entry is emitted as a {@code &filter[<key>]=<value>} query
+   * parameter — the R5 Mode-B item backfill passes {@code filter[classification]=…} per kind
+   * endpoint (SC_WIKI_SYNC_PLAN.md §3.4 / §8.4). The ETag cache key is the full first-page URI, so
+   * differently-filtered passes over the same endpoint keep independent conditional-GET state. Pass
+   * an order-preserving map ({@link java.util.LinkedHashMap} / {@link Map#of}) when supplying more
+   * than one filter so the generated URI stays stable across runs.
+   *
    * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
-   * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
+   * @param endpoint Wiki endpoint path (e.g. {@code "/api/armor"})
    * @param typeRef typed wrapper carrying the parametric envelope type
    * @param resourceLabel human-readable label for log lines (singular / plural to taste)
    * @param include optional value for the {@code ?include=…} parameter (e.g. {@code
    *     "blueprints,items"}); {@code null} or blank means no include
+   * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none,
+   *     and any entry with a blank value is skipped
    * @return merged list of rows across all pages, or an empty list on 304 / error
    */
   public <T> List<T> fetchAllPages(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
-      String include) {
+      String include,
+      Map<String, String> filters) {
     log.info("Fetching all {} from SC Wiki API (paginated)", resourceLabel);
 
-    String firstPageUri = buildPagedUri(endpoint, 1, include);
+    String firstPageUri = buildPagedUri(endpoint, 1, include, filters);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
 
     ScWikiResponseDto<T> first =
@@ -174,7 +205,7 @@ public class ScWikiClient {
 
     for (int page = 2; page <= lastPage; page++) {
       paceForRateLimit();
-      String pageUri = buildPagedUri(endpoint, page, include);
+      String pageUri = buildPagedUri(endpoint, page, include, filters);
       ScWikiResponseDto<T> next = fetchSinglePage(pageUri, typeRef, resourceLabel, null);
       if (next == null) {
         log.warn(
@@ -320,20 +351,33 @@ public class ScWikiClient {
    * canonical encoded form.
    *
    * <p>Appended params (in order): {@code page[number]}, {@code page[size]}, {@code include} (if
-   * non-blank), {@code version} (if non-blank). Commas inside {@code include} stay literal and are
+   * non-blank), each {@code filter[<key>]} (for every non-blank entry, in the map's iteration
+   * order), {@code version} (if non-blank). Commas inside {@code include} stay literal and are
    * encoded by the WebClient to {@code %2C}.
    *
    * @param endpoint Wiki endpoint path
    * @param pageNumber 1-based page index
    * @param include optional eager-load string, or {@code null} / blank
+   * @param filters optional {@code filter[<key>]=<value>} pairs, or {@code null} / empty; entries
+   *     with a blank key or value are skipped
    * @return relative URI string passed to the WebClient via {@code .uri(String)}
    */
-  private String buildPagedUri(String endpoint, int pageNumber, String include) {
+  private String buildPagedUri(
+      String endpoint, int pageNumber, String include, Map<String, String> filters) {
     StringBuilder sb = new StringBuilder(endpoint);
     sb.append("?page[number]=").append(pageNumber);
     sb.append("&page[size]=").append(properties.getPageSize());
     if (include != null && !include.isBlank()) {
       sb.append("&include=").append(include);
+    }
+    if (filters != null) {
+      for (Map.Entry<String, String> entry : filters.entrySet()) {
+        String key = entry.getKey();
+        String value = entry.getValue();
+        if (key != null && !key.isBlank() && value != null && !value.isBlank()) {
+          sb.append("&filter[").append(key).append("]=").append(value);
+        }
+      }
     }
     if (properties.getGameVersion() != null && !properties.getGameVersion().isBlank()) {
       sb.append("&version=").append(properties.getGameVersion());
