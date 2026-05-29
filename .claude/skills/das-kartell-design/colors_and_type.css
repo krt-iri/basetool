@@ -1,0 +1,269 @@
+/* ============================================================================
+   DAS KARTELL — Profit Basetool
+   Foundational color + type tokens.
+
+   Source of truth: krt-iri/basetool · frontend/.../static/css/styles.css
+   Aesthetic: dark sci-fi "HUD" for a Star Citizen squadron-management tool.
+   Default color-scheme is DARK. There is no light theme.
+
+   Load order: this file declares @font-face + :root tokens + a small set of
+   semantic element defaults. Import it first, then layer component CSS on top.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   FONTS
+   Two faces only:
+   - Ethnocentric — the wide, angular display face. Headlines ONLY, always
+     UPPERCASE, letter-spacing 0.05em. Never set body copy in it.
+   - Lato — everything else. Default body weight is 300 (Light).
+   The original app ships WOFF2; here we reference the OTF/TTF originals.
+   ---------------------------------------------------------------------------- */
+/* Ethnocentric — display. Versalien (uppercase) only. */
+@font-face {
+    font-family: 'Ethnocentric';
+    src: url('fonts/Ethnocentric_Rg.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Ethnocentric';
+    src: url('fonts/Ethnocentric_Rg_It.otf') format('opentype');
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+/* Lato — body/UI. Full cut set: Thin 100 / Light 300 / Regular 400 / Bold 700 / Black 900, each + italic. */
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-ThinItalic.ttf') format('truetype');
+    font-weight: 100;
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-LightItalic.ttf') format('truetype');
+    font-weight: 300;
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Italic.ttf') format('truetype');
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-BoldItalic.ttf') format('truetype');
+    font-weight: 700;
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Lato';
+    src: url('fonts/Lato-BlackItalic.ttf') format('truetype');
+    font-weight: 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: dark;
+
+    /* ------------------------------------------------------------------ */
+    /* HAUPTFARBEN — house colors (Corporate Design Manual V2, p.12)       */
+    /* ------------------------------------------------------------------ */
+    --color-primary: #E77E23;        /* HAUSFARBE — the only logo color besides white/black */
+    --color-white: #FFFFFF;          /* WEISS */
+    --color-bg-black: #000000;       /* SCHWARZ — page background */
+
+    /* ZIERFARBEN — decorative accents (Manual p.13) */
+    --color-accent-light: #EEB64B;   /* ZIERFARBE HELL — hover state of orange */
+    --color-accent-dark: #C45C00;    /* ZIERFARBE DUNKEL — elevated/admin chrome, deep accents */
+
+    /* GRAUABSTUFUNGEN — the official 4-step grayscale (Manual p.13).      */
+    /* light → dark. Grau 4 (#141414) is the standard dark surface.        */
+    --color-gray-1: #D2D2D2;         /* GRAUABSTUFUNG 1 — primary body text on dark */
+    --color-gray-2: #646464;         /* GRAUABSTUFUNG 2 — muted text, placeholders, disabled */
+    --color-gray-3: #282828;         /* GRAUABSTUFUNG 3 — hairline borders, hover-row fill */
+    --color-gray-4: #141414;         /* GRAUABSTUFUNG 4 — darkest; standard surface */
+    --color-bg-dark-gray: #141414;   /* alias of Grau 4 — header, footer, tables, cards, sidebar */
+
+    /* Implementation extension — NOT in the 2016 manual.                  */
+    /* The live app inserts this half-step between Grau 4 (#141414) and    */
+    /* Grau 3 (#282828) for input + table-head fills so controls read      */
+    /* slightly above the surface. Use only to match the shipped product.  */
+    --color-surface-input: #1C1C1C;
+
+    /* ------------------------------------------------------------------ */
+    /* DEPARTMENT COLORS — org "Abteilungen". Used for tags/badges/rows.   */
+    /* These are functional accents, NOT decorative — reach for the        */
+    /* semantic aliases below in generic UI.                               */
+    /* ------------------------------------------------------------------ */
+    /* Names + hex are authoritative per Manual p.14 (BEREICHSFARBEN).      */
+    /* "Die Farbwerte dürfen weder abgewandelt noch verändert werden."      */
+    --color-dept-raumueberlegenheit: #37BBC0; /* RAUMÜBERLEGENHEIT — Space Superiority (teal) */
+    --color-dept-forschung: #355DDC;          /* FORSCHUNG — Research (blue) */
+    --color-dept-sub-radar: #A3000A;          /* SUB-RADAR — covert (red) */
+    --color-dept-marinekorps: #7A5E96;        /* MARINEKORPS — Marine Corps (purple) */
+    --color-dept-profit: #239E33;             /* PROFIT (green) */
+    --color-dept-search-rescue: #FFD23F;      /* SEARCH AND RESCUE (yellow) */
+
+    /* Legacy aliases — the shipped styles.css used these (mis-)names.      */
+    /* Kept so code written against the live product still resolves, but    */
+    /* prefer the official names above. */
+    --color-dept-combat: var(--color-dept-raumueberlegenheit); /* live code called teal "combat" */
+    --color-dept-research: var(--color-dept-forschung);
+    --color-dept-marine: var(--color-dept-marinekorps);
+
+    /* ------------------------------------------------------------------ */
+    /* SEMANTIC COLORS — alias department hues to status meaning           */
+    /* ------------------------------------------------------------------ */
+    /* Status hues are a UI concern, not part of the brand manual — they    */
+    /* reuse Bereichsfarben values by appearance (red=stop, green=go, …).   */
+    --color-danger:  #A3000A;  /* red  — same value as Sub-Radar */
+    --color-success: #239E33;  /* green — same value as Profit */
+    --color-warning: #FFD23F;  /* yellow — same value as Search and Rescue */
+    --color-info:    #355DDC;  /* blue — same value as Forschung */
+    --color-secondary: #FFD23F;                       /* cross-squadron / foreign-link highlight */
+
+    /* Status hover tints (from the .btn variants) */
+    --color-danger-hover:  #D41A25;
+    --color-success-hover: #2EBC3D;
+
+    /* ------------------------------------------------------------------ */
+    /* TYPOGRAPHY tokens                                                   */
+    /* ------------------------------------------------------------------ */
+    --font-headline: 'Ethnocentric', sans-serif;
+    --font-body: 'Lato', sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace; /* version strings, IDs, code */
+
+    /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
+    --fs-h1: 2rem;       /* page title in .greeting */
+    --fs-h2: 1.5rem;     /* section / hud-box heading */
+    --fs-h3: 1.17rem;    /* sub-section, collapsible summary */
+    --fs-body: 1rem;     /* paragraph, table cell */
+    --fs-sm: 0.9rem;     /* table head, nav links, form-label-sm */
+    --fs-xs: 0.8rem;     /* btn label, footer, chips */
+    --fs-2xs: 0.7rem;    /* chip labels, overline */
+
+    --fw-thin: 300;      /* body default */
+    --fw-regular: 400;
+    --fw-bold: 700;      /* labels, nav, btn, strong */
+    --fw-black: 900;
+
+    --tracking-display: 0.05em;  /* Ethnocentric optical kerning fix */
+    --tracking-overline: 0.15em; /* admin chip, overlines */
+    --lh-body: 1.5;
+
+    /* ------------------------------------------------------------------ */
+    /* SHAPE / ELEVATION — square-first. Corners are SHARP.                */
+    /* Only pills (chips/badges) and circular controls (radio) round.     */
+    /* ------------------------------------------------------------------ */
+    --radius-none: 0;          /* default for cards, inputs, buttons, modals */
+    --radius-pill: 999px;      /* squadron chips / badges only */
+
+    --border-hairline: 1px solid var(--color-gray-3);
+    --border-accent: 1px solid var(--color-primary);
+    --border-heading: 2px solid var(--color-primary);
+
+    /* Glows / shadows — orange bloom is the brand's only "shadow" idiom */
+    --glow-primary: 0 0 5px rgba(231, 126, 35, 0.3);   /* input focus */
+    --glow-primary-lg: 0 0 20px rgba(231, 126, 35, 0.2); /* toasts, modals */
+    --glow-danger-lg: 0 0 20px rgba(163, 0, 10, 0.2);
+    --shadow-drawer: 5px 0 15px rgba(0, 0, 0, 0.5);
+    --shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.8);
+
+    /* Spacing rhythm (the app works in rem multiples of 0.5) */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --touch-target: 44px;      /* min hit area for every interactive control */
+    --content-max: 1200px;     /* main column cap */
+    --measure: 80ch;           /* paragraph max line length */
+}
+
+/* ============================================================================
+   SEMANTIC ELEMENT DEFAULTS
+   A minimal reset so raw HTML already looks on-brand. Component CSS extends it.
+   ============================================================================ */
+body {
+    background-color: var(--color-bg-black);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-thin);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-headline);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    font-weight: normal;
+    margin: 0 0 0.5em;
+}
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+
+p  { max-width: var(--measure); text-wrap: pretty; }
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover { color: var(--color-accent-light); }
+
+strong, b { font-weight: var(--fw-bold); }
+code, kbd, samp { font-family: var(--font-mono); }
+
+::selection { background: var(--color-primary); color: var(--color-bg-black); }
+
+*, *::before, *::after { box-sizing: border-box; }

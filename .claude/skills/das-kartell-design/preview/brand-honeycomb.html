@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="_card.css">
+<style>
+  .combs { display:flex; gap:14px; flex-wrap:wrap; }
+  .comb { width:200px; height:96px; border:1px solid var(--color-gray-3); }
+  .bold { background:#000 url('../assets/honeycomb.svg') repeat; background-size:46px 26.55px; }
+  .ambient { background:var(--color-bg-dark-gray) url('../assets/honeycomb-bg.svg') repeat; background-size:46px 26.55px; }
+  .cap { font-family:var(--font-mono); font-size:.58rem; color:var(--color-gray-2); margin-top:6px; }
+</style>
+</head>
+<body>
+  <p class="pv-label">Honeycomb — the brand's Wabenmuster background</p>
+  <div class="combs">
+    <div><div class="comb bold"></div><div class="cap">honeycomb.svg — full orange</div></div>
+    <div><div class="comb ambient"></div><div class="cap">honeycomb-bg.svg — 10% ambient</div></div>
+  </div>
+  <p class="pv-mono" style="margin-top:14px;">Seamless flat-top hex tile (72×41.57, circumradius 24). The faint variant tiles behind the app at ~46px for a technical HUD wash; the bold variant is for accents/marketing.</p>
+</body>
+</html>
