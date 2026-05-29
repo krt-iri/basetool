@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCompanyDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexFactionDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemDto;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemPriceDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexJurisdictionDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexMoonDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexOrbitDto;
@@ -127,6 +128,20 @@ public class UexClient {
         uexProperties.getCommoditiesPricesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "commodities prices");
+  }
+
+  /**
+   * Fetches the full UEX item-price matrix ({@code /items_prices_all}, ~24 000 rows, {@literal >}1
+   * MB — covered by the {@code maxInMemorySize} in {@link #initClient()}). Drives the R7 {@code
+   * UexItemPriceSyncService}, which is feature-flagged off by default.
+   *
+   * @return all item prices, or an empty list on error / 304
+   */
+  public List<UexItemPriceDto> getItemPrices() {
+    return fetchList(
+        uexProperties.getItemsPricesEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "item prices");
   }
 
   /**
