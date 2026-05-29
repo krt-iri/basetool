@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.syncReports.title} + ' - ' + ${appTitle}">Sync-Berichte - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style th:attr="nonce=${cspNonce}">
+        .data-section { margin-bottom: 3rem; }
+        .tab-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .event-type { font-family: var(--font-headline); font-size: 0.75rem; letter-spacing: 0.04em; }
+        .event-detail { color: var(--color-gray-2); font-size: 0.85rem; }
+        .pager { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.syncReports.title}">Sync-Berichte</h1>
+        <p th:text="#{admin.syncReports.subtitle}">Ergebnisse der UEX- und SC-Wiki-Synchronisation.</p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-combat);">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div class="tab-bar">
+            <a th:href="@{/admin/sync-reports}" class="btn"
+               th:classappend="${activeTab == 'ALL'} ? '' : 'btn-secondary'"
+               th:text="#{admin.syncReports.tab.all}">Alle</a>
+            <a th:href="@{/admin/sync-reports/scwiki}" class="btn"
+               th:classappend="${activeTab == 'SCWIKI'} ? '' : 'btn-secondary'"
+               th:text="#{admin.syncReports.tab.scwiki}">SC Wiki</a>
+            <a th:href="@{/admin/sync-reports/uex}" class="btn"
+               th:classappend="${activeTab == 'UEX'} ? '' : 'btn-secondary'"
+               th:text="#{admin.syncReports.tab.uex}">UEX</a>
+        </div>
+
+        <p class="event-detail" th:text="#{admin.syncReports.total} + ': ' + ${totalElements}">Gesamt: 0</p>
+
+        <div class="table-responsive">
+        <table id="syncReportsTable">
+            <thead>
+                <tr>
+                    <th th:text="#{admin.syncReports.col.ranAt}">Zeitpunkt</th>
+                    <th th:text="#{admin.syncReports.col.source}">Quelle</th>
+                    <th th:text="#{admin.syncReports.col.eventType}">Ereignis</th>
+                    <th th:text="#{admin.syncReports.col.aggregate}">Aggregat</th>
+                    <th th:text="#{admin.syncReports.col.name}">Name</th>
+                    <th th:text="#{admin.syncReports.col.detail}">Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="ev : ${events}">
+                    <td th:text="${ev.ranAt}">2026-05-28T00:00:00Z</td>
+                    <td th:text="${ev.sourceSystem}">SCWIKI</td>
+                    <td class="event-type" th:text="${ev.eventType}">CREATED_WIKI_ONLY</td>
+                    <td th:text="${ev.aggregate}">commodity</td>
+                    <td th:text="${ev.externalName}">-</td>
+                    <td class="event-detail" th:text="${ev.detail}">-</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(events)}">
+                    <td colspan="6" th:text="#{admin.syncReports.empty}">Noch keine Sync-Ereignisse.</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <div class="pager" th:if="${totalPages > 1}">
+            <a th:if="${currentPage > 0}" class="btn btn-secondary"
+               th:href="@{${basePath}(page=${currentPage - 1})}"
+               th:text="#{general.pagination.previous}">Zurück</a>
+            <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
+            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary"
+               th:href="@{${basePath}(page=${currentPage + 1})}"
+               th:text="#{general.pagination.next}">Weiter</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

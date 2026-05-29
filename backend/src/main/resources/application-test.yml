@@ -54,6 +54,12 @@ spring:
 krt:
   uex:
     scheduler-enabled: false
+  scwiki:
+    # The SC Wiki scheduler default flipped to true in R3; disable it under @SpringBootTest so the
+    # @Scheduled tick never fires against a MockWebServer-less context. commodity-sync-enabled is
+    # already false by default, but the scheduler bean itself is silenced here for determinism.
+    scheduler-enabled: false
+    commodity-sync-enabled: false
 
 app:
   cors:
