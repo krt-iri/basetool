@@ -1087,34 +1087,103 @@ with the revert). The backup is the fallback.
 
 ---
 
-## 8. R8 - Soak + V115 cleanup
-
-*(Stub - V115 backfills `is_manual_entry=true -> source_systems='MANUAL'`.
-Two-week soak window before R9 destructive cleanup runs.)*
+## 8. R8 - Soak + V116 cleanup
 
 ### 8.1 Scope summary
 
-TBD.
+R8 has two parts: an **operational soak** (turn every sync on, watch it for ~two weeks) and one
+small **data migration** that prepares the destructive R9 cleanup.
+
+- **Migration V116** (`update_material_source_systems_for_is_manual_entry.sql`) — a one-shot,
+  idempotent backfill: `UPDATE material SET source_systems = 'MANUAL' WHERE is_manual_entry = TRUE
+  AND source_systems <> 'MANUAL'`. Admin-created commodities were marked by `is_manual_entry = TRUE`
+  while `source_systems` kept the V106 default `'UEX_ONLY'`; R9 drops `is_manual_entry`, so the
+  MANUAL provenance moves into the canonical `MaterialSourceSystem.MANUAL` enum value (which already
+  exists) first. **No schema change**, no entity change beyond a doc fix.
+- **V-NUMBER DRIFT.** Plan §7 pencilled this as V115, but R7 took V115 for `game_item_price`, so the
+  backfill is **V116** and the R9 destructive drop (`material.is_manual_entry` +
+  `ship_type.description`) shifts to **V117**.
+- **Soak (operational, no code).** With R1-R7 deployed, turn every sync flag on and run the full
+  cadence (UEX hourly, Wiki 24 h) for ~two weeks, watching the signals in §8.6 before committing to
+  the R9 destructive drop. The flags stay operator-controlled — R8 ships **no** default-on change.
 
 ### 8.2 Pre-deployment checks (R8)
 
-TBD.
+- [ ] R7 (PR [#270](https://github.com/krt-iri/basetool/pull/270)) deployed.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R8 branch.
+- [ ] Logical backup taken (V116 overwrites `source_systems` on manual rows and has no clean
+      automatic inverse).
+- [ ] Note the pre-migration manual-row count for the smoke check:
+      ```bash
+      psql -d basetool -c "SELECT count(*) FROM material WHERE is_manual_entry = TRUE"
+      ```
 
 ### 8.3 Deployment steps (production, R8)
 
-TBD.
+1. **Backup**:
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r8-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R8 PR.** Watch for V116 (a fast data UPDATE, no DDL):
+   ```
+   Migrating schema "public" to version "116 - update material source systems for is manual entry"
+   ```
+3. **Begin the soak.** Ensure every sync flag is on for the soak window and confirm the cadence:
+   `krt.scwiki.scheduler-enabled`, `commodity-sync-enabled`, `vehicle-sync-enabled`,
+   `item-sync-enabled` (+ `sync-all-items` if running the full backfill), `blueprint-sync-enabled`,
+   `manufacturer-sync-enabled`, and `krt.uex.item-price-sync-enabled`. Restart after `.env` changes.
 
 ### 8.4 Smoke tests (R8, post-deploy)
 
-TBD.
+```bash
+# 1. The backfill ran and the invariant holds (no manual row kept a non-MANUAL provenance).
+psql -d basetool -c "SELECT count(*) FROM material WHERE is_manual_entry = TRUE AND source_systems <> 'MANUAL'"
+#   Expect 0.
+
+# 2. MANUAL now appears in the provenance distribution; the count matches the pre-migration
+#    manual-row count noted in §8.2 (minus any UEX has since adopted).
+psql -d basetool -c "SELECT source_systems, count(*) FROM material GROUP BY source_systems ORDER BY 1"
+
+# 3. The admin "manual" badge still resolves (it now reads source_systems = 'MANUAL' as well as the
+#    legacy is_manual_entry flag) — spot-check a known manual commodity in the materials admin UI.
+```
 
 ### 8.5 Rollback (R8)
 
-TBD.
+V116 is a data migration with **no clean automatic inverse** — the pre-flip per-row value (the
+incorrect `'UEX_ONLY'` default) is not preserved. `is_manual_entry` is left untouched (R9 drops it),
+so it remains the source of truth for a manual reclassification:
+
+```sql
+-- Best-effort manual revert (restores the pre-R8 — arguably wrong — default):
+UPDATE material SET source_systems = 'UEX_ONLY'
+ WHERE is_manual_entry = TRUE AND source_systems = 'MANUAL';
+DELETE FROM flyway_schema_history WHERE version = '116';
+```
+
+Prefer restoring the pre-R8 backup. The soak itself rolls back by turning the sync flags off.
 
 ### 8.6 Monitoring during the soak window (R8)
 
-TBD.
+The point of R8 is to prove the whole sync is healthy before the irreversible R9 drop. Over the
+~two-week window watch:
+
+- **DB growth.** `game_item`, `game_item_price`, `blueprint` / `blueprint_ingredient`, `material`
+  should plateau after the first full cycle of each sync — continued growth means an upsert key is
+  missing and rows are duplicating.
+- **Scheduler runtimes.** Every `Finished … sync` line must land inside its cadence (UEX 1 h, Wiki
+  24 h). The item-price sync (~24 k rows) and the full Wiki backfill (~12 700 rows) are the two to
+  watch.
+- **Sync-report event mix** (`/admin/sync-reports`). `UNRESOLVED_INGREDIENT`, `WIKI_MISSING`,
+  `MANUFACTURER_MISMATCH` and `MULTI_MATCH_AMBIGUOUS` are the action items; a steady or shrinking
+  count is healthy, a growing one points at a catalogue gap.
+- **Log volume.** Establish a baseline for the new services so a future regression (e.g. an error
+  loop) is visible against it.
+- **Exit criterion.** After ~two weeks with the signals above clean, proceed to **R9** (the V117
+  destructive drop of `material.is_manual_entry` + `ship_type.description`), tracked in its own
+  roadmap doc.
 
 ---
 
