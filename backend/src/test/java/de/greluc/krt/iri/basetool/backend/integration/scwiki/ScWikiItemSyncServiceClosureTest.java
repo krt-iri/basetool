@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private ScWikiClient scWikiClient;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private BlueprintRepository blueprintRepository;
+  @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
@@ -44,7 +46,12 @@ class ScWikiItemSyncServiceClosureTest {
     properties.setItemSyncEnabled(true);
     service =
         new ScWikiItemSyncService(
-            scWikiClient, properties, gameItemRepository, blueprintRepository, syncReportService);
+            scWikiClient,
+            properties,
+            gameItemRepository,
+            blueprintRepository,
+            manufacturerRepository,
+            syncReportService);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
