@@ -299,7 +299,7 @@ main {
      */
     padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
     width: 100%;
-    max-width: 1200px;
+    max-width: var(--content-max);
     margin: 0 auto;
     box-sizing: border-box;
 }
@@ -558,7 +558,7 @@ select {
 select.association-select {
     width: 100%;
     min-width: 190px;
-    min-height: 44px;
+    min-height: var(--touch-target);
     padding: 0.375rem 2.5rem 0.375rem 0.75rem;
     background-color: var(--color-bg-dark-gray, #141414);
     border: 1px solid var(--color-primary, #E77E23);
@@ -905,7 +905,7 @@ select:focus,
 textarea:focus {
     border-color: var(--color-primary);
     outline: none;
-    box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+    box-shadow: var(--glow-primary);
 }
 
 input::placeholder {
@@ -963,7 +963,7 @@ input[type="radio"]:checked::after {
 input[type="checkbox"]:focus,
 input[type="radio"]:focus {
     outline: none;
-    box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+    box-shadow: var(--glow-primary);
     border-color: var(--color-primary);
 }
 
@@ -1013,7 +1013,7 @@ input[type="radio"]:focus {
     align-items: center;
     justify-content: center;
     padding: 0.5rem 1rem;
-    min-height: 44px;
+    min-height: var(--touch-target);
     background-color: var(--color-primary);
     color: var(--color-bg-black);
     font-family: var(--font-body);
@@ -1169,7 +1169,7 @@ input[type="radio"]:focus {
     background-color: rgba(0, 0, 0, 0.95);
     border: 1px solid var(--color-primary);
     padding: 1.5rem;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
+    box-shadow: var(--glow-primary-lg);
     
     opacity: 0;
     transform: translateX(30px);
@@ -1217,7 +1217,7 @@ input[type="radio"]:focus {
 
 .notification-toast.error-toast {
     border-color: var(--color-danger);
-    box-shadow: 0 0 20px rgba(163, 0, 10, 0.2);
+    box-shadow: var(--glow-danger-lg);
 }
 
 .notification-toast.error-toast::before {
@@ -1268,7 +1268,7 @@ input[type="radio"]:focus {
     top: 100%;
     background-color: var(--color-bg-dark-gray);
     min-width: 140px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.8);
+    box-shadow: var(--shadow-dropdown);
     z-index: 1000;
     border: 1px solid var(--color-primary);
     margin-top: 0.5rem;
@@ -1332,7 +1332,7 @@ input[type="radio"]:focus {
     z-index: 2000;
     transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     background-color: var(--color-bg-dark-gray);
-    box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-drawer);
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -1499,7 +1499,7 @@ input[type="radio"]:focus {
     padding: 0.35rem 0.75rem;
     background-color: rgba(20, 20, 20, 0.85);
     border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: var(--color-gray-1);
     font-family: 'Lato', sans-serif;
     font-size: 0.85rem;
@@ -1578,7 +1578,7 @@ input[type="radio"]:focus {
     padding: 0.5rem 0.6rem;
     font-family: 'Lato', sans-serif;
     font-size: 0.9rem;
-    min-height: 44px; /* fat-finger target per the corporate design rule */
+    min-height: var(--touch-target); /* fat-finger target per the corporate design rule */
     cursor: pointer;
 }
 
@@ -1605,7 +1605,7 @@ input[type="radio"]:focus {
     align-items: center;
     padding: 0.15rem 0.5rem;
     border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: var(--color-primary);
     font-family: 'Lato', sans-serif;
     font-size: 0.75rem;
@@ -1689,7 +1689,7 @@ input[type="radio"]:focus {
     border: 1px solid var(--color-primary);
     width: 80%;
     max-width: 800px;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
+    box-shadow: var(--glow-primary-lg);
 }
 
 .close-modal {
@@ -1798,7 +1798,7 @@ details.hud-details[open] > summary::after {
 
 /* Constrain text width for better readability on ultra-wide screens */
 main p {
-    max-width: 80ch;
+    max-width: var(--measure);
 }
 
 /* Custom Scrollbars */
@@ -1864,7 +1864,7 @@ textarea:focus-visible,
 
     /* Touch target size optimization (fat-finger) */
     input, select, textarea, .btn, .hamburger-btn {
-        min-height: 44px;
+        min-height: var(--touch-target);
         padding: 0.75rem 1rem;
     }
 
@@ -1883,7 +1883,7 @@ textarea:focus-visible,
     }
     
     .sidebar-links a, .sidebar-group > summary {
-        min-height: 44px;
+        min-height: var(--touch-target);
         line-height: 1.5;
         padding-top: 0.5rem;
         padding-bottom: 0.5rem;
@@ -1952,7 +1952,7 @@ textarea:focus-visible,
     font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    min-height: 44px;
+    min-height: var(--touch-target);
 }
 
 .krt-loading-indicator[hidden] {
@@ -1996,7 +1996,7 @@ textarea:focus-visible,
     margin-left: 0.6rem;
     padding: 0.15rem 0.5rem 0.15rem 0.4rem;
     border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: rgba(231, 126, 35, 0.08);
     color: var(--color-primary);
     font-family: 'Lato', sans-serif;
@@ -2076,7 +2076,7 @@ textarea:focus-visible,
 }
 
 .krt-confirm-actions .btn {
-    min-height: 44px;
+    min-height: var(--touch-target);
     min-width: 96px;
     padding: 0 1rem;
     font-family: var(--font-headline);
@@ -2143,7 +2143,7 @@ textarea:focus-visible,
     justify-content: space-between;
     align-items: center;
     font-family: var(--font-body);
-    min-height: 44px;
+    min-height: var(--touch-target);
     user-select: none;
     transition: border-color 0.2s;
     box-sizing: border-box;
@@ -2186,7 +2186,7 @@ textarea:focus-visible,
     margin-bottom: 0;
     font-family: var(--font-body);
     white-space: nowrap;
-    min-height: 44px;
+    min-height: var(--touch-target);
 }
 .multi-select-option:hover {
     background-color: var(--color-gray-3);
