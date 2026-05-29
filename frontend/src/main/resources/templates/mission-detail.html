@@ -371,8 +371,8 @@
                 <label th:text="#{mission.planned_start}">Planned Start</label>
                 <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" required th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="date" class="date-part" data-testid="mission-start-date" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" data-testid="mission-start-time" required th:disabled="${!isNew and !mission.canEdit}">
                 </div>
                 <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
             </div>
