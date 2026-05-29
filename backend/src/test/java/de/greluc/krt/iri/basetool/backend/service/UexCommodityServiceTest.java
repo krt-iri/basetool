@@ -9,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.integration.UexClient;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialPrice;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialPriceRepository;
@@ -185,12 +186,12 @@ class UexCommodityServiceTest {
   }
 
   @Test
-  void commoditySync_clearsIsManualEntry_whenNameMatchAdoptsManualMaterial() {
-    // Given a manually-entered material with isManualEntry=true and no id_commodity yet
+  void commoditySync_flipsManualToUexOnly_whenNameMatchAdoptsManualMaterial() {
+    // Given a manually-entered material with source_systems=MANUAL and no id_commodity yet
     Material manual = new Material();
     manual.setName("Raw Ouratite");
     manual.setIdCommodity(null);
-    manual.setIsManualEntry(true);
+    manual.setSourceSystems(MaterialSourceSystem.MANUAL);
     manual.setIsManualRawMaterial(true);
 
     UexCommodityDto upstream = commodity(42, "Raw Ouratite", 0, 1);
@@ -202,17 +203,17 @@ class UexCommodityServiceTest {
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then — id_commodity backfilled AND the audit flag is cleared so the manual badge
-    // disappears on the next render. The admin-set isManualRawMaterial override stays
-    // intact (UEX may not classify the commodity as a raw input).
+    // Then — id_commodity backfilled AND the provenance flips off MANUAL so the manual badge
+    // disappears on the next render (the derived isManualEntry wire field follows source_systems).
+    // The admin-set isManualRawMaterial override stays intact (UEX may not classify it as raw).
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertSame(manual, cap.getValue());
     assertEquals(42, cap.getValue().getIdCommodity());
     assertEquals(
-        Boolean.FALSE,
-        cap.getValue().getIsManualEntry(),
-        "Manual-entry flag must clear once UEX adopts the commodity");
+        MaterialSourceSystem.UEX_ONLY,
+        cap.getValue().getSourceSystems(),
+        "MANUAL provenance flips to UEX_ONLY once UEX adopts the commodity");
     assertEquals(
         Boolean.TRUE,
         cap.getValue().getIsManualRawMaterial(),
@@ -220,12 +221,12 @@ class UexCommodityServiceTest {
   }
 
   @Test
-  void commoditySync_leavesIsManualEntryFalse_whenAdoptedByNameMatchOnNonManualRow() {
-    // Existing row matched by name but never marked manual → flag stays false (no-op).
+  void commoditySync_leavesUexOnlyProvenanceUntouched_whenAdoptedByNameMatchOnNonManualRow() {
+    // Existing row matched by name but never MANUAL → provenance stays UEX_ONLY (no-op).
     Material existing = new Material();
     existing.setName("Bexalite");
     existing.setIdCommodity(null);
-    existing.setIsManualEntry(false);
+    existing.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
 
     UexCommodityDto fresh = commodity(77, "Bexalite", 0, 1);
     when(uexClient.getCommodities()).thenReturn(List.of(fresh));
@@ -237,7 +238,63 @@ class UexCommodityServiceTest {
 
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
-    assertEquals(Boolean.FALSE, cap.getValue().getIsManualEntry());
+    assertEquals(MaterialSourceSystem.UEX_ONLY, cap.getValue().getSourceSystems());
+  }
+
+  @Test
+  void commoditySync_promotesWikiOnlyMaterialToBothAndVisible_whenAdoptedByName() {
+    // A commodity the Wiki imported first: WIKI_ONLY + invisible (§4.3). UEX now sources it by
+    // name-match, which validates it as a real trade commodity — provenance must flip to BOTH and
+    // the row must become visible in trading flows (§6.1). This is the M1 regression: the commodity
+    // sync previously left adopted Wiki rows stuck at WIKI_ONLY (and hidden).
+    Material wikiOnly = new Material();
+    wikiOnly.setName("Bluemoon Fungus");
+    wikiOnly.setIdCommodity(null);
+    wikiOnly.setSourceSystems(MaterialSourceSystem.WIKI_ONLY);
+    wikiOnly.setIsVisible(false);
+
+    UexCommodityDto upstream = commodity(314, "Bluemoon Fungus", 0, 1);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(314)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Bluemoon Fungus")).thenReturn(Optional.of(wikiOnly));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertSame(wikiOnly, cap.getValue());
+    assertEquals(
+        MaterialSourceSystem.BOTH,
+        cap.getValue().getSourceSystems(),
+        "UEX adoption of a Wiki-only commodity flips provenance to BOTH");
+    assertEquals(
+        Boolean.TRUE,
+        cap.getValue().getIsVisible(),
+        "UEX validates the commodity — it becomes visible in trading flows");
+  }
+
+  @Test
+  void commoditySync_flipsManualToUexOnly_whenAdoptedByName() {
+    // R9 Step 1: a MANUAL row adopted by UEX flips to UEX_ONLY (it is now UEX-sourced; it was never
+    // in the Wiki, so it does not become BOTH). Contrast the WIKI_ONLY → BOTH promotion above.
+    Material manual = new Material();
+    manual.setName("Admin Special");
+    manual.setIdCommodity(null);
+    manual.setSourceSystems(MaterialSourceSystem.MANUAL);
+    manual.setIsVisible(true);
+
+    UexCommodityDto upstream = commodity(315, "Admin Special", 0, 0);
+    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(materialRepository.findByIdCommodity(315)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Admin Special")).thenReturn(Optional.of(manual));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(cap.capture());
+    assertEquals(MaterialSourceSystem.UEX_ONLY, cap.getValue().getSourceSystems());
   }
 
   @Test

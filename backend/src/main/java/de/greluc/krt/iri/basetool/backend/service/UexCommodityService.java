@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.integration.UexClient;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialPrice;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialPriceRepository;
@@ -77,19 +78,21 @@ public class UexCommodityService {
                                 .map(
                                     m -> {
                                       m.setIdCommodity(dto.id());
-                                      // A manual entry has just been adopted by UEX. Clear the
-                                      // audit flag so the admin badge disappears and the
+                                      // A manual entry has just been adopted by UEX. Flip its
+                                      // provenance
+                                      // off MANUAL so the admin badge disappears and the
                                       // "manual" filter only lists materials that UEX has not yet
                                       // picked up; the link to UEX is recorded via the INFO log
                                       // and the now-populated idCommodity column.
-                                      if (Boolean.TRUE.equals(m.getIsManualEntry())) {
+                                      if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
                                         log.info(
                                             "Manual material '{}' is now linked to UEX commodity"
                                                 + " id={}",
                                             m.getName(),
                                             dto.id());
-                                        m.setIsManualEntry(false);
+                                        m.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
                                       }
+                                      promoteOnUexAdoption(m);
                                       return m;
                                     })
                                 .orElseGet(
@@ -223,6 +226,7 @@ public class UexCommodityService {
                     .map(
                         m -> {
                           m.setIdCommodity(dto.idCommodity());
+                          promoteOnUexAdoption(m);
                           return materialRepository.save(m);
                         })
                     .orElseGet(
@@ -245,5 +249,24 @@ public class UexCommodityService {
       return MaterialType.RAW;
     }
     return MaterialType.NO_REFINE;
+  }
+
+  /**
+   * Promotes a locally-existing material that this UEX sync has just adopted by name-match. A row
+   * the Wiki imported first ({@link MaterialSourceSystem#WIKI_ONLY}, inserted invisible per §4.3)
+   * is validated by UEX's presence — UEX only carries real trade commodities — so its provenance
+   * flips to {@link MaterialSourceSystem#BOTH} and it becomes visible in trading flows. This
+   * honours the {@link MaterialSourceSystem} contract (§6.1) that the UEX item and vehicle syncs
+   * already follow; the commodity sync previously left an adopted Wiki row stuck at {@code
+   * WIKI_ONLY} (and hidden). Idempotent: only a {@code WIKI_ONLY} row is touched, so a normal
+   * re-sync of a {@code UEX_ONLY} / {@code BOTH} / {@code MANUAL} row is unaffected.
+   *
+   * @param material the locally-resolved material UEX just linked by name
+   */
+  private static void promoteOnUexAdoption(Material material) {
+    if (material.getSourceSystems() == MaterialSourceSystem.WIKI_ONLY) {
+      material.setSourceSystems(MaterialSourceSystem.BOTH);
+      material.setIsVisible(true);
+    }
   }
 }

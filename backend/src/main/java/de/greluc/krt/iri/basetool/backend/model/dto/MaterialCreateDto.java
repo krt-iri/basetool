@@ -10,8 +10,8 @@ import java.util.UUID;
  * Inbound DTO for the admin {@code POST /api/v1/materials} create flow. UEX-imported fields ({@code
  * idCommodity}, {@code code}, {@code slug}, {@code priceBuy}, …) are intentionally absent — they
  * stay {@code null} for manual entries and get populated by the next UEX sync if the commodity
- * later appears upstream. The server stamps {@code isManualEntry=true} on creation; the client
- * cannot set it via this payload.
+ * later appears upstream. The server stamps {@code sourceSystems=MANUAL} on creation (surfaced via
+ * the derived {@code isManualEntry} wire field); the client cannot set it via this payload.
  *
  * @param name unique material name; matched against UEX commodity names by the sync's {@code
  *     findByName} fallback when UEX later picks the material up.

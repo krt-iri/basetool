@@ -1,11 +1,14 @@
 package de.greluc.krt.iri.basetool.backend.integration;
 
 import de.greluc.krt.iri.basetool.backend.config.UexProperties;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCityDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexCompanyDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexFactionDto;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemDto;
+import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemPriceDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexJurisdictionDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexMoonDto;
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexOrbitDto;
@@ -125,6 +128,20 @@ public class UexClient {
         uexProperties.getCommoditiesPricesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "commodities prices");
+  }
+
+  /**
+   * Fetches the full UEX item-price matrix ({@code /items_prices_all}, ~24 000 rows, {@literal >}1
+   * MB — covered by the {@code maxInMemorySize} in {@link #initClient()}). Drives the R7 {@code
+   * UexItemPriceSyncService}, which is feature-flagged off by default.
+   *
+   * @return all item prices, or an empty list on error / 304
+   */
+  public List<UexItemPriceDto> getItemPrices() {
+    return fetchList(
+        uexProperties.getItemsPricesEndpoint(),
+        new ParameterizedTypeReference<>() {},
+        "item prices");
   }
 
   /**
@@ -291,6 +308,36 @@ public class UexClient {
   }
 
   /**
+   * Fetches the UEX category reference table (R2). The list drives {@code UexItemSyncService}'s
+   * 98-iteration walk through {@code /items?id_category=<n>}.
+   *
+   * @return all categories, or an empty list on error / 304
+   */
+  public List<UexCategoryDto> getCategories() {
+    return fetchList(
+        uexProperties.getCategoriesEndpoint(), new ParameterizedTypeReference<>() {}, "categories");
+  }
+
+  /**
+   * Fetches every UEX item in a single category (R2). UEX rejects {@code /items} without a filter
+   * parameter; the {@code UexItemSyncService} drives this method from the {@code uex_category}
+   * reference table.
+   *
+   * <p>ETag storage is keyed by the full URL including the {@code id_category} query so each
+   * category's response is conditionally cached independently — a category whose roster has not
+   * changed between sync runs short-circuits via {@code 304 Not Modified} without re-parsing the
+   * payload.
+   *
+   * @param categoryId UEX integer category id (from {@code /categories[].id})
+   * @return items in this category, or an empty list on error / 304
+   */
+  public List<UexItemDto> getItemsForCategory(int categoryId) {
+    String endpoint = uexProperties.getItemsEndpoint() + "?id_category=" + categoryId;
+    return fetchList(
+        endpoint, new ParameterizedTypeReference<>() {}, "items (category=" + categoryId + ")");
+  }
+
+  /**
    * Shared request pipeline for every UEX list endpoint. Implements the conditional GET (M-5)
    * behaviour and the unified error / empty-list fallback.
    *
@@ -339,7 +386,9 @@ public class UexClient {
               if (etag != null && !etag.isBlank()) {
                 etagByEndpoint.put(endpoint, etag);
               }
-              return response.bodyToMono(typeRef).map(UexResponseDto::data);
+              return response
+                  .bodyToMono(typeRef)
+                  .map(body -> body.data() == null ? Collections.<T>emptyList() : body.data());
             })
         .timeout(CALL_TIMEOUT)
         .onErrorResume(

@@ -1,6 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.mapper.MaterialMapper;
@@ -8,6 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.MaterialService;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class MaterialControllerTest {
@@ -50,6 +56,7 @@ class MaterialControllerTest {
             null,
             true,
             false,
+            true,
             0L);
 
     when(materialService.getAllJobOrderMaterials()).thenReturn(List.of(mat));
@@ -62,6 +69,51 @@ class MaterialControllerTest {
     assertEquals(1, result.size());
     assertEquals("Agricium", result.get(0).name());
     assertEquals(true, result.get(0).isJobOrder());
+  }
+
+  @Test
+  void getAllMaterials_byDefault_returnsVisibleOnly() {
+    // Given a trading caller (no includeHidden)
+    Material mat = new Material();
+    mat.setId(UUID.randomUUID());
+    mat.setName("Agricium");
+    when(materialService.getVisibleMaterials(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(mat)));
+    when(materialMapper.toDto(mat)).thenReturn(minimalDto(mat.getId(), "Agricium", true));
+
+    // When
+    PageResponse<MaterialDto> result =
+        materialController.getAllMaterials(false, false, 0, 10, null);
+
+    // Then — the leak fix: trading callers go through the is_visible-filtered query
+    assertEquals(1, result.content().size());
+    verify(materialService).getVisibleMaterials(any(Pageable.class));
+    verify(materialService, never()).getAllMaterials(any(Pageable.class));
+  }
+
+  @Test
+  void getAllMaterials_includeHidden_returnsFullCatalogForAdmin() {
+    // Given the admin catalog (includeHidden=true)
+    Material hidden = new Material();
+    hidden.setId(UUID.randomUUID());
+    hidden.setName("Ace Interceptor Helmet");
+    when(materialService.getAllMaterials(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(hidden)));
+    when(materialMapper.toDto(hidden))
+        .thenReturn(minimalDto(hidden.getId(), "Ace Interceptor Helmet", false));
+
+    // When
+    PageResponse<MaterialDto> result = materialController.getAllMaterials(false, true, 0, 10, null);
+
+    // Then — admins still see hidden rows so they can review/unhide them (§4.3)
+    assertEquals(1, result.content().size());
+    verify(materialService).getAllMaterials(any(Pageable.class));
+    verify(materialService, never()).getVisibleMaterials(any(Pageable.class));
+  }
+
+  private static MaterialDto minimalDto(UUID id, String name, boolean visible) {
+    return new MaterialDto(
+        id, name, "RAW", null, null, null, null, null, null, null, null, null, null, visible, 0L);
   }
 
   @Test
@@ -89,6 +141,7 @@ class MaterialControllerTest {
             false,
             true,
             false,
+            true,
             true,
             0L);
 

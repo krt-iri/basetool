@@ -35,18 +35,18 @@ class AdminMaterialsPageControllerTest {
     MaterialDto currentMaterial =
         new MaterialDto(
             matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, false,
-            false, 1L);
+            false, true, 1L);
     MaterialDto updatedMaterial =
         new MaterialDto(
             matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false,
-            false, false, 2L);
+            false, false, true, 2L);
 
     when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
         .thenReturn(currentMaterial)
         .thenReturn(updatedMaterial);
 
     MaterialUpdateAjaxRequest request =
-        new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", null, null, 1L);
+        new MaterialUpdateAjaxRequest("QUANTITY_TYPE", null, null, "PIECE", null, null, null, 1L);
 
     // Act
     ResponseEntity<MaterialDto> response = controller.updateMaterialAjax(matId, request);
@@ -81,6 +81,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L));
     materials.add(
         new MaterialDto(
@@ -98,6 +99,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L));
     materials.add(
         new MaterialDto(
@@ -115,6 +117,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L));
     materials.add(
         new MaterialDto(
@@ -132,6 +135,7 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L));
     materials.add(
         new MaterialDto(
@@ -149,13 +153,15 @@ class AdminMaterialsPageControllerTest {
             false,
             false,
             false,
+            true,
             0L));
 
     PageResponse<MaterialDto> materialsPage =
         new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"),
+            any(ParameterizedTypeReference.class)))
         .thenReturn(materialsPage);
 
     // Act
@@ -204,6 +210,7 @@ class AdminMaterialsPageControllerTest {
             false,
             true,
             false,
+            true,
             true,
             0L);
 

@@ -238,11 +238,13 @@ public class RefineryOrderPageController {
                   null,
                   null,
                   null,
+                  null,
                   null);
           de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat =
               g.getOutputMaterialId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(
                       g.getOutputMaterialId(),
+                      null,
                       null,
                       null,
                       null,
@@ -594,11 +596,13 @@ public class RefineryOrderPageController {
                   null,
                   null,
                   null,
+                  null,
                   null);
           de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat =
               g.getOutputMaterialId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(
                       g.getOutputMaterialId(),
+                      null,
                       null,
                       null,
                       null,

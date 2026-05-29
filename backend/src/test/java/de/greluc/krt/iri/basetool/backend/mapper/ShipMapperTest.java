@@ -201,6 +201,25 @@ class ShipMapperTest {
   }
 
   @Test
+  void shipTypeToDto_sourcesDescriptionFromRichColumns_germanPreferred() {
+    // R9 Step 2: the description wire field comes from the rich descriptionDe/descriptionEn columns
+    // (German preferred), not the legacy synthesised ship_type.description column.
+    ShipType german = new ShipType();
+    german.setName("Carrack");
+    german.setDescriptionDe("Deutsche Beschreibung");
+    german.setDescriptionEn("English description");
+    assertEquals("Deutsche Beschreibung", mapper.shipTypeToDto(german).description());
+  }
+
+  @Test
+  void shipTypeToDto_fallsBackToEnglishDescription_whenGermanNull() {
+    ShipType englishOnly = new ShipType();
+    englishOnly.setName("Gladius");
+    englishOnly.setDescriptionEn("English only");
+    assertEquals("English only", mapper.shipTypeToDto(englishOnly).description());
+  }
+
+  @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
     assertNull(mapper.locationToDto(null));

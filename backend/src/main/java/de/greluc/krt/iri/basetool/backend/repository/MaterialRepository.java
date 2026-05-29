@@ -2,12 +2,15 @@ package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,25 +20,66 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every material,
-   * ordered by name. Used to populate material pickers without pulling the full Material aggregate.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every <b>visible</b>
+   * material, ordered by name. Used to populate material pickers (inventory, alias targets) without
+   * pulling the full Material aggregate. Wiki-only commodities imported {@code is_visible = false}
+   * (§4.3) are excluded so unreviewed entries never appear in a picker — see {@code isVisible} on
+   * {@link Material}.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto(m.id, m.name,"
-          + " m.quantityType) FROM Material m ORDER BY m.name")
+          + " m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
 
   /**
-   * Returns every entity matching the derived {@code findAllByIsJobOrderTrueOrderByNameAsc}
-   * criteria.
+   * Paged list of materials with {@code is_visible = true}, used for the public/trading catalog
+   * list. Wiki-only commodities inserted invisible (§4.3) are filtered out here; the admin catalog
+   * uses the unfiltered {@link #findAll(Pageable)} instead so it can review and unhide them.
+   *
+   * @param pageable page request
+   * @return paged visible materials
    */
-  List<Material> findAllByIsJobOrderTrueOrderByNameAsc();
+  Page<Material> findByIsVisibleTrue(Pageable pageable);
+
+  /**
+   * Returns every <b>visible</b> material flagged {@code isJobOrder=true}, ordered by name. The
+   * {@code isVisible} clause keeps unreviewed wiki-only rows out of the job-order material picker.
+   */
+  List<Material> findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
 
   /** Derived Spring-Data query - returns entities matching {@code IdCommodity}. */
   Optional<Material> findByIdCommodity(Integer idCommodity);
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Material> findByName(String name);
+
+  /**
+   * Resolution-chain step 1 for the R3 Wiki commodity sync (§8.1.1): match a Wiki commodity to a
+   * local material via the SC Wiki UUID written on a previous sync.
+   *
+   * @param scwikiUuid the SC Wiki commodity UUID
+   * @return the material if a previous sync linked it
+   */
+  Optional<Material> findByScwikiUuid(UUID scwikiUuid);
+
+  /**
+   * Soft-deletes SC Wiki ownership of every material whose {@code scwiki_uuid} is set, NOT in
+   * {@code seenScwikiUuids}, and not already marked. Mirrors {@code
+   * MaterialPriceRepository.clearStalePrices}: the caller gates this on a non-empty seen set so a
+   * sync that fails to fetch the Wiki catalogue never wipes the merge state (§8.7).
+   *
+   * @param seenScwikiUuids the Wiki UUIDs successfully processed in the current run
+   * @param now timestamp to stamp on the soft-deleted rows
+   * @return number of rows marked deleted
+   */
+  @Modifying
+  @Query(
+      "UPDATE Material m SET m.scwikiDeletedAt = :now "
+          + "WHERE m.scwikiUuid IS NOT NULL "
+          + "AND m.scwikiUuid NOT IN :seenScwikiUuids "
+          + "AND m.scwikiDeletedAt IS NULL")
+  int markScwikiDeleted(
+      @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
    * Returns only the materials that actually have at least one price row at a non-hidden terminal -

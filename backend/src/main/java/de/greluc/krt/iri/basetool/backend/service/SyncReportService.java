@@ -1,0 +1,138 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.model.ExternalSyncReport;
+import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
+import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
+import de.greluc.krt.iri.basetool.backend.repository.ExternalSyncReportRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Collects sync findings into the append-only {@code external_sync_report} table (SC_WIKI_SYNC_
+ * PLAN.md §8.8) and serves them back, paged, to the admin sync-report pages.
+ *
+ * <p>Shared by every sync service across the rollout. R3 is the first writer (the Wiki commodity
+ * merge). A sync cycle calls {@link #beginRun()} once to obtain a {@code run_id}, then {@link
+ * #logCommodityEvent} (or a future per-aggregate variant) for each finding, then {@link #pruneRuns}
+ * at the end to enforce the §8.8 "keep the last 30 runs per source" retention.
+ *
+ * <p>The write methods carry no transaction annotation of their own: they are designed to be called
+ * from within the calling sync's {@code @Transactional} boundary so the audit rows commit (or roll
+ * back) atomically with the data changes they describe. The read methods open their own read-only
+ * transaction for the controller.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SyncReportService {
+
+  /** §8.8 retention: keep the last 30 runs per source. */
+  public static final int RUNS_TO_KEEP = 30;
+
+  private final ExternalSyncReportRepository repository;
+
+  /**
+   * Starts a new sync cycle and returns its {@code run_id}. Every event logged for this cycle
+   * carries the same id so the admin UI can group them.
+   *
+   * @return a fresh run id
+   */
+  public UUID beginRun() {
+    return UUID.randomUUID();
+  }
+
+  /**
+   * Records one Wiki-commodity-sync finding. Stamps {@code source = SCWIKI}, {@code aggregate =
+   * "commodity"} and {@code ran_at = now}.
+   *
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param eventType the kind of finding
+   * @param externalUuid the Wiki commodity UUID the event concerns, or {@code null}
+   * @param externalName the Wiki commodity display name, or {@code null}
+   * @param detail free-form human-readable detail (e.g. the ambiguous candidate names)
+   */
+  public void logCommodityEvent(
+      UUID runId, SyncEventType eventType, UUID externalUuid, String externalName, String detail) {
+    logScwikiEvent(runId, eventType, "commodity", externalUuid, externalName, detail);
+  }
+
+  /**
+   * Records one SC Wiki sync finding for an arbitrary aggregate. Stamps {@code source = SCWIKI} and
+   * {@code ran_at = now}; the caller supplies the aggregate label ({@code "commodity"} / {@code
+   * "game_item"} / {@code "ship_type"} / {@code "blueprint"}). Used by the R4 blueprint / item /
+   * vehicle syncs; {@link #logCommodityEvent} delegates here for the R3 commodity merge.
+   *
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param eventType the kind of finding
+   * @param aggregate the aggregate the event concerns
+   * @param externalUuid the external asset UUID the event concerns, or {@code null}
+   * @param externalName the external display name, or {@code null}
+   * @param detail free-form human-readable detail
+   */
+  public void logScwikiEvent(
+      UUID runId,
+      SyncEventType eventType,
+      String aggregate,
+      UUID externalUuid,
+      String externalName,
+      String detail) {
+    repository.save(
+        ExternalSyncReport.builder()
+            .runId(runId)
+            .ranAt(Instant.now())
+            .sourceSystem(SyncSourceSystem.SCWIKI)
+            .eventType(eventType)
+            .aggregate(aggregate)
+            .externalUuid(externalUuid)
+            .externalName(externalName)
+            .detail(detail)
+            .build());
+  }
+
+  /**
+   * Enforces the §8.8 retention: deletes every event of {@code source} whose run is older than the
+   * newest {@link #RUNS_TO_KEEP}. No-op when the source has fewer than the cap (the keep set would
+   * be the whole population). Skips the delete entirely on an empty keep set so the {@code NOT IN
+   * ()} clause is never generated.
+   *
+   * @param source the catalogue whose old runs should be pruned
+   */
+  public void pruneRuns(SyncSourceSystem source) {
+    List<UUID> keptRunIds = repository.findRecentRunIds(source, PageRequest.of(0, RUNS_TO_KEEP));
+    if (keptRunIds.isEmpty()) {
+      return;
+    }
+    int deleted = repository.deleteBySourceAndRunIdNotIn(source, keptRunIds);
+    if (deleted > 0) {
+      log.info(
+          "Pruned {} stale {} sync-report row(s) beyond the last {} runs.",
+          deleted,
+          source,
+          RUNS_TO_KEEP);
+    }
+  }
+
+  /**
+   * Returns one page of sync-report events, newest-first. When {@code source} is {@code null} the
+   * page spans both catalogues (the combined admin view); otherwise it is filtered to that source.
+   *
+   * @param source the catalogue to filter to, or {@code null} for the combined view
+   * @param pageable paging
+   * @return one page of events newest-first
+   */
+  @Transactional(readOnly = true)
+  public Page<ExternalSyncReport> findEvents(SyncSourceSystem source, Pageable pageable) {
+    if (source == null) {
+      return repository.findAllByOrderByRanAtDesc(pageable);
+    }
+    return repository.findBySourceSystemOrderByRanAtDesc(source, pageable);
+  }
+}

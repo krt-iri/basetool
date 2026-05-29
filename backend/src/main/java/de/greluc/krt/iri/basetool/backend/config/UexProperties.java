@@ -18,11 +18,11 @@ import org.springframework.validation.annotation.Validated;
  * one-line config change.
  *
  * <p>{@code schedulerEnabled} toggles the periodic background sync; {@code schedulerDelay} is the
- * fixed-delay between successive sync runs in milliseconds. Defaults run every hour, which keeps
- * the catalog fresh without hammering the upstream API. Carries {@code @EnableScheduling} and
- * {@code @EnableAsync} because it is the single owner of the sync timing — putting these in a
- * standalone configuration class would have led to two unrelated {@code @Configuration} classes
- * sharing the same purpose.
+ * fixed-delay between successive sync runs in milliseconds. Defaults to once a day (24 h) — UEX
+ * commodity prices and the catalogue move slowly enough that a daily refresh keeps the data fresh
+ * without hammering the upstream API. Carries {@code @EnableScheduling} and {@code @EnableAsync}
+ * because it is the single owner of the sync timing — putting these in a standalone configuration
+ * class would have led to two unrelated {@code @Configuration} classes sharing the same purpose.
  */
 @Data
 @Validated
@@ -68,7 +68,35 @@ public class UexProperties {
 
   @NotBlank private String refineriesYieldsEndpoint = "/refineries_yields";
 
+  /**
+   * R2 item-catalogue endpoint. Filtered call-site: {@code /items?id_category=<n>} — see {@code
+   * UexItemSyncService}. Walking every category requires 98+ round-trips, which is paced at the
+   * same default cadence as the rest of the UEX sync.
+   */
+  @NotBlank private String itemsEndpoint = "/items";
+
+  /**
+   * R7 item-price endpoint (~1 MB+ payload, similar shape to {@code /commodities_prices_all}).
+   * Feature-flagged via {@code krt.uex.item-price-sync-enabled}; R2 ships only the property +
+   * client method, not the sync service.
+   */
+  @NotBlank private String itemsPricesEndpoint = "/items_prices_all";
+
+  /**
+   * R2 category reference endpoint. Drives the UEX item walk through {@code UexCategoryRefService};
+   * the response shape carries the 98 (or more) {@code (id, type, section, name)} tuples that map
+   * each item / vehicle to its grouping.
+   */
+  @NotBlank private String categoriesEndpoint = "/categories";
+
+  /**
+   * Master switch for the R7 {@code UexItemPriceSyncService}. R2 ships the property only; the sync
+   * service lands in R7. Defaults to {@code false} so an accidental flip on a non-R7 build is a
+   * no-op.
+   */
+  @NotNull private Boolean itemPriceSyncEnabled = false;
+
   @NotNull private Boolean schedulerEnabled = true;
 
-  @NotBlank private String schedulerDelay = "3600000";
+  @NotBlank private String schedulerDelay = "86400000";
 }
