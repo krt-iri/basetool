@@ -12,8 +12,8 @@ public interface MaterialMapper {
    * Maps a {@link Material} entity to its DTO. UEX-style {@code Integer} 0/1 flags ({@code
    * isIllegal}, {@code isVolatileQt}, {@code isVolatileTime}) are normalised to {@code Boolean} for
    * the client. {@code isManualEntry} is derived from {@code sourceSystems == MANUAL} (R9 Step 1):
-   * the legacy {@code is_manual_entry} column is no longer read — the canonical provenance lives in
-   * {@code source_systems} since the V116 backfill.
+   * the legacy {@code is_manual_entry} column was dropped in R9 Step 4 — the canonical provenance
+   * lives in {@code source_systems} (V116 backfill).
    */
   @Mapping(
       target = "isIllegal",
@@ -33,9 +33,7 @@ public interface MaterialMapper {
 
   /**
    * Builds a new {@link Material} entity from the DTO. Boolean flags are converted back to
-   * UEX-style {@code Integer} 0/1 storage. {@code isManualEntry} is intentionally not written back
-   * (R9 Step 1): the legacy column is no longer a writer target — provenance is owned by {@code
-   * sourceSystems}.
+   * UEX-style {@code Integer} 0/1 storage.
    */
   @Mapping(
       target = "isIllegal",
@@ -46,7 +44,6 @@ public interface MaterialMapper {
   @Mapping(
       target = "isVolatileTime",
       expression = "java(dto.isVolatileTime() != null && dto.isVolatileTime() ? 1 : 0)")
-  @Mapping(target = "isManualEntry", ignore = true)
   Material toEntity(MaterialDto dto);
 
   /**

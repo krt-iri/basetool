@@ -6,9 +6,10 @@ scopes R9 **out** of the main rollout ("Out of scope of this plan; tracked separ
 removes two columns that user-facing code still reads. This doc is that separate track.
 
 > **Status (2026-05-29):** Steps 1–2 (the reader migrations — code-only and individually reversible)
-> are implemented in PR [#275](https://github.com/krt-iri/basetool/pull/275). Steps 3–4 (the soak and
-> the irreversible V117 column drop) remain **pending** and must **not** start until the R8 soak (PR
-> [#271](https://github.com/krt-iri/basetool/pull/271)) has run clean for ~two weeks.
+> are implemented in PR [#275](https://github.com/krt-iri/basetool/pull/275). Step 4 (the irreversible
+> V117 column drop) is implemented as a **draft** PR stacked on #275 — held as a draft until Step 3
+> (the R8 soak, PR [#271](https://github.com/krt-iri/basetool/pull/271)) has run clean for ~two weeks;
+> it **must not** merge before then.
 
 ## What R9 removes
 

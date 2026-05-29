@@ -78,7 +78,6 @@ class ShipTypeTest {
     ShipType shipType = new ShipType();
     shipType.setName("Light Fighter");
     shipType.setManufacturer(aegis);
-    shipType.setDescription("Fast and agile");
     shipType.setHidden(false);
     shipType = shipTypeRepository.save(shipType);
 

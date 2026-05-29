@@ -26,9 +26,8 @@ import lombok.ToString;
  * #externalUuid} / {@link #uexVehicleId} cross-source keys. Wiki-side columns ({@link #scwikiSlug},
  * {@link #gameName}, {@link #descriptionDe}, …) stay nullable until R4.
  *
- * <p>The legacy {@link #description} column carries a synthesized multi-line summary written by the
- * pre-R2 code path; new code reads {@link #descriptionEn} / {@link #descriptionDe} directly. The
- * synthesized column is dropped in R9.
+ * <p>R9 Step 4 dropped the legacy synthesized {@code description} column; ship-type descriptions
+ * now come from {@link #descriptionEn} / {@link #descriptionDe}.
  */
 @Entity
 @Getter
@@ -49,15 +48,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @ManyToOne
   @JoinColumn(name = "manufacturer_id")
   private Manufacturer manufacturer;
-
-  /**
-   * Legacy synthesized description (name_full / SCU / crew / wiki|store URL multi-line text).
-   * Written by {@code UexVehicleService} for back-compat with pre-R2 UIs; the R9 destructive
-   * cleanup drops this column once {@link #descriptionEn} / {@link #descriptionDe} are wired
-   * through every consumer.
-   */
-  @Column(columnDefinition = "TEXT")
-  private String description;
 
   private Integer scu;
 

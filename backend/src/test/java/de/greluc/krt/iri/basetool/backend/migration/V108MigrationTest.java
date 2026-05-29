@@ -106,8 +106,8 @@ class V108MigrationTest {
       java.util.UUID id = java.util.UUID.randomUUID();
       jdbcTemplate.update(
           "INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material, "
-              + "is_job_order, is_manual_entry, is_visible, source_systems) "
-              + "VALUES (?, ?, 'NO_REFINE', 'SCU', false, false, false, true, 'UEX_ONLY')",
+              + "is_job_order, is_visible, source_systems) "
+              + "VALUES (?, ?, 'NO_REFINE', 'SCU', false, false, true, 'UEX_ONLY')",
           id,
           materialName);
       insertedMaterialIds.put(materialName, id);
