@@ -180,7 +180,7 @@
         </div>
 
         <div class="form-container">
-            <form th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}">
+            <form data-testid="refinery-form" th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}">
                 <input type="hidden" th:field="*{source}" />
                 
                 <div class="material-row mt-1-5">
@@ -359,10 +359,10 @@
                     </div>
                 </div>
 
-                <button type="button" class="btn-add-row" data-trigger="rfc-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
+                <button type="button" class="btn-add-row" data-testid="refinery-add-material" data-trigger="rfc-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
 
                 <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="submit" class="btn" data-testid="refinery-submit" th:text="#{orders.create.save}">Speichern</button>
                     <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>

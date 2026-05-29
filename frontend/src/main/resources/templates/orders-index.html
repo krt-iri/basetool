@@ -93,7 +93,7 @@
             </tr>
             </thead>
             <tbody>
-            <tr th:each="order, stat : ${orders}"
+            <tr th:each="order, stat : ${orders}" data-testid="order-row"
                 th:attr="data-id=${order.id}, data-priority=${order.priority}"
                 th:classappend="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'draggable-row' : ''"
                 th:draggable="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'true' : 'false'">

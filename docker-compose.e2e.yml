@@ -1,0 +1,64 @@
+# E2E spike isolation override (docs/E2E_TESTING_PLAN.md, Phase 0).
+#
+# Replaces the shared `/var/iri/...` host bind mounts (which every stack on this
+# machine shares) with project-scoped named volumes, so the E2E run never reads
+# or clobbers another stack's Postgres cluster — and so a fresh run always gets
+# a clean DB that Flyway can migrate from scratch. Host-path log mounts are
+# dropped (container logs go to stdout); the Keycloak realm-import mount and the
+# keystore mount are kept. Uses the Compose `!override` tag to REPLACE the list
+# inherited from the YAML anchors rather than append to it.
+#
+# Pass AFTER the base + test + build files:
+#   docker compose --env-file .env.test \
+#     -f docker-compose.yml -f docker-compose.test.yml \
+#     -f docker-compose.build.yml -f docker-compose.e2e.yml \
+#     --profile dev up -d --wait \
+#     db-backend-dev db-keycloak-dev keycloak-dev redis-dev backend-dev frontend-dev
+services:
+  db-backend-dev:
+    volumes: !override
+      - iri-e2e-db-backend:/var/lib/postgresql/data
+  db-keycloak-dev:
+    volumes: !override
+      - iri-e2e-db-keycloak:/var/lib/postgresql/data
+  redis-dev:
+    volumes: !override []
+  keycloak-dev:
+    # KC 26 hostname-v2 rejected the browser's plain-HTTP OIDC auth request with
+    # "This combination of host and port requires TLS" when KC_HOSTNAME was the
+    # bare hostname `host.docker.internal` (the test override's value). Pinning
+    # the full http:// URL declares HTTP for the public hostname, so the
+    # browser-side redirect works over HTTP while the issuer string stays stable
+    # and identical for the host browser AND the in-Docker backend/frontend
+    # (both already use http://host.docker.internal:18080/realms/iri). Dropping
+    # --proxy-headers (there is no reverse proxy in front of KC in this stack)
+    # lets KC read the real request scheme instead of expecting X-Forwarded-Proto.
+    command: start-dev --import-realm --cache=local
+    environment:
+      KC_HOSTNAME: http://host.docker.internal:18080
+    volumes: !override
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+  # The app images bake a ROOT-owned /app/logs/backend.log: the Dockerfile's
+  # AppCDS training run executes as root (before `USER 10001`) and Logback's
+  # FILE appender — active in every profile via <springProfile name="!prod"> —
+  # creates the file then. The prod/dev compose stacks hide this by overlaying
+  # /app/logs with a pre-chowned `/var/iri/.../log` bind mount; our isolation
+  # override dropped that mount, exposing the root-owned file to the non-root
+  # runtime user -> "logs/backend.log (Permission denied)" -> startup abort.
+  # Running the throwaway E2E container as root sidesteps it without any host
+  # bind mount, so the identical config also works on a clean CI runner (where
+  # a Docker-created bind dir would be root:root and equally unwritable by
+  # uid 10001). The proper long-term fix belongs in the Dockerfile (chown
+  # /app/logs after the CDS run, or point the training run's logs elsewhere).
+  backend-dev:
+    user: "0:0"
+    volumes: !override
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+  frontend-dev:
+    user: "0:0"
+    volumes: !override
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+
+volumes:
+  iri-e2e-db-backend:
+  iri-e2e-db-keycloak:

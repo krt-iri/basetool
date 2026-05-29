@@ -173,7 +173,7 @@
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn" style="background-color: var(--color-primary); color: #000; min-height: 44px;" th:text="#{orders.detail.handover}" data-trigger="od-open-handover">Übergabe protokollieren</button>
+            <button type="button" class="btn" style="background-color: var(--color-primary); color: #000; min-height: 44px;" th:text="#{orders.detail.handover}" data-testid="order-handover-open" data-trigger="od-open-handover">Übergabe protokollieren</button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn" style="background-color: var(--color-gray-3); color: var(--color-text); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
         </div>
 
@@ -335,7 +335,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
-        <form th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
+        <form data-testid="order-handover-form" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="handoverTime" th:text="#{orders.handover.time}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
@@ -371,7 +371,7 @@
                         th:text="#{orders.handover.report.preview}"
                         th:data-order-id="${order.id}"
                         data-trigger="od-preview-handover">Vorschau als PDF</button>
-                <button type="submit" class="btn" th:text="#{orders.detail.save}">Speichern</button>
+                <button type="submit" class="btn" data-testid="order-handover-submit" th:text="#{orders.detail.save}">Speichern</button>
             </div>
         </form>
     </div>
