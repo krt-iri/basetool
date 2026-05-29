@@ -21,14 +21,16 @@
 /* Ethnocentric — display. Versalien (uppercase) only. */
 @font-face {
     font-family: 'Ethnocentric';
-    src: url('fonts/Ethnocentric_Rg.otf') format('opentype');
+    src: url('fonts/Ethnocentric_Rg.woff2') format('woff2'),
+         url('fonts/Ethnocentric_Rg.otf') format('opentype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Ethnocentric';
-    src: url('fonts/Ethnocentric_Rg_It.otf') format('opentype');
+    src: url('fonts/Ethnocentric_Rg_It.woff2') format('woff2'),
+         url('fonts/Ethnocentric_Rg_It.otf') format('opentype');
     font-weight: normal;
     font-style: italic;
     font-display: swap;
@@ -37,70 +39,80 @@
 /* Lato — body/UI. Full cut set: Thin 100 / Light 300 / Regular 400 / Bold 700 / Black 900, each + italic. */
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Thin.ttf') format('truetype');
+    src: url('fonts/Lato-Thin.woff2') format('woff2'),
+         url('fonts/Lato-Thin.ttf') format('truetype');
     font-weight: 100;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-ThinItalic.ttf') format('truetype');
+    src: url('fonts/Lato-ThinItalic.woff2') format('woff2'),
+         url('fonts/Lato-ThinItalic.ttf') format('truetype');
     font-weight: 100;
     font-style: italic;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Light.ttf') format('truetype');
+    src: url('fonts/Lato-Light.woff2') format('woff2'),
+         url('fonts/Lato-Light.ttf') format('truetype');
     font-weight: 300;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-LightItalic.ttf') format('truetype');
+    src: url('fonts/Lato-LightItalic.woff2') format('woff2'),
+         url('fonts/Lato-LightItalic.ttf') format('truetype');
     font-weight: 300;
     font-style: italic;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Regular.ttf') format('truetype');
+    src: url('fonts/Lato-Regular.woff2') format('woff2'),
+         url('fonts/Lato-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Italic.ttf') format('truetype');
+    src: url('fonts/Lato-Italic.woff2') format('woff2'),
+         url('fonts/Lato-Italic.ttf') format('truetype');
     font-weight: 400;
     font-style: italic;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Bold.ttf') format('truetype');
+    src: url('fonts/Lato-Bold.woff2') format('woff2'),
+         url('fonts/Lato-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-BoldItalic.ttf') format('truetype');
+    src: url('fonts/Lato-BoldItalic.woff2') format('woff2'),
+         url('fonts/Lato-BoldItalic.ttf') format('truetype');
     font-weight: 700;
     font-style: italic;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-Black.ttf') format('truetype');
+    src: url('fonts/Lato-Black.woff2') format('woff2'),
+         url('fonts/Lato-Black.ttf') format('truetype');
     font-weight: 900;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Lato';
-    src: url('fonts/Lato-BlackItalic.ttf') format('truetype');
+    src: url('fonts/Lato-BlackItalic.woff2') format('woff2'),
+         url('fonts/Lato-BlackItalic.ttf') format('truetype');
     font-weight: 900;
     font-style: italic;
     font-display: swap;
@@ -175,7 +187,10 @@
     /* ------------------------------------------------------------------ */
     --font-headline: 'Ethnocentric', sans-serif;
     --font-body: 'Lato', sans-serif;
-    --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace; /* version strings, IDs, code */
+    /* The brand ships no monospace face, so "mono" contexts (version strings,
+       IDs, hex codes, code) use the house font Lato with tabular figures for
+       column alignment. No system/substitute font is referenced. */
+    --font-mono: 'Lato', sans-serif;
 
     /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
     --fs-h1: 2rem;       /* page title in .greeting */
@@ -262,7 +277,7 @@ a {
 a:hover { color: var(--color-accent-light); }
 
 strong, b { font-weight: var(--fw-bold); }
-code, kbd, samp { font-family: var(--font-mono); }
+code, kbd, samp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
 
 ::selection { background: var(--color-primary); color: var(--color-bg-black); }
 
