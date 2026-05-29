@@ -24,7 +24,7 @@ Request; "Date" is the production deploy timestamp.
 | R1 - Foundation | TBD | TBD | TBD | TBD | TBD | additive only; scheduler default off |
 | R2 - UEX items + vehicle hardening | TBD | TBD | TBD | TBD | TBD | game_item table + 47 ship_type flags; no Wiki traffic |
 | R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on |
-| R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph land + closure-mode item fill |
+| R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags |
 | R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | feature-flagged backfill (~12 700 rows) |
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | |
 | R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | feature-flagged; off by default |
@@ -580,34 +580,134 @@ For a full revert:
 
 ---
 
-## 4. R4 - Wiki items + Blueprints
+## 4. R4 - Wiki items + Blueprints + Wiki vehicles
 
-*(Stub - V113 migration adds the blueprint graph. Wiki item sync runs in
-closure mode; Wiki vehicle sync fills the columns added in V111.)*
+### 4.1 Scope summary (R4)
 
-### 4.1 Scope summary
+R4 adds the SC Wiki blueprint graph, the closure-mode Wiki item fill, and the
+Wiki vehicle fill. Like R3 it ships **dark**: three independent per-sync flags
+default `false`, so no R4 Wiki traffic is generated until an operator flips
+each on. (Note the migration is **V114**, not the plan's draft V113 — V113 was
+consumed by R3's `external_sync_report`.)
 
-TBD.
+- Migration **V114** — `blueprint` + `blueprint_ingredient` +
+  `blueprint_dismantle_return`. Ingredient CHECK constraints are **relaxed**
+  vs. the plan's §6.3.3 draft: they enforce kind/FK and kind/quantity
+  exclusivity but permit a NULL matching FK so an *unresolved* ingredient
+  line persists its Wiki snapshot for later re-resolution (§8.2).
+- `ScWikiBlueprintSyncService` (flag `krt.scwiki.blueprint-sync-enabled`) —
+  pulls `/api/blueprints`, upserts the recipe graph. RESOURCE ingredients
+  resolve to `material` (scwiki_uuid → alias → name), ITEM ingredients to
+  `game_item` (external_uuid). Unresolved lines persist the Wiki snapshot and
+  log `UNRESOLVED_INGREDIENT`.
+- `ScWikiItemSyncService` closure mode (flag `krt.scwiki.item-sync-enabled`) —
+  fetches `GET /api/items/{uuid}` for every `game_item.external_uuid` (the UEX
+  catalogue) plus blueprint-referenced item uuids, filling Wiki columns
+  (classification / mass / dimensions / descriptions) and flipping
+  `source_systems` `UEX_ONLY → BOTH`. A 404 logs `WIKI_MISSING`. This is the
+  expensive one: ~5000 single fetches at the configured rate (~17 min at
+  5 req/s).
+- `ScWikiVehicleSyncService` (flag `krt.scwiki.vehicle-sync-enabled`) —
+  paginates `/api/vehicles`, fills `scwiki_slug` / `game_name` /
+  `description_de` on `ship_type` (and `description_en` / `class_name` /
+  `vehicle_inventory_scu` only where UEX left them blank), flips
+  `source_systems` `UEX_ONLY → BOTH`. UEX-owned `is_*` flags / dims / fuel are
+  never touched.
+- The scheduler runs the four syncs (commodity, vehicle, item, blueprint) in
+  dependency order, each behind its own flag, each in its own try/catch.
 
 ### 4.2 Pre-deployment checks (R4)
 
-TBD.
+- [ ] R3 (PR [#266](https://github.com/krt-iri/basetool/pull/266)) deployed;
+      its commodity merge has run at least once so `material.scwiki_uuid` is
+      populated (RESOURCE ingredient resolution leans on it).
+- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC LIMIT 5`
+      shows V113 as the latest; no V114.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R4 branch.
+- [ ] All three R4 flags unset / `false` in prod `.env` for the initial deploy.
+- [ ] `game_item` is populated (R2 ran) — the closure item fill iterates it.
 
 ### 4.3 Deployment steps (production, R4)
 
-TBD.
+1. **Backup** (the syncs mutate `game_item` + `ship_type` + create blueprint
+   rows):
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r4-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R4 PR.** Watch for V114:
+   ```
+   Migrating schema "public" to version "114 - create blueprint tables"
+   ```
+3. **Confirm the dark state** — the next scheduler tick logs three skips:
+   ```
+   SC Wiki vehicle sync invoked but disabled … skipping.
+   SC Wiki item sync invoked but disabled … skipping.
+   SC Wiki blueprint sync invoked but disabled … skipping.
+   ```
+4. **Enable in order, one at a time, soaking between each:**
+   `KRT_SCWIKI_VEHICLE_SYNC_ENABLED=true` → review → then
+   `KRT_SCWIKI_ITEM_SYNC_ENABLED=true` (watch runtime — the slow one) → review →
+   then `KRT_SCWIKI_BLUEPRINT_SYNC_ENABLED=true` (last, since its ingredient
+   resolution benefits from items being filled first). Restart after each
+   `.env` change.
 
 ### 4.4 Smoke tests (R4, post-deploy)
 
-TBD.
+```bash
+# 1. Blueprint tables exist.
+psql -d basetool -c "\d blueprint" | grep -E 'scwiki_uuid|output_item_id'
+
+# --- after enabling vehicle sync + one tick: ---
+psql -d basetool -c "SELECT count(*) FILTER (WHERE scwiki_synced_at IS NOT NULL) FROM ship_type"
+#   expect > 0; description_de / game_name populated on matched rows.
+
+# --- after enabling item sync + one tick (allow ~20 min): ---
+psql -d basetool -c "SELECT count(*) FILTER (WHERE scwiki_synced_at IS NOT NULL) AS filled, \
+                            count(*) FILTER (WHERE source_systems='BOTH') AS both FROM game_item"
+#   expect filled close to the count that exist on the Wiki; WIKI_MISSING
+#   events on /admin/sync-reports/scwiki for the ~3% the Wiki lacks.
+
+# --- after enabling blueprint sync + one tick: ---
+psql -d basetool -c "SELECT count(*) FROM blueprint"          # ~1559
+psql -d basetool -c "SELECT count(*) FROM blueprint_ingredient WHERE material_id IS NULL AND game_item_id IS NULL"
+#   the unresolved-line count — should shrink on subsequent runs as items fill;
+#   each is visible as an UNRESOLVED_INGREDIENT event for admin follow-up.
+
+# 5. Trading / refinery UI unaffected (Wiki fill only touches Wiki columns +
+#    invisible WIKI_ONLY rows).
+```
 
 ### 4.5 Rollback (R4)
 
-TBD.
+Fastest: set all three flags to `false`. For a full revert:
+
+1. Flags off, revert the merge on `main`.
+2. Drop the blueprint graph and clear Wiki fill (optional):
+   ```sql
+   DROP TABLE IF EXISTS blueprint_dismantle_return;
+   DROP TABLE IF EXISTS blueprint_ingredient;
+   DROP TABLE IF EXISTS blueprint;
+   DELETE FROM flyway_schema_history WHERE version = '114';
+   -- game_item / ship_type Wiki columns added in R2 remain; clear if desired:
+   UPDATE game_item SET scwiki_synced_at = NULL, classification = NULL, mass = NULL,
+          source_systems = 'UEX_ONLY' WHERE source_systems = 'BOTH';
+   DELETE FROM game_item WHERE source_systems = 'WIKI_ONLY';
+   ```
+   Restart; `ddl-auto: validate` must pass against the R3 schema (blueprint
+   entities removed with the revert). The backup is the fallback.
 
 ### 4.6 Monitoring during the soak window (R4)
 
-TBD.
+- `/admin/sync-reports/scwiki`: `UNRESOLVED_INGREDIENT` and `WIKI_MISSING` are
+  the action items. Unresolved ingredients shrink as the item fill + admin
+  aliases land; persistent ones flag a genuine catalogue gap.
+- Watch the item-sync runtime — at 5 req/s, ~5000 items ≈ 17 min/cycle. If it
+  overruns the scheduler delay, lower `krt.scwiki.scheduler-delay` headroom or
+  raise `krt.scwiki.requests-per-second` cautiously.
+- Confirm `blueprint_ingredient` CHECK constraints never reject a write (no
+  constraint-violation errors in `backend.json`).
 
 ---
 

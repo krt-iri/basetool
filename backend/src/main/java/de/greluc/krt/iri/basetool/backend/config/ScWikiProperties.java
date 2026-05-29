@@ -45,6 +45,12 @@ public class ScWikiProperties {
   /** Full game-item pool (R4+). */
   @NotBlank private String itemsEndpoint = "/api/items";
 
+  /**
+   * Vehicle catalogue endpoint — drives the R4 Wiki vehicle fill ({@code
+   * ScWikiVehicleSyncService}).
+   */
+  @NotBlank private String vehiclesEndpoint = "/api/vehicles";
+
   /** Ship / vehicle component catalogue (R4+). */
   @NotBlank private String vehicleItemsEndpoint = "/api/vehicle-items";
 
@@ -86,6 +92,25 @@ public class ScWikiProperties {
    * still being soaked.
    */
   @NotNull private Boolean commoditySyncEnabled = false;
+
+  /**
+   * Per-sync feature flag for the R4 Wiki blueprint sync ({@code ScWikiBlueprintSyncService}).
+   * Default {@code false} — ships dark; flip on per runbook §4.
+   */
+  @NotNull private Boolean blueprintSyncEnabled = false;
+
+  /**
+   * Per-sync feature flag for the R4 closure-mode Wiki item sync ({@code ScWikiItemSyncService}).
+   * Default {@code false} — ships dark. When on, fills Wiki columns on every existing {@code
+   * game_item} (~5000 single fetches at the configured rate), so flip it on deliberately.
+   */
+  @NotNull private Boolean itemSyncEnabled = false;
+
+  /**
+   * Per-sync feature flag for the R4 Wiki vehicle sync ({@code ScWikiVehicleSyncService}). Default
+   * {@code false} — ships dark; flip on per runbook §4.
+   */
+  @NotNull private Boolean vehicleSyncEnabled = false;
 
   /**
    * Fixed delay between successive {@code ScWikiScheduler} ticks, in milliseconds. Default 24h (86

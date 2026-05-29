@@ -35,6 +35,19 @@ public interface ManufacturerRepository extends JpaRepository<Manufacturer, UUID
    */
   Optional<Manufacturer> findByUexCompanyId(Integer uexCompanyId);
 
+  /**
+   * Resolution-chain fallback for {@code UexManufacturerService}: match by the UNIQUE {@code
+   * abbreviation} (the UEX nickname) when both the {@code uexCompanyId} and {@code name} lookups
+   * miss. {@code abbreviation} is the column under the UNIQUE constraint, so a legacy row whose
+   * {@code name} is the short form — local {@code "Esperia"} vs UEX {@code "Esperia Incorporation"}
+   * — must be adopted here rather than inserted as a duplicate that violates {@code
+   * manufacturer_abbreviation_key}.
+   *
+   * @param abbreviation manufacturer short code / abbreviation (the UEX nickname)
+   * @return matching manufacturer if present
+   */
+  Optional<Manufacturer> findByAbbreviationIgnoreCase(String abbreviation);
+
   /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
   Page<Manufacturer> findByHiddenFalse(Pageable pageable);
 }

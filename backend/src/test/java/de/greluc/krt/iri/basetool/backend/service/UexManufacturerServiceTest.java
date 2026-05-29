@@ -135,6 +135,48 @@ class UexManufacturerServiceTest {
   }
 
   @Test
+  void abbreviationFallback_adoptsLegacyShortNamedRow_insteadOfInsertingDuplicateAbbreviation() {
+    // UEX returns the full company name, but the legacy vehicle-manufacturer row was seeded with
+    // its short nickname as the name: local "Esperia" vs UEX name "Esperia Incorporation" /
+    // nickname "Esperia". Both the id and name lookups miss, so without the abbreviation fallback
+    // the insert collides on the UNIQUE manufacturer.abbreviation ("Esperia" already exists) and
+    // poisons the whole single-transaction sweep.
+    UexCompanyDto dto =
+        UexCompanyDto.builder()
+            .id(278)
+            .name("Esperia Incorporation")
+            .nickname("Esperia")
+            .industry("Aerospace")
+            .isItemManufacturer(1)
+            .isVehicleManufacturer(1)
+            .build();
+    Manufacturer legacy = new Manufacturer();
+    legacy.setName("Esperia");
+    legacy.setAbbreviation("Esperia");
+    // legacy: seeded before this sync persisted every company, so no uexCompanyId yet.
+
+    when(uexClient.getCompanies()).thenReturn(List.of(dto));
+    when(manufacturerRepository.findByUexCompanyId(278)).thenReturn(Optional.empty());
+    when(manufacturerRepository.findByNameIgnoreCase("Esperia Incorporation"))
+        .thenReturn(Optional.empty());
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("Esperia"))
+        .thenReturn(Optional.of(legacy));
+
+    uexManufacturerService.syncManufacturers();
+
+    // Adopted the existing row: exactly one save, and it is the legacy instance — no duplicate row.
+    ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);
+    verify(manufacturerRepository, times(1)).save(captor.capture());
+    Manufacturer saved = captor.getValue();
+    assertSame(legacy, saved, "must adopt the abbreviation-matched row, not insert a new one");
+    assertEquals(
+        278, saved.getUexCompanyId(), "abbreviation-fallback hit must backfill uex_company_id");
+    assertEquals("Esperia", saved.getAbbreviation(), "the UNIQUE abbreviation key is preserved");
+    assertEquals(
+        "Esperia Incorporation", saved.getName(), "name is updated to the UEX-canonical full name");
+  }
+
+  @Test
   void emptyResponse_skipsWrites() {
     when(uexClient.getCompanies()).thenReturn(List.of());
 

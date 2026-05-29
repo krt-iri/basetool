@@ -61,13 +61,36 @@ public class SyncReportService {
    */
   public void logCommodityEvent(
       UUID runId, SyncEventType eventType, UUID externalUuid, String externalName, String detail) {
+    logScwikiEvent(runId, eventType, "commodity", externalUuid, externalName, detail);
+  }
+
+  /**
+   * Records one SC Wiki sync finding for an arbitrary aggregate. Stamps {@code source = SCWIKI} and
+   * {@code ran_at = now}; the caller supplies the aggregate label ({@code "commodity"} / {@code
+   * "game_item"} / {@code "ship_type"} / {@code "blueprint"}). Used by the R4 blueprint / item /
+   * vehicle syncs; {@link #logCommodityEvent} delegates here for the R3 commodity merge.
+   *
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param eventType the kind of finding
+   * @param aggregate the aggregate the event concerns
+   * @param externalUuid the external asset UUID the event concerns, or {@code null}
+   * @param externalName the external display name, or {@code null}
+   * @param detail free-form human-readable detail
+   */
+  public void logScwikiEvent(
+      UUID runId,
+      SyncEventType eventType,
+      String aggregate,
+      UUID externalUuid,
+      String externalName,
+      String detail) {
     repository.save(
         ExternalSyncReport.builder()
             .runId(runId)
             .ranAt(Instant.now())
             .sourceSystem(SyncSourceSystem.SCWIKI)
             .eventType(eventType)
-            .aggregate("commodity")
+            .aggregate(aggregate)
             .externalUuid(externalUuid)
             .externalName(externalName)
             .detail(detail)
