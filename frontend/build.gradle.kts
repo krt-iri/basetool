@@ -297,6 +297,12 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
   // the full browser set (Firefox + WebKit) on first run.
   environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+  // CI passes credentials through the environment (masked in logs) rather than on the command line;
+  // map them onto the e2e.* system properties the tests read. An explicit -P value (below) wins.
+  // E2E_BASE_URL needs no mapping — E2eStackExtension reads it straight from the environment.
+  mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
+    System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
+  }
   listOf("e2e.baseUrl", "e2e.username", "e2e.password", "e2e.hostResolverRules").forEach { key ->
     (findProperty(key) as String?)?.let { systemProperty(key, it) }
   }

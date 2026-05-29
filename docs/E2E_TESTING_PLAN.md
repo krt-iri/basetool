@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen. Phasen 5–6 offen. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt — erster CI-Lauf steht aus. Phase 6 (Doku) offen. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 
@@ -120,7 +120,16 @@ Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
 
 **Tag-Trennung in Gradle:** `e2eTest` filtert jetzt auf `@Tag("e2e")` (die sechs destruktiven Flows), die neue `smokeTest`-Task auf `@Tag("smoke")`. Beide teilen sich dieselbe Verdrahtung (`playwrightSuiteConfig`): `e2e`-Source-Set, provisioniertes Chromium, `e2e.*`-Property-Forwarding. Dass `smokeTest` exakt die fünf Smoke-Checks und keinen der sechs e2e-Flows ausführt, belegt die Tag-Filterung in beide Richtungen.
 
-**Ziel-Agnostik:** Ohne `E2E_BASE_URL` fährt `E2eStackExtension` den ephemeren Stack hoch (hier verifiziert). Mit gesetztem `E2E_BASE_URL` (+ `-Pe2e.username`/`-Pe2e.password` aus CI-Secrets) überspringt die Extension Docker komplett und läuft gegen das externe Deployment — dann kostet die Suite nur Login + fünf Seitenaufrufe statt eines Stack-Boots.
+**Ziel-Agnostik:** Ohne `E2E_BASE_URL` fährt `E2eStackExtension` den ephemeren Stack hoch (hier verifiziert). Mit gesetztem `E2E_BASE_URL` (+ Credentials aus CI-Secrets) überspringt die Extension Docker komplett und läuft gegen das externe Deployment — dann kostet die Suite nur Login + fünf Seitenaufrufe statt eines Stack-Boots.
+
+## Phase 5 — Stand (2026-05-29)
+
+**CI-Workflow `.github/workflows/e2e.yml` angelegt** (zwei Jobs). Lokal verifiziert: das YAML parst sauber und das Build-Skript evaluiert mit der neuen `smokeTest`-Task + Credential-Env-Mapping. **Der erste echte CI-Lauf steht noch aus** (Push + `e2e`-Label bzw. Nightly) — er muss die Linux-Runner-Spezifika bestätigen (Docker-in-CI, der `host.docker.internal`-Browser-Remap, Boot-Timings); daher „angelegt", nicht „grün".
+
+- **Job `e2e`** (`@Tag("e2e")`, ephemerer Stack): Trigger `pull_request` (nur bei `e2e`-Label, via Job-`if`), `schedule` (nightly 03:00 UTC) und `workflow_dispatch` — die gewählte „Label + nightly + manual"-Strategie. `ubuntu-latest` (Docker + compose v2 vorinstalliert), JDK 25 (Temurin), `setup-gradle`-Cache und Playwright-Chromium-Cache (`~/.cache/ms-playwright`, Key auf `gradle/libs.versions.toml`). `E2eStackExtension` baut die Images selbst (multi-stage Dockerfiles → kein separater `bootJar`-Schritt). Traces/Dumps/Compose-Logs aus `frontend/build/e2e` gehen mit `if: always()` als Artefakt hoch.
+- **Job `smoke`** (`@Tag("smoke")`, Staging): **`if`-gegated auf die Repo-Variable `E2E_BASE_URL`** (eine Variable statt Secret — nur so in `if:` lesbar) **und** Nicht-PR-Events. Liegt brach, bis ein Staging-Host existiert; kein toter Pflicht-Check. Credentials (`E2E_USERNAME`/`E2E_PASSWORD`) kommen aus Secrets **über die Umgebung** (maskiert), die die `smokeTest`-Task auf die `e2e.*`-System-Properties mappt — keine Secrets auf der Kommandozeile.
+
+**Bewusst weggelassen:** der im Plan erwähnte gha-**Docker-Layer-Cache**. Compose-gebaute Images über BuildKit/gha zu cachen ist fummelig und fehleranfällig; die Images werden pro Lauf frisch gebaut (~3-5 min). Für eine Label-/Nightly-Task vertretbar und später nachrüstbar.
 
 ## Warum dieser Stack zu diesem Projekt passt
 
