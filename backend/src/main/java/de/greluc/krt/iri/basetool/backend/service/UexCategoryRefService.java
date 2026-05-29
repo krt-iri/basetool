@@ -16,11 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
  * Syncs UEX Corp's {@code /categories} endpoint into the local {@code uex_category} reference
  * table.
  *
- * <p>The 98+ rows of UEX categories drive {@link UexItemSyncService}'s walk through {@code
+ * <p>The UEX categories drive {@link UexItemSyncService}'s walk through {@code
  * /items?id_category=<n>}; this service is its prerequisite and runs once per UEX scheduler tick
- * before the item sync. Idempotent: matching is by UEX integer id (PK), so a re-run on an unchanged
- * catalogue is a no-op series of {@code SELECT}s followed by no-op {@code UPDATE}s. An empty UEX
- * response short-circuits without wiping local data.
+ * before the item sync. Only {@code item} / {@code vehicle} categories are persisted — {@code
+ * uex_category.type} is constrained to those ({@code chk_uex_category_type}, V109) and the item
+ * sync reads only {@code item} rows; UEX's other types (e.g. {@code service}) carry no items and
+ * are skipped so one unsupported type can never abort the sweep. Idempotent: matching is by UEX
+ * integer id (PK), so a re-run on an unchanged catalogue is a no-op series of {@code SELECT}s
+ * followed by no-op {@code UPDATE}s. An empty UEX response short-circuits without wiping local
+ * data.
  */
 @Slf4j
 @Service
@@ -35,7 +39,7 @@ public class UexCategoryRefService {
    * Pulls the category catalogue and upserts each row. Returns the persisted list so {@link
    * UexItemSyncService} can iterate without re-querying the DB.
    *
-   * @return all categories after this sync run (game-related and otherwise)
+   * @return the persisted {@code item} / {@code vehicle} categories after this sync run
    */
   @Transactional
   public List<UexCategory> syncCategories() {
@@ -49,9 +53,19 @@ public class UexCategoryRefService {
     Instant now = Instant.now();
     int added = 0;
     int updated = 0;
+    int skipped = 0;
     for (UexCategoryDto dto : dtos) {
       if (dto.id() == null || dto.section() == null || dto.name() == null) {
         log.debug("Skipping category with missing id/section/name: {}", dto);
+        continue;
+      }
+      String type = dto.type() == null ? "item" : dto.type();
+      if (!"item".equals(type) && !"vehicle".equals(type)) {
+        // uex_category.type is constrained to ('item','vehicle') (chk_uex_category_type, V109), the
+        // only types the item sync reads. UEX also returns other types (e.g. 'service') that carry
+        // no items; skip them so a single unsupported type never aborts the whole UEX sweep.
+        log.debug("Skipping UEX category {} with unsupported type '{}'", dto.id(), type);
+        skipped++;
         continue;
       }
       Optional<UexCategory> existingOpt = repository.findById(dto.id());
@@ -60,7 +74,7 @@ public class UexCategoryRefService {
       if (isNew) {
         category.setId(dto.id());
       }
-      category.setType(dto.type() == null ? "item" : dto.type());
+      category.setType(type);
       category.setSection(dto.section());
       category.setName(dto.name());
       category.setIsGameRelated(asBoolean(dto.isGameRelated()));
@@ -75,7 +89,11 @@ public class UexCategoryRefService {
       }
     }
 
-    log.info("Finished UEX category sync: {} added, {} updated", added, updated);
+    log.info(
+        "Finished UEX category sync: {} added, {} updated, {} skipped (unsupported type)",
+        added,
+        updated,
+        skipped);
     return repository.findAll();
   }
 

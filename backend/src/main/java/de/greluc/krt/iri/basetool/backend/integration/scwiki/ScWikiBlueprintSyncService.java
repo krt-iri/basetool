@@ -161,8 +161,7 @@ public class ScWikiBlueprintSyncService {
         line = lines.get(i);
       } else {
         line = new BlueprintIngredient();
-        line.setBlueprint(bp);
-        lines.add(line);
+        bp.addIngredient(line);
       }
       line.setOrderIndex(i);
       line.setWikiResourceUuid(ing.resourceTypeUuid());
@@ -196,7 +195,7 @@ public class ScWikiBlueprintSyncService {
     }
 
     while (lines.size() > incoming.size()) {
-      lines.removeLast();
+      bp.removeLastIngredient();
     }
     return unresolved;
   }
@@ -221,8 +220,7 @@ public class ScWikiBlueprintSyncService {
         line = lines.get(i);
       } else {
         line = new BlueprintDismantleReturn();
-        line.setBlueprint(bp);
-        lines.add(line);
+        bp.addDismantleReturn(line);
       }
       line.setOrderIndex(i);
       line.setWikiResourceUuid(ret.resourceTypeUuid());
@@ -236,7 +234,7 @@ public class ScWikiBlueprintSyncService {
     }
 
     while (lines.size() > incoming.size()) {
-      lines.removeLast();
+      bp.removeLastDismantleReturn();
     }
   }
 
