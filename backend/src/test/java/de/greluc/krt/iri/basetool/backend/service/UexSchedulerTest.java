@@ -32,6 +32,8 @@ class UexSchedulerTest {
   @Mock private UexVehicleService uexVehicleService;
   @Mock private UexUniverseSyncService uexUniverseSyncService;
   @Mock private UexRefinerySyncService uexRefinerySyncService;
+  @Mock private UexCategoryRefService uexCategoryRefService;
+  @Mock private UexItemSyncService uexItemSyncService;
 
   @InjectMocks private UexScheduler scheduler;
 
@@ -57,6 +59,9 @@ class UexSchedulerTest {
     verify(uexManufacturerService).syncManufacturers();
     verify(uexVehicleService).syncVehicles();
 
+    verify(uexCategoryRefService).syncCategories();
+    verify(uexItemSyncService).syncItems();
+
     verify(uexRefinerySyncService).syncRefiningMethods();
     verify(uexRefinerySyncService).syncRefineryYields();
 
@@ -66,6 +71,8 @@ class UexSchedulerTest {
         uexCommodityService,
         uexManufacturerService,
         uexVehicleService,
+        uexCategoryRefService,
+        uexItemSyncService,
         uexRefinerySyncService);
   }
 
@@ -84,6 +91,8 @@ class UexSchedulerTest {
             uexCommodityService,
             uexManufacturerService,
             uexVehicleService,
+            uexCategoryRefService,
+            uexItemSyncService,
             uexRefinerySyncService);
 
     // Phase 1: universe basics in declared order
@@ -103,6 +112,11 @@ class UexSchedulerTest {
     order.verify(uexCommodityService).fetchAndProcessCommoditiesPrices();
     order.verify(uexManufacturerService).syncManufacturers();
     order.verify(uexVehicleService).syncVehicles();
+
+    // Phase 2.5 (R2): category ref + item walk — categories before items, both after
+    // manufacturers + vehicles so the item upsert can resolve manufacturer + linked_ship_type FKs.
+    order.verify(uexCategoryRefService).syncCategories();
+    order.verify(uexItemSyncService).syncItems();
 
     // Phase 3: refineries last (depend on materials)
     order.verify(uexRefinerySyncService).syncRefiningMethods();

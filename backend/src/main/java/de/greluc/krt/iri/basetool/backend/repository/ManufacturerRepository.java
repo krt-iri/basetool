@@ -26,6 +26,15 @@ public interface ManufacturerRepository extends JpaRepository<Manufacturer, UUID
   /** Derived Spring-Data query - returns entities matching {@code NameIgnoreCase}. */
   Optional<Manufacturer> findByNameIgnoreCase(String name);
 
+  /**
+   * Resolution-chain step 1 for the R2 {@code UexManufacturerService}: match by UEX's integer
+   * company id. UEX never re-numbers companies, so this is the fastest re-resolution key.
+   *
+   * @param uexCompanyId UEX integer company id (from {@code /companies[].id})
+   * @return matching manufacturer if present
+   */
+  Optional<Manufacturer> findByUexCompanyId(Integer uexCompanyId);
+
   /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
   Page<Manufacturer> findByHiddenFalse(Pageable pageable);
 }

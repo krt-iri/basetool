@@ -22,8 +22,8 @@ Request; "Date" is the production deploy timestamp.
 | Phase | Dev | Staging | Prod | Date | PR | Notes |
 |---|---|---|---|---|---|---|
 | R1 - Foundation | TBD | TBD | TBD | TBD | TBD | additive only; scheduler default off |
-| R2 - UEX items + vehicle hardening | TBD | TBD | TBD | TBD | TBD | adds game_item table + UEX item walk |
-| R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | first Wiki sync goes live |
+| R2 - UEX items + vehicle hardening | TBD | TBD | TBD | TBD | TBD | game_item table + 47 ship_type flags; no Wiki traffic |
+| R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on |
 | R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph land + closure-mode item fill |
 | R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | feature-flagged backfill (~12 700 rows) |
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | |
@@ -280,65 +280,303 @@ The R1 soak is **>= 1 release** before R2 merges. Watch for:
 
 ## 2. R2 - UEX item catalogue + UEX manufacturer / vehicle hardening
 
-*(Stub - written when R2 lands. Adds V110 - V112 migrations,
-`UexItemSyncService`, `UexCategoryRefService`, `UexVehicleService` UUID
-hardening. No Wiki side touched yet.)*
+### 2.1 Scope summary (R2)
 
-### 2.1 Scope summary
+R2 ships the UEX side of the sync end-to-end with **no Wiki traffic** —
+the Wiki scheduler stays at the R1 default (`krt.scwiki.scheduler-enabled
+= false`).
 
-TBD.
+- Flyway migrations **V110 - V112**:
+  - **V110** - new `game_item` table keyed by `external_uuid` UNIQUE (R2
+    relaxed to NULLABLE — ~30 % of UEX items ship with an empty uuid)
+    + `uex_item_id` UNIQUE. Wiki-sourced columns (`scwiki_*`,
+    `classification`, `mass`, dimensions, descriptions) land in the
+    schema but stay NULL until R4 writes them. FKs to `manufacturer`,
+    `uex_category`, `ship_type` (for vehicle-bound items).
+  - **V111** - extends `ship_type` with `external_uuid` UNIQUE,
+    `uex_vehicle_id` UNIQUE, 36 capability `is_*` flags, dimensions,
+    fuel, urls, English description, R2 `source_systems` column. The
+    legacy synthesized `description` column stays for back-compat
+    (dropped in R9).
+  - **V112** - tiny fix-up that adds `created_at` / `updated_at`
+    columns missed by R1's V109 on `uex_category` (Hibernate
+    `ddl-auto: validate` requires them since `UexCategory` extends
+    `AbstractEntity`).
+- `UexCategoryRefService` populates the 98+ rows of `uex_category` once
+  per scheduler tick.
+- `UexItemSyncService` iterates the game-related categories, calls
+  `/items?id_category=<n>` per category, and upserts rows into
+  `game_item`. Resolution chain: `findByUexItemId` →
+  `findByExternalUuid` → create-new. Kind derivation from the row's
+  category section per Plan §6.3.1 (Armor → ARMOR, "Vehicle Weapons"
+  → VEHICLE_WEAPON, …). Orphan sweep marks rows whose `uex_item_id`
+  no longer appears as `uex_deleted_at`.
+- `UexManufacturerService` rewritten to persist **both** item and
+  vehicle manufacturers (item catalog needs them too). Match by
+  `uex_company_id` first, name-fallback for legacy rows.
+- `UexVehicleService` rewritten for the UUID-first chain
+  (`findByExternalUuid` → `findByUexVehicleId` →
+  `findByNameIgnoreCase` fallback). The name-fallback hit
+  **backfills** `external_uuid` + `uex_vehicle_id` on the matched row
+  — R2's substitute for the planned standalone V112 data migration.
+  All 36 capability flags + dims + fuel + urls + English description
+  land on `ship_type`.
+- `UexScheduler` calls in topological order:
+  universe → commodities → manufacturers → vehicles → categories
+  → items → refineries.
 
 ### 2.2 Pre-deployment checks (R2)
 
-TBD.
+- [ ] R1 (PR [#261](https://github.com/krt-iri/basetool/pull/261))
+      deployed to prod and stable through one full UEX scheduler tick.
+- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC
+      LIMIT 5` on prod shows V109 as the latest applied migration; no
+      V110+ entries.
+- [ ] `./gradlew spotlessApply check` is green from a clean clone of
+      the R2 branch.
+- [ ] `psql` on prod confirms `material_external_alias` has the 6
+      R1 seed rows (UEX sync has populated the target materials).
+- [ ] `.env` on prod still has `KRT_SCWIKI_SCHEDULER_ENABLED=false`
+      (R2 does not flip it).
+- [ ] `.env` on prod has `KRT_UEX_SCHEDULER_ENABLED=true` (R2 expands
+      the UEX work; the hourly sync must continue).
 
 ### 2.3 Deployment steps (production, R2)
 
-TBD.
+1. **Take the logical backup.**
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r2-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+
+2. **Merge the R2 PR.** Watch the prod deploy logs for the Flyway
+   lines applying V110 - V112.
+   ```
+   Migrating schema "public" to version "110 - create game item"
+   Migrating schema "public" to version "111 - extend ship type with uex and wiki fields"
+   Migrating schema "public" to version "112 - add audit columns to uex category"
+   ```
+
+3. **Watch the first UEX scheduler tick** (~within an hour of deploy).
+   Expected log lines under one tick:
+   ```
+   Starting synchronization of UEX manufacturers...
+   Finished UEX manufacturer sync: NNN added, NNN updated, ...
+   Starting synchronization of UEX vehicles (ships)...
+   Finished UEX vehicle sync: NNN added, NNN updated, ...
+   Starting synchronization of UEX categories...
+   Finished UEX category sync: NNN added, NNN updated
+   Starting synchronization of UEX items...
+   Finished UEX item sync: NN categories visited, NNNN items upserted (NNNN new, N updated)
+   ```
 
 ### 2.4 Smoke tests (R2, post-deploy)
 
-TBD.
+```bash
+# 1. New tables / columns visible.
+psql -d basetool -c "\d game_item" | grep -E 'external_uuid|uex_item_id|kind'
+psql -d basetool -c "\d ship_type" | grep -E 'external_uuid|is_bomber|fuel_quantum'
+
+# 2. uex_category populated.
+psql -d basetool -c "SELECT count(*) FROM uex_category"
+# Expect: >= 98 after the first UEX scheduler tick.
+
+# 3. game_item populated.
+psql -d basetool -c "SELECT count(*) FROM game_item WHERE source_systems='UEX_ONLY'"
+# Expect: thousands (one row per UEX item, ~3500-5000 depending on
+# how many UEX categories are game-related).
+
+# 4. ship_type external_uuid backfilled on most rows.
+psql -d basetool -c "SELECT count(*) FILTER (WHERE external_uuid IS NOT NULL) AS with_uuid, \
+                              count(*) FILTER (WHERE external_uuid IS NULL)     AS without_uuid \
+                          FROM ship_type"
+# Expect: most rows have external_uuid (UEX UUIDs are stable). The
+# without_uuid count is the ~31% UEX-empty-uuid set + admin-created
+# entries.
+
+# 5. UEX manufacturer cross-ref populated.
+psql -d basetool -c "SELECT count(*) FROM manufacturer WHERE uex_company_id IS NOT NULL"
+# Expect: matches the company count UEX returned on the latest sync.
+
+# 6. SC Wiki scheduler still disabled (R2 ships zero Wiki traffic).
+docker compose logs backend | grep -E "ScWikiScheduler.*disabled"
+# Expect: at least one match per 24h tick.
+```
 
 ### 2.5 Rollback (R2)
 
-TBD.
+1. **Revert the merge** on `main` to restore the R1 code.
+2. Drop the new tables / columns in reverse order:
+   ```sql
+   ALTER TABLE uex_category
+     DROP COLUMN IF EXISTS created_at,
+     DROP COLUMN IF EXISTS updated_at;
+   ALTER TABLE ship_type
+     DROP COLUMN IF EXISTS external_uuid,
+     DROP COLUMN IF EXISTS uex_vehicle_id,
+     DROP COLUMN IF EXISTS uex_slug,
+     DROP COLUMN IF EXISTS scwiki_slug,
+     -- … repeat for every column V111 added; see V111__*.sql for the list.
+     DROP COLUMN IF EXISTS source_systems;
+   DROP TABLE IF EXISTS game_item;
+   DELETE FROM flyway_schema_history WHERE version IN ('110','111','112');
+   ```
+3. Restart the backend; `ddl-auto: validate` must pass against the
+   R1 schema.
 
 ### 2.6 Monitoring during the soak window (R2)
 
-TBD.
+- `game_item` row count should be stable after the first sync; it
+  grows only when UEX adds new items (rare, every patch).
+- `ship_type.external_uuid` coverage should hold at ~70 % (the rest is
+  the UEX-empty-uuid set + admin entries).
+- No new `ERROR` log lines in the UEX sync chain — the orphan sweep is
+  gated on a non-empty seen-id set, so a transient UEX outage produces
+  WARNs but no errors.
+- The new `uex_synced_at` column on `manufacturer` should be within
+  the last hour for every row that had a recent UEX sync.
 
 ---
 
 ## 3. R3 - Wiki commodity merge
 
-*(Stub - written when R3 lands. First phase that flips
-`krt.scwiki.scheduler-enabled` to `true`. Adds the junk filter, fuzzy seed
-verification, and the sync-report admin page.)*
+### 3.1 Scope summary (R3)
 
-### 3.1 Scope summary
+R3 ships the first SC Wiki sync — the commodity merge — but **dark**: the
+code, audit table and admin page all land, yet **no live Wiki traffic is
+generated** until an operator flips `krt.scwiki.commodity-sync-enabled` to
+`true` (default `false`, mirroring R7's price flag). The master switch
+`krt.scwiki.scheduler-enabled` default flips to `true` in R3 so the
+scheduler bean ticks; each tick still no-ops while the per-sync flag is off.
 
-TBD.
+- Flyway migration **V113** — new append-only `external_sync_report`
+  audit table (`run_id`, `ran_at`, `source_system` CHECK, `event_type`,
+  `aggregate`, external ref columns, `detail`) + two indexes.
+- `SyncReportService` — collects findings into `external_sync_report`,
+  keeps the last 30 runs per source.
+- `ScWikiCommoditySyncService` — pulls `/api/commodities`, applies the
+  §8.9 hard-junk name filter, and merges the rest into `material` via the
+  §8.1.1 resolution chain (`scwiki_uuid` → alias table → exact name →
+  canonical name with multi-match rejection). Conflict policy (§4.6): UEX
+  stays canonical for `name` / `code` / `kind` / prices / flags; the Wiki
+  sync only writes `scwiki_uuid` / `scwiki_key` / `scwiki_slug` /
+  `density_g_per_cc` and flips `source_systems` `UEX_ONLY → BOTH`.
+  Wiki-only commodities become fresh `WIKI_ONLY` rows **inserted invisible**
+  (`is_visible = false`) so they never reach the trading UI until reviewed.
+- Admin sync-report pages at `/admin/sync-reports`, `/scwiki`, `/uex`
+  (read-only, ADMIN-gated) backed by `GET /api/v1/sync-reports`.
+- **Deviation from plan §8.1 pseudocode (documented in the service):** a
+  canonical *multi-match* skips the row (logs `MULTI_MATCH_AMBIGUOUS`)
+  instead of creating a `WIKI_ONLY` row, because stamping the Wiki UUID on
+  a new row would let step 1 shadow the admin's later alias fix forever.
 
 ### 3.2 Pre-deployment checks (R3)
 
-TBD.
+- [ ] R2 (PR [#263](https://github.com/krt-iri/basetool/pull/263)) deployed
+      and stable; `game_item` + `material` cross-ref columns populated.
+- [ ] `SELECT version FROM flyway_schema_history ORDER BY version DESC
+      LIMIT 5` shows V112 as the latest applied migration; no V113.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R3
+      branch.
+- [ ] Decide the soak cadence: leave `krt.scwiki.scheduler-delay` at the
+      24h default, or set it to weekly (`604800000`) for the first runs
+      per plan §11 R3 ("weekly first, escalate to 24h once the report is
+      clean").
+- [ ] Confirm `krt.scwiki.commodity-sync-enabled` is **unset / false** in
+      prod `.env` for the initial deploy — R3 ships dark.
 
 ### 3.3 Deployment steps (production, R3)
 
-TBD.
+1. **Take the logical backup** (commodity merge mutates `material`):
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r3-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R3 PR.** Watch the deploy log for V113:
+   ```
+   Migrating schema "public" to version "113 - create external sync report"
+   ```
+3. **Confirm the dark state.** Within 24h the SC Wiki scheduler ticks and
+   logs (commodity sync is still gated off):
+   ```
+   SC Wiki commodity sync invoked but disabled (krt.scwiki.commodity-sync-enabled=false) — skipping.
+   ```
+4. **Enable the merge when ready.** Set `KRT_SCWIKI_COMMODITY_SYNC_ENABLED=true`
+   in the prod `.env` and restart the backend (or wait for the next tick if
+   the runtime re-reads properties). The next tick runs the real merge:
+   ```
+   Starting SC Wiki commodity merge...
+   Finished SC Wiki commodity merge: NNN linked, NN created WIKI_ONLY, NN junk-skipped, N ambiguous-skipped.
+   ```
 
 ### 3.4 Smoke tests (R3, post-deploy)
 
-TBD.
+```bash
+# 1. Audit table exists.
+psql -d basetool -c "\d external_sync_report" | grep -E 'run_id|event_type|source_system'
+
+# 2. Admin sync-report page renders (ADMIN session).
+curl -fsS -H "Cookie: <session-cookie>" https://<host>/admin/sync-reports/scwiki \
+  | grep -c 'admin.syncReports.title'   # expect >= 1
+
+# --- after enabling commodity-sync-enabled and one tick: ---
+
+# 3. Events were recorded.
+psql -d basetool -c "SELECT event_type, count(*) FROM external_sync_report \
+                       WHERE source_system='SCWIKI' GROUP BY event_type ORDER BY 1"
+# Expect a mix of LINKED_VIA_ALIAS / CREATED_WIKI_ONLY / SKIP_JUNK; possibly
+# LOOKS_LIKE_ITEM / MULTI_MATCH_AMBIGUOUS.
+
+# 4. Existing UEX commodities gained Wiki cross-refs (UEX_ONLY -> BOTH).
+psql -d basetool -c "SELECT source_systems, count(*) FROM material GROUP BY source_systems"
+# Expect BOTH > 0 and the bulk of pre-R3 rows still UEX_ONLY (Wiki-only gaps).
+
+# 5. CRITICAL — Wiki-only rows are invisible (must NOT pollute trading).
+psql -d basetool -c "SELECT count(*) FILTER (WHERE is_visible) AS visible, \
+                            count(*) FILTER (WHERE NOT is_visible) AS hidden \
+                       FROM material WHERE source_systems='WIKI_ONLY'"
+# Expect visible = 0 : every WIKI_ONLY row ships invisible until admin review.
+
+# 6. Existing UEX-sourced catalogue stayed visible.
+psql -d basetool -c "SELECT count(*) FROM material WHERE source_systems IN ('UEX_ONLY','BOTH') AND NOT is_visible"
+# Expect 0 : the merge never hides a UEX row.
+```
 
 ### 3.5 Rollback (R3)
 
-TBD.
+The merge only adds Wiki-owned columns + new invisible rows, so the
+fastest rollback is to **disable the flag** (`KRT_SCWIKI_COMMODITY_SYNC_ENABLED=false`)
+— the trading UI is unaffected because Wiki-only rows were never visible.
+For a full revert:
+
+1. Set `KRT_SCWIKI_COMMODITY_SYNC_ENABLED=false`, revert the merge on `main`.
+2. Optionally clean up Wiki-only rows + cross-refs:
+   ```sql
+   DELETE FROM material WHERE source_systems = 'WIKI_ONLY';
+   UPDATE material SET source_systems = 'UEX_ONLY', scwiki_uuid = NULL,
+          scwiki_key = NULL, scwiki_slug = NULL, scwiki_synced_at = NULL,
+          scwiki_deleted_at = NULL, density_g_per_cc = NULL
+     WHERE source_systems = 'BOTH';
+   DROP TABLE IF EXISTS external_sync_report;   -- V113
+   DELETE FROM flyway_schema_history WHERE version = '113';
+   ```
+   Restart; `ddl-auto: validate` must pass against the R2 schema. The
+   logical backup is the fallback if the in-place cleanup misbehaves.
 
 ### 3.6 Monitoring during the soak window (R3)
 
-TBD.
+- Review `/admin/sync-reports/scwiki` after the first enabled run:
+  `MULTI_MATCH_AMBIGUOUS` events are the action items — add a
+  `material_external_alias` row for each, then the next run links them.
+- `CREATED_WIKI_ONLY` / `LOOKS_LIKE_ITEM` rows are invisible by design;
+  flip `is_visible` only after confirming the entry is a real commodity.
+- Watch for `SKIP_JUNK` spikes — a sudden jump means the Wiki added a new
+  junk-name variant; extend `HARDCODED_ATMOSPHERE_SET` via PR.
+- Confirm the trading / refinery UI is unchanged (Wiki-only rows invisible,
+  UEX names untouched). Escalate the schedule from weekly to 24h once the
+  report is clean (per plan §11 R3).
 
 ---
 

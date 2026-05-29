@@ -2,12 +2,15 @@ package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,6 +39,34 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Material> findByName(String name);
+
+  /**
+   * Resolution-chain step 1 for the R3 Wiki commodity sync (§8.1.1): match a Wiki commodity to a
+   * local material via the SC Wiki UUID written on a previous sync.
+   *
+   * @param scwikiUuid the SC Wiki commodity UUID
+   * @return the material if a previous sync linked it
+   */
+  Optional<Material> findByScwikiUuid(UUID scwikiUuid);
+
+  /**
+   * Soft-deletes SC Wiki ownership of every material whose {@code scwiki_uuid} is set, NOT in
+   * {@code seenScwikiUuids}, and not already marked. Mirrors {@code
+   * MaterialPriceRepository.clearStalePrices}: the caller gates this on a non-empty seen set so a
+   * sync that fails to fetch the Wiki catalogue never wipes the merge state (§8.7).
+   *
+   * @param seenScwikiUuids the Wiki UUIDs successfully processed in the current run
+   * @param now timestamp to stamp on the soft-deleted rows
+   * @return number of rows marked deleted
+   */
+  @Modifying
+  @Query(
+      "UPDATE Material m SET m.scwikiDeletedAt = :now "
+          + "WHERE m.scwikiUuid IS NOT NULL "
+          + "AND m.scwikiUuid NOT IN :seenScwikiUuids "
+          + "AND m.scwikiDeletedAt IS NULL")
+  int markScwikiDeleted(
+      @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
    * Returns only the materials that actually have at least one price row at a non-hidden terminal -

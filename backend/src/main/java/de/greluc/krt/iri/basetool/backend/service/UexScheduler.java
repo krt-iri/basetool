@@ -19,11 +19,13 @@ import org.springframework.stereotype.Component;
  * {@code @ConditionalOnProperty(matchIfMissing = true)} keeps the bean active by default but lets
  * the {@code test} profile disable it without touching the rest of the wiring.
  *
- * <p>The single scheduled method calls the 6 dedicated sync services in a fixed order: universe
- * topology first (factions, jurisdictions, planets, moons, …) so subsequent imports can resolve
- * their parent locations, then star systems / commodities / manufacturers / vehicles, then refinery
- * methods + yields last (depend on commodities). Any single service failure is caught and logged so
- * a half-stale UEX response does not abort the whole sweep.
+ * <p>R2 expansion: the original chain (universe topology → commodities → manufacturers → vehicles →
+ * refinery) is extended with {@code UexCategoryRefService.syncCategories()} and {@code
+ * UexItemSyncService.syncItems()} between manufacturers and refinery. The order matters: categories
+ * must land before items (the item walk reads them); manufacturers must land before items (the item
+ * upsert resolves the manufacturer FK); vehicles must land before items because vehicle-bound items
+ * (paints, components) resolve {@code linked_ship_type_id} via {@code
+ * ShipTypeRepository.findByUexVehicleId}.
  */
 @Slf4j
 @Component
@@ -41,6 +43,8 @@ public class UexScheduler {
   private final UexVehicleService uexVehicleService;
   private final UexUniverseSyncService uexUniverseSyncService;
   private final UexRefinerySyncService uexRefinerySyncService;
+  private final UexCategoryRefService uexCategoryRefService;
+  private final UexItemSyncService uexItemSyncService;
 
   /**
    * Runs the full UEX sync sweep on a fixed delay. Order matters — topology imports first so later
@@ -67,6 +71,12 @@ public class UexScheduler {
       uexCommodityService.fetchAndProcessCommoditiesPrices();
       uexManufacturerService.syncManufacturers();
       uexVehicleService.syncVehicles();
+
+      // R2 — category reference + item catalogue. categoriesRef populates the table that
+      // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
+      // and linked ship types (also above), so the topological order is preserved.
+      uexCategoryRefService.syncCategories();
+      uexItemSyncService.syncItems();
 
       uexRefinerySyncService.syncRefiningMethods();
       uexRefinerySyncService.syncRefineryYields();
