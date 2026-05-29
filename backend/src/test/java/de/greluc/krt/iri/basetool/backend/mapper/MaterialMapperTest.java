@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
@@ -69,6 +70,35 @@ class MaterialMapperTest {
     assertFalse(dto.isIllegal());
     assertFalse(dto.isVolatileQt());
     assertFalse(dto.isVolatileTime());
+  }
+
+  @Test
+  void toDto_derivesIsManualEntryTrue_whenSourceSystemsManual() {
+    // R9 Step 1: the isManualEntry wire field is derived from source_systems == MANUAL, not from
+    // the legacy is_manual_entry column.
+    Material entity = new Material();
+    entity.setName("Admin Special");
+    entity.setSourceSystems(MaterialSourceSystem.MANUAL);
+
+    assertTrue(
+        mapper.toDto(entity).isManualEntry(),
+        "source_systems=MANUAL must surface as the derived isManualEntry=true");
+  }
+
+  @Test
+  void toDto_derivesIsManualEntryFalse_whenSourceSystemsNotManual() {
+    for (MaterialSourceSystem nonManual :
+        new MaterialSourceSystem[] {
+          MaterialSourceSystem.UEX_ONLY, MaterialSourceSystem.WIKI_ONLY, MaterialSourceSystem.BOTH
+        }) {
+      Material entity = new Material();
+      entity.setName("Catalogue Row");
+      entity.setSourceSystems(nonManual);
+
+      assertFalse(
+          mapper.toDto(entity).isManualEntry(),
+          "source_systems=" + nonManual + " must surface as isManualEntry=false");
+    }
   }
 
   @Test

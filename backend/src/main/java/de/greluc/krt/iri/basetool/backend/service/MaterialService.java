@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
@@ -171,8 +172,9 @@ public class MaterialService {
    * Persists a manually-entered material from the admin UI. Used when UEX has not (yet) published a
    * commodity that the squadron needs — e.g. a refinery raw input that exists in-game but is
    * missing from {@code get_commodities_prices_all/}. The server unconditionally stamps {@code
-   * isManualEntry=true} on the persisted row (Audit + UI badge); the next UEX sync clears the flag
-   * automatically once UEX picks the commodity up (see {@code UexCommodityService}).
+   * sourceSystems=MANUAL} on the persisted row (Audit + UI badge, surfaced via the derived {@code
+   * isManualEntry} wire field); the next UEX sync flips it off {@code MANUAL} automatically once
+   * UEX picks the commodity up (see {@code UexCommodityService}).
    *
    * <p>UEX-imported columns ({@code idCommodity}, {@code code}, {@code slug}, {@code priceBuy} …)
    * are left {@code null} — they get populated by the sync's name-match fallback once UEX exposes
@@ -222,7 +224,7 @@ public class MaterialService {
     material.setIsIllegal(Boolean.TRUE.equals(dto.isIllegal()) ? 1 : 0);
     material.setIsVolatileQt(Boolean.TRUE.equals(dto.isVolatileQt()) ? 1 : 0);
     material.setIsVolatileTime(Boolean.TRUE.equals(dto.isVolatileTime()) ? 1 : 0);
-    material.setIsManualEntry(true);
+    material.setSourceSystems(MaterialSourceSystem.MANUAL);
 
     if (dto.refinedMaterialId() != null) {
       Material refined =

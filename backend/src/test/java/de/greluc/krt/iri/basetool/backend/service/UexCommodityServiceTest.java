@@ -186,12 +186,12 @@ class UexCommodityServiceTest {
   }
 
   @Test
-  void commoditySync_clearsIsManualEntry_whenNameMatchAdoptsManualMaterial() {
-    // Given a manually-entered material with isManualEntry=true and no id_commodity yet
+  void commoditySync_flipsManualToUexOnly_whenNameMatchAdoptsManualMaterial() {
+    // Given a manually-entered material with source_systems=MANUAL and no id_commodity yet
     Material manual = new Material();
     manual.setName("Raw Ouratite");
     manual.setIdCommodity(null);
-    manual.setIsManualEntry(true);
+    manual.setSourceSystems(MaterialSourceSystem.MANUAL);
     manual.setIsManualRawMaterial(true);
 
     UexCommodityDto upstream = commodity(42, "Raw Ouratite", 0, 1);
@@ -203,17 +203,17 @@ class UexCommodityServiceTest {
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then — id_commodity backfilled AND the audit flag is cleared so the manual badge
-    // disappears on the next render. The admin-set isManualRawMaterial override stays
-    // intact (UEX may not classify the commodity as a raw input).
+    // Then — id_commodity backfilled AND the provenance flips off MANUAL so the manual badge
+    // disappears on the next render (the derived isManualEntry wire field follows source_systems).
+    // The admin-set isManualRawMaterial override stays intact (UEX may not classify it as raw).
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertSame(manual, cap.getValue());
     assertEquals(42, cap.getValue().getIdCommodity());
     assertEquals(
-        Boolean.FALSE,
-        cap.getValue().getIsManualEntry(),
-        "Manual-entry flag must clear once UEX adopts the commodity");
+        MaterialSourceSystem.UEX_ONLY,
+        cap.getValue().getSourceSystems(),
+        "MANUAL provenance flips to UEX_ONLY once UEX adopts the commodity");
     assertEquals(
         Boolean.TRUE,
         cap.getValue().getIsManualRawMaterial(),
@@ -221,12 +221,12 @@ class UexCommodityServiceTest {
   }
 
   @Test
-  void commoditySync_leavesIsManualEntryFalse_whenAdoptedByNameMatchOnNonManualRow() {
-    // Existing row matched by name but never marked manual → flag stays false (no-op).
+  void commoditySync_leavesUexOnlyProvenanceUntouched_whenAdoptedByNameMatchOnNonManualRow() {
+    // Existing row matched by name but never MANUAL → provenance stays UEX_ONLY (no-op).
     Material existing = new Material();
     existing.setName("Bexalite");
     existing.setIdCommodity(null);
-    existing.setIsManualEntry(false);
+    existing.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
 
     UexCommodityDto fresh = commodity(77, "Bexalite", 0, 1);
     when(uexClient.getCommodities()).thenReturn(List.of(fresh));
@@ -238,7 +238,7 @@ class UexCommodityServiceTest {
 
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
-    assertEquals(Boolean.FALSE, cap.getValue().getIsManualEntry());
+    assertEquals(MaterialSourceSystem.UEX_ONLY, cap.getValue().getSourceSystems());
   }
 
   @Test
@@ -275,9 +275,9 @@ class UexCommodityServiceTest {
   }
 
   @Test
-  void commoditySync_leavesManualProvenanceUntouched_whenAdoptedByName() {
-    // A MANUAL row adopted by name keeps its MANUAL provenance — only WIKI_ONLY is promoted here.
-    // The MANUAL → BOTH/UEX_ONLY migration is R9 Step 1's job (when is_manual_entry is dropped).
+  void commoditySync_flipsManualToUexOnly_whenAdoptedByName() {
+    // R9 Step 1: a MANUAL row adopted by UEX flips to UEX_ONLY (it is now UEX-sourced; it was never
+    // in the Wiki, so it does not become BOTH). Contrast the WIKI_ONLY → BOTH promotion above.
     Material manual = new Material();
     manual.setName("Admin Special");
     manual.setIdCommodity(null);
@@ -294,7 +294,7 @@ class UexCommodityServiceTest {
 
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
-    assertEquals(MaterialSourceSystem.MANUAL, cap.getValue().getSourceSystems());
+    assertEquals(MaterialSourceSystem.UEX_ONLY, cap.getValue().getSourceSystems());
   }
 
   @Test

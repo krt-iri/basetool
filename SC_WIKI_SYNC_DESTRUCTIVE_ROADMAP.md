@@ -5,10 +5,10 @@ scopes R9 **out** of the main rollout ("Out of scope of this plan; tracked separ
 `R8_DESTRUCTIVE_ROADMAP.md` does for the SK work") because it is the only irreversible phase and it
 removes two columns that user-facing code still reads. This doc is that separate track.
 
-> **Status (2026-05-29):** pending. R1–R8 have shipped as the stacked PR series
-> ([#261](https://github.com/krt-iri/basetool/pull/261) … [#271](https://github.com/krt-iri/basetool/pull/271)).
-> R9 must **not** start until the R8 soak (PR [#271](https://github.com/krt-iri/basetool/pull/271))
-> has run clean for ~two weeks. The steps below are written but unexecuted.
+> **Status (2026-05-29):** Steps 1–2 (the reader migrations — code-only and individually reversible)
+> are implemented in PR [#275](https://github.com/krt-iri/basetool/pull/275). Steps 3–4 (the soak and
+> the irreversible V117 column drop) remain **pending** and must **not** start until the R8 soak (PR
+> [#271](https://github.com/krt-iri/basetool/pull/271)) has run clean for ~two weeks.
 
 ## What R9 removes
 
@@ -102,13 +102,18 @@ immediately before the merge. Irreversible.
 
 ## Acceptance checklist per step
 
-- [ ] Step 1 PR: `git grep -i isManualEntry` returns only the (transitional) DTO wire field derived
-      from `source_systems`; the admin materials badge/filter reads `source_systems == MANUAL`. No
-      code writes the column. `MaterialServiceTest` / `MaterialControllerTest` /
-      `UexCommodityServiceTest` updated.
-- [ ] Step 2 PR: `ShipTypeDto` + `ship-data.html` + `admin/mission-data.html` render
-      `description_en` / `description_de`; `UexVehicleService` no longer writes the synthesized
-      column; `UexVehicleService` tests updated. No production UI row shows an empty description.
+- [x] Step 1 (#275): the `isManualEntry` DTO wire field is derived from `source_systems == MANUAL`
+      in `MaterialMapper` (and ignored on the reverse mapping); no code writes the `is_manual_entry`
+      column — admin create stamps `source_systems = MANUAL` and the UEX-adoption handover flips
+      `MANUAL → UEX_ONLY`. `MaterialMapperTest` / `MaterialServiceTest` / `UexCommodityServiceTest`
+      updated. The column itself stays in place until Step 4.
+- [x] Step 2 (#275): `ShipMapper.shipTypeToDto` sources the `description` wire field from
+      `descriptionDe ?: descriptionEn` (German preferred, English fallback) instead of the legacy
+      synthesised `ship_type.description`; `UexVehicleService` no longer writes that column and the
+      `buildLegacyDescription` helper is deleted. `ShipMapperTest` updated. The wire field is kept
+      for API stability, so `ship-data.html` renders the rich text with no template change.
+      (Correction to the original plan: `admin/mission-data.html` never rendered the ship-type
+      description.) The column itself stays in place until Step 4.
 - [ ] Step 3: `git grep` for both columns is clean in `main`; soak window observed; APM/logs clean
       on the migrated pages.
 - [ ] Step 4 PR: V117 applied against a `.env.test` snapshot of the prod schema; `Material` /

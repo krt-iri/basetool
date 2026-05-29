@@ -225,8 +225,8 @@ public class MaterialController {
   /**
    * Creates a material manually. Uses the dedicated {@link MaterialCreateDto} (UEX-imported columns
    * are absent) — the service resolves {@code refinedMaterialId} / {@code categoryId} by id and
-   * stamps {@code isManualEntry=true} so the admin UI can badge it and the next UEX sync can clear
-   * the flag on a name-match.
+   * stamps {@code sourceSystems=MANUAL} so the admin UI can badge it (via the derived {@code
+   * isManualEntry} field) and the next UEX sync flips it off {@code MANUAL} on a name-match.
    *
    * @param material create payload
    * @return the persisted DTO

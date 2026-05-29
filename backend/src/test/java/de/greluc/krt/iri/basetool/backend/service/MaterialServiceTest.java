@@ -15,6 +15,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCreateDto;
@@ -213,7 +214,7 @@ class MaterialServiceTest {
   // ─── createMaterial ─────────────────────────────────────────────────────
 
   @Test
-  void createMaterial_setsIsManualEntryTrue_andPersists() {
+  void createMaterial_setsSourceSystemsManual_andPersists() {
     // Given a minimal payload without category/refined references
     MaterialCreateDto dto =
         new MaterialCreateDto(
@@ -229,7 +230,7 @@ class MaterialServiceTest {
     // When
     Material saved = materialService.createMaterial(dto);
 
-    // Then — server-side stamped flag, scalars copied over verbatim, no FK lookup attempted
+    // Then — server-side stamped provenance, scalars copied over verbatim, no FK lookup attempted
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     Material captured = cap.getValue();
@@ -239,7 +240,10 @@ class MaterialServiceTest {
     assertEquals("manual", captured.getDescription());
     assertEquals(Boolean.TRUE, captured.getIsManualRawMaterial());
     assertEquals(Boolean.FALSE, captured.getIsJobOrder());
-    assertEquals(Boolean.TRUE, captured.getIsManualEntry(), "Server stamps isManualEntry=true");
+    assertEquals(
+        MaterialSourceSystem.MANUAL,
+        captured.getSourceSystems(),
+        "Server stamps source_systems=MANUAL (R9 Step 1, surfaced as derived isManualEntry)");
     assertNull(captured.getRefinedMaterial());
     assertNull(captured.getCategory());
     assertNull(captured.getIdCommodity(), "Manual entries carry no UEX commodity id");
