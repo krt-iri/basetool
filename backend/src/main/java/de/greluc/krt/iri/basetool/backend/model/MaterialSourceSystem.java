@@ -17,7 +17,7 @@ package de.greluc.krt.iri.basetool.backend.model;
  * </ul>
  *
  * <p>R1 only writes {@link #UEX_ONLY} (every existing row at migration time). The other values
- * become reachable in R3 (Wiki commodity sync) and R8 (post-soak V115 backfill of {@code
+ * become reachable in R3 (Wiki commodity sync) and R8 (post-soak V116 backfill of {@code
  * is_manual_entry → MANUAL}).
  */
 public enum MaterialSourceSystem {
@@ -36,7 +36,7 @@ public enum MaterialSourceSystem {
   BOTH,
 
   /**
-   * Admin-created row that has not (yet) been linked to either UEX or SC Wiki. The post-R8 V115
+   * Admin-created row that has not (yet) been linked to either UEX or SC Wiki. The post-R8 V116
    * backfill flips every legacy {@code is_manual_entry=true} row into this value.
    */
   MANUAL
