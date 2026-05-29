@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt — erster CI-Lauf steht aus. Phase 6 (Doku) offen. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt — offen bleiben nur der erste echte CI-Lauf und ein realer Staging-Host. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 
@@ -130,6 +130,12 @@ Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
 - **Job `smoke`** (`@Tag("smoke")`, Staging): **`if`-gegated auf die Repo-Variable `E2E_BASE_URL`** (eine Variable statt Secret — nur so in `if:` lesbar) **und** Nicht-PR-Events. Liegt brach, bis ein Staging-Host existiert; kein toter Pflicht-Check. Credentials (`E2E_USERNAME`/`E2E_PASSWORD`) kommen aus Secrets **über die Umgebung** (maskiert), die die `smokeTest`-Task auf die `e2e.*`-System-Properties mappt — keine Secrets auf der Kommandozeile.
 
 **Bewusst weggelassen:** der im Plan erwähnte gha-**Docker-Layer-Cache**. Compose-gebaute Images über BuildKit/gha zu cachen ist fummelig und fehleranfällig; die Images werden pro Lauf frisch gebaut (~3-5 min). Für eine Label-/Nightly-Task vertretbar und später nachrüstbar.
+
+## Phase 6 — Stand (2026-05-29)
+
+**README-Abschnitt „4.7 End-to-end (E2E) tests" ergänzt:** lokales Ausführen (`e2eTest` / `smokeTest`), ephemerer-Stack-Default vs. `E2E_BASE_URL`-Staging-Modus, CI-Verhalten und Verweis auf diesen Plan. Javadoc liegt auf allen neuen e2e-Klassen und -Methoden vor; `spotlessApply` lief auf jeder neuen Java-Datei.
+
+**Kein CHANGELOG-Eintrag (bewusst, abweichend vom ursprünglichen Phase-6-Punkt):** `CHANGELOG.md` ist gemäß CLAUDE.md für **nutzersichtbare** Änderungen (Features, Fixes, Env-Vars) reserviert und nach Keep-a-Changelog (`Added`/`Changed`/`Fixed`) gegliedert. Die E2E-Test-/CI-Infrastruktur ist Entwickler-/CI-Tooling ohne nutzersichtbaren Effekt — konsistent dazu trugen bereits die Phase-0–5-Commits keinen CHANGELOG-Eintrag.
 
 ## Warum dieser Stack zu diesem Projekt passt
 
