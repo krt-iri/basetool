@@ -43,6 +43,12 @@ public enum SyncEventType {
   /** Both sides (R4+): UEX and Wiki disagree on the manufacturer for the same UUID. */
   MANUFACTURER_MISMATCH,
 
+  /**
+   * Wiki manufacturer reconciliation (R6): a Wiki manufacturer was linked to an existing UEX
+   * manufacturer row for the first time — {@code scwiki_uuid} / {@code scwiki_code} were stamped.
+   */
+  MANUFACTURER_LINKED,
+
   /** Both sides: the optimistic-lock retry budget for a joint row was exhausted. */
   SYNC_RACE_CONFLICT,
 
