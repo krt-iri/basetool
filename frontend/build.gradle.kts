@@ -262,6 +262,9 @@ configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
   "e2eImplementation"(libs.playwright)
+  // PostgreSQL driver for the JDBC catalog seeding (UEX-owned reference data the admin API can't
+  // create); version is managed by the Spring Boot BOM.
+  "e2eImplementation"("org.postgresql:postgresql")
   // JUnit Platform launcher so the custom Test task can discover Jupiter tests.
   "e2eRuntimeOnly"("org.junit.platform:junit-platform-launcher")
 }

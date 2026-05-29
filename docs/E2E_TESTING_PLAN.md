@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows) begonnen — Flows „Mission anlegen" + „Job-Order anlegen" grün. Phasen 4–6 offen. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): fünf Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar) — bis auf JobOrder-Handover (vertagt) komplett. Phasen 4–6 offen. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 
@@ -90,26 +90,24 @@ Der Spike lief erfolgreich gegen den vollen, lokal hochgefahrenen Stack: ein ech
 
 **Noch offen:** Die `data-testid`-Vergabe ist auf die fünf Phase-1/3-Flows begrenzt; weitere Flows bekommen ihre Hooks, wenn sie getestet werden.
 
-## Phase 3 — Stand (2026-05-29, begonnen)
+## Phase 3 — Stand (2026-05-29)
 
-**Zwei funktionale Flows grün: „Mission anlegen" + „Job-Order anlegen".** `./gradlew :frontend:e2eTest` führt drei Tests aus (Login-Smoke + Mission-Create + JobOrder-Create), alle grün gegen den selbst-hochgefahrenen Stack (zweimal in Folge verifiziert, sauberer Teardown).
+**Fünf funktionale Flows grün: Login-Smoke, „Mission anlegen", „Job-Order anlegen", „Refinery-Order anlegen", „Hangar-Schiff hinzufügen".** `./gradlew :frontend:e2eTest` führt alle fünf Tests gegen den selbst-hochgefahrenen Stack aus — grün, mit sauberem Teardown (`down --volumes`, keine zurückbleibenden Container).
 
 **Neu:**
-- `BackendSeeder` — seedet die Create-Voraussetzungen: (1) `ensureIridiumMembership` holt per Keycloak-Password-Grant ein `test-admin`-Token und weist den User via `PATCH /api/v1/users/{id}/squadron` der IRIDIUM-Staffel zu (mit 409-Retry gegen den `syncUser`-Versions-Bump), damit staffel-scoped Creates nicht 400en; (2) `ensureJobOrderMaterial` legt per `POST /api/v1/materials` ein `isJobOrder=true`-Material an (`categoryId` optional). Trust-all-SSL für das self-signed Backend-Zertifikat. Greift nur im ephemeren Modus.
+- `BackendSeeder` — seedet die Create-Voraussetzungen: (1) `ensureIridiumMembership` holt per Keycloak-Password-Grant ein `test-admin`-Token und weist den User via `PATCH /api/v1/users/{id}/squadron` der IRIDIUM-Staffel zu (mit 409-Retry gegen den `syncUser`-Versions-Bump), damit staffel-scoped Creates nicht 400en; (2) `ensureJobOrderMaterial` / `createRefineryMaterial` legen per `POST /api/v1/materials` die benötigten Materialien an; (3) **`seedCatalog`** spielt den UEX-Katalog-Snapshot per JDBC ein (siehe „Katalog-Seeding"). Trust-all-SSL für das self-signed Backend-Zertifikat. Greift nur im ephemeren Modus.
 - `E2eSupport` — geteilte Helfer: Chromium-Launch (mit `host.docker.internal`-Remap im lokalen Modus), Keycloak-Login, `storageState`-Capture und Failure-Dump (Screenshot + HTML).
-- `MissionCreateE2eTest`, `JobOrderCreateE2eTest` — je: navigieren → Create-Formular füllen → Submit → Ergebnis in der Liste verifizieren (auto-waiting).
+- `MissionCreateE2eTest`, `JobOrderCreateE2eTest`, `RefineryOrderCreateE2eTest`, `HangarAddShipE2eTest` — je: navigieren → Create-Formular füllen → Submit → Ergebnis in der Liste verifizieren (auto-waiting).
 
 **Befunde:**
-- Das Mission-Create-Formular blockiert den Submit **clientseitig** (HTML-`required` auf Planned-Start-Datum/Zeit) ohne sichtbare Server-Fehlermeldung — Flow-Tests müssen die clientseitig-`required`-Felder füllen (mit Zukunfts-Datum, sonst greift die Not-in-the-past-Prüfung).
+- **Clientseitige `required`-Blockade (zweimal getroffen):** Sowohl das Mission- als auch das Refinery-Create-Formular blockieren den Submit **clientseitig** über HTML-`required`, ohne sichtbare Server-Fehlermeldung — der Test bleibt stumm auf dem Formular. Mission: Planned-Start-Datum/Zeit (mit Zukunfts-Datum füllen, sonst greift die Not-in-the-past-Prüfung). Refinery: die Goods-Zeile hat **drei** Pflichtfelder — `inputMaterialId_0`, `inputQuantity_0` **und** `outputQuantity_0` (nicht nur Material + Ausgangsmenge). Lehre: vor dem Submit alle `[required]`-Felder des Formulars füllen, nicht nur die offensichtlichen.
 - **Race vermeiden:** `datetime-splitter.js` leert die Datum/Zeit-Picker beim `DOMContentLoaded` aus dem leeren Hidden-Feld. Wer vor diesem Init füllt, dessen Werte werden wieder gelöscht → der Submit wird stumm blockiert (intermittierender Fehlschlag). Erst auf vollständigen Page-Load warten, dann füllen.
 - **Test-Isolation:** `storageState` wird NICHT über Testklassen hinweg memoisiert — jede Klasse loggt frisch ein (eigene Session). Cross-Class-Session-Sharing hatte sonst nicht-deterministische Fehlschläge verursacht.
 
-**Noch offen — gemeinsamer Blocker (UEX-Katalog / verknüpftes Inventar):**
-- **Refinery-Order** — Flow + Seeding-Scaffold (`BackendSeeder.createLocation` / `createRefiningMethod` / `createRefineryMaterial` / `seedEntity`) sind vorhanden, der Test ist aber `@Disabled`: das Standort-Dropdown listet nur **refinery-hosting** Standorte (`getRefineryLocations` → `GET /api/v1/locations/refineries`, UEX-synced); ein einfaches `POST /api/v1/locations` erzeugt keinen Raffinerie-Standort. (Befund: `LocationDto` hat ein primitives `boolean hidden`, das beim POST mitgesendet werden muss.)
-- **Hangar** — blockiert: ShipTypes sind UEX-synced (kein POST-Endpunkt), praktisch DB-Insert-only.
-- **JobOrder-Handover** — technisch machbar, aber vertagt: das Übergabe-Item-Dropdown listet das an den Auftrag **verknüpfte Inventar** (`name="items[N].inventoryItemId"`), nicht bloße Materialien — braucht also zusätzlich Inventar-Seeding plus die Modal-Interaktion (Datum/Zeit + Empfänger + Item).
+**Katalog-Seeding (Option 1 — umgesetzt, entsperrt Refinery + Hangar):**
+Refinery-Standorte und ShipTypes sind normalerweise UEX-synced und über die Admin-REST-API auf einer frischen DB nicht anlegbar. Gewählt wurde **Option 1**: ein deterministischer UEX-Katalog-Snapshot (`frontend/src/e2e/resources/uex-catalog-seed.sql`) wird von `BackendSeeder.seedCatalog()` per JDBC eingespielt, direkt nachdem der Stack gesund ist (`E2eStackExtension.beforeAll`). Inhalt (idempotent via feste UUIDs + `ON CONFLICT (id) DO NOTHING`): eine `city` mit `has_refinery=true` + verknüpfte `location` „E2E Refinery Hub" (macht den Standort refinery-fähig, da `getRefineryLocations` über `has_refinery` joint), ein `manufacturer` + `ship_type` „E2E Ship Type" und eine `refining_method` „E2E Refining Method". Damit listen die Refinery-Standort-/Methoden-Dropdowns und das Hangar-ShipType-Dropdown stabile Referenzdaten, unabhängig vom (netzabhängigen) UEX-Sync.
 
-**Gemeinsames Thema:** Flows jenseits von Mission/Job-Order hängen an UEX-Katalogdaten (ShipTypes, Raffinerie-Standorte) oder verknüpftem Inventar, die eine frische DB nicht hat und die einfachen Admin-POSTs nicht liefern. Vor weiterem Ausbau zu entscheiden: (a) einen UEX-Katalog-Snapshot vor dem Stack-Up in die Test-DB seeden, (b) direktes JDBC-DB-Seeding (ShipType / refinery-fähige Location / Inventar), oder (c) den UEX-Sync auf Service-Ebene mocken.
+**Noch offen — JobOrder-Handover:** technisch machbar, aber vertagt: das Übergabe-Item-Dropdown listet das an den Auftrag **verknüpfte Inventar** (`name="items[N].inventoryItemId"`), nicht bloße Materialien — braucht also zusätzlich Inventar-Seeding plus die Modal-Interaktion (Datum/Zeit + Empfänger + Item). Inventar lässt sich auf demselben Weg seeden (Admin-POST oder JDBC); die offene Arbeit ist die Modal-Interaktion im Test.
 
 Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
 

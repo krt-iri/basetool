@@ -2,6 +2,8 @@ package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -11,7 +13,11 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Duration;
+import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -38,6 +44,12 @@ public final class BackendSeeder {
   private static final String BACKEND_BASE_URL = "https://localhost:11261";
   private static final String CLIENT_ID = "basetool-frontend";
   private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
+
+  /** JDBC coordinates of the ephemeral backend Postgres (published on the host loopback). */
+  private static final String JDBC_URL = "jdbc:postgresql://localhost:15432/krt_basetool_e2e";
+
+  private static final String DB_USER = "basetool_e2e";
+  private static final String DB_PASSWORD = "basetool-e2e-pw-do-not-use-in-prod";
 
   /**
    * How many times to re-read the user and retry the squadron PATCH on a 409. The per-request
@@ -88,6 +100,50 @@ public final class BackendSeeder {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.ensureIridiumMembership failed", e);
+    }
+  }
+
+  /**
+   * Seeds UEX-owned catalog reference data (a refinery-hosting location, a ship type, a refining
+   * method) directly into the backend Postgres over JDBC, from the {@code /uex-catalog-seed.sql}
+   * classpath fixture. These rows are normally UEX-synced and cannot be created via the admin REST
+   * API on a fresh DB. Idempotent (fixed UUIDs + {@code ON CONFLICT}). Run once after the ephemeral
+   * stack is healthy.
+   */
+  public void seedCatalog() {
+    try {
+      String body =
+          readResource("/uex-catalog-seed.sql")
+              .lines()
+              .filter(line -> !line.strip().startsWith("--"))
+              .collect(Collectors.joining("\n"));
+      try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+          Statement statement = connection.createStatement()) {
+        for (String rawStatement : body.split(";")) {
+          String sql = rawStatement.strip();
+          if (!sql.isEmpty()) {
+            statement.execute(sql);
+          }
+        }
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedCatalog failed", e);
+    }
+  }
+
+  /**
+   * Reads a UTF-8 classpath resource into a string.
+   *
+   * @param path absolute classpath path (leading {@code /})
+   * @return the resource contents
+   * @throws IOException if the resource is missing or unreadable
+   */
+  private String readResource(String path) throws IOException {
+    try (InputStream in = BackendSeeder.class.getResourceAsStream(path)) {
+      if (in == null) {
+        throw new IllegalStateException(path + " not found on the e2e classpath");
+      }
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
   }
 

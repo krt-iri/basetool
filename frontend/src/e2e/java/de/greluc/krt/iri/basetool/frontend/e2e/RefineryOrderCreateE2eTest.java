@@ -11,7 +11,6 @@ import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -20,18 +19,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Functional flow: create a Refinery Order through the UI and verify it appears in the order list.
  *
  * <p>Refinery orders are staffel-scoped (need an OrgUnit membership) and the create form selects a
- * Location, a RefiningMethod and an input Material — so {@link BackendSeeder} seeds the IRIDIUM
- * membership plus those three reference entities in {@link #setUp()}. The first goods row is
- * pre-rendered ({@code #inputMaterialId_0} / {@code #outputQuantity_0}); the owner field is only
- * editable for logisticians and otherwise auto-defaults to the caller.
+ * refinery-hosting Location + a RefiningMethod (both UEX-owned, provided by the SQL catalog seed in
+ * {@link E2eStackExtension}) plus an input Material (a manual RAW material, creatable via the admin
+ * API). {@link BackendSeeder} seeds the IRIDIUM membership + the material in {@link #setUp()}. The
+ * first goods row is pre-rendered ({@code #inputMaterialId_0} / {@code #outputQuantity_0}); the
+ * owner field is only editable for logisticians and otherwise auto-defaults to the caller.
  */
 @Tag("e2e")
-@Disabled(
-    "Blocked: the refinery-order form's location dropdown lists only refinery-hosting locations"
-        + " (LocationService.getRefineryLocations / GET /api/v1/locations/refineries), which are"
-        + " UEX-synced — a plain POST /api/v1/locations is not refinery-hosting, so the seeded"
-        + " location never appears. Needs UEX-catalog or direct-DB seeding (see"
-        + " docs/E2E_TESTING_PLAN.md, Phase 3). The flow + seeding scaffold are kept for then.")
 class RefineryOrderCreateE2eTest {
 
   /** Provisions (or, in staging mode, targets) the stack for the whole run. */
@@ -42,11 +36,9 @@ class RefineryOrderCreateE2eTest {
 
   private static Playwright playwright;
   private static Browser browser;
-  private static String locationId;
-  private static String methodId;
   private static String materialId;
 
-  /** Launches the browser and, for the ephemeral stack, seeds the membership + reference data. */
+  /** Launches the browser and, for the ephemeral stack, seeds the membership + input material. */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
@@ -54,8 +46,8 @@ class RefineryOrderCreateE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Location");
-      methodId = seeder.createRefiningMethod(USERNAME, PASSWORD, "E2E Method");
+      // Location + refining method come from the SQL catalog seed (E2eStackExtension.seedCatalog);
+      // the input material is a manual RAW material, creatable via the admin API.
       materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
     }
   }
@@ -97,9 +89,12 @@ class RefineryOrderCreateE2eTest {
         if (owner.isEnabled()) {
           owner.selectOption(new SelectOption().setIndex(1));
         }
-        page.locator("#locationId").selectOption(locationId);
-        page.locator("#refiningMethodId").selectOption(methodId);
+        page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
+        page.locator("#refiningMethodId")
+            .selectOption(new SelectOption().setLabel("E2E Refining Method"));
         page.locator("#inputMaterialId_0").selectOption(materialId);
+        // Both the input and the expected output quantity of the goods row are required.
+        page.locator("#inputQuantity_0").fill("100");
         page.locator("#outputQuantity_0").fill("100");
         page.getByTestId("refinery-submit").click();
         page.waitForLoadState();

@@ -123,6 +123,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
       stageRealm(root);
       ensureKeystore(root);
       composeUp(root);
+      // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
+      // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
+      // flows.
+      new BackendSeeder().seedCatalog();
       started = true;
       context
           .getRoot()
