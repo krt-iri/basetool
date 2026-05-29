@@ -42,6 +42,7 @@
     color-scheme: dark;
     /* Colors */
     --color-primary: #E77E23;
+    --color-white: #FFFFFF;
     --color-bg-black: #000000;
     --color-bg-dark-gray: #141414;
     
@@ -83,10 +84,60 @@
     --color-success: #239E33; /* same value as Profit */
     --color-warning: #FFD23F; /* same value as Search and Rescue */
     --color-info:    #355DDC; /* same value as Forschung */
+    --color-secondary: #FFD23F; /* cross-squadron / foreign-link highlight */
+    --color-danger-hover:  #D41A25;
+    --color-success-hover: #2EBC3D;
     
     /* Typography */
     --font-headline: 'Ethnocentric', sans-serif;
     --font-body: 'Lato', sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace; /* version strings, IDs, code */
+
+    /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
+    --fs-h1: 2rem;
+    --fs-h2: 1.5rem;
+    --fs-h3: 1.17rem;
+    --fs-body: 1rem;
+    --fs-sm: 0.9rem;
+    --fs-xs: 0.8rem;
+    --fs-2xs: 0.7rem;
+
+    --fw-thin: 300;       /* body default */
+    --fw-regular: 400;
+    --fw-bold: 700;       /* labels, nav, btn, strong */
+    --fw-black: 900;
+
+    --tracking-display: 0.05em;   /* Ethnocentric optical kerning fix */
+    --tracking-overline: 0.15em;  /* admin chip, overlines */
+    --lh-body: 1.5;
+
+    /* Shape / elevation - square-first. Corners are SHARP; only pills
+       (chips/badges) and the circular radio control round. */
+    --radius-none: 0;
+    --radius-pill: 999px;
+
+    --border-hairline: 1px solid var(--color-gray-3);
+    --border-accent: 1px solid var(--color-primary);
+    --border-heading: 2px solid var(--color-primary);
+
+    /* Glows / shadows - the orange bloom is the brand's only "shadow" idiom. */
+    --glow-primary: 0 0 5px rgba(231, 126, 35, 0.3);     /* input focus */
+    --glow-primary-lg: 0 0 20px rgba(231, 126, 35, 0.2); /* toasts, modals */
+    --glow-danger-lg: 0 0 20px rgba(163, 0, 10, 0.2);
+    --shadow-drawer: 5px 0 15px rgba(0, 0, 0, 0.5);
+    --shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.8);
+
+    /* Spacing rhythm (rem multiples of 0.5). */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --touch-target: 44px;    /* min hit area for every interactive control */
+    --content-max: 1200px;   /* main column cap */
+    --measure: 80ch;         /* paragraph max line length */
 }
 
 body {
@@ -995,7 +1046,7 @@ input[type="radio"]:focus {
 }
 
 .btn-danger:hover {
-    background-color: #D41A25; /* Consistent with error pages hover */
+    background-color: var(--color-danger-hover); /* Consistent with error pages hover */
     color: #FFFFFF;
 }
 
@@ -1017,7 +1068,7 @@ input[type="radio"]:focus {
 }
 
 .btn-success:hover {
-    background-color: #2ebc3d;
+    background-color: var(--color-success-hover);
     color: #FFFFFF;
 }
 
@@ -1580,8 +1631,8 @@ input[type="radio"]:focus {
 }
 
 .squadron-badge-foreign {
-    color: var(--color-secondary, #FFD23F);
-    border-color: var(--color-secondary, #FFD23F);
+    color: var(--color-secondary);
+    border-color: var(--color-secondary);
 }
 
 /* Spezialkommando badge variant — neutral grey style so SK pins are visually
@@ -1598,7 +1649,7 @@ input[type="radio"]:focus {
    orange-yellow left border so the cross-squadron link is visible at a
    glance during handover preparation. */
 .inventory-row-foreign-jobOrder {
-    border-left: 4px solid var(--color-secondary, #FFD23F);
+    border-left: 4px solid var(--color-secondary);
 }
 
 /*
