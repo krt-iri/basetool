@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
@@ -30,6 +31,7 @@ class MaterialMapperTest {
     entity.setIsVolatileTime(0); // 0 → false
     entity.setIsManualRawMaterial(true);
     entity.setIsJobOrder(false);
+    entity.setIsVisible(false); // wiki-only invisible row → must surface on the DTO
     entity.setVersion(4L);
 
     // When
@@ -47,6 +49,7 @@ class MaterialMapperTest {
     assertFalse(dto.isVolatileTime());
     assertTrue(dto.isManualRawMaterial());
     assertFalse(dto.isJobOrder());
+    assertFalse(dto.isVisible(), "is_visible maps through to the DTO");
     assertEquals(4L, dto.version());
   }
 
@@ -70,6 +73,35 @@ class MaterialMapperTest {
   }
 
   @Test
+  void toDto_derivesIsManualEntryTrue_whenSourceSystemsManual() {
+    // R9 Step 1: the isManualEntry wire field is derived from source_systems == MANUAL, not from
+    // the legacy is_manual_entry column.
+    Material entity = new Material();
+    entity.setName("Admin Special");
+    entity.setSourceSystems(MaterialSourceSystem.MANUAL);
+
+    assertTrue(
+        mapper.toDto(entity).isManualEntry(),
+        "source_systems=MANUAL must surface as the derived isManualEntry=true");
+  }
+
+  @Test
+  void toDto_derivesIsManualEntryFalse_whenSourceSystemsNotManual() {
+    for (MaterialSourceSystem nonManual :
+        new MaterialSourceSystem[] {
+          MaterialSourceSystem.UEX_ONLY, MaterialSourceSystem.WIKI_ONLY, MaterialSourceSystem.BOTH
+        }) {
+      Material entity = new Material();
+      entity.setName("Catalogue Row");
+      entity.setSourceSystems(nonManual);
+
+      assertFalse(
+          mapper.toDto(entity).isManualEntry(),
+          "source_systems=" + nonManual + " must surface as isManualEntry=false");
+    }
+  }
+
+  @Test
   void toEntity_shouldConvertBooleanFlagsToInteger1or0() {
     // Given
     UUID id = UUID.randomUUID();
@@ -88,6 +120,7 @@ class MaterialMapperTest {
             false,
             true,
             null,
+            false,
             1L);
 
     // When
@@ -104,6 +137,7 @@ class MaterialMapperTest {
     assertEquals(1, entity.getIsVolatileTime());
     assertEquals(Boolean.FALSE, entity.getIsManualRawMaterial());
     assertEquals(Boolean.TRUE, entity.getIsJobOrder());
+    assertEquals(Boolean.FALSE, entity.getIsVisible(), "is_visible maps back to the entity");
     assertEquals(1L, entity.getVersion());
   }
 
@@ -116,6 +150,7 @@ class MaterialMapperTest {
             "Tin",
             "RAW",
             "SCU",
+            null,
             null,
             null,
             null,

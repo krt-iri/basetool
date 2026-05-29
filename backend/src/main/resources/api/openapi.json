@@ -15450,6 +15450,14 @@
             "default" : false
           }
         }, {
+          "name" : "includeHidden",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -30261,6 +30269,9 @@
             "type" : "boolean"
           },
           "isManualEntry" : {
+            "type" : "boolean"
+          },
+          "isVisible" : {
             "type" : "boolean"
           },
           "version" : {

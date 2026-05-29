@@ -9,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.model.Terminal;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.TerminalRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -46,11 +47,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UexItemPriceSyncService {
 
+  /**
+   * Flush/clear the persistence context every this-many upserts so the ~24 000-row matrix never
+   * accumulates in one context (§ M2 hardening). See {@link #flushAndClearIfBatchFull(int)}.
+   */
+  static final int FLUSH_BATCH_SIZE = 500;
+
   private final UexClient uexClient;
   private final UexProperties uexProperties;
   private final GameItemRepository gameItemRepository;
   private final GameItemPriceRepository gameItemPriceRepository;
   private final TerminalRepository terminalRepository;
+  private final EntityManager entityManager;
 
   /**
    * Runs the full item-price matrix sync. No-op (with an INFO line) when the feature flag is off;
@@ -82,6 +90,7 @@ public class UexItemPriceSyncService {
         if (savedId != null) {
           seenPriceIds.add(savedId);
           processed++;
+          flushAndClearIfBatchFull(processed);
         } else {
           skipped++;
         }
@@ -145,5 +154,23 @@ public class UexItemPriceSyncService {
     price.setDateModified(dto.dateModified());
     price.setUexSyncedAt(now);
     return gameItemPriceRepository.save(price).getId();
+  }
+
+  /**
+   * Flushes and clears the persistence context every {@link #FLUSH_BATCH_SIZE} upserts so the ~24
+   * 000-row item-price matrix never accumulates in one context. Without this, Hibernate's
+   * auto-flush re-dirty-checks every managed entity before each lookup query — O(n²) over the run —
+   * and the heap holds every {@code game_item_price} for the transaction. {@code flush()} writes
+   * pending changes first (nothing is lost), then {@code clear()} detaches them; the {@code
+   * seenPriceIds} set holds row UUIDs (not entities), so the stale-row sweep after the loop is
+   * unaffected, and {@code item} / {@code terminal} are re-looked-up fresh on each iteration.
+   *
+   * @param processedSoFar count of price rows upserted so far this run
+   */
+  void flushAndClearIfBatchFull(int processedSoFar) {
+    if (processedSoFar > 0 && processedSoFar % FLUSH_BATCH_SIZE == 0) {
+      entityManager.flush();
+      entityManager.clear();
+    }
   }
 }

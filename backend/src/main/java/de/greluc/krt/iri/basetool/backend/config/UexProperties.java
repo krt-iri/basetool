@@ -18,11 +18,11 @@ import org.springframework.validation.annotation.Validated;
  * one-line config change.
  *
  * <p>{@code schedulerEnabled} toggles the periodic background sync; {@code schedulerDelay} is the
- * fixed-delay between successive sync runs in milliseconds. Defaults run every hour, which keeps
- * the catalog fresh without hammering the upstream API. Carries {@code @EnableScheduling} and
- * {@code @EnableAsync} because it is the single owner of the sync timing — putting these in a
- * standalone configuration class would have led to two unrelated {@code @Configuration} classes
- * sharing the same purpose.
+ * fixed-delay between successive sync runs in milliseconds. Defaults to once a day (24 h) — UEX
+ * commodity prices and the catalogue move slowly enough that a daily refresh keeps the data fresh
+ * without hammering the upstream API. Carries {@code @EnableScheduling} and {@code @EnableAsync}
+ * because it is the single owner of the sync timing — putting these in a standalone configuration
+ * class would have led to two unrelated {@code @Configuration} classes sharing the same purpose.
  */
 @Data
 @Validated
@@ -98,5 +98,5 @@ public class UexProperties {
 
   @NotNull private Boolean schedulerEnabled = true;
 
-  @NotBlank private String schedulerDelay = "3600000";
+  @NotBlank private String schedulerDelay = "86400000";
 }

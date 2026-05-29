@@ -174,6 +174,39 @@ class UexItemSyncServiceTest {
   }
 
   @Test
+  void syncItems_doesNotDowngradeKindToGeneric_whenUexReCataloguesAWikiSpecificRow() {
+    // A paint Wiki filed as VEHICLE_ITEM (via /vehicle-items); UEX later lists the same
+    // external_uuid under the "Liveries" section (deriveKind → GENERIC). The §6.3.1
+    // more-specific-wins merge must keep VEHICLE_ITEM — UEX must not downgrade it to GENERIC.
+    UUID externalUuid = UUID.randomUUID();
+    UexItemDto paint =
+        helmetDto(21, "100i Auspicious Red Dog Livery", externalUuid.toString(), liveriesCategory);
+
+    GameItem prior = new GameItem();
+    prior.setId(UUID.randomUUID());
+    prior.setExternalUuid(externalUuid);
+    prior.setName("100i Auspicious Red Dog Livery");
+    prior.setKind(GameItemKind.VEHICLE_ITEM);
+    prior.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    prior.setScwikiSyncedAt(java.time.Instant.now());
+
+    when(categoryRefService.syncCategories()).thenReturn(List.of(liveriesCategory));
+    when(uexClient.getItemsForCategory(75)).thenReturn(List.of(paint));
+    when(gameItemRepository.findByUexItemId(21)).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(prior));
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    assertEquals(
+        GameItemKind.VEHICLE_ITEM,
+        saved.getValue().getKind(),
+        "UEX must not downgrade a Wiki-set VEHICLE_ITEM to GENERIC (§6.3.1)");
+  }
+
+  @Test
   void syncItems_skipsOrphanSweep_whenNoItemsWereProcessed() {
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
     when(uexClient.getItemsForCategory(3)).thenReturn(List.of());

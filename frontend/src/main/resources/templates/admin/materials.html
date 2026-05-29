@@ -47,6 +47,20 @@
             border-radius: 2px;
             vertical-align: middle;
         }
+        .material-hidden-badge {
+            display: inline-block;
+            margin-right: 0.4rem;
+            padding: 0.05rem 0.4rem;
+            font-size: 0.7rem;
+            font-family: var(--font-headline);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-warning);
+            background-color: transparent;
+            border: 1px solid var(--color-warning);
+            border-radius: 2px;
+            vertical-align: middle;
+        }
         .modal-box-create-material {
             max-width: 640px;
         }
@@ -172,7 +186,7 @@
                 <tbody>
                     <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}">
                         <td>
-                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
+                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span><span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
                         </td>
                         <td>
                             <div style="white-space: nowrap;">
@@ -188,6 +202,12 @@
                                 <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
                                     <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
                                     <span th:text="#{admin.material.job_order}">Auftrag</span>
+                                </label>
+                            </div>
+                            <div sec:authorize="hasRole('ADMIN')" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
+                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
+                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
+                                    <span th:text="#{admin.material.visible}">Sichtbar</span>
                                 </label>
                             </div>
                         </td>
@@ -375,6 +395,8 @@
             requestBody.isManualRawMaterial = selectElement.checked;
         } else if (updateType === 'JOB_ORDER') {
             requestBody.isJobOrder = selectElement.checked;
+        } else if (updateType === 'VISIBILITY') {
+            requestBody.isVisible = selectElement.checked;
         }
 
         const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;

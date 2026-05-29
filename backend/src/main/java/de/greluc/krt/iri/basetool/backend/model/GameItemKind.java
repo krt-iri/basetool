@@ -34,5 +34,38 @@ public enum GameItemKind {
   CLOTHING,
 
   /** Food or drink item. */
-  FOOD
+  FOOD;
+
+  /**
+   * Merges an existing kind with an incoming one per the SC_WIKI_SYNC_PLAN.md §6.3.1
+   * "more-specific-wins, never downgrade to {@link #GENERIC}" rule. This is the single shared
+   * arbiter applied identically whether UEX or Wiki was the last writer (§6.3.1: "applies whether
+   * UEX or Wiki was the last writer") — so a paint one source files as {@link #VEHICLE_ITEM} is
+   * never downgraded to {@link #GENERIC} when the other re-catalogues it under a generic section.
+   *
+   * <p>Semantics: a {@code null} or {@link #GENERIC} {@code existing} yields to {@code incoming};
+   * an incoming {@link #GENERIC} (or an equal kind) keeps {@code existing}; {@link
+   * #WEAPON_ATTACHMENT} refines {@link #WEAPON} and {@link #VEHICLE_WEAPON} refines {@link
+   * #VEHICLE_ITEM}; any other pair of distinct specific kinds keeps {@code existing} (no
+   * cross-family flip).
+   *
+   * @param existing the kind currently on the row (may be {@code null})
+   * @param incoming the kind derived from the current sync pass
+   * @return the kind to persist
+   */
+  public static GameItemKind mergeMoreSpecific(GameItemKind existing, GameItemKind incoming) {
+    if (existing == null || existing == GENERIC) {
+      return incoming;
+    }
+    if (incoming == GENERIC || existing == incoming) {
+      return existing;
+    }
+    if (existing == WEAPON && incoming == WEAPON_ATTACHMENT) {
+      return incoming;
+    }
+    if (existing == VEHICLE_ITEM && incoming == VEHICLE_WEAPON) {
+      return incoming;
+    }
+    return existing;
+  }
 }

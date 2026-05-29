@@ -4,10 +4,12 @@ package de.greluc.krt.iri.basetool.backend.model;
  * Catalogue of findings a sync run can record into {@link ExternalSyncReport}, per
  * SC_WIKI_SYNC_PLAN.md §8.8.
  *
- * <p>R3 (Wiki commodity merge) emits {@link #SKIP_JUNK}, {@link #CREATED_WIKI_ONLY}, {@link
- * #LOOKS_LIKE_ITEM}, {@link #LINKED_VIA_ALIAS} and {@link #MULTI_MATCH_AMBIGUOUS}. The remaining
- * values are reserved for later phases (R4 blueprint / item sync, R7 prices) and are declared now
- * so the enum — and the {@code event_type} column it maps to — is stable across the rollout.
+ * <p>Each value is emitted by a specific sync (noted per-constant); the {@code event_type} column
+ * stores the enum name. Optimistic-lock conflicts between a sync write and a concurrent admin edit
+ * are intentionally <b>not</b> recorded here: the per-row handler logs and skips the row, which
+ * re-syncs on the next cycle. The {@code §5.4} "retry-once" budget was never needed — each
+ * scheduler runs single-threaded on its own {@code @Async} executor, so an intra-run race on the
+ * same row cannot occur.
  */
 public enum SyncEventType {
 
@@ -48,9 +50,6 @@ public enum SyncEventType {
    * manufacturer row for the first time — {@code scwiki_uuid} / {@code scwiki_code} were stamped.
    */
   MANUFACTURER_LINKED,
-
-  /** Both sides: the optimistic-lock retry budget for a joint row was exhausted. */
-  SYNC_RACE_CONFLICT,
 
   /** Wiki item sync (R4): a UUID present in UEX is absent on the Wiki. */
   WIKI_MISSING,

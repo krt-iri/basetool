@@ -12,7 +12,7 @@ public class JacksonRecordTest {
     MaterialDto dto =
         new MaterialDto(
             null, "Test", "RAW", "SCU", "desc", null, null, true, true, true, false, false, false,
-            1L);
+            true, 1L);
     ObjectMapper mapper = new ObjectMapper();
     String json = mapper.writeValueAsString(dto);
 

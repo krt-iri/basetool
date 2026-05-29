@@ -12,4 +12,5 @@ public record MaterialUpdateAjaxRequest(
     String quantityType,
     Boolean isManualRawMaterial,
     Boolean isJobOrder,
+    Boolean isVisible,
     @NotNull Long version) {}

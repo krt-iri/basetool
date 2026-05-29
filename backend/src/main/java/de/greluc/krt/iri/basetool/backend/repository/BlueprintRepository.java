@@ -52,7 +52,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Modifying
   @Query(
       "UPDATE Blueprint b SET b.scwikiDeletedAt = :now "
-          + "WHERE b.scwikiUuid NOT IN :seenScwikiUuids "
+          + "WHERE b.scwikiUuid IS NOT NULL "
+          + "AND b.scwikiUuid NOT IN :seenScwikiUuids "
           + "AND b.scwikiDeletedAt IS NULL")
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);

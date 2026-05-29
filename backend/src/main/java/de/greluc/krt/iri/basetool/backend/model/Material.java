@@ -190,7 +190,7 @@ public class Material extends AbstractEntity<UUID> {
    * backfill maps {@code is_manual_entry=true → MANUAL}.
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "source_systems", nullable = false)
+  @Column(name = "source_systems", nullable = false, length = 16)
   private MaterialSourceSystem sourceSystems = MaterialSourceSystem.UEX_ONLY;
 
   @ManyToOne

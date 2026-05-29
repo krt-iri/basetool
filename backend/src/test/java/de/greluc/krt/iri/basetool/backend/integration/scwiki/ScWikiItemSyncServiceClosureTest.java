@@ -16,6 +16,7 @@ import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +37,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private EntityManager entityManager;
 
   private ScWikiProperties properties;
   private ScWikiItemSyncService service;
@@ -51,7 +53,8 @@ class ScWikiItemSyncServiceClosureTest {
             gameItemRepository,
             blueprintRepository,
             manufacturerRepository,
-            syncReportService);
+            syncReportService,
+            entityManager);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
