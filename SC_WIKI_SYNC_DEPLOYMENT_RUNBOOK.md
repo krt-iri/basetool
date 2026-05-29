@@ -26,7 +26,7 @@ Request; "Date" is the production deploy timestamp.
 | R3 - Wiki commodity merge | TBD | TBD | TBD | TBD | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on |
 | R4 - Wiki items + Blueprints | TBD | TBD | TBD | TBD | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags |
 | R5 - Full Wiki item backfill | TBD | TBD | TBD | TBD | TBD | needs item-sync-enabled + sync-all-items both on; ~12 700 rows; NO migration |
-| R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | |
+| R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | needs manufacturer-sync-enabled; enriches scwiki_uuid/code on UEX rows; NO migration |
 | R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | feature-flagged; off by default |
 | R8 - Soak + V115 cleanup | TBD | TBD | TBD | TBD | TBD | flips is_manual_entry -> source_systems=MANUAL |
 | R9 - V116 destructive cleanup | TBD | TBD | TBD | TBD | TBD | drops is_manual_entry + ship_type.description |
@@ -860,32 +860,109 @@ No migration to revert. The backup is the fallback.
 
 ## 6. R6 - Manufacturer Wiki reconciliation
 
-*(Stub - adds `ScWikiManufacturerSyncService`. Fills `scwiki_uuid` /
-`scwiki_code` on rows where UEX has set `uex_company_id`.)*
-
 ### 6.1 Scope summary
 
-TBD.
+R6 adds `ScWikiManufacturerSyncService` — an **enrichment-only** pass that stamps the Wiki
+cross-reference columns onto the manufacturer rows the UEX sync already created. Like every prior
+phase it ships **dark** behind `krt.scwiki.manufacturer-sync-enabled` (default `false`), and like R5
+it carries **no Flyway migration** (the `scwiki_uuid` / `scwiki_code` columns landed in R1's V107;
+R6 finally writes them).
+
+- Walks `/api/manufacturers` (~130 rows, one page at the 200 page-size) and resolves each Wiki
+  manufacturer to a local row via the §6.4 chain: `scwiki_uuid` → case-insensitive `name` →
+  case-insensitive `abbreviation == code`. The abbreviation/code fallback is an addition over the
+  plan's literal `industry+name` third step (the Wiki manufacturer payload exposes no industry; the
+  UNIQUE local `abbreviation` matched against the Wiki `code` lifts the link rate for companies
+  whose full name differs between catalogues).
+- On a match it stamps `scwiki_uuid` / `scwiki_code` / `scwiki_synced_at` (and clears
+  `scwiki_deleted_at`). It **never inserts a row** (a Wiki manufacturer with no UEX counterpart is
+  skipped — `manufacturer.name` / `abbreviation` are `NOT NULL UNIQUE` and there is no `WIKI_ONLY`
+  concept here) and **never overwrites** the UEX-canonical `name` / `abbreviation` / `industry`.
+- A candidate already linked to a *different* Wiki UUID is left untouched and logged
+  `MANUFACTURER_MISMATCH` rather than hijacked. A first-time link logs `MANUFACTURER_LINKED`; a
+  refresh of an already-linked row logs nothing (so steady-state runs are quiet).
+- Gated cross-kind orphan sweep (`Manufacturer.markScwikiDeletedExcept`, Wiki-linked rows only)
+  fires only on a non-empty seen set (§8.7). Expected on ~50 local manufacturers: ~50 linked, the
+  remaining ~80 Wiki-only companies unmatched (no UEX row to enrich).
+- The scheduler now runs the manufacturer reconciliation as a fifth step after the blueprint sync,
+  behind its own flag.
 
 ### 6.2 Pre-deployment checks (R6)
 
-TBD.
+- [ ] R5 (PR [#268](https://github.com/krt-iri/basetool/pull/268)) deployed.
+- [ ] The UEX manufacturer sync has run at least once so `manufacturer` rows carry
+      `uex_company_id` (R6 only enriches existing rows):
+      ```bash
+      psql -d basetool -c "SELECT count(*) FROM manufacturer WHERE uex_company_id IS NOT NULL"
+      # Expect the UEX company count (~50); 0 means nothing to reconcile yet.
+      ```
+- [ ] `krt.scwiki.manufacturer-sync-enabled` unset / `false` in prod `.env` for the merge.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R6 branch.
 
 ### 6.3 Deployment steps (production, R6)
 
-TBD.
+1. **Backup** (the sync mutates a few `manufacturer` columns):
+   ```bash
+   pg_dump --host=<prod-host> --username=<prod-user> --format=custom \
+     --no-owner --no-acl \
+     --file=basetool-pre-r6-$(date -u +%Y%m%d-%H%M).dump basetool
+   ```
+2. **Merge the R6 PR.** There is **no migration** — `flyway_schema_history` stays at V114.
+3. **Confirm the dark state** — the next tick logs the skip line:
+   ```
+   SC Wiki manufacturer sync invoked but disabled … skipping.
+   ```
+4. **Enable** with `KRT_SCWIKI_MANUFACTURER_SYNC_ENABLED=true`, restart, let one tick run, and watch
+   the summary line:
+   ```
+   Finished SC Wiki manufacturer reconciliation: N newly linked, M refreshed, C conflicts, U unmatched.
+   ```
 
 ### 6.4 Smoke tests (R6, post-deploy)
 
-TBD.
+```bash
+# --- after enabling manufacturer-sync + one tick: ---
+
+# 1. Wiki cross-refs are now populated on the UEX rows.
+psql -d basetool -c "SELECT count(*) FILTER (WHERE scwiki_uuid IS NOT NULL) AS linked, \
+                            count(*) FILTER (WHERE uex_company_id IS NOT NULL) AS uex FROM manufacturer"
+#   expect linked close to (but <=) uex; the gap is UEX companies the Wiki spells differently.
+
+# 2. UEX-canonical fields were NOT touched (spot-check a known manufacturer).
+psql -d basetool -c "SELECT name, abbreviation, scwiki_code FROM manufacturer WHERE abbreviation = 'AEGS'"
+#   name/abbreviation unchanged; scwiki_code now set.
+
+# 3. sync-report recorded the reconciliation (ADMIN session, /admin/sync-reports/scwiki).
+psql -d basetool -c "SELECT event_type, count(*) FROM external_sync_report \
+                     WHERE source='SCWIKI' AND aggregate='manufacturer' GROUP BY event_type"
+#   expect MANUFACTURER_LINKED on the first run; MANUFACTURER_MISMATCH only on genuine conflicts.
+
+# 4. Ship picker / item manufacturer labels unaffected (R6 only adds cross-ref columns).
+```
 
 ### 6.5 Rollback (R6)
 
-TBD.
+Fastest: set `KRT_SCWIKI_MANUFACTURER_SYNC_ENABLED=false` and restart — no data is removed (the
+`scwiki_*` columns are additive cross-refs that nothing reads yet). To also clear the stamps:
+
+```sql
+UPDATE manufacturer
+   SET scwiki_uuid = NULL, scwiki_code = NULL, scwiki_synced_at = NULL, scwiki_deleted_at = NULL
+ WHERE scwiki_synced_at IS NOT NULL;
+```
+
+No migration to revert. The backup is the fallback.
 
 ### 6.6 Monitoring during the soak window (R6)
 
-TBD.
+- **Link rate.** The `… N newly linked, M refreshed, C conflicts, U unmatched.` line is the health
+  signal. A high `unmatched` is normal (the Wiki lists more companies than UEX); a high `conflicts`
+  is not — it points at a name/code collision and warrants a look at the `MANUFACTURER_MISMATCH`
+  events.
+- **DB growth.** Negligible — no new rows, a handful of column writes; `external_sync_report` gains
+  ~one `MANUFACTURER_LINKED` row per first-time link, then nothing on steady-state runs.
+- **Orphan sweep.** A `Skipping … (no sweep)` / empty-feed WARN means the Wiki returned nothing —
+  transient; the sweep is correctly suppressed.
 
 ---
 
