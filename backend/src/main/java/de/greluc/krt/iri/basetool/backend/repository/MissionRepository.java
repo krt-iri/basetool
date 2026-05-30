@@ -60,17 +60,21 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
   /**
    * Returns the first matching {@code PlannedStartTimeAfterOrderByPlannedStartTimeAsc} (limit 1).
-   * Eagerly fetches the configured relations via {@code @EntityGraph}.
+   * Deliberately NOT graphed: combining the {@code limit 1} with a collection {@code @EntityGraph}
+   * ({@code participants} / {@code assignedUnits}) forces Hibernate to load the whole result set
+   * and paginate in memory (HHH90003004). Callers that need the collections re-fetch the single hit
+   * by id through the graphed {@link #findById(UUID)} — see {@code MissionService.getNextMission}.
    */
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(Instant date);
 
   /**
    * Returns the first matching {@code
-   * PlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc} (limit 1). Eagerly fetches
-   * the configured relations via {@code @EntityGraph}.
+   * PlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc} (limit 1). Deliberately NOT
+   * graphed for the same reason as {@link
+   * #findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(Instant)} — a {@code limit 1} plus
+   * a collection {@code @EntityGraph} triggers in-memory pagination (HHH90003004); callers re-fetch
+   * the hit by id through the graphed {@link #findById(UUID)}.
    */
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   Optional<Mission> findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(
       Instant date);
 

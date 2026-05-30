@@ -3,8 +3,10 @@ package de.greluc.krt.iri.basetool.backend;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +59,58 @@ class MissionServiceTest {
       orgUnitMembershipService;
 
   @InjectMocks private MissionService missionService;
+
+  @Test
+  void getNextMission_allowInternal_refetchesByIdThroughGraph() {
+    // The limit-1 lookup is intentionally not graphed (a collection fetch + limit forces in-memory
+    // pagination, HHH90003004); the service re-fetches the hit by id via the graphed findById so
+    // the collections are eagerly loaded for the mapper.
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any()))
+        .thenReturn(Optional.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission(true);
+
+    assertSame(detail, result.orElseThrow(), "must return the graphed findById re-fetch");
+    verify(missionRepository).findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any());
+    verify(missionRepository).findById(id);
+  }
+
+  @Test
+  void getNextMission_guest_usesInternalFalseVariantThenRefetches() {
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(missionRepository
+            .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(any()))
+        .thenReturn(Optional.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission(false);
+
+    assertSame(detail, result.orElseThrow());
+    verify(missionRepository)
+        .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(any());
+    verify(missionRepository).findById(id);
+  }
+
+  @Test
+  void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
+    when(missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any()))
+        .thenReturn(Optional.empty());
+
+    Optional<Mission> result = missionService.getNextMission(true);
+
+    assertEquals(Optional.empty(), result);
+    verify(missionRepository, never()).findById(any());
+  }
 
   @Test
   void addParticipant_ShouldMatchGuestNameToExistingUserCaseInsensitive() {
