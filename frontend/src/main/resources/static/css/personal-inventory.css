@@ -19,7 +19,7 @@
 }
 .krt-personal-inventory-header .krt-subtitle {
     font-family: 'Lato', sans-serif;
-    font-weight: 300;
+    font-weight: var(--fw-thin);
     color: var(--color-gray-1, #D2D2D2);
     margin: 0;
     max-width: 80ch;
@@ -64,7 +64,7 @@
 }
 .krt-pi-userform select {
     min-height: 44px;
-    background-color: var(--color-gray-4, #1C1C1C);
+    background-color: var(--color-surface-input, #1C1C1C);
     border: 1px solid var(--color-gray-3, #282828);
     color: var(--color-gray-1, #D2D2D2);
     /* Reserve right space for the SVG arrow injected by styles.css */
@@ -74,10 +74,10 @@
 .krt-pi-userform label {
     color: var(--color-primary, #E77E23);
     font-family: 'Lato', sans-serif;
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
 }
 
 .krt-pi-filter {
@@ -88,7 +88,7 @@
 }
 .krt-pi-search-input {
     min-height: 44px;
-    background-color: var(--color-gray-4, #1C1C1C);
+    background-color: var(--color-surface-input, #1C1C1C);
     border: 1px solid var(--color-gray-3, #282828);
     color: var(--color-gray-1, #D2D2D2);
     padding: 0.4rem 0.6rem;
@@ -147,7 +147,7 @@
 #krt-pi-modal .form-group textarea {
     width: 100%;
     min-height: 44px;
-    background-color: var(--color-gray-4, #1C1C1C);
+    background-color: var(--color-surface-input, #1C1C1C);
     border: 1px solid var(--color-gray-3, #282828);
     color: var(--color-gray-1, #D2D2D2);
     font-family: 'Lato', sans-serif;
@@ -162,7 +162,7 @@
 #krt-pi-modal .form-group select {
     width: 100%;
     min-height: 44px;
-    background-color: var(--color-gray-4, #1C1C1C);
+    background-color: var(--color-surface-input, #1C1C1C);
     border: 1px solid var(--color-gray-3, #282828);
     color: var(--color-gray-1, #D2D2D2);
     font-family: 'Lato', sans-serif;
@@ -176,17 +176,17 @@
     display: block;
     color: var(--color-primary, #E77E23);
     font-family: 'Lato', sans-serif;
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     margin: 0 0 0.4rem 0;
     padding: 0;
     text-align: left;
 }
 .krt-pi-help {
     color: var(--color-gray-2, #646464);
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     display: block;
     margin-top: 0.25rem;
 }
@@ -275,10 +275,10 @@
 }
 .krt-pi-typeahead-item:hover,
 .krt-pi-typeahead-item:focus {
-    background-color: var(--color-gray-4, #1C1C1C);
+    background-color: var(--color-surface-input, #1C1C1C);
     color: var(--color-primary, #E77E23);
 }
-.krt-pi-typeahead-name { font-weight: 700; }
+.krt-pi-typeahead-name { font-weight: var(--fw-bold); }
 .krt-pi-typeahead-meta { color: var(--color-gray-2, #646464); font-size: 0.85rem; margin-left: auto; }
 .krt-pi-typeahead-loading,
 .krt-pi-typeahead-empty {

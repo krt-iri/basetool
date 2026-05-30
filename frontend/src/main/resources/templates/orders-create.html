@@ -18,7 +18,7 @@
         .form-group input, .form-group select {
             width: 100%;
             padding: 0.75rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -125,28 +125,28 @@
                 
                 <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.materials.title}">Materialien</h3>
                 
-                <details class="form-group scmdb-import" style="border: 1px dashed var(--color-primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+                <details class="form-group scmdb-import" style="border: 1px dashed var(--color-primary); padding: 1rem; border-radius: var(--radius-none); margin-bottom: 2rem;">
                     <summary th:text="#{orders.create.scmdb.label}">scmdb.net Export</summary>
                     <div class="mt-1">
-                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" style="width: 100%; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); padding: 0.75rem; box-sizing: border-box; resize: vertical;"></textarea>
+                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" style="width: 100%; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); padding: 0.75rem; box-sizing: border-box; resize: vertical;"></textarea>
                         <button type="button" class="btn btn-secondary" style="margin-top: 1rem; width: 100%;" data-trigger="orders-import-scmdb" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
                     </div>
                 </details>
                 
                 <div id="materials-container">
                     <div class="material-row" th:each="mat, stat : *{materials}">
-                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
                             <select th:field="*{materials[__${stat.index}__].materialId}" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.amount}">Menge</label>
                             <input type="number" th:field="*{materials[__${stat.index}__].amount}" step="0.001" min="0" required>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
                             <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
                         </div>
@@ -277,13 +277,13 @@
         const options = document.getElementById('material-options-template').innerHTML;
         
         row.innerHTML = `
-            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <div class="form-group flex-2 mb-0">
                 <select name="materials[${materialIndex}].materialId" required>${options}</select>
             </div>
-            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <div class="form-group flex-1 mb-0">
                 <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
             </div>
-            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <div class="form-group flex-1 mb-0">
                 <input type="number" name="materials[${materialIndex}].minQuality" value="700" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
             </div>
         `;

@@ -53,9 +53,9 @@
         <p th:text="#{operations.description}">Manage and view operations.</p>
     </div>
 
-    <div th:if="${successMessage}" class="alert alert-success mt-2" th:text="#{${successMessage}}"></div>
-    <div th:if="${errorMessage}" class="alert alert-danger mt-2" th:text="#{${errorMessage}}"></div>
-    <div th:if="${error}" class="alert alert-danger mt-2" th:text="#{${error}}"></div>
+    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <div class="hud-box mt-2">
 
@@ -76,7 +76,10 @@
                 <tbody>
                     <tr th:each="op : ${operations}">
                         <td th:text="${op.name}">Name</td>
-                        <td th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</td>
+                        <td>
+                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(op.status)}"
+                                  th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</span>
+                        </td>
                         <td class="op-desc" th:text="${op.description}">Description</td>
                         <td class="op-action">
                             <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
@@ -103,15 +106,15 @@
             <form th:action="@{/operations/create}" method="post">
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                     <label for="create-name" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.name}">Name</label>
-                    <input type="text" id="create-name" name="name" style="width: 100%;" required>
+                    <input type="text" id="create-name" name="name" class="w-full" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                     <label for="create-desc" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.description}">Description</label>
-                    <textarea id="create-desc" name="description" style="width: 100%;"></textarea>
+                    <textarea id="create-desc" name="description" class="w-full"></textarea>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                     <label for="create-status" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.status}">Status</label>
-                    <select id="create-status" name="status" style="width: 100%;" required>
+                    <select id="create-status" name="status" class="w-full" required>
                         <option value="PLANNED" th:text="#{operation.status.planned}">PLANNED</option>
                         <option value="ACTIVE" th:text="#{operation.status.active}">ACTIVE</option>
                         <option value="COMPLETED" th:text="#{operation.status.completed}">COMPLETED</option>

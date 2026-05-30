@@ -29,9 +29,9 @@
 .matrix-table th {
     color: var(--color-primary);
     font-family: var(--font-body);
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
     position: sticky;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     z-index: 20;
     background-clip: padding-box;
 }
@@ -104,7 +104,7 @@
     border-bottom: 1px solid var(--color-gray-3);
     text-align: center;
     font-family: var(--font-headline);
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     padding: 0.5rem;
 }
 
@@ -130,7 +130,7 @@
 .matrix-table td:first-child {
     position: sticky;
     left: 0;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     z-index: 11;
     font-weight: bold;
     color: var(--color-primary);
@@ -149,9 +149,10 @@
 
 .matrix-table td {
     color: var(--color-gray-1);
-    font-family: monospace;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     text-align: right;
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
 }
 
 .matrix-table td .price-sell {
@@ -181,14 +182,14 @@
     margin-bottom: 0.25rem;
     color: var(--color-primary);
     font-family: var(--font-body);
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
 }
 
 .materials-overview-main .form-group input:not([type="checkbox"]),
 .materials-overview-main .form-group select {
     width: 100%;
     padding: 0.5rem;
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     border: 1px solid var(--color-gray-3);
     color: var(--color-gray-1);
     font-family: var(--font-body);

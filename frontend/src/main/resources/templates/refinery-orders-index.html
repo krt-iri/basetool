@@ -29,19 +29,19 @@
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{refineryorder.status.OPEN}">Offen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
                 <span th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
                 <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
             </label>
@@ -70,16 +70,16 @@
             </thead>
             <tbody>
             <tr th:each="order : ${orders}">
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span class="refinery-order-id-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${#strings.substring(order.id, #strings.length(order.id) - 4)}"></span>
                 </td>
                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}"></td>
                 <td th:text="${order.status != null ? #messages.msg('refineryorder.status.' + order.status) : '-'}"></td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <!-- Server-Rendering explizit in UTC, Anzeige wird im Browser per JS in Browser-Lokalzeit (DST-korrekt) konvertiert. -->
                     <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${order.startedAt != null ? #temporals.format(order.startedAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>
@@ -100,12 +100,12 @@
                           th:text="${order.owningSquadron.shorthand()}">IRI</span>
                     <span th:if="${order.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn" th:text="#{refineryorder.action.details}">Details</a>
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td th:attr="colspan=${isAllSquadronsMode ? 10 : 9}" style="text-align: center;" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
+                <td th:attr="colspan=${isAllSquadronsMode ? 10 : 9}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>
