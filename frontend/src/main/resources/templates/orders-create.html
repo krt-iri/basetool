@@ -135,18 +135,18 @@
                 
                 <div id="materials-container">
                     <div class="material-row" th:each="mat, stat : *{materials}">
-                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                        <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
                             <select th:field="*{materials[__${stat.index}__].materialId}" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.amount}">Menge</label>
                             <input type="number" th:field="*{materials[__${stat.index}__].amount}" step="0.001" min="0" required>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
                             <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
                         </div>
@@ -277,13 +277,13 @@
         const options = document.getElementById('material-options-template').innerHTML;
         
         row.innerHTML = `
-            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <div class="form-group flex-2 mb-0">
                 <select name="materials[${materialIndex}].materialId" required>${options}</select>
             </div>
-            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <div class="form-group flex-1 mb-0">
                 <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
             </div>
-            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <div class="form-group flex-1 mb-0">
                 <input type="number" name="materials[${materialIndex}].minQuality" value="700" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
             </div>
         `;

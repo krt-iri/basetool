@@ -82,7 +82,7 @@
             </div>
             <div class="profile-row" style="align-items: flex-start;">
                 <span class="profile-label" th:text="#{profile.custom_data}" style="padding-top: 0.5rem;">Custom Data</span>
-                <form th:action="@{/profile/description}" method="post" style="flex: 1;" th:object="${profileDescriptionForm}">
+                <form th:action="@{/profile/description}" method="post" class="flex-1" th:object="${profileDescriptionForm}">
                     <input type="hidden" name="version" th:field="*{version}">
                     <div class="mb-1">
                         <label for="displayName" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.display_name}">Display Name</label>

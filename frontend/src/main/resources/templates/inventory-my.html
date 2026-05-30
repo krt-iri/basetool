@@ -380,13 +380,13 @@
             
             <div class="form-group mb-1">
                 <label for="targetAmount" class="form-label" th:text="#{inventory.bookout.targetAmount}">Zielbestand</label>
-                <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" data-trigger="inv-my-amount-from-target">
+                <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-my-amount-from-target">
             </div>
             
             <div class="form-group mb-1">
                 <label for="amount" class="form-label" th:text="#{inventory.bookout.amount}">Menge ausbuchen</label>
                 <div class="flex-gap-sm">
-                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" data-trigger="inv-my-target-from-amount">
+                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-my-target-from-amount">
                     <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
@@ -409,15 +409,15 @@
             
             <div id="transferFields" style="display:none; margin-bottom: 1rem;" class="form-group">
                 <div class="flex-gap-md">
-                    <div style="flex: 1;">
+                    <div class="flex-1">
                         <label for="targetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
-                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-my-target-user-changed" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-my-target-user-changed" class="w-full">
                             <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
                         </select>
                     </div>
-                    <div style="flex: 1;">
+                    <div class="flex-1">
                         <label for="targetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="targetLocationId" th:field="*{targetLocationId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                        <select id="targetLocationId" th:field="*{targetLocationId}" class="w-full">
                             <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
                         </select>
                     </div>
@@ -428,7 +428,7 @@
                      changes. -->
                 <div id="targetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
                     <label for="targetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
-                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" class="w-full">
                         <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
                     </select>
                 </div>
@@ -437,13 +437,13 @@
             <div id="sellFields" style="display:none; margin-bottom: 1rem;">
                 <div class="form-group mb-1">
                     <label for="terminal" class="form-label" th:text="#{inventory.bookout.terminal}">Terminal</label>
-                    <select id="terminal" th:field="*{terminal}" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <select id="terminal" th:field="*{terminal}" class="w-full">
                         <option value="" disabled selected>...wählen...</option>
                     </select>
                 </div>
                 <div class="form-group mb-1">
                     <label for="sellAmount" class="form-label" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
-                    <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
                 </div>
             </div>
             
@@ -468,7 +468,7 @@
             <textarea id="noteModalTextarea" maxlength="1000" rows="6"
                       th:placeholder="#{inventory.note.placeholder}"
                       data-trigger="inv-my-update-note-counter"
-                      style="width: 100%; padding: 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); min-height: 44px;"></textarea>
+                      class="w-full"></textarea>
             <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
         </div>
         <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">

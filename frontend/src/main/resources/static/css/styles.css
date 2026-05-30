@@ -899,11 +899,15 @@ label:has(+ [required])::after {
 .mt-0 { margin-top: 0; }
 .mb-1 { margin-bottom: var(--space-4); }
 .mb-2 { margin-bottom: var(--space-8); }
+.mb-0 { margin-bottom: 0; }
 .m-0 { margin: 0; }
 .nowrap { white-space: nowrap; }
 .text-center { text-align: center; }
 .w-full { width: 100%; }
 .w-1 { width: 1%; }
+/* Flex-item grow shorthands (distinct from the container .flex-* helpers above). */
+.flex-1 { flex: 1; }
+.flex-2 { flex: 2; }
 
 .flex-gap-xs { display: flex; gap: var(--space-2); }
 .flex-gap-sm { display: flex; gap: var(--space-2); align-items: center; }
