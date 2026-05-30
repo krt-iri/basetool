@@ -61,7 +61,7 @@
 
             <div class="search-form-actions">
                 <button type="button" id="missions-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zurücksetzen</button>
-                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" th:text="#{mission.create}">Create New</a>
+                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" data-testid="missions-create-link" th:text="#{mission.create}">Create New</a>
             </div>
         </form>
 
@@ -83,7 +83,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="m : ${missions}">
+                    <tr th:each="m : ${missions}" data-testid="mission-row">
                         <td th:text="${m.name}">Name</td>
                         <td>
                             <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(m.status)}"

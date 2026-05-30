@@ -137,14 +137,14 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <select th:field="*{materials[__${stat.index}__].materialId}" required>
+                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
                             </select>
                         </div>
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.amount}">Menge</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" step="0.001" min="0" required>
+                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" step="0.001" min="0" required>
                         </div>
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
@@ -164,7 +164,7 @@
                 </div>
 
                 <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="submit" class="btn" data-testid="order-submit" th:text="#{orders.create.save}">Speichern</button>
                     <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>

@@ -288,7 +288,7 @@
             <div class="col-content" id="col-details-content">
                 <div class="hud-box">
 
-                    <form id="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
+                    <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
                         <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
@@ -296,7 +296,7 @@
 
             <div class="form-group">
                 <label th:text="#{mission.name}">Name</label>
-                <input type="text" name="name" th:value="*{name}" required 
+                <input type="text" name="name" data-testid="mission-name-input" th:value="*{name}" required 
                        th:disabled="${!isNew and !mission.canEdit}">
                 <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
             </div>
@@ -323,7 +323,7 @@
             <div class="form-row">
             <div class="form-group">
                 <label th:text="#{mission.status}">Status</label>
-                <select name="status" th:disabled="${!isNew and !mission.canEdit}" required>
+                <select name="status" data-testid="mission-status-select" th:disabled="${!isNew and !mission.canEdit}" required>
                     <option value="PLANNED" th:selected="*{status == 'PLANNED'}">PLANNED</option>
                     <option value="ACTIVE" th:selected="*{status == 'ACTIVE'}">ACTIVE</option>
                     <option value="COMPLETED" th:selected="*{status == 'COMPLETED'}">COMPLETED</option>
@@ -371,8 +371,8 @@
                 <label th:text="#{mission.planned_start}">Planned Start</label>
                 <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" required th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="date" class="date-part" data-testid="mission-start-date" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" data-testid="mission-start-time" required th:disabled="${!isNew and !mission.canEdit}">
                 </div>
                 <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" class="field-error"></div>
             </div>

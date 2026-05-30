@@ -181,6 +181,16 @@ tasks.cyclonedxBom {
   includeBuildSystem = true
 }
 
+// Keep the e2e (Playwright / Testcontainers) source-set dependencies out of the shipped SBOM:
+// they are test-only and never enter the bootJar or the published image. In cyclonedx-gradle 3.x
+// the dependency scan runs in the `cyclonedxDirectBom` task (CyclonedxDirectTask), which exposes
+// `skipConfigs` (regexes matched against configuration names); the aggregate `cyclonedxBom` task
+// only formats the output. Skipping every `e2e*` configuration there stops Playwright from
+// polluting `frontend-bom.*`.
+tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+  skipConfigs.set(listOf("^e2e.*"))
+}
+
 // L-2 from the performance audit: minify CSS files inside the built jar so the
 // shipped payload is smaller than the readable sources under
 // `src/main/resources/static/css/`. The source files stay untouched (so editing
@@ -241,6 +251,90 @@ tasks.register("minifyStaticCss") {
   }
 }
 tasks.named("classes").configure { dependsOn("minifyStaticCss") }
+
+// ---------------------------------------------------------------------------
+// E2E (Playwright) source set + task — Phase 0 spike (docs/E2E_TESTING_PLAN.md).
+//
+// Deliberately NOT wired into `check` / `test` / `build`: the suite needs a
+// running stack and a downloaded Chromium, so it only runs on an explicit
+// `./gradlew :frontend:e2eTest`. The `e2e` source set reuses the test
+// dependencies (JUnit 5 + assertions from spring-boot-starter-test) and adds
+// the Playwright Java binding on top.
+// ---------------------------------------------------------------------------
+sourceSets { create("e2e") }
+
+configurations["e2eImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
+dependencies {
+  "e2eImplementation"(libs.playwright)
+  // PostgreSQL driver for the JDBC catalog seeding (UEX-owned reference data the admin API can't
+  // create); version is managed by the Spring Boot BOM.
+  "e2eImplementation"("org.postgresql:postgresql")
+  // JUnit Platform launcher so the custom Test task can discover Jupiter tests.
+  "e2eRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+}
+
+// Checkstyle auto-creates `checkstyleE2e` and wires it into `check`. E2E code,
+// like test code (see the root build's `checkstyleTest` disable), uses
+// conventions Google style flags as noise — disable it to keep `check` green.
+tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
+
+// Installs the Playwright-managed browsers into the per-user cache (~/.cache/ms-playwright).
+// Cached in CI; a no-op once present. On a CI Linux runner it additionally installs the browsers'
+// OS libraries via `--with-deps` — WebKit needs libs ubuntu-latest lacks and otherwise fails to
+// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI Linux;
+// local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
+val playwrightInstall by tasks.registering(JavaExec::class) {
+  group = "verification"
+  description = "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
+  classpath = sourceSets["e2e"].runtimeClasspath
+  mainClass.set("com.microsoft.playwright.CLI")
+  val withDeps =
+      System.getenv("CI") == "true" &&
+          System.getProperty("os.name").orEmpty().lowercase().contains("linux")
+  val browsers = listOf("chromium", "firefox", "webkit")
+  setArgs(
+      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers)
+}
+
+// Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
+// provisioned Chromium and forward the same `e2e.*` knobs; they differ only in the JUnit tag they
+// select (and therefore the target they assume). E2E_BASE_URL is read straight from the inherited
+// environment by E2eStackExtension, so it needs no forwarding; -Pe2e.baseUrl switches to
+// external/staging mode.
+val playwrightSuiteConfig: Test.() -> Unit = {
+  group = "verification"
+  testClassesDirs = sourceSets["e2e"].output.classesDirs
+  classpath = sourceSets["e2e"].runtimeClasspath
+  dependsOn(playwrightInstall)
+  // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
+  // the full browser set (Firefox + WebKit) on first run.
+  environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+  // CI passes credentials through the environment (masked in logs) rather than on the command line;
+  // map them onto the e2e.* system properties the tests read. An explicit -P value (below) wins.
+  // E2E_BASE_URL needs no mapping — E2eStackExtension reads it straight from the environment.
+  mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
+    System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
+  }
+  listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
+      .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
+}
+
+// Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).
+tasks.register<Test>("e2eTest") {
+  description = "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("e2e") }
+}
+
+// Non-destructive login + core-page checks; target-agnostic, safe to run against staging.
+tasks.register<Test>("smokeTest") {
+  description =
+    "Runs the non-destructive Playwright smoke checks (JUnit tag: smoke); set E2E_BASE_URL for staging."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("smoke") }
+}
 
 // ---------------------------------------------------------------------------
 // Web-asset linting: ESLint (JS), Stylelint (CSS), HTMLHint (Thymeleaf HTML).

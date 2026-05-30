@@ -1,0 +1,98 @@
+name: E2E
+
+# The destructive functional flows (@Tag("e2e")) against an ephemeral full stack
+# (Postgres x2 + Keycloak + Redis + backend + frontend), built and torn down by
+# E2eStackExtension via `docker compose`, fanned out over three browser engines
+# (Chromium, Firefox, WebKit) as a matrix. Heavy (~2 GB RAM + a Keycloak boot),
+# so it runs nightly + on manual dispatch, and on PRs only when they carry the
+# `e2e` label.
+#
+# The non-destructive @Tag("smoke") checks against a staging deployment live in
+# `e2e-smoke.yml` — a post-release / nightly concern, deliberately NOT a PR check
+# (so a dormant, skipped job never shows up as a confusing matrix placeholder on
+# pull requests).
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *' # nightly 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E flows (${{ matrix.browser }})
+    # PRs: only when labelled `e2e`. schedule / workflow_dispatch: always.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # Run all three engines even if one fails, so a Chromium-only regression
+      # doesn't hide a Firefox/WebKit pass (and vice versa).
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Cache the Playwright-managed browsers (~/.cache/ms-playwright) so the
+      # playwrightInstall task is a no-op on a hit. Keyed on the version catalog,
+      # so a Playwright bump (gradle/libs.versions.toml) invalidates the cache.
+      - name: Cache Playwright browsers
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # WebKit has no launch-level DNS override, so the ephemeral stack's Keycloak
+      # issuer host must be mapped to the loopback at the OS level. Chromium (a
+      # resolver arg) and Firefox (a profile pref) remap it themselves, but the
+      # entry is harmless for them.
+      - name: Map host.docker.internal to the loopback (needed by WebKit)
+        run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+
+      # E2eStackExtension builds the images and brings the stack up itself (no
+      # E2E_BASE_URL => ephemeral mode); the Dockerfiles are multi-stage, so no
+      # separate bootJar step is needed. Docker + compose v2 ship on the runner.
+      - name: Run e2e flows
+        run: ./gradlew :frontend:e2eTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
+
+      # Playwright traces, failure screenshots/HTML dumps and the docker compose
+      # build/boot logs all land under frontend/build/e2e.
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-artifacts-${{ matrix.browser }}
+          path: |
+            frontend/build/e2e/**
+            frontend/build/test-results/e2eTest/**
+            frontend/build/reports/tests/e2eTest/**
+          retention-days: 14
+          if-no-files-found: ignore
