@@ -16,6 +16,22 @@ Für Architektur, Phasenplan und Designentscheidungen der E2E-Suite siehe [`../E
 | [UC-06](UC-06-job-order-handover.md) | Job-Order-Handover protokollieren | `e2e` | `JobOrderHandoverE2eTest` |
 | [UC-07](UC-07-kernseiten-smoke.md) | Kernseiten-Smoke (nicht-destruktiv) | `smoke` | `CorePagesSmokeE2eTest` |
 
+UC-01 bis UC-07 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied).
+
+### Rollen & staffel-/SK-übergreifend
+
+Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfaches Mitglied) und **Mehr-Staffel-/SK-Szenarien** — inkl. der Fälle, in denen eine Staffel etwas anlegt und eine andere damit weiterarbeitet. Sie sind **spezifiziert; die zugehörigen Tests folgen** (Reihenfolge „erst Doku, dann Tests").
+
+| Dokument | Thema |
+|----------|-------|
+| [Rollen & Scope](rollen-und-scope.md) | Rollen × Flow-Matrix, Mandanten-Scope-Modell, Admin-Pin, SK-Grundlagen (Referenz) |
+| [UC-08](UC-08-job-order-staffel-uebergreifend.md) | Job Order: Staffel A bestellt, Staffel B liefert (B's Inventar verknüpft) |
+| [UC-09](UC-09-handover-staffel-uebergreifend.md) | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel) |
+| [UC-10](UC-10-mission-staffel-uebergreifend.md) | Öffentliche Mission mit Teilnehmern aus anderer Staffel |
+| [UC-11](UC-11-sk-spezialkommando.md) | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen) |
+
+> **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Missionen (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
+
 ## Gemeinsamer Rahmen
 
 **Akteur.** Sofern nicht anders genannt, ist der Akteur der synthetische Test-User `test-admin` (Keycloak) — nach dem Login eine authentifizierte Session mit Mitgliedschaft in der IRIDIUM-Staffel. Der Test-User hat die ADMIN-Rolle; staffel-scoped Aktionen (Mission, Ship, Refinery Order) verlangen eine OrgUnit-Mitgliedschaft, die der Seeder herstellt.
