@@ -204,7 +204,8 @@ public class JobOrderController {
    * had assignees at create time — defence-in-depth), the {@code handovers} list (logistician audit
    * trail) and the optimistic-lock {@code version} (anonymous cannot update the order). The {@code
    * id} / {@code displayId} / squadron references / materials / status are preserved so the public
-   * form can show a confirmation page with the order number.
+   * form can show a confirmation page with the order number. The order's own free-text {@code
+   * comment} is preserved — it is the order's own note, not collaborator-identifying data.
    *
    * @param dto the persisted job-order DTO
    * @return a slim acknowledgement DTO safe for anonymous callers
@@ -216,6 +217,7 @@ public class JobOrderController {
         dto.creatingSquadron(),
         dto.requestingSquadron(),
         dto.handle(),
+        dto.comment(),
         dto.priority(),
         dto.status(),
         dto.materials(),

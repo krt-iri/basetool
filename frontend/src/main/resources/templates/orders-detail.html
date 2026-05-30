@@ -93,7 +93,12 @@
                 </div>
             </div>
         </div>
-        
+
+        <div th:if="${order.comment != null and !order.comment.isEmpty()}" style="margin-bottom: 2rem;">
+            <strong th:text="#{orders.detail.comment}">Kommentar</strong><br>
+            <span th:text="${order.comment}" style="white-space: pre-wrap;"></span>
+        </div>
+
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -115,7 +120,10 @@
                 data-trigger="od-toggle-inventory"
                 style="cursor: pointer;">
                 <td th:text="${mat.material.name}"></td>
-                <td th:text="${mat.minQuality}"></td>
+                <td>
+                    <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
+                    <span th:if="${mat.minQuality == null}" th:text="#{orders.material.minQuality.none}">Keine</span>
+                </td>
                 <td th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
@@ -273,6 +281,11 @@
                 <input type="text" id="handle" th:field="*{handle}" class="w-full">
             </div>
 
+            <div class="form-group mb-1">
+                <label for="edit-comment" th:text="#{orders.detail.comment}" class="form-label">Kommentar</label>
+                <textarea id="edit-comment" th:field="*{comment}" rows="4" maxlength="1000" class="w-full"></textarea>
+            </div>
+
             <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Materialien</h3>
             <div id="materials-container">
                 <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
@@ -285,7 +298,10 @@
                     </div>
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
-                        <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" min="0" max="1000" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                        <select th:field="*{materials[__${stat.index}__].minQuality}" style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                            <option th:value="700" th:text="700">700</option>
+                            <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+                        </select>
                     </div>
                     <div>
                         <label th:text="#{orders.material.amount}" class="form-label-sm">Menge (SCU)</label>
@@ -568,22 +584,26 @@
                         const name = select.getAttribute('name');
                         if (name) {
                             select.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
-                            select.setAttribute('id', select.getAttribute('id').replace(/\d+/, nextIndex));
-                            select.value = '';
+                            const selectId = select.getAttribute('id');
+                            if (selectId) {
+                                select.setAttribute('id', selectId.replace(/\d+/, nextIndex));
+                            }
+                            // minQuality is a 700/Keine select; default a fresh row to 700. The
+                            // material select resets to the empty "please choose" option.
+                            select.value = name.includes('minQuality') ? '700' : '';
                         }
                     });
-                    
+
                     const inputs = newRow.querySelectorAll('input');
                     inputs.forEach(input => {
                         const name = input.getAttribute('name');
                         if (name) {
                             input.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
-                            input.setAttribute('id', input.getAttribute('id').replace(/\d+/, nextIndex));
-                            if (input.type === 'number' && input.name.includes('minQuality')) {
-                                input.value = '100';
-                            } else {
-                                input.value = '';
+                            const inputId = input.getAttribute('id');
+                            if (inputId) {
+                                input.setAttribute('id', inputId.replace(/\d+/, nextIndex));
                             }
+                            input.value = '';
                         }
                     });
                     

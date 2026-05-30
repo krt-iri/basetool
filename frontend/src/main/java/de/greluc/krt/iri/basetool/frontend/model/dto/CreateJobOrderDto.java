@@ -17,5 +17,6 @@ public record CreateJobOrderDto(
     @Nullable UUID creatingSquadronId,
     @Nullable UUID requestingOrgUnitId,
     String handle,
+    String comment,
     List<CreateJobOrderMaterialDto> materials,
     Long version) {}

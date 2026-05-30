@@ -1,6 +1,11 @@
 # Changelog
 ## [Unreleased]
 
+### Added
+
+- **Aufträge haben jetzt ein optionales Kommentarfeld.** Beim Aufgeben eines Auftrags kann ein Freitext-Kommentar (max. 1000 Zeichen) hinterlegt werden; er wird HTML-escaped angezeigt und serverseitig längenbegrenzt validiert, sodass auch anonyme Eingaben kein Injection-Risiko sind.
+- **Mindestqualität eines Auftrags-Materials kann jetzt „Keine" sein.** Neben dem vorgegebenen Wert 700 lässt sich „Keine" wählen, wenn keine bestimmte Qualität gefordert ist; der Lagerbestand zählt dann Einträge aller Qualitäten (V118 macht `min_quality` nullable, V117 ergänzt die Kommentar-Spalte).
+
 ### Fixed
 - **`GET /api/v1/missions/next` paginiert nicht mehr im Arbeitsspeicher (Hibernate-WARN `HHH90003004`).** Die `findFirst…`-Queries für die nächste Mission zogen die Collections (`participants`/`assignedUnits`) per `@EntityGraph` zusammen mit dem impliziten `limit 1` — eine Kombination, die SQL-seitig nicht geht, also lud Hibernate alle künftigen Missionen samt Sub-Collections in den Speicher und paginierte dort (bei jedem Home-Aufruf). Der Service holt jetzt erst die nächste Mission ohne Graph (`limit 1`) und lädt sie dann per ID über das bereits gegraphte `findById` nach. Verhalten unverändert — nur ohne den In-Memory-Sweep und die Warnung.
 
