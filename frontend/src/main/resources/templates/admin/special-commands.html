@@ -86,7 +86,7 @@
                         <tr th:each="sc : ${specialCommands}" th:style="${!sc.active} ? 'opacity: 0.6;' : ''">
                             <td>
                                 <span th:text="${sc.name}">Name</span>
-                                <span th:if="${!sc.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
+                                <span th:if="${!sc.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: var(--radius-none); margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
                             </td>
                             <td th:text="${sc.shorthand}">Kürzel</td>
                             <td th:text="${sc.description}">Desc</td>

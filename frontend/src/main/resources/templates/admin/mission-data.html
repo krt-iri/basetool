@@ -81,7 +81,7 @@
                     <tr th:each="sq : ${squadrons}" th:style="${!sq.active} ? 'opacity: 0.6;' : ''">
                         <td>
                             <span th:text="${sq.name}">Name</span>
-                            <span th:if="${!sq.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.squadron.inactive}">Inaktiv</span>
+                            <span th:if="${!sq.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: var(--radius-none); margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.squadron.inactive}">Inaktiv</span>
                         </td>
                         <td th:text="${sq.shorthand}">Kürzel</td>
                         <td th:text="${sq.description}">Desc</td>
@@ -140,7 +140,7 @@
                     <tr th:each="job : ${jobTypes}" th:style="${!job.active} ? 'opacity: 0.6;' : ''">
                         <td>
                             <span th:text="${job.name}">Name</span>
-                            <span th:if="${!job.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.job_type.inactive}">Inaktiv</span>
+                            <span th:if="${!job.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: var(--radius-none); margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.job_type.inactive}">Inaktiv</span>
                         </td>
                         <td th:text="${job.archetype}">Archetype</td>
                         <td th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</td>
@@ -201,7 +201,7 @@
                         draggable="true" class="draggable-row" th:data-id="${freq.id}" style="cursor: grab;">
                         <td>
                             <span th:text="${freq.name}">Name</span>
-                            <span th:if="${!freq.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.job_type.inactive}">Inaktiv</span>
+                            <span th:if="${!freq.active}" style="font-size: 0.7rem; background-color: var(--color-surface-input); padding: 0.2rem 0.4rem; border-radius: var(--radius-none); margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.job_type.inactive}">Inaktiv</span>
                         </td>
                         <td th:text="${freq.description}">Desc</td>
                         <td class="flex-gap-xs">

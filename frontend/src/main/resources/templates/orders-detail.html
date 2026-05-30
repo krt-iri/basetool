@@ -136,7 +136,7 @@
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 1rem;">
-                <li th:each="user : ${order.assignees}" style="background-color: var(--color-surface-input); padding: 0.5rem 1rem; border: 1px solid var(--color-gray-3); border-radius: 4px; display: flex; align-items: center; gap: 1rem;">
+                <li th:each="user : ${order.assignees}" style="background-color: var(--color-surface-input); padding: 0.5rem 1rem; border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); display: flex; align-items: center; gap: 1rem;">
                     <span th:text="${user.effectiveName}"></span>
                     
                     <form th:if="${currentUserId != null and currentUserId.equals(user.id)} or ${#authorization.expression('hasAnyRole(''ADMIN'', ''OFFICER'')')}"

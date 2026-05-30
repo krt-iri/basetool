@@ -491,7 +491,7 @@
                             <div class="flex-gap-sm">
                                 <span th:each="p : ${participantsByLeadType[#strings.toString(leadType.id)]}"
                                 th:text="${p['user'] != null ? p['user']['effectiveName'] : p['guestName']}"
-                                      style="color: var(--color-accent-light); font-weight: bold; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;">User</span>
+                                      style="color: var(--color-accent-light); font-weight: bold; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: var(--radius-none);">User</span>
                             </div>
                         </div>
                     </div>
@@ -508,7 +508,7 @@
                                 <span class="freq-value-display"
                                       th:attr="data-freq-type-id=${freqType.id}"
                                       th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
-                                      th:style="${f != null ? 'color: var(--color-accent-light); font-weight: bold; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;' : 'display:none;'}">123.45</span>
+                                      th:style="${f != null ? 'color: var(--color-accent-light); font-weight: bold; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: var(--radius-none);' : 'display:none;'}">123.45</span>
 
                                 <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-secondary set-freq-btn"
                                         th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
@@ -1566,7 +1566,7 @@
                             if (display && match) {
                                 const formatted = Number(match.value).toFixed(2);
                                 display.textContent = formatted;
-                                display.style.cssText = 'color: var(--color-accent-light); font-weight: bold; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: 4px;';
+                                display.style.cssText = 'color: var(--color-accent-light); font-weight: bold; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: var(--radius-none);';
                             }
                             if (editBtn && match) {
                                 editBtn.setAttribute('data-current-value', String(match.value));

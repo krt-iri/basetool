@@ -2177,7 +2177,6 @@ textarea:focus-visible,
     letter-spacing: 0.06em;
     font-size: 0.85rem;
     cursor: pointer;
-    border-radius: 2px;
     border: 1px solid transparent;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }

@@ -44,7 +44,7 @@
                 font-weight: bold;
                 font-size: 0.75rem;
                 letter-spacing: 0;
-                border-radius: 2px;
+                border-radius: var(--radius-none);
                 text-transform: none;
             }
             .yield-bonus-badge.yield-positive {
@@ -273,7 +273,7 @@
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
                         </select>
                     </div>
-                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: 4px; min-height: 44px;">
+                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); min-height: 44px;">
                         <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
                             <span id="ratingYieldVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
@@ -294,7 +294,7 @@
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
@@ -370,7 +370,7 @@
     </div>
 
     <div id="storeModal" class="modal" th:style="${showStoreModal} ? 'display: flex;' : 'display: none;'">
-        <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: 4px;">
+        <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h2 style="margin: 0; color: var(--color-primary); font-family: var(--font-headline); text-transform: uppercase;" th:text="#{refineryorder.action.store}">Einlagern</h2>
                 <span class="close" data-trigger="rod-close-store" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
@@ -378,7 +378,7 @@
             
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
                 <div id="storeItemsContainer">
-                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-surface-input); margin-bottom: 1rem;">
+                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-surface-input); margin-bottom: 1rem;">
                         <div class="flex-between-mb">
                             <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
                             <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
