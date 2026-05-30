@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V119__add_blueprint_requirement_groups.sql}.
+ * TestContainers-backed migration test for {@code V120__add_blueprint_requirement_groups.sql}.
  * Asserts the three new requirement-group tables exist with their columns and that the {@code
  * blueprint} / {@code blueprint_ingredient} column additions landed. Booting the full context also
  * exercises Hibernate {@code ddl-auto=validate}, so a mismatch between the new entities and this
@@ -20,12 +20,12 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class V119MigrationTest {
+class V120MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
-  void v119CreatesRequirementGroupTables() {
+  void v120CreatesRequirementGroupTables() {
     Map<String, String> group = dataTypesOf("blueprint_requirement_group");
     assertEquals("uuid", group.get("id"));
     assertEquals("uuid", group.get("blueprint_id"));
@@ -51,7 +51,7 @@ class V119MigrationTest {
   }
 
   @Test
-  void v119AddsBlueprintAndIngredientColumns() {
+  void v120AddsBlueprintAndIngredientColumns() {
     Map<String, String> blueprint = dataTypesOf("blueprint");
     assertEquals("integer", blueprint.get("dismantle_time_seconds"));
     assertEquals("double precision", blueprint.get("dismantle_efficiency"));

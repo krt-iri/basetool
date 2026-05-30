@@ -1,5 +1,5 @@
 -- =====================================================================
--- V119 - Blueprint requirement groups (crafting stat contributions)
+-- V120 - Blueprint requirement groups (crafting stat contributions)
 -- =====================================================================
 -- Why: the SC Wiki blueprint DETAIL endpoint (/api/blueprints/{uuid})
 -- exposes requirement_groups[] — named build slots (FRAME, EMITTER, ...)
