@@ -19,3 +19,16 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+
+# SC Wiki catalogue sync. The per-sync feature flags default to false in code
+# (ScWikiProperties -- "ships dark"); enabled here so each scheduler step actually
+# runs and the admin sync-report log (/admin/sync-reports) gets populated.
+# sync-all-items stays at its default (false) -- closure mode, not the heavy full backfill.
+krt:
+  scwiki:
+    scheduler-enabled: true
+    commodity-sync-enabled: true
+    vehicle-sync-enabled: true
+    item-sync-enabled: true
+    blueprint-sync-enabled: true
+    manufacturer-sync-enabled: true
