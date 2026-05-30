@@ -44,8 +44,11 @@ public final class E2eStackExtension implements BeforeAllCallback {
   /** External origin the ephemeral frontend is reachable at (HTTPS, self-signed). */
   static final String EPHEMERAL_BASE_URL = "https://localhost:18081";
 
-  /** Throwaway PKCS12 keystore password; must match {@code SERVER_SSL_KEY_STORE_PASSWORD} below. */
-  private static final String KEYSTORE_PW = "keystore-e2e-pw-do-not-use-in-prod";
+  /**
+   * Throwaway PKCS12 keystore password; must match {@code SERVER_SSL_KEY_STORE_PASSWORD} below and
+   * is read by {@link BackendSeeder} to build its trust store for the generated dev certificate.
+   */
+  static final String KEYSTORE_PW = "keystore-e2e-pw-do-not-use-in-prod";
 
   /** Local image tag the compose build override tags the freshly built images with. */
   private static final String IMAGE_TAG = "e2e-local";

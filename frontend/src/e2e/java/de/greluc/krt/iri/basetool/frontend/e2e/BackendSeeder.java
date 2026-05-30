@@ -11,16 +11,20 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyStore;
 import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
+import java.security.cert.Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * Seeds the minimal backend state the ephemeral-stack create-flows need, via the backend REST API
@@ -32,7 +36,7 @@ import javax.net.ssl.X509TrustManager;
  * seeded IRIDIUM Squadron via {@code PATCH /api/v1/users/{id}/squadron} so those flows can run.
  *
  * <p>Local-stack only: it talks to Keycloak on {@code http://localhost:18080} and the backend on
- * {@code https://localhost:11261} (self-signed dev cert — the HTTP client trusts all certificates).
+ * {@code https://localhost:11261} (self-signed dev cert — the HTTP client trusts only that cert).
  * The bearer token is minted with the Keycloak password grant on the public {@code
  * basetool-frontend} client; the backend resource server accepts it on issuer + signature alone (no
  * audience check).
@@ -64,7 +68,7 @@ public final class BackendSeeder {
   public BackendSeeder() {
     this.http =
         HttpClient.newBuilder()
-            .sslContext(trustAllContext())
+            .sslContext(backendCertContext())
             .connectTimeout(Duration.ofSeconds(10))
             .build();
   }
@@ -430,36 +434,56 @@ public final class BackendSeeder {
   }
 
   /**
-   * Builds an {@link SSLContext} that trusts every certificate — acceptable here because the only
-   * target is the local ephemeral backend's self-signed dev cert.
+   * Builds an {@link SSLContext} that trusts ONLY the e2e backend's self-signed dev certificate,
+   * loaded from the keystore {@link E2eStackExtension} generates at the repository root. The cert's
+   * SAN covers {@code localhost}, so the JDK's default hostname verification still applies — this
+   * is a scoped trust anchor, not a trust-all manager.
    *
-   * @return a trust-all TLS context
+   * @return a TLS context trusting only the backend dev cert
    */
-  private static SSLContext trustAllContext() {
-    TrustManager[] trustAll = {
-      new X509TrustManager() {
-        @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) {
-          // test-only client: trust everything
-        }
-
-        @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) {
-          // test-only client: trust the backend's self-signed dev cert
-        }
-
-        @Override
-        public X509Certificate[] getAcceptedIssuers() {
-          return new X509Certificate[0];
+  private static SSLContext backendCertContext() {
+    try {
+      KeyStore keyStore = KeyStore.getInstance("PKCS12");
+      try (InputStream in = Files.newInputStream(locateKeystore())) {
+        keyStore.load(in, E2eStackExtension.KEYSTORE_PW.toCharArray());
+      }
+      // The generated store holds a private-key entry; its certificate is not a trust anchor until
+      // copied into a trust store as a trusted-certificate entry.
+      KeyStore trustStore = KeyStore.getInstance("PKCS12");
+      trustStore.load(null, null);
+      for (String alias : Collections.list(keyStore.aliases())) {
+        Certificate cert = keyStore.getCertificate(alias);
+        if (cert != null) {
+          trustStore.setCertificateEntry(alias, cert);
         }
       }
-    };
-    try {
+      TrustManagerFactory tmf =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      tmf.init(trustStore);
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, trustAll, new SecureRandom());
+      context.init(null, tmf.getTrustManagers(), new SecureRandom());
       return context;
     } catch (Exception e) {
-      throw new IllegalStateException("Could not build trust-all SSLContext", e);
+      throw new IllegalStateException("Could not build the backend-cert SSLContext", e);
     }
+  }
+
+  /**
+   * Locates the throwaway {@code keystore.p12} that {@link E2eStackExtension} generated, by walking
+   * up from the working directory (the e2e tests run with the {@code frontend} module as CWD; the
+   * keystore sits at the repository root).
+   *
+   * @return the path to the e2e keystore
+   * @throws IllegalStateException if no {@code keystore.p12} is found up to the filesystem root
+   */
+  private static Path locateKeystore() {
+    for (Path p = Paths.get("").toAbsolutePath(); p != null; p = p.getParent()) {
+      Path candidate = p.resolve("keystore.p12");
+      if (Files.exists(candidate)) {
+        return candidate;
+      }
+    }
+    throw new IllegalStateException(
+        "keystore.p12 not found walking up from " + Paths.get("").toAbsolutePath());
   }
 }
