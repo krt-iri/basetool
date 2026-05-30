@@ -290,17 +290,17 @@
                         </select>
                     </div>
                     <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); min-height: 44px;">
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
-                            <span id="ratingYieldVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingYieldVal" class="stat-value">-</span>
                         </div>
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.cost}">Kosten</span>
-                            <span id="ratingCostVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingCostVal" class="stat-value">-</span>
                         </div>
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.speed}">Dauer</span>
-                            <span id="ratingSpeedVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingSpeedVal" class="stat-value">-</span>
                         </div>
                     </div>
                 </div>

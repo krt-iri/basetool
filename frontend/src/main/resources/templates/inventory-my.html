@@ -141,7 +141,7 @@
             <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.material}">Material:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.material}">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-my-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                                 <span class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</span>
@@ -159,14 +159,14 @@
                         </div>
                     </div>
                     <div class="flex-gap-sm">
-                        <label for="minQuality" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.minQuality}">Qualit\u00e4t \u2265:</label>
+                        <label for="minQuality" class="form-label-xs" th:text="#{inventory.filter.minQuality}">Qualit\u00e4t \u2265:</label>
                         <select id="minQuality" name="minQuality" style="padding: 0.375rem 2.5rem 0.375rem 0.75rem; min-height: 44px; min-width: 90px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" data-trigger="inv-my-filter">
                             <option value="" th:text="#{filter.all}">-- Alle --</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
                         </select>
                     </div>
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
                         <div class="multi-select-container" id="jobOrderFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-my-toggle-multi" data-multi-target="jobOrderOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="jobOrderHeader">
                                 <span class="selected-text" id="jobOrderSelectedText" th:text="#{filter.all}">Alle</span>
@@ -184,7 +184,7 @@
                         </div>
                     </div>
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.mission}">Einsatz:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.mission}">Einsatz:</label>
                         <div class="multi-select-container" id="missionFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-my-toggle-multi" data-multi-target="missionOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="missionHeader">
                                 <span class="selected-text" id="missionSelectedText" th:text="#{filter.all}">Alle</span>
