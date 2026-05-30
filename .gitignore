@@ -54,3 +54,6 @@ Mining_Hub_V0.3.0.py
 /.claude/worktrees/
 /input/
 /log.txt
+
+### Node / web-asset linting (gradle-node-plugin) ###
+node_modules/

@@ -20,16 +20,16 @@
 (function () {
     'use strict';
 
-    var modal = null;
-    var deleteModal = null;
-    var form = null;
-    var deleteForm = null;
-    var titleEl = null;
-    var searchInput = null;
-    var resultsEl = null;
-    var hiddenUexId = null;
-    var hiddenLocationType = null;
-    var debounceTimer = null;
+    let modal = null;
+    let deleteModal = null;
+    let form = null;
+    let deleteForm = null;
+    let titleEl = null;
+    let searchInput = null;
+    let resultsEl = null;
+    let hiddenUexId = null;
+    let hiddenLocationType = null;
+    let debounceTimer = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -65,7 +65,7 @@
 
     function openCreate(btn) {
         if (!modal || !form) return;
-        var i18n = window.krtPersonalInventoryI18n || {};
+        let i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         clearForm();
@@ -74,7 +74,7 @@
 
     function openEdit(btn) {
         if (!modal || !form) return;
-        var i18n = window.krtPersonalInventoryI18n || {};
+        let i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         setField('id', btn.getAttribute('data-id'));
@@ -95,8 +95,8 @@
     function openDelete(btn) {
         if (!deleteModal || !deleteForm) return;
         deleteForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
-        var msgEl = $('krt-pi-delete-message');
-        var name = btn.getAttribute('data-name');
+        let msgEl = $('krt-pi-delete-message');
+        let name = btn.getAttribute('data-name');
         if (msgEl && name) {
             msgEl.textContent = (window.krtPersonalInventoryI18n && window.krtPersonalInventoryI18n.confirmBody)
                 ? (window.krtPersonalInventoryI18n.confirmBody + ' (' + name + ')')
@@ -111,7 +111,7 @@
 
     function setField(name, value) {
         if (!form) return;
-        var el = form.querySelector('[name="' + name + '"]');
+        let el = form.querySelector('[name="' + name + '"]');
         if (el) el.value = (value == null ? '' : value);
     }
 
@@ -130,9 +130,9 @@
 
     function runSearch() {
         if (!searchInput || !resultsEl) return;
-        var q = searchInput.value || '';
-        var endpoints = window.krtPersonalInventoryEndpoints || {};
-        var url = (endpoints.uexSearch || '/personal-inventory/uex-search')
+        let q = searchInput.value || '';
+        let endpoints = window.krtPersonalInventoryEndpoints || {};
+        let url = (endpoints.uexSearch || '/personal-inventory/uex-search')
                 + '?q=' + encodeURIComponent(q) + '&limit=2000';
         resultsEl.hidden = false;
         resultsEl.innerHTML = '<div class="krt-pi-typeahead-loading">'
@@ -150,9 +150,9 @@
                     + escapeHtml((window.krtPersonalInventoryI18n || {}).noResults || 'Keine Treffer') + '</div>';
             return;
         }
-        var html = '';
+        let html = '';
         items.forEach(function (it) {
-            var typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
+            let typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
             html += '<button type="button" class="krt-pi-typeahead-item" '
                     + 'data-uex-id="' + escapeAttr(it.uexId) + '" '
                     + 'data-type="' + escapeAttr(it.type) + '" '
@@ -184,15 +184,15 @@
      */
     function sanitizeQuantity(input) {
         if (!input) return;
-        var raw = input.value || '';
-        var digitsOnly = raw.replace(/[^0-9]/g, '');
+        let raw = input.value || '';
+        let digitsOnly = raw.replace(/[^0-9]/g, '');
         if (digitsOnly === '') {
             if (raw !== '') input.value = '';
             return;
         }
         // Strip leading zeros (but keep a single zero if user is mid-typing).
         digitsOnly = digitsOnly.replace(/^0+/, '');
-        var n = parseInt(digitsOnly, 10);
+        let n = parseInt(digitsOnly, 10);
         if (isNaN(n) || n < 1) n = 1;
         input.value = String(n);
     }
