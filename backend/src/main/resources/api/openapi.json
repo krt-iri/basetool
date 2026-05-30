@@ -35318,6 +35318,33 @@
           },
           "valueRangeType" : {
             "type" : "string"
+          },
+          "segments" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
+            }
+          }
+        }
+      },
+      "BlueprintRequirementModifierSegmentDto" : {
+        "type" : "object",
+        "properties" : {
+          "qualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityMax" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtStart" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtEnd" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },
