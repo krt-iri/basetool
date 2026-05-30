@@ -794,7 +794,7 @@
                                     <td th:text="${entry.participant != null ? (entry.participant.user != null ? entry.participant.user.effectiveName : entry.participant.guestName) : '-'}">Nutzer</td>
                                     <td>
                                         <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: var(--color-success);">Einnahme</span>
-                                        <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" style="color: var(--color-danger);">Ausgabe</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" class="text-danger">Ausgabe</span>
                                     </td>
                                     <td th:text="${#numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td th:text="${entry.note}">Notiz</td>
@@ -818,7 +818,7 @@
                                 <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
                                     <td>
-                                        <span th:text="#{mission.finance.type.expense}" style="color: var(--color-danger);">Ausgabe</span>
+                                        <span th:text="#{mission.finance.type.expense}" class="text-danger">Ausgabe</span>
                                     </td>
                                     <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td>
@@ -1175,7 +1175,7 @@
                     <select name="jobTypeIds" multiple style="height: 100px;">
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
-                    <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
+                    <small class="text-muted" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
                     <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" class="field-error"></div>
                 </div>
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
@@ -1194,7 +1194,7 @@
                     <select name="jobTypeIds" id="edit-crew-jobs" multiple style="height: 100px;">
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
-                    <small style="color: var(--color-gray-2);" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
+                    <small class="text-muted" th:text="#{general.multiselect}">Strg+Klick für Mehrfachauswahl</small>
                     <div th:if="${#fields.hasErrors('jobTypeIds')}" th:errors="*{jobTypeIds}" class="field-error"></div>
                 </div>
                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>

@@ -221,7 +221,7 @@
                         <td></td>
                     </tr>
                     <tr class="group-items" style="display: none;">
-                        <td colspan="6" style="padding: 0;">
+                        <td colspan="6" class="p-0">
                             <div class="inventory-items-table-wrapper">
                             <table class="krt-table" style="margin: 0; background: transparent; border-top: none;">
                                 <thead>
@@ -255,7 +255,7 @@
                                             <!-- Normaler Text für Nutzer ohne Rechte -->
                                             <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                                                 <span th:if="${item.jobOrderId != null}" th:text="'Auftrag #' + ${item.jobOrderDisplayId}">Zugewiesen</span>
-                                                <span th:if="${item.jobOrderId == null}" style="color: var(--color-gray-2);">-</span>
+                                                <span th:if="${item.jobOrderId == null}" class="text-muted">-</span>
                                             </div>
                                             <!-- Dropdown für Logistiker/Offiziere/Admins -->
                                             <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
@@ -283,7 +283,7 @@
                                             <!-- Normaler Text für Nutzer ohne Rechte -->
                                             <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                                                 <span th:if="${item.missionId != null}" th:text="${item.missionName}">Einsatz</span>
-                                                <span th:if="${item.missionId == null}" style="color: var(--color-gray-2);">-</span>
+                                                <span th:if="${item.missionId == null}" class="text-muted">-</span>
                                             </div>
                                             <!-- Dropdown für Logistiker/Offiziere/Admins -->
                                             <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">

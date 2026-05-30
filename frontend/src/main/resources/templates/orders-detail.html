@@ -233,8 +233,8 @@
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
-                <label for="requestingOrgUnitId" th:text="#{orders.detail.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Auftraggeber-Staffel</label>
-                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="requestingOrgUnitId" th:text="#{orders.detail.squadron}" class="form-label">Auftraggeber-Staffel</label>
+                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required class="w-full">
                     <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
                     <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
                         <option th:each="o : ${ownerOptions}"
@@ -260,7 +260,7 @@
                  author squadron stays as it was when the row was first persisted. Render as a
                  read-only chip so the editor sees the value without being able to edit it. -->
             <div class="form-group mb-1" th:if="${order.creatingSquadron != null}">
-                <label th:text="#{orders.detail.creating_squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Erstellt durch</label>
+                <label th:text="#{orders.detail.creating_squadron}" class="form-label">Erstellt durch</label>
                 <span class="squadron-badge squadron-badge-muted"
                       th:title="${order.creatingSquadron.name()}"
                       th:text="${order.creatingSquadron.shorthand()}">IRI</span>
@@ -269,26 +269,26 @@
             </div>
 
             <div class="form-group mb-1">
-                <label for="handle" th:text="#{orders.detail.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Handle (Ingame-Name)</label>
-                <input type="text" id="handle" th:field="*{handle}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="handle" th:text="#{orders.detail.handle}" class="form-label">Handle (Ingame-Name)</label>
+                <input type="text" id="handle" th:field="*{handle}" class="w-full">
             </div>
 
             <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Materialien</h3>
             <div id="materials-container">
                 <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
                     <div>
-                        <label th:text="#{orders.material.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Material</label>
+                        <label th:text="#{orders.material.name}" class="form-label-sm">Material</label>
                         <select th:field="*{materials[__${stat.index}__].materialId}" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
                             <option value="" disabled selected>-- Material wählen --</option>
                             <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
                         </select>
                     </div>
                     <div>
-                        <label th:text="#{orders.material.minQuality}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Min. Qualität</label>
+                        <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" min="0" max="1000" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
                     </div>
                     <div>
-                        <label th:text="#{orders.material.amount}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Menge (SCU)</label>
+                        <label th:text="#{orders.material.amount}" class="form-label-sm">Menge (SCU)</label>
                         <input type="number" step="0.001" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
                     </div>
                     <div>
@@ -337,7 +337,7 @@
 
         <form th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
-                <label for="handoverTime" th:text="#{orders.handover.time}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Zeitpunkt der Übergabe</label>
+                <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
                     <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
@@ -346,13 +346,13 @@
             </div>
 
             <div class="form-group mb-1">
-                <label for="recipientHandle" th:text="#{orders.handover.handle}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Empfänger (Handle)</label>
-                <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="recipientHandle" th:text="#{orders.handover.handle}" class="form-label">Empfänger (Handle)</label>
+                <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required class="w-full">
             </div>
 
             <div class="form-group mb-1">
-                <label for="recipientSquadron" th:text="#{orders.handover.squadron}" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem;">Staffel des Empfängers</label>
-                <select id="recipientSquadron" th:field="*{recipientSquadron}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label for="recipientSquadron" th:text="#{orders.handover.squadron}" class="form-label">Staffel des Empfängers</label>
+                <select id="recipientSquadron" th:field="*{recipientSquadron}" class="w-full">
                     <option value="" th:text="#{orders.handover.selectSquadron}">-- Optional --</option>
                     <option th:each="s : ${squadrons}" th:value="${s.name}" th:text="${s.name}"></option>
                 </select>
@@ -437,14 +437,14 @@
 
         row.innerHTML = `
             <div>
-                <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Lagereintrag</label>
-                <select name="items[${index}].inventoryItemId" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label class="form-label-sm">Lagereintrag</label>
+                <select name="items[${index}].inventoryItemId" required class="w-full">
                     ${options}
                 </select>
             </div>
             <div>
-                <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Menge (SCU)</label>
-                <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                <label class="form-label-sm">Menge (SCU)</label>
+                <input type="number" step="0.001" name="items[${index}].amount" min="0.001" required class="w-full">
             </div>
             <div>
                 <button type="button" class="btn btn-outline-danger" style="padding: 0.5rem;" data-trigger="od-remove-handover-row">Entfernen</button>
@@ -921,7 +921,7 @@
             const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
             let html = `
-                <td colspan="${subColspan}" style="padding: 0;">
+                <td colspan="${subColspan}" class="p-0">
                     <div style="background: var(--color-surface-input); border: 1px solid var(--color-gray-3); border-top: none;">
                         <div class="table-responsive">
                             <table class="data-table" style="margin: 0; border: none; background: transparent;">
@@ -994,7 +994,7 @@
             console.error('Error fetching inventory items:', error);
             detailsRow.innerHTML = `
                 <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
-                    <div style="color: var(--color-danger);">Fehler beim Laden der Lagereinträge.</div>
+                    <div class="text-danger">Fehler beim Laden der Lagereinträge.</div>
                 </td>
             `;
         }

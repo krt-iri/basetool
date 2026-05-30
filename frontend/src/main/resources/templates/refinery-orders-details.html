@@ -221,9 +221,9 @@
                         <label th:text="#{refineryorder.form.duration}">Dauer</label>
                         <div class="flex-gap-sm">
                             <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" class="flex-1" th:readonly="${!canEdit}">
-                            <span style="color: var(--color-gray-2);">h</span>
+                            <span class="text-muted">h</span>
                             <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" class="flex-1" th:readonly="${!canEdit}">
-                            <span style="color: var(--color-gray-2);">m</span>
+                            <span class="text-muted">m</span>
                         </div>
                     </div>
 

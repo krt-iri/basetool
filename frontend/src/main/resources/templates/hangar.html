@@ -237,12 +237,12 @@
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
                         <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" style="color: var(--color-danger);"></div>
+                    <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" class="text-danger"></div>
                 </div>
                 <div class="form-group">
                     <label for="ship-name" th:text="#{hangar.ship.name}">Name</label>
                     <input type="text" id="ship-name" name="name" th:field="*{name}">
-                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color: var(--color-danger);"></div>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="text-danger"></div>
                 </div>
                 <div class="form-group">
                     <label for="ship-insurance" th:text="#{hangar.ship.insurance}">Versicherung</label>
@@ -252,7 +252,7 @@
                         <option value="LTI" th:text="#{hangar.ship.insurance.lti}">LTI</option>
                         <option th:each="i : ${#numbers.sequence(1, 120)}" th:value="${i}" th:text="${i == 1 ? #messages.msg('hangar.ship.insurance.month') : #messages.msg('hangar.ship.insurance.months', i)}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('insurance')}" th:errors="*{insurance}" style="color: var(--color-danger);"></div>
+                    <div th:if="${#fields.hasErrors('insurance')}" th:errors="*{insurance}" class="text-danger"></div>
                 </div>
                 <div class="form-group">
                     <label for="ship-location" th:text="#{hangar.ship.location}">Ort</label>
@@ -260,7 +260,7 @@
                         <option value="" th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" style="color: var(--color-danger);"></div>
+                    <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" class="text-danger"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
