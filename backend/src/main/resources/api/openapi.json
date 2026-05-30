@@ -28710,6 +28710,134 @@
         }
       }
     },
+    "/api/v1/blueprints" : {
+      "get" : {
+        "tags" : [ "blueprint-controller" ],
+        "summary" : "List synced crafting blueprints",
+        "description" : "Admin-only. Returns synced SC Wiki blueprints with their ingredients and the per-slot stat modifiers (requirement groups), filtered by output-item name / Wiki key.",
+        "operationId" : "getBlueprints",
+        "parameters" : [ {
+          "name" : "search",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Blueprint page returned",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseBlueprintDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/announcement/admin" : {
       "get" : {
         "tags" : [ "announcement-controller" ],
@@ -34995,6 +35123,225 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/CityDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "BlueprintDismantleReturnDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "quantityScu" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "BlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "scwikiUuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "scwikiKey" : {
+            "type" : "string"
+          },
+          "outputName" : {
+            "type" : "string"
+          },
+          "craftTimeSeconds" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "isAvailableByDefault" : {
+            "type" : "boolean"
+          },
+          "ingredientCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unlockingMissionsCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "gameVersionSeen" : {
+            "type" : "string"
+          },
+          "dismantleTimeSeconds" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "dismantleEfficiency" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "scwikiSyncedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "requirementGroups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementGroupDto"
+            }
+          },
+          "ingredients" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementIngredientDto"
+            }
+          },
+          "summaryProperties" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintSummaryPropertyDto"
+            }
+          },
+          "dismantleReturns" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintDismantleReturnDto"
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "BlueprintRequirementGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "groupKey" : {
+            "type" : "string"
+          },
+          "requiredCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "modifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
+          },
+          "ingredients" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementIngredientDto"
+            }
+          }
+        }
+      },
+      "BlueprintRequirementIngredientDto" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantityScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "quantityUnits" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "BlueprintRequirementModifierDto" : {
+        "type" : "object",
+        "properties" : {
+          "propertyKey" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "betterWhen" : {
+            "type" : "string"
+          },
+          "qualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityMax" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtMinQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtMaxQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "valueRangeType" : {
+            "type" : "string"
+          }
+        }
+      },
+      "BlueprintSummaryPropertyDto" : {
+        "type" : "object",
+        "properties" : {
+          "propertyKey" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "betterWhen" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PageResponseBlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintDto"
             }
           },
           "page" : {

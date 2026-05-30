@@ -24,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 
 /**
  * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint
@@ -41,7 +42,14 @@ import lombok.ToString;
 @Table(name = "blueprint")
 @Getter
 @Setter
-@ToString(exclude = {"outputItem", "ingredients", "dismantleReturns"})
+@ToString(
+    exclude = {
+      "outputItem",
+      "ingredients",
+      "dismantleReturns",
+      "requirementGroups",
+      "summaryProperties"
+    })
 @NoArgsConstructor
 public class Blueprint extends AbstractEntity<UUID> {
 
@@ -79,6 +87,16 @@ public class Blueprint extends AbstractEntity<UUID> {
   @Column(name = "craft_time_seconds")
   private Integer craftTimeSeconds;
 
+  /**
+   * Dismantle duration in seconds (Wiki {@code dismantle.time_seconds}); {@code null} if absent.
+   */
+  @Column(name = "dismantle_time_seconds")
+  private Integer dismantleTimeSeconds;
+
+  /** Fraction of inputs recovered on dismantle (Wiki {@code dismantle.efficiency}, e.g. 0.5). */
+  @Column(name = "dismantle_efficiency")
+  private Double dismantleEfficiency;
+
   /** Whether the recipe is unlocked by default (vs. mission-gated). */
   @Column(name = "is_available_by_default", nullable = false)
   private Boolean isAvailableByDefault = false;
@@ -112,6 +130,7 @@ public class Blueprint extends AbstractEntity<UUID> {
       orphanRemoval = true,
       fetch = FetchType.LAZY)
   @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
   private List<BlueprintIngredient> ingredients = new ArrayList<>();
 
   /** Ordered dismantle-return lines (RESOURCE only). Owned with cascade + orphan removal. */
@@ -123,7 +142,34 @@ public class Blueprint extends AbstractEntity<UUID> {
       orphanRemoval = true,
       fetch = FetchType.LAZY)
   @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
   private List<BlueprintDismantleReturn> dismantleReturns = new ArrayList<>();
+
+  /**
+   * Ordered requirement groups (build slots) with their stat modifiers. Owned, cascade + orphan.
+   */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @OneToMany(
+      mappedBy = "blueprint",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
+  private List<BlueprintRequirementGroup> requirementGroups = new ArrayList<>();
+
+  /** Ordered summary stat roll-up (which stats this blueprint affects). Owned, cascade + orphan. */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @OneToMany(
+      mappedBy = "blueprint",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
+  private List<BlueprintSummaryProperty> summaryProperties = new ArrayList<>();
 
   /**
    * Returns the ordered ingredient lines as an unmodifiable view. Mutate the recipe through {@link
@@ -151,6 +197,11 @@ public class Blueprint extends AbstractEntity<UUID> {
     ingredients.removeLast();
   }
 
+  /** Clears all ingredient lines; orphan removal deletes them on flush. */
+  public void clearIngredients() {
+    ingredients.clear();
+  }
+
   /**
    * Returns the ordered dismantle-return lines as an unmodifiable view. Mutate through {@link
    * #addDismantleReturn} / {@link #removeLastDismantleReturn}.
@@ -174,5 +225,55 @@ public class Blueprint extends AbstractEntity<UUID> {
   /** Removes the last dismantle-return line; orphan removal deletes it on flush. */
   public void removeLastDismantleReturn() {
     dismantleReturns.removeLast();
+  }
+
+  /**
+   * Returns the ordered requirement groups as an unmodifiable view. Mutate through {@link
+   * #addRequirementGroup} / {@link #clearRequirementGroups}.
+   *
+   * @return an unmodifiable view of the requirement groups
+   */
+  public List<BlueprintRequirementGroup> getRequirementGroups() {
+    return Collections.unmodifiableList(requirementGroups);
+  }
+
+  /**
+   * Appends a requirement group and sets its back-reference to this blueprint.
+   *
+   * @param group the group to add
+   */
+  public void addRequirementGroup(BlueprintRequirementGroup group) {
+    group.setBlueprint(this);
+    requirementGroups.add(group);
+  }
+
+  /** Clears all requirement groups; orphan removal deletes them (and their modifiers) on flush. */
+  public void clearRequirementGroups() {
+    requirementGroups.clear();
+  }
+
+  /**
+   * Returns the ordered summary properties as an unmodifiable view. Mutate through {@link
+   * #addSummaryProperty} / {@link #clearSummaryProperties}.
+   *
+   * @return an unmodifiable view of the summary properties
+   */
+  public List<BlueprintSummaryProperty> getSummaryProperties() {
+    return Collections.unmodifiableList(summaryProperties);
+  }
+
+  /**
+   * Appends a summary property and sets its back-reference to this blueprint.
+   *
+   * @param summaryProperty the summary property to add
+   */
+  public void addSummaryProperty(BlueprintSummaryProperty summaryProperty) {
+    summaryProperty.setBlueprint(this);
+    summaryProperties.add(summaryProperty);
+  }
+
+  /** Clears all summary properties; orphan removal deletes them on flush. */
+  public void clearSummaryProperties() {
+    summaryProperties.clear();
   }
 }
