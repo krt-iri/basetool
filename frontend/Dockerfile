@@ -53,6 +53,9 @@ RUN ./gradlew :frontend:build \
     -x spotbugsMain \
     -x spotlessCheck \
     -x spotlessJavaCheck \
+    -x lintCss \
+    -x lintHtml \
+    -x lintJs \
     --no-daemon
 
 # Layered JAR extrahieren. The Spring Boot Gradle plugin produces exactly one
