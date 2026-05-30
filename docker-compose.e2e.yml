@@ -36,6 +36,17 @@ services:
     command: start-dev --import-realm --cache=local
     environment:
       KC_HOSTNAME: http://host.docker.internal:18080
+    # Resolve the issuer host to THIS container on the shared Docker network, so the in-Docker
+    # backend/frontend reach Keycloak the same way on a Linux CI runner as on Docker Desktop. The
+    # published port is 127.0.0.1-only, so the test stack's `extra_hosts: host.docker.internal ->
+    # host-gateway` cannot reach it on a plain Linux bridge (the gateway IP is not the loopback);
+    # the alias bypasses the host round-trip entirely. Paired with the extra_hosts override on
+    # backend-dev/frontend-dev below, which clears the /etc/hosts entry that would shadow this alias.
+    networks:
+      net-backend-keycloak:
+        aliases:
+          - keycloak
+          - host.docker.internal
     volumes: !override
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
   # The app images bake a ROOT-owned /app/logs/backend.log: the Dockerfile's
@@ -52,10 +63,15 @@ services:
   # /app/logs after the CDS run, or point the training run's logs elsewhere).
   backend-dev:
     user: "0:0"
+    # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
+    # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
+    # published port on a Linux runner.
+    extra_hosts: !override []
     volumes: !override
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
   frontend-dev:
     user: "0:0"
+    extra_hosts: !override []
     volumes: !override
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
 
