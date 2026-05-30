@@ -230,12 +230,40 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * @throws Exception if {@code docker compose up} exits non-zero or times out
    */
   private void composeUp(Path root) throws Exception {
-    runProcess(
-        root,
-        "compose-up",
-        composeCommand("up", "-d", "--build", "--wait", "--wait-timeout", "360"),
-        throwawayEnv(),
-        UP_TIMEOUT);
+    try {
+      runProcess(
+          root,
+          "compose-up",
+          composeCommand("up", "-d", "--build", "--wait", "--wait-timeout", "360"),
+          throwawayEnv(),
+          UP_TIMEOUT);
+    } catch (Exception up) {
+      // The stack failed to come up healthy (e.g. a service never passed its healthcheck). Dump the
+      // container logs into build/e2e so the CI artifact shows *why* — `up --wait` itself only
+      // reports "dependency failed to start", not the failing container's own output.
+      captureComposeLogs(root);
+      throw up;
+    }
+  }
+
+  /**
+   * Best-effort dump of the stack's container logs to {@code build/e2e/compose-logs.log} for
+   * post-mortem diagnostics when {@link #composeUp} fails. Never throws — the original bring-up
+   * failure is the one that should propagate.
+   *
+   * @param root the repository root the compose files live in
+   */
+  private void captureComposeLogs(Path root) {
+    try {
+      runProcess(
+          root,
+          "compose-logs",
+          composeCommand("logs", "--no-color", "--tail", "300"),
+          throwawayEnv(),
+          Duration.ofMinutes(2));
+    } catch (Exception ignored) {
+      System.out.println("[E2E] could not capture compose logs: " + ignored.getMessage());
+    }
   }
 
   /**
@@ -273,7 +301,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
     cmd.add("--profile");
     cmd.add("dev");
     cmd.addAll(List.of(verbAndArgs));
-    if ("up".equals(verbAndArgs[0])) {
+    // Scope `up` and `logs` to the explicit service list (npm is intentionally excluded).
+    if ("up".equals(verbAndArgs[0]) || "logs".equals(verbAndArgs[0])) {
       cmd.addAll(SERVICES);
     }
     return cmd;
