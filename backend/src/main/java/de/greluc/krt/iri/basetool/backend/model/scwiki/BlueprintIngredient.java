@@ -36,7 +36,7 @@ import lombok.ToString;
 @Table(name = "blueprint_ingredient")
 @Getter
 @Setter
-@ToString(exclude = {"blueprint", "material", "gameItem"})
+@ToString(exclude = {"blueprint", "requirementGroup", "material", "gameItem"})
 @NoArgsConstructor
 public class BlueprintIngredient extends AbstractEntity<UUID> {
 
@@ -49,6 +49,15 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "blueprint_id", nullable = false)
   private Blueprint blueprint;
+
+  /**
+   * Requirement group (build slot) this ingredient fills, when the blueprint was synced from the
+   * detail endpoint. {@code null} for rows populated from the list endpoint's flat {@code
+   * ingredients[]} fallback (no group / modifier data available for those).
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "requirement_group_id")
+  private BlueprintRequirementGroup requirementGroup;
 
   /** Position within the blueprint's ingredient list (drives {@code @OrderBy}). */
   @Column(name = "order_index", nullable = false)
@@ -88,4 +97,10 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
   /** Quantity in whole units for an ITEM line. */
   @Column(name = "quantity_units")
   private Integer quantityUnits;
+
+  /**
+   * Minimum quality tier the ingredient must have (Wiki {@code min_quality}); {@code null} if none.
+   */
+  @Column(name = "min_quality")
+  private Integer minQuality;
 }

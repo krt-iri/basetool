@@ -2,23 +2,34 @@ package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintDismantleDto;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintIngredientDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintModifierDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintModifierRangeDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintQualityRangeDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementChildDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementGroupDto;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintSummaryPropertyDto;
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintRequirementGroup;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintRequirementModifier;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +50,7 @@ class ScWikiBlueprintSyncServiceTest {
   @Mock private MaterialExternalAliasService aliasService;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private EntityManager entityManager;
 
   private ScWikiProperties properties;
   private ScWikiBlueprintSyncService service;
@@ -55,7 +67,8 @@ class ScWikiBlueprintSyncServiceTest {
             materialRepository,
             aliasService,
             gameItemRepository,
-            syncReportService);
+            syncReportService,
+            entityManager);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
@@ -69,7 +82,8 @@ class ScWikiBlueprintSyncServiceTest {
   }
 
   @Test
-  void syncBlueprints_resolvesResourceToMaterialAndItemToGameItem() {
+  void syncBlueprints_fallbackList_resolvesResourceToMaterialAndItemToGameItem() {
+    // No detail (fetchOne returns null) — exercises the flat-list fallback path.
     UUID resourceUuid = UUID.randomUUID();
     UUID itemUuid = UUID.randomUUID();
     UUID outputUuid = UUID.randomUUID();
@@ -111,6 +125,141 @@ class ScWikiBlueprintSyncServiceTest {
     assertNull(line1.getMaterial());
     assertEquals(7, line1.getQuantityUnits());
     assertNull(line1.getQuantityScu());
+  }
+
+  @Test
+  void syncBlueprints_detailWithRequirementGroups_persistsGroupsModifiersIngredientsAndSummary() {
+    UUID bpUuid = UUID.randomUUID();
+    UUID outputUuid = UUID.randomUUID();
+    UUID resourceUuid = UUID.randomUUID();
+    UUID itemUuid = UUID.randomUUID();
+
+    // Minimal list row used only to enumerate the UUID; the detail carries the requirement groups.
+    ScWikiBlueprintDto listDto =
+        new ScWikiBlueprintDto(
+            bpUuid,
+            "BP",
+            outputUuid,
+            "Omnisky",
+            null,
+            540,
+            false,
+            "4.8",
+            2,
+            1,
+            List.of(),
+            List.of(),
+            null,
+            null,
+            null);
+
+    ScWikiBlueprintModifierDto frameModifier =
+        new ScWikiBlueprintModifierDto(
+            "health_maxhealth",
+            null,
+            "Integrity",
+            "higher",
+            new ScWikiBlueprintQualityRangeDto(0.0, 1000.0),
+            new ScWikiBlueprintModifierRangeDto(0.9, 1.1),
+            "linear",
+            List.of(
+                new de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintModifierSegmentDto(
+                    0.0, 500.0, 0.9, 1.0),
+                new de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintModifierSegmentDto(
+                    500.0, 1000.0, 1.0, 1.1)));
+    ScWikiBlueprintRequirementChildDto frameChild =
+        new ScWikiBlueprintRequirementChildDto(
+            null, "resource", resourceUuid, "Agricium", null, 0.36, 1);
+    ScWikiBlueprintRequirementGroupDto frame =
+        new ScWikiBlueprintRequirementGroupDto(
+            "FRAME", "Frame", "group", 1, List.of(frameModifier), List.of(frameChild));
+
+    ScWikiBlueprintModifierDto emitterModifier =
+        new ScWikiBlueprintModifierDto(
+            "weapon_damage",
+            null,
+            "Impact Force",
+            "higher",
+            new ScWikiBlueprintQualityRangeDto(0.0, 1000.0),
+            new ScWikiBlueprintModifierRangeDto(0.95, 1.05),
+            "linear",
+            null);
+    ScWikiBlueprintRequirementChildDto emitterChild =
+        new ScWikiBlueprintRequirementChildDto(null, "item", itemUuid, "Hadanite", 7, null, 1);
+    ScWikiBlueprintRequirementGroupDto emitter =
+        new ScWikiBlueprintRequirementGroupDto(
+            "EMITTER", "Emitter", "group", 1, List.of(emitterModifier), List.of(emitterChild));
+
+    ScWikiBlueprintSummaryPropertyDto summary =
+        new ScWikiBlueprintSummaryPropertyDto("weapon_damage", null, "Impact Force", "higher");
+
+    ScWikiBlueprintDto detail =
+        new ScWikiBlueprintDto(
+            bpUuid,
+            "BP",
+            outputUuid,
+            "Omnisky",
+            null,
+            540,
+            false,
+            "4.8",
+            2,
+            1,
+            List.of(),
+            List.of(),
+            List.of(frame, emitter),
+            List.of(summary),
+            new ScWikiBlueprintDismantleDto(15, 0.5));
+
+    Material agricium = material("Agricium");
+    GameItem hadanite = gameItem(itemUuid);
+    GameItem output = gameItem(outputUuid);
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(listDto));
+    when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
+        .thenReturn(detail);
+    when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(outputUuid)).thenReturn(Optional.of(output));
+    when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));
+    when(gameItemRepository.findByExternalUuid(itemUuid)).thenReturn(Optional.of(hadanite));
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncBlueprints();
+
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    Blueprint bp = saved.getValue();
+
+    assertEquals(2, bp.getRequirementGroups().size(), "both slots persisted");
+    BlueprintRequirementGroup frameGroup = bp.getRequirementGroups().get(0);
+    assertEquals("Frame", frameGroup.getName());
+    assertEquals(1, frameGroup.getModifiers().size());
+    BlueprintRequirementModifier frameMod = frameGroup.getModifiers().get(0);
+    assertEquals("health_maxhealth", frameMod.getPropertyKey());
+    assertEquals("Integrity", frameMod.getLabel());
+    assertEquals(0.9, frameMod.getModifierAtMinQuality());
+    assertEquals(1.1, frameMod.getModifierAtMaxQuality());
+    assertEquals(1000.0, frameMod.getQualityMax());
+    assertEquals(2, frameMod.getSegments().size(), "stepped-curve segments persisted in order");
+    assertEquals(0.0, frameMod.getSegments().get(0).getQualityMin());
+    assertEquals(1.0, frameMod.getSegments().get(0).getModifierAtEnd());
+    assertEquals(500.0, frameMod.getSegments().get(1).getQualityMin());
+    assertEquals(1.1, frameMod.getSegments().get(1).getModifierAtEnd());
+
+    assertEquals(2, bp.getIngredients().size(), "one ingredient per slot child");
+    BlueprintIngredient resourceLine = bp.getIngredients().get(0);
+    assertEquals(BlueprintIngredientKind.RESOURCE, resourceLine.getKind());
+    assertSame(agricium, resourceLine.getMaterial());
+    assertSame(frameGroup, resourceLine.getRequirementGroup(), "ingredient linked to its slot");
+    assertEquals(1, resourceLine.getMinQuality());
+    BlueprintIngredient itemLine = bp.getIngredients().get(1);
+    assertEquals(BlueprintIngredientKind.ITEM, itemLine.getKind());
+    assertSame(hadanite, itemLine.getGameItem());
+    assertSame(bp.getRequirementGroups().get(1), itemLine.getRequirementGroup());
+
+    assertEquals(1, bp.getSummaryProperties().size());
+    assertEquals("Impact Force", bp.getSummaryProperties().get(0).getLabel());
+    assertEquals(15, bp.getDismantleTimeSeconds());
+    assertEquals(0.5, bp.getDismantleEfficiency());
   }
 
   @Test
@@ -158,12 +307,26 @@ class ScWikiBlueprintSyncServiceTest {
       line.setKind(BlueprintIngredientKind.RESOURCE);
       existing.addIngredient(line);
     }
-    // Incoming DTO has only 1 ingredient.
+    // Incoming DTO has only 1 ingredient (and no requirement groups → fallback path).
     ScWikiBlueprintIngredientDto one =
         new ScWikiBlueprintIngredientDto("Iron", "resource", UUID.randomUUID(), null, 1.0, null);
     ScWikiBlueprintDto dto =
         new ScWikiBlueprintDto(
-            bpUuid, "BP", null, "Out", null, 10, false, "4.8", 1, 0, List.of(one), List.of());
+            bpUuid,
+            "BP",
+            null,
+            "Out",
+            null,
+            10,
+            false,
+            "4.8",
+            1,
+            0,
+            List.of(one),
+            List.of(),
+            null,
+            null,
+            null);
 
     when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
@@ -218,7 +381,10 @@ class ScWikiBlueprintSyncServiceTest {
         ingredients.size(),
         0,
         ingredients,
-        dismantle);
+        dismantle,
+        null,
+        null,
+        null);
   }
 
   private Material material(String name) {

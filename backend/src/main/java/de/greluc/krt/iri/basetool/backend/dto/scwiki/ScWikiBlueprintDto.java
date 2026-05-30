@@ -24,6 +24,13 @@ import java.util.UUID;
  * @param unlockingMissionsCount Wiki-reported unlocking-mission count
  * @param ingredients ordered ingredient lines (may be {@code null} if the list omits them)
  * @param dismantleReturns ordered dismantle-return lines (may be {@code null})
+ * @param requirementGroups named build slots, each with its ingredient children and the stat
+ *     modifiers that slot contributes to the crafted item. Present only on the blueprint
+ *     <em>detail</em> response ({@code GET /api/blueprints/{uuid}}); {@code null} on list payloads.
+ * @param summaryProperties de-duplicated roll-up of the stats this blueprint affects (detail
+ *     response only; {@code null} on list payloads)
+ * @param dismantle dismantle time / efficiency metadata (detail response only; {@code null} on list
+ *     payloads)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiBlueprintDto(
@@ -38,4 +45,7 @@ public record ScWikiBlueprintDto(
     @JsonProperty("ingredient_count") Integer ingredientCount,
     @JsonProperty("unlocking_missions_count") Integer unlockingMissionsCount,
     @JsonProperty("ingredients") List<ScWikiBlueprintIngredientDto> ingredients,
-    @JsonProperty("dismantle_returns") List<ScWikiBlueprintIngredientDto> dismantleReturns) {}
+    @JsonProperty("dismantle_returns") List<ScWikiBlueprintIngredientDto> dismantleReturns,
+    @JsonProperty("requirement_groups") List<ScWikiBlueprintRequirementGroupDto> requirementGroups,
+    @JsonProperty("summary_properties") List<ScWikiBlueprintSummaryPropertyDto> summaryProperties,
+    @JsonProperty("dismantle") ScWikiBlueprintDismantleDto dismantle) {}
