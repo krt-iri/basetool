@@ -105,6 +105,12 @@ jobs:
               - '**/node_modules/**'
               - 'frontend/src/main/resources/static/js/vendor/**'
               - '**/*.min.js'
+              # The Playwright e2e harness (frontend/src/e2e) is throwaway test infrastructure, not
+              # shipped code: it intentionally trusts the local self-signed dev cert when seeding the
+              # ephemeral backend (a deliberate test-only TrustManager, flagged java/insecure-
+              # trustmanager). Checkstyle is likewise disabled for this source set. Exclude only this
+              # test path so the rule stays active for production code.
+              - 'frontend/src/e2e/**'
 
             # `java/log-injection` fires on every SLF4J parameterised call
             # `log.X("text {}", userValue)` where the argument is a method

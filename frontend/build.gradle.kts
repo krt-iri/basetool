@@ -274,14 +274,22 @@ dependencies {
 // conventions Google style flags as noise — disable it to keep `check` green.
 tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 
-// Installs the Playwright-managed Chromium into the per-user browser cache
-// (~/.cache/ms-playwright). Cached in CI; a no-op once present.
+// Installs the Playwright-managed browsers into the per-user cache (~/.cache/ms-playwright).
+// Cached in CI; a no-op once present. On a CI Linux runner it additionally installs the browsers'
+// OS libraries via `--with-deps` — WebKit needs libs ubuntu-latest lacks and otherwise fails to
+// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI Linux;
+// local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
 val playwrightInstall by tasks.registering(JavaExec::class) {
   group = "verification"
   description = "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
   classpath = sourceSets["e2e"].runtimeClasspath
   mainClass.set("com.microsoft.playwright.CLI")
-  args("install", "chromium", "firefox", "webkit")
+  val withDeps =
+      System.getenv("CI") == "true" &&
+          System.getProperty("os.name").orEmpty().lowercase().contains("linux")
+  val browsers = listOf("chromium", "firefox", "webkit")
+  setArgs(
+      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers)
 }
 
 // Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
