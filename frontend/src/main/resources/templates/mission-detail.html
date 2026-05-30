@@ -427,7 +427,35 @@
                     <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn" th:text="#{mission.save}">Save</button>
                     <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
                 </div>
-                
+
+                <!-- Party Lead (Partyleiter) Section: visible to every viewer, editable by mission managers. -->
+                <div class="hud-box" th:if="${!isNew}">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label th:text="#{mission.party_lead}">Partyleiter</label>
+                        <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                            <div style="color: var(--color-accent-light); font-weight: bold; background: var(--color-surface-input); padding: 0.5rem; border: 1px solid var(--color-gray-3);">
+                                <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
+                                <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
+                            </div>
+                            <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
+                                  th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
+                                  style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start;">
+                                <input type="hidden" name="version" th:value="${mission.partyLeadVersion}">
+                                <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
+                                <div style="position: relative; flex: 1; min-width: 12rem;">
+                                    <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
+                                           th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : mission.partyLeadGuestName}"
+                                           th:placeholder="#{mission.party_lead.placeholder}">
+                                    <div id="party-lead-search-results" class="autocomplete-items"></div>
+                                </div>
+                                <button type="submit" class="btn" th:text="#{general.save}">Speichern</button>
+                                <button type="button" class="btn btn-secondary" id="party-lead-clear-btn" th:text="#{mission.party_lead.clear}">Entfernen</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Mission Managers Section -->
                 <div class="hud-box" th:if="${!isNew and mission.canManageManagers}">
                     <h3 th:text="#{mission.management_rights}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem;">Verwaltungsrechte</h3>
@@ -2132,6 +2160,80 @@
                 if (e.target !== searchInput) {
                     closeAllLists();
                 }
+            });
+        }
+
+        // Party Lead autocomplete — same /users/search mechanic as the participant add: picking a
+        // member fills the hidden userId, typing a free-text name clears it so the backend resolves
+        // the name (unique member -> linked, unknown -> kept as a guest handle).
+        const partyLeadInput = document.getElementById('party-lead-search-input');
+        const partyLeadUserId = document.getElementById('party-lead-user-id');
+        const partyLeadResults = document.getElementById('party-lead-search-results');
+        const partyLeadClearBtn = document.getElementById('party-lead-clear-btn');
+        const partyLeadForm = document.getElementById('party-lead-form');
+
+        if (partyLeadInput && partyLeadResults && partyLeadUserId) {
+            let partyLeadDebounce;
+
+            function partyLeadCloseLists() {
+                while (partyLeadResults.firstChild) {
+                    partyLeadResults.removeChild(partyLeadResults.firstChild);
+                }
+            }
+
+            partyLeadInput.addEventListener('input', function() {
+                const val = this.value;
+                // Any manual edit drops a previously resolved id; the backend re-resolves the name.
+                partyLeadUserId.value = '';
+                clearTimeout(partyLeadDebounce);
+                if (!val) { partyLeadCloseLists(); return; }
+                partyLeadDebounce = setTimeout(() => {
+                    fetch('/users/search?query=' + encodeURIComponent(val))
+                        .then(response => {
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            return response.json();
+                        })
+                        .then(users => {
+                            partyLeadCloseLists();
+                            if (!users || users.length === 0) return;
+                            users.forEach(user => {
+                                const div = document.createElement('div');
+                                const regex = new RegExp("(" + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ")", "gi");
+                                const displayName = user.effectiveName || '';
+                                displayName.split(regex).forEach((part, i) => {
+                                    if (i % 2 === 1) {
+                                        const strong = document.createElement("strong");
+                                        strong.textContent = part;
+                                        div.appendChild(strong);
+                                    } else if (part) {
+                                        div.appendChild(document.createTextNode(part));
+                                    }
+                                });
+                                div.addEventListener("click", function() {
+                                    partyLeadInput.value = displayName;
+                                    partyLeadUserId.value = user.id;
+                                    partyLeadCloseLists();
+                                });
+                                partyLeadResults.appendChild(div);
+                            });
+                        })
+                        .catch(err => console.error('Error fetching users:', err));
+                }, 300);
+            });
+
+            document.addEventListener("click", function (e) {
+                if (e.target !== partyLeadInput) {
+                    partyLeadCloseLists();
+                }
+            });
+        }
+
+        if (partyLeadClearBtn && partyLeadForm && partyLeadInput && partyLeadUserId) {
+            partyLeadClearBtn.addEventListener('click', function() {
+                // Submit empty userId + guestName so the backend clears the party lead.
+                partyLeadInput.value = '';
+                partyLeadUserId.value = '';
+                partyLeadForm.submit();
             });
         }
 

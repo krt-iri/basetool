@@ -16,6 +16,11 @@ import java.util.UUID;
  * <p>{@code owningSquadron} mirrors the backend's squadron reference so the detail template can
  * render the owner-squadron badge consistently with the list view (MULTI_SQUADRON_PLAN.md section
  * 4.5). {@code null} for historic rows persisted before V82.
+ *
+ * <p>{@code partyLeadUser} / {@code partyLeadGuestName} mirror the backend's optional party lead
+ * (Partyleiter) — a registered user reference or a free-text handle, mutually exclusive — so the
+ * detail template can render and edit it. {@code partyLeadVersion} is the dedicated section-scoped
+ * optimistic-lock counter echoed back into the party-lead edit form.
  */
 public record MissionDto(
     UUID id,
@@ -46,4 +51,7 @@ public record MissionDto(
     Long flagsVersion,
     Integer checkedInParticipants,
     Integer registeredParticipants,
-    SquadronReferenceDto owningSquadron) {}
+    SquadronReferenceDto owningSquadron,
+    UserReferenceDto partyLeadUser,
+    String partyLeadGuestName,
+    Long partyLeadVersion) {}

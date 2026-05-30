@@ -533,6 +533,15 @@ public class MissionService {
     }
   }
 
+  private void assertPartyLeadVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
   private void bumpCoreVersion(@NotNull Mission mission) {
     long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
     mission.setCoreVersion(current + 1L);
@@ -546,6 +555,11 @@ public class MissionService {
   private void bumpFlagsVersion(@NotNull Mission mission) {
     long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
     mission.setFlagsVersion(current + 1L);
+  }
+
+  private void bumpPartyLeadVersion(@NotNull Mission mission) {
+    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
+    mission.setPartyLeadVersion(current + 1L);
   }
 
   /**
@@ -1482,6 +1496,66 @@ public class MissionService {
     }
     ownership.setOwner(newOwner);
     missionOwnershipRepository.save(ownership);
+  }
+
+  /**
+   * Assigns or clears a mission's party lead (Partyleiter). The party lead is either a linked
+   * registered user or a free-text guest handle — mutually exclusive, mirroring the participant
+   * {@code user}/{@code guestName} model. Free-text-to-user resolution is performed by the caller
+   * (controller, like the participant-add endpoints); this method persists whatever {@code userId}
+   * / {@code guestName} it is handed:
+   *
+   * <ul>
+   *   <li>{@code userId != null} → link the registered user, clear any guest handle;
+   *   <li>{@code userId == null} and {@code guestName} non-blank → store the trimmed guest handle,
+   *       clear any linked user;
+   *   <li>both {@code null}/blank → clear the party lead entirely.
+   * </ul>
+   *
+   * <p>Versioning: validates and bumps the dedicated {@code partyLeadVersion} counter only. The
+   * association and columns are {@code @OptimisticLock(excluded = true)}, so the global {@code
+   * Mission.version} and the other section counters stay untouched and concurrent edits on other
+   * sections of the same mission remain valid (Option A / multi-user concurrency).
+   *
+   * @param missionId mission to update
+   * @param userId registered party-lead reference, or {@code null}
+   * @param guestName free-text party-lead handle, or {@code null}
+   * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
+   * @return the managed mission with the party lead applied
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the mission or the
+   *     referenced user is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedPartyLeadVersion} is stale
+   */
+  @Transactional
+  public Mission setPartyLead(
+      @NotNull UUID missionId,
+      UUID userId,
+      String guestName,
+      @NotNull Long expectedPartyLeadVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertPartyLeadVersion(mission, expectedPartyLeadVersion, missionId);
+
+    if (userId != null) {
+      User user =
+          userRepository
+              .findById(userId)
+              .orElseThrow(() -> new NotFoundException("User not found"));
+      mission.setPartyLeadUser(user);
+      mission.setPartyLeadGuestName(null);
+    } else if (guestName != null && !guestName.isBlank()) {
+      mission.setPartyLeadUser(null);
+      mission.setPartyLeadGuestName(guestName.trim());
+    } else {
+      mission.setPartyLeadUser(null);
+      mission.setPartyLeadGuestName(null);
+    }
+
+    bumpPartyLeadVersion(mission);
+    return missionRepository.save(mission);
   }
 
   /**

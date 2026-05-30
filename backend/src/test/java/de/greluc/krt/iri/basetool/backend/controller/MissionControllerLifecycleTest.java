@@ -7,10 +7,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.iri.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
@@ -21,6 +23,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionCoreRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.SetPartyLeadRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionOwnerRequest;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.iri.basetool.backend.service.MissionService;
@@ -155,7 +158,10 @@ class MissionControllerLifecycleTest {
         6L, // flagsVersion
         1,
         1,
-        null);
+        null,
+        null,
+        null,
+        0L);
   }
 
   // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
@@ -740,5 +746,100 @@ class MissionControllerLifecycleTest {
 
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     verify(missionService).deleteMission(id);
+  }
+
+  // ── PUT /api/v1/missions/{id}/party-lead ─────────────────────────────
+
+  @Test
+  void setPartyLead_explicitUserId_isForwardedWithoutNameResolution() {
+    UUID id = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    SetPartyLeadRequest request = new SetPartyLeadRequest(userId, null, 3L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.setPartyLead(id, userId, null, 3L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.setPartyLead(id, request);
+
+    assertThat(result).isSameAs(dto);
+    // An explicit autocomplete pick must NOT go through the free-text resolution path.
+    verify(userService, never()).findMatchesByExactName(any());
+    verify(missionService).setPartyLead(id, userId, null, 3L);
+  }
+
+  @Test
+  void setPartyLead_freeTextName_uniqueMatch_isResolvedToUserId() {
+    UUID id = UUID.randomUUID();
+    UUID resolvedId = UUID.randomUUID();
+    User matched = new User();
+    matched.setId(resolvedId);
+    SetPartyLeadRequest request = new SetPartyLeadRequest(null, "Alice", 1L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(userService.findMatchesByExactName("Alice")).thenReturn(List.of(matched));
+    when(missionService.setPartyLead(id, resolvedId, null, 1L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.setPartyLead(id, request);
+
+    assertThat(result).isSameAs(dto);
+    // Same mechanic as the participant add: a free-text name with a single member match is linked
+    // as a registered party lead and the guest handle is dropped.
+    verify(missionService).setPartyLead(id, resolvedId, null, 1L);
+  }
+
+  @Test
+  void setPartyLead_freeTextName_noMatch_isStoredAsGuestHandle() {
+    UUID id = UUID.randomUUID();
+    SetPartyLeadRequest request = new SetPartyLeadRequest(null, "Stranger", 0L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(userService.findMatchesByExactName("Stranger")).thenReturn(List.of());
+    when(missionService.setPartyLead(id, null, "Stranger", 0L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.setPartyLead(id, request);
+
+    assertThat(result).isSameAs(dto);
+    // No registered member matches the free text -> kept as an anonymous guest handle.
+    verify(missionService).setPartyLead(id, null, "Stranger", 0L);
+  }
+
+  @Test
+  void setPartyLead_freeTextName_ambiguous_throws409_andDoesNotPersist() {
+    UUID id = UUID.randomUUID();
+    SetPartyLeadRequest request = new SetPartyLeadRequest(null, "Sam", 0L);
+    User a = new User();
+    a.setId(UUID.randomUUID());
+    User b = new User();
+    b.setId(UUID.randomUUID());
+    when(userService.findMatchesByExactName("Sam")).thenReturn(List.of(a, b));
+
+    try {
+      controller.setPartyLead(id, request);
+      org.junit.jupiter.api.Assertions.fail("Expected BusinessConflictException");
+    } catch (BusinessConflictException expected) {
+      // ok — an ambiguous name surfaces as 409 before any persistence happens.
+    }
+
+    verify(missionService, never()).setPartyLead(any(), any(), any(), any());
+  }
+
+  @Test
+  void setPartyLead_emptySubmission_clearsPartyLead() {
+    UUID id = UUID.randomUUID();
+    SetPartyLeadRequest request = new SetPartyLeadRequest(null, null, 4L);
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(id);
+    when(missionService.setPartyLead(id, null, null, 4L)).thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result = controller.setPartyLead(id, request);
+
+    assertThat(result).isSameAs(dto);
+    // Neither a userId nor a guest name -> no resolution, the service clears the party lead.
+    verify(userService, never()).findMatchesByExactName(any());
+    verify(missionService).setPartyLead(id, null, null, 4L);
   }
 }
