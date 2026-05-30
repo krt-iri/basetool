@@ -88,7 +88,7 @@
         let socket;
         try {
             socket = new WebSocket(url);
-        } catch (e) {
+        } catch (_e) {
             this._scheduleReconnect();
             return;
         }

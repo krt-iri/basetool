@@ -35,7 +35,7 @@
     // handlers cannot lose its registration to a load-order race — even if this
     // script is deferred, slowed by the network or blocked by a stale browser cache.
     // See the comment in `fragments/head.html` for why the stub exists.
-    var pendingQueue = (window.krtEvents
+    let pendingQueue = (window.krtEvents
         && window.krtEvents._isBootstrapStub
         && window.krtEvents._queuedRegistrations) || [];
 
@@ -48,11 +48,11 @@
      */
     function on(eventType, actionName, handler) {
         if (typeof handler !== 'function') return;
-        var selector = '[data-trigger="' + actionName + '"]';
+        let selector = '[data-trigger="' + actionName + '"]';
         document.addEventListener(eventType, function (event) {
-            var target = event.target;
+            let target = event.target;
             if (!target || typeof target.closest !== 'function') return;
-            var matched = target.closest(selector);
+            let matched = target.closest(selector);
             if (!matched) return;
             if (matched.disabled) return;
             handler(matched, event);
@@ -64,7 +64,7 @@
     // Drain everything that was queued before this script ran. Order is preserved so
     // a template that registered handler A then handler B for the same event sees A
     // fire first — same as if both calls had hit the real `on(...)` directly.
-    for (var i = 0; i < pendingQueue.length; i++) {
+    for (let i = 0; i < pendingQueue.length; i++) {
         on(pendingQueue[i][0], pendingQueue[i][1], pendingQueue[i][2]);
     }
 
@@ -76,7 +76,7 @@
     // reporting "the dropdown does nothing" a fourth time. No-op once `on` is installed.
     if (typeof window.setTimeout === 'function') {
         window.setTimeout(function () {
-            var stub = window.krtEvents;
+            let stub = window.krtEvents;
             if (stub && stub._isBootstrapStub) {
                 if (typeof console !== 'undefined' && typeof console.error === 'function') {
                     console.error(
