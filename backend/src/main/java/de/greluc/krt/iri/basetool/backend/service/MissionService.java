@@ -193,14 +193,18 @@ public class MissionService {
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission(boolean allowInternal) {
-    if (allowInternal) {
-      return missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(
-          Instant.now());
-    } else {
-      return missionRepository
-          .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(
-              Instant.now());
-    }
+    Instant now = Instant.now();
+    Optional<Mission> next =
+        allowInternal
+            ? missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(now)
+            : missionRepository
+                .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(now);
+    // The limit-1 lookup above is intentionally not graphed — a collection fetch combined with the
+    // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
+    // through the graphed findById so participants / assignedUnits are eagerly loaded for the
+    // mapper
+    // (and the home-page guest redaction) without paginating the whole upcoming-mission set.
+    return next.map(Mission::getId).flatMap(missionRepository::findById);
   }
 
   /**
