@@ -51,7 +51,7 @@
     font-family: var(--font-headline);
     text-transform: uppercase;
     color: var(--color-primary);
-    font-size: 1rem;
+    font-size: var(--fs-body);
     margin-bottom: 1.25rem;
 }
 .modal-actions {
@@ -72,7 +72,7 @@
     border: 1px solid var(--color-gray-3);
     color: var(--color-gray-1);
     padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
     box-sizing: border-box;
 }
 .form-input:focus {
@@ -179,7 +179,7 @@
     width: 1.8rem;
     height: 1.1rem;
     padding: 0;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     cursor: pointer;
     line-height: 1;
 }
@@ -207,7 +207,7 @@
     border: 1px solid var(--color-gray-3);
     color: var(--color-gray-1);
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -218,8 +218,8 @@
 .pa-category-card > summary::before {
     content: '+';
     color: var(--color-primary);
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-body);
     margin-right: 0.5rem;
 }
 .pa-category-card[open] > summary::before { content: '\2212'; }
@@ -247,8 +247,8 @@
 .pa-level-row:last-child { margin-bottom: 0; }
 .pa-level-row .pa-level-label {
     color: var(--color-primary);
-    font-weight: 700;
-    font-size: 0.8rem;
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-xs);
     min-width: 52px;
     padding-top: 0.35rem;
 }
@@ -285,5 +285,5 @@
 .pa-save-all-banner.visible { display: flex; }
 .pa-save-all-banner .pa-save-all-count {
     color: var(--color-primary);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
 }
