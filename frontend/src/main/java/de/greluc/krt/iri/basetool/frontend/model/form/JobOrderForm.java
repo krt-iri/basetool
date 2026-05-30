@@ -19,6 +19,10 @@ public class JobOrderForm {
   private UUID requestingOrgUnitId;
 
   private String handle;
+
+  /** Optional free-text comment captured from the order creator; HTML-escaped on display. */
+  private String comment;
+
   private Long version;
   private String source;
   private List<JobOrderMaterialForm> materials = new ArrayList<>();

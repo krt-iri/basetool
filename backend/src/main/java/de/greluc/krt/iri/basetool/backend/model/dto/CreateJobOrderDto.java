@@ -28,11 +28,13 @@ import org.jetbrains.annotations.Nullable;
  *       When the field is {@code null} the service falls back to {@code creatingSquadronId} (i.e.
  *       the order executes for its own author squadron), preserving the same minimal-payload
  *       contract the legacy field had.
+ *   <li>{@code comment} — optional free-text note (≤1000 chars), HTML-escaped on display.
  * </ul>
  */
 public record CreateJobOrderDto(
     @Nullable UUID creatingSquadronId,
     @Nullable UUID requestingOrgUnitId,
     @Size(max = 200) String handle,
+    @Size(max = 1000) String comment,
     @NotEmpty @Size(max = 50) @Valid List<CreateJobOrderMaterialDto> materials,
     Long version) {}

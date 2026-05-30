@@ -81,6 +81,7 @@ class JobOrderServiceAssigneeAndListTest {
                   null,
                   null,
                   o.getHandle(),
+                  o.getComment(),
                   o.getPriority(),
                   o.getStatus(),
                   List.of(),

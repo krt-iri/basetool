@@ -30847,6 +30847,11 @@
             "maxLength" : 200,
             "minLength" : 0
           },
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
           "materials" : {
             "type" : "array",
             "items" : {
@@ -30872,7 +30877,7 @@
           "minQuality" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Minimale Qualität, wird serverseitig fest auf 700 gesetzt",
+            "description" : "Minimale Qualität: 700 (vorgegeben) oder null für \"Keine\" (keine Mindestqualität).",
             "example" : 700,
             "maximum" : 700,
             "minimum" : 700
@@ -30884,7 +30889,7 @@
             "minimum" : 0
           }
         },
-        "required" : [ "amount", "materialId", "minQuality" ]
+        "required" : [ "amount", "materialId" ]
       },
       "JobOrderDto" : {
         "type" : "object",
@@ -30904,6 +30909,9 @@
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "handle" : {
+            "type" : "string"
+          },
+          "comment" : {
             "type" : "string"
           },
           "priority" : {

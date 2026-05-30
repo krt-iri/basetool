@@ -52,6 +52,7 @@ class OrderHierarchyVisibilityTest {
             null,
             null,
             "Handle",
+            null,
             1,
             "OPEN",
             java.util.List.of(),

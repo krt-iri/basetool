@@ -12,6 +12,7 @@ public record JobOrderDto(
     SquadronReferenceDto creatingSquadron,
     SquadronReferenceDto requestingSquadron,
     String handle,
+    String comment,
     Integer priority,
     JobOrderStatus status,
     List<JobOrderMaterialDto> materials,

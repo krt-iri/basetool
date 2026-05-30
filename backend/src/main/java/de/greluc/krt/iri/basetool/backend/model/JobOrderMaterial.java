@@ -39,7 +39,13 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
   @JoinColumn(name = "material_id", nullable = false)
   private Material material;
 
-  @Column(nullable = false)
+  /**
+   * Minimum acceptable quality of the contributed material, or {@code null} for "Keine" (no quality
+   * floor — inventory of any quality satisfies the requirement). When non-null it is the fixed
+   * refining-grade value 700; the DTO boundary rejects any other concrete value.
+   */
+  @org.jetbrains.annotations.Nullable
+  @Column(name = "min_quality")
   private Integer minQuality;
 
   @Column(nullable = false)

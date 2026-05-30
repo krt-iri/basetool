@@ -91,6 +91,7 @@ class JobOrderMapperTest {
     iridium.setShorthand("Iridium");
     jobOrder.setRequestingOrgUnit(iridium);
     jobOrder.setHandle("recipient");
+    jobOrder.setComment("Bring to ArcCorp");
     jobOrder.setPriority(3);
     jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
     jobOrder.setMaterials(new HashSet<>(Set.of(jm)));
@@ -109,6 +110,7 @@ class JobOrderMapperTest {
     assertNotNull(dto.requestingSquadron());
     assertEquals("Iridium", dto.requestingSquadron().shorthand());
     assertEquals("recipient", dto.handle());
+    assertEquals("Bring to ArcCorp", dto.comment());
     assertEquals(3, dto.priority());
     assertEquals(JobOrderStatus.IN_PROGRESS, dto.status());
     assertEquals(createdAt, dto.createdAt());
@@ -306,6 +308,25 @@ class JobOrderMapperTest {
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto((JobOrder) null));
     assertNull(mapper.toDto((JobOrderMaterial) null));
+  }
+
+  @Test
+  void singleMaterialToDto_nullMinQuality_mapsToNull() {
+    // Given a material line with "Keine" (null minQuality) — must survive the mapping as null,
+    // not get coerced to 0 or a default.
+    Material material = newMaterial("Quartz", QuantityType.SCU);
+    JobOrderMaterial jm = new JobOrderMaterial();
+    jm.setId(UUID.randomUUID());
+    jm.setMaterial(material);
+    jm.setMinQuality(null);
+    jm.setAmount(42.0);
+
+    // When
+    JobOrderMaterialDto dto = mapper.toDto(jm);
+
+    // Then
+    assertNotNull(dto);
+    assertNull(dto.minQuality(), "null minQuality (Keine) must map through as null");
   }
 
   // ─── helper ─────────────────────────────────────────────────────────────────
