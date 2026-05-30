@@ -193,20 +193,25 @@ final class E2eSupport {
   }
 
   /**
-   * Activates a form submit control that can be covered by the {@code position: fixed} global
-   * footer ({@code .krt-footer}, introduced with the das-kartell design system). A long form's
-   * bottom submit button sits at the viewport edge, behind the footer, so a coordinate click is
-   * intercepted and times out — and Playwright's {@code click} re-runs its own scroll-into-view,
-   * which puts the button back behind the footer, so scrolling first does not help. A dispatched
-   * click is untrusted and does not submit. This instead focuses the button and presses Enter:
-   * keyboard activation goes to the focused element with no coordinate hit-test the footer could
-   * block, and (unlike a dispatched click) it is a trusted activation that submits the button's
-   * form.
+   * Clicks a submit control that can be covered by the {@code position: fixed} global footer
+   * ({@code .krt-footer}, introduced with the das-kartell design system). A long form's bottom
+   * submit button sits behind the footer, so a coordinate click is intercepted and times out. The
+   * alternatives each failed on at least one engine — {@code dispatchEvent} is untrusted, {@code
+   * press("Enter")} does not activate these submits on WebKit, and {@code requestSubmit()} aborted
+   * the app's submit. So this drops the footer out of the way (it is irrelevant to the submit flow,
+   * and the page-side {@code evaluate} runs fine under the strict CSP — unlike string-predicate
+   * {@code eval}), then performs a normal, trusted click that submits with full validation,
+   * consistently across Chromium, Firefox and WebKit.
    *
-   * @param submit the submit control (a focusable {@code <button>}) to activate
+   * @param submit the submit control (a {@code <button type="submit">}) to click
    */
   static void clickSubmitClearingFooter(Locator submit) {
-    submit.press("Enter");
+    submit
+        .page()
+        .evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+    submit.click();
   }
 
   /**
