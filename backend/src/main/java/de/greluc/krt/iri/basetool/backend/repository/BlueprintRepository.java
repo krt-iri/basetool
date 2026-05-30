@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -57,4 +59,22 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           + "AND b.scwikiDeletedAt IS NULL")
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
+
+  /**
+   * Paged, filtered list of non-soft-deleted blueprints for the admin blueprint page. When {@code
+   * q} is non-null it matches case-insensitively against the output-item name or the Wiki key;
+   * {@code null} returns every active blueprint. Sorting is supplied by the caller via {@code
+   * Pageable} against a whitelisted field set; the owned collections are left lazy (batched on
+   * access by their {@code @BatchSize}).
+   *
+   * @param q case-insensitive output-name / key substring, or {@code null} for no filter
+   * @param pageable page request (whitelisted sort)
+   * @return a page of matching blueprints
+   */
+  @Query(
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL "
+          + "AND (:q IS NULL "
+          + "OR LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) "
+          + "OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))")
+  Page<Blueprint> findActiveFiltered(@Param("q") String q, Pageable pageable);
 }
