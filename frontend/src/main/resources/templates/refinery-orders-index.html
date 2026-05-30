@@ -29,19 +29,19 @@
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{refineryorder.status.OPEN}">Offen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
                 <span th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
                 <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
             </label>

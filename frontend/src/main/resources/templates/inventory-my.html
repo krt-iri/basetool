@@ -214,7 +214,7 @@
             <span id="bulkCheckoutCount" style="color: var(--color-gray-2); font-size: 0.9rem;"></span>
         </div>
 
-        <div style="overflow-x: auto;" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
+        <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
@@ -253,7 +253,7 @@
                                         </th>
                                         <th style="padding-left: 0.5rem; width: 18%;" th:text="#{inventory.location}">Ort</th>
                                         <th style="width: 10%;" th:text="#{inventory.quality}">Qualität</th>
-                                        <th style="width: 15%;" th:text="#{inventory.amount}">Menge</th>
+                                        <th class="w-15" th:text="#{inventory.amount}">Menge</th>
                                         <th style="width: 18%;" th:text="#{inventory.order}">Auftrag</th>
                                         <th style="width: 18%;" th:text="#{inventory.mission}">Einsatz</th>
                                         <th style="width: 16%;" th:text="#{inventory.actions}">Aktionen</th>

@@ -195,7 +195,7 @@
             </div>
         </div>
 
-        <div style="overflow-x: auto;" id="tableContainer" th:fragment="inventoryTableFragment">
+        <div class="overflow-x-auto" id="tableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
@@ -228,12 +228,12 @@
                                     <tr>
                                         <th style="padding-left: 2rem; width: 15%;">Nutzer</th>
                                         <th th:if="${isAllSquadronsMode}" style="width: 8%;" th:text="#{inventory.owning_squadron}">Staffel</th>
-                                        <th style="width: 15%;">Ort</th>
+                                        <th class="w-15">Ort</th>
                                         <th style="width: 10%;">Qualität</th>
                                         <th style="width: 10%;">Menge</th>
-                                        <th style="width: 15%;">Auftrag</th>
+                                        <th class="w-15">Auftrag</th>
                                         <th style="width: 20%;">Einsatz</th>
-                                        <th style="width: 15%;" sec:authorize="hasRole('LOGISTICIAN')">Aktionen</th>
+                                        <th class="w-15" sec:authorize="hasRole('LOGISTICIAN')">Aktionen</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -29,19 +29,19 @@
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{status.OPEN}">Offen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
                 <span th:text="#{status.IN_PROGRESS}">In Bearbeitung</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="REJECTED" th:checked="${selectedStatuses != null and selectedStatuses.contains('REJECTED')}">
                 <span th:text="#{status.REJECTED}">Abgelehnt</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
             </label>
@@ -51,11 +51,11 @@
                  (admins in "all squadrons" mode) — the backend filter is a display preference,
                  not an access-control gate. -->
             <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary); margin-left: 1rem;">Staffel:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
                 <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="all" th:checked="${selectedScope == 'all'}">
                 <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
             </label>
