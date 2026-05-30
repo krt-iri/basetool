@@ -9,7 +9,7 @@ Für Architektur, Phasenplan und Designentscheidungen der E2E-Suite siehe [`../E
 | ID | Use Case | Tag | Testklasse |
 |----|----------|-----|------------|
 | [UC-01](UC-01-login.md) | Login via Keycloak | `e2e` | `LoginSmokeE2eTest` |
-| [UC-02](UC-02-mission-anlegen.md) | Mission anlegen | `e2e` | `MissionCreateE2eTest` |
+| [UC-02](UC-02-mission-anlegen.md) | Einsatz anlegen | `e2e` | `MissionCreateE2eTest` |
 | [UC-03](UC-03-job-order-anlegen.md) | Job Order anlegen | `e2e` | `JobOrderCreateE2eTest` |
 | [UC-04](UC-04-refinery-order-anlegen.md) | Refinery Order anlegen | `e2e` | `RefineryOrderCreateE2eTest` |
 | [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen | `e2e` | `HangarAddShipE2eTest` |
@@ -27,14 +27,14 @@ Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfa
 | [Rollen & Scope](rollen-und-scope.md) | Rollen × Flow-Matrix, Mandanten-Scope-Modell, Admin-Pin, SK-Grundlagen (Referenz) |
 | [UC-08](UC-08-job-order-staffel-uebergreifend.md) | Job Order: Staffel A bestellt, Staffel B liefert (B's Inventar verknüpft) |
 | [UC-09](UC-09-handover-staffel-uebergreifend.md) | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel) |
-| [UC-10](UC-10-mission-staffel-uebergreifend.md) | Öffentliche Mission mit Teilnehmern aus anderer Staffel |
+| [UC-10](UC-10-mission-staffel-uebergreifend.md) | Öffentlicher Einsatz mit Teilnehmern aus anderer Staffel |
 | [UC-11](UC-11-sk-spezialkommando.md) | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen) |
 
-> **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Missionen (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
+> **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 
 ## Gemeinsamer Rahmen
 
-**Akteur.** Sofern nicht anders genannt, ist der Akteur der synthetische Test-User `test-admin` (Keycloak) — nach dem Login eine authentifizierte Session mit Mitgliedschaft in der IRIDIUM-Staffel. Der Test-User hat die ADMIN-Rolle; staffel-scoped Aktionen (Mission, Ship, Refinery Order) verlangen eine OrgUnit-Mitgliedschaft, die der Seeder herstellt.
+**Akteur.** Sofern nicht anders genannt, ist der Akteur der synthetische Test-User `test-admin` (Keycloak) — nach dem Login eine authentifizierte Session mit Mitgliedschaft in der IRIDIUM-Staffel. Der Test-User hat die ADMIN-Rolle; staffel-scoped Aktionen (Einsatz, Ship, Refinery Order) verlangen eine OrgUnit-Mitgliedschaft, die der Seeder herstellt.
 
 **Ziel-Modi.** Die Suite ist ziel-agnostisch:
 

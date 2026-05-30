@@ -9,7 +9,7 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | **Admin** | Keycloak-Rolle | Globaler Scope, umgeht alle OrgUnit-Checks. |
 | **Officer** | Keycloak-Rolle | Erbt `LOGISTICIAN` + `MISSION_MANAGER` (Hierarchie), aber **staffel-scoped** über `canEditOrgUnit(...)`. |
 | **Logistician** | Kontextuell: `org_unit_membership.is_logistician` | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
-| **Mission Manager** | Kontextuell: `org_unit_membership.is_mission_manager` | Missions-/Einsatz-Verwaltung; gleiche Beförderungslogik. |
+| **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager` | Einsatz-Verwaltung; gleiche Beförderungslogik. |
 | **SK Lead** | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts. |
 | **Squadron Member** | Basis-User | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte. |
 | **Guest** | Unauthentifiziert | Nur lesend auf öffentliche Aggregate. |
@@ -18,9 +18,9 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
-| Flow | Guest | Squadron Member | Logistician | Mission Manager | Officer | Admin |
+| Flow | Guest | Squadron Member | Logistician | Einsatzleiter | Officer | Admin |
 |---|---|---|---|---|---|---|
-| Mission anlegen (UC-02) | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Einsatz anlegen (UC-02) | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Job Order anlegen (UC-03) | ✓ (öffentl. Formular) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Refinery Order anlegen (UC-04) | ✗ | ✓ (Owner = self) | ✓ (Owner frei wählbar) | ✓ | ✓ | ✓ |
 | Schiff in Hangar (UC-05) | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -30,17 +30,17 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | SK anlegen / umbenennen / löschen | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | SK-Mitglieder verwalten | ✗ | nur als **Lead** des SK | – | – | ✗ | ✓ |
 
-Die Gates verbatim: Mission `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
+Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
 
 ## Mandanten-Scope-Modell
 
 Der Scope wird **im Service-Layer** durchgesetzt (`OwnerScopeService`), nicht im Controller. Drei Aggregat-Scope-Arten:
 
 - **Strict-Staffel** (kein staffel-übergreifender Zugriff): `Ship`, `InventoryItem` (direkte Lager-View), `RefineryOrder`, **`Operation`**. Listen filtern auf `owning_org_unit_id`; Detail-/Schreibendpunkte gaten über `canSee*`/`canEdit*`.
-- **Cross-Staffel mit Public-Escape**: `Mission`. Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
+- **Cross-Staffel mit Public-Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
 - **Cross-Staffel-Workspace**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. **Kein OrgUnit-Filter beim Zugriff** — jeder mit Rolle/Berechtigung darf lesen/bearbeiten. → UC-08, UC-09.
 
-> **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **öffentliche Missionen** (Teilnehmer aus anderen Staffeln, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
+> **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **öffentliche Einsätze** (Teilnehmer aus anderen Staffeln, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
 
 ## Admin-Pin & Scope-Auflösung (`ScopePredicate`)
 

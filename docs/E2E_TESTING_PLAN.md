@@ -1,6 +1,6 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt + Cross-Browser-Matrix (Chromium/Firefox/WebKit); die CI läuft grün (alle drei Browser + CodeQL) — offen bleibt nur ein realer Staging-Host für den Smoke-Job. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Einsatz, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt + Cross-Browser-Matrix (Chromium/Firefox/WebKit); die CI läuft grün (alle drei Browser + CodeQL) — offen bleibt nur ein realer Staging-Host für den Smoke-Job. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
 **Use Cases:** Die einzelnen Testszenarien sind als Use Cases unter [`docs/e2e-test/`](e2e-test/README.md) dokumentiert (ein Dokument je Flow, verlinkt auf die Testklasse).
@@ -20,7 +20,7 @@ Damit bleibt der echte End-to-End-Pfad (echter Browser, echter Keycloak-Login, e
 2. **Ziel-Umgebungen:** beide — ephemerer CI-Stack (PR-Gate) **und** Smoke gegen Staging.
 3. **Orchestrierung:** Testcontainers in Gradle (`ComposeContainer`, wiederverwendet die vorhandenen Compose-Dateien).
 4. **Staging:** existiert real noch nicht (nur der `:edge`-Image-Tag). Die Smoke-Harness wird gebaut, aber bis ein Staging-Host läuft in der CI **inaktiv** geschaltet.
-5. **Erster Funktions-Scope:** Login -> Mission anlegen -> Hangar -> Refinery-Order -> JobOrder-Handover.
+5. **Erster Funktions-Scope:** Login -> Einsatz anlegen -> Hangar -> Refinery-Order -> JobOrder-Handover.
 
 ## Phase 0 — Ergebnisse (abgeschlossen, verifiziert 2026-05-29)
 
@@ -84,7 +84,7 @@ Der Spike lief erfolgreich gegen den vollen, lokal hochgefahrenen Stack: ein ech
 
 **Inventar:**
 - Navigation (`fragments/sidebar.html`): `nav-missions`, `nav-orders`, `nav-refinery`, `nav-hangar`.
-- Mission anlegen: `missions-create-link`, `mission-row` (`missions.html`); `mission-form`, `mission-name-input`, `mission-status-select`, `mission-start-date`, `mission-start-time` (`mission-detail.html`).
+- Einsatz anlegen: `missions-create-link`, `mission-row` (`missions.html`); `mission-form`, `mission-name-input`, `mission-status-select`, `mission-start-date`, `mission-start-time` (`mission-detail.html`).
 - Hangar: `hangar-add-ship`, `hangar-ship-form`, `hangar-ship-submit`, `hangar-ship-row` (`hangar.html`).
 - Refinery-Order: `refinery-create-link` (`refinery-orders-index.html`); `refinery-form`, `refinery-add-material`, `refinery-submit` (`refinery-orders-create.html`).
 - JobOrder: `order-row` (`orders-index.html`); `order-material-select`, `order-material-amount`, `order-submit` (`orders-create.html`); `order-handover-open`, `order-handover-form`, `order-handover-submit` (`orders-detail.html`).
@@ -93,7 +93,7 @@ Der Spike lief erfolgreich gegen den vollen, lokal hochgefahrenen Stack: ein ech
 
 ## Phase 3 — Stand (2026-05-29)
 
-**Sechs funktionale Flows grün: Login-Smoke, „Mission anlegen", „Job-Order anlegen", „Refinery-Order anlegen", „Hangar-Schiff hinzufügen", „JobOrder-Handover protokollieren".** `./gradlew :frontend:e2eTest` führt alle sechs Tests gegen den selbst-hochgefahrenen Stack aus — grün, mit sauberem Teardown (`down --volumes`, keine zurückbleibenden Container).
+**Sechs funktionale Flows grün: Login-Smoke, „Einsatz anlegen", „Job-Order anlegen", „Refinery-Order anlegen", „Hangar-Schiff hinzufügen", „JobOrder-Handover protokollieren".** `./gradlew :frontend:e2eTest` führt alle sechs Tests gegen den selbst-hochgefahrenen Stack aus — grün, mit sauberem Teardown (`down --volumes`, keine zurückbleibenden Container).
 
 **Neu:**
 - `BackendSeeder` — seedet die Create-Voraussetzungen: (1) `ensureIridiumMembership` holt per Keycloak-Password-Grant ein `test-admin`-Token und weist den User via `PATCH /api/v1/users/{id}/squadron` der IRIDIUM-Staffel zu (mit 409-Retry gegen den `syncUser`-Versions-Bump), damit staffel-scoped Creates nicht 400en; (2) `ensureJobOrderMaterial` / `createRefineryMaterial` legen per `POST /api/v1/materials` die benötigten Materialien an; (3) **`seedCatalog`** spielt den UEX-Katalog-Snapshot per JDBC ein (siehe „Katalog-Seeding"); (4) **`createJobOrder` / `createInventoryItemForJobOrder`** bauen per `POST /api/v1/orders` + `POST /api/v1/inventory` einen Auftrag samt verknüpftem Lagereintrag als Handover-Vorbedingung. Trust-all-SSL für das self-signed Backend-Zertifikat. Greift nur im ephemeren Modus.
@@ -102,7 +102,7 @@ Der Spike lief erfolgreich gegen den vollen, lokal hochgefahrenen Stack: ein ech
 - `JobOrderHandoverE2eTest` — öffnet das Handover-Modal eines geseedeten Auftrags, wartet per `waitForResponse` auf das lazy nachgeladene verknüpfte Inventar, wählt Lagereintrag + Menge, füllt Empfänger + Übergabezeit und verifiziert die Übergabe in der Handover-Tabelle.
 
 **Befunde:**
-- **Clientseitige `required`-Blockade (zweimal getroffen):** Sowohl das Mission- als auch das Refinery-Create-Formular blockieren den Submit **clientseitig** über HTML-`required`, ohne sichtbare Server-Fehlermeldung — der Test bleibt stumm auf dem Formular. Mission: Planned-Start-Datum/Zeit (mit Zukunfts-Datum füllen, sonst greift die Not-in-the-past-Prüfung). Refinery: die Goods-Zeile hat **drei** Pflichtfelder — `inputMaterialId_0`, `inputQuantity_0` **und** `outputQuantity_0` (nicht nur Material + Ausgangsmenge). Lehre: vor dem Submit alle `[required]`-Felder des Formulars füllen, nicht nur die offensichtlichen.
+- **Clientseitige `required`-Blockade (zweimal getroffen):** Sowohl das Einsatz- als auch das Refinery-Create-Formular blockieren den Submit **clientseitig** über HTML-`required`, ohne sichtbare Server-Fehlermeldung — der Test bleibt stumm auf dem Formular. Einsatz: Planned-Start-Datum/Zeit (mit Zukunfts-Datum füllen, sonst greift die Not-in-the-past-Prüfung). Refinery: die Goods-Zeile hat **drei** Pflichtfelder — `inputMaterialId_0`, `inputQuantity_0` **und** `outputQuantity_0` (nicht nur Material + Ausgangsmenge). Lehre: vor dem Submit alle `[required]`-Felder des Formulars füllen, nicht nur die offensichtlichen.
 - **Race vermeiden:** `datetime-splitter.js` leert die Datum/Zeit-Picker beim `DOMContentLoaded` aus dem leeren Hidden-Feld. Wer vor diesem Init füllt, dessen Werte werden wieder gelöscht → der Submit wird stumm blockiert (intermittierender Fehlschlag). Erst auf vollständigen Page-Load warten, dann füllen.
 - **Test-Isolation:** `storageState` wird NICHT über Testklassen hinweg memoisiert — jede Klasse loggt frisch ein (eigene Session). Cross-Class-Session-Sharing hatte sonst nicht-deterministische Fehlschläge verursacht.
 - **Kein `page.waitForFunction(String)`:** Die App liefert eine strikte CSP (`script-src` mit Nonce + `strict-dynamic`, **kein** `unsafe-eval`). Playwrights `waitForFunction` mit String-Ausdruck wird im Seitenkontext per `eval` ausgeführt und von der CSP geblockt (`EvalError`). Stattdessen auf Netzwerk-Antworten (`waitForResponse`) oder DOM-Zustände warten — die laufen Playwright-seitig und umgehen die CSP. Die übrigen Helfer (`selectOption`, `fill`, `waitForURL`, `assertThat`) sind CSP-sicher.
@@ -111,7 +111,7 @@ Der Spike lief erfolgreich gegen den vollen, lokal hochgefahrenen Stack: ein ech
 **Katalog-Seeding (Option 1 — umgesetzt, entsperrt Refinery + Hangar):**
 Refinery-Standorte und ShipTypes sind normalerweise UEX-synced und über die Admin-REST-API auf einer frischen DB nicht anlegbar. Gewählt wurde **Option 1**: ein deterministischer UEX-Katalog-Snapshot (`frontend/src/e2e/resources/uex-catalog-seed.sql`) wird von `BackendSeeder.seedCatalog()` per JDBC eingespielt, direkt nachdem der Stack gesund ist (`E2eStackExtension.beforeAll`). Inhalt (idempotent via feste UUIDs + `ON CONFLICT (id) DO NOTHING`): eine `city` mit `has_refinery=true` + verknüpfte `location` „E2E Refinery Hub" (macht den Standort refinery-fähig, da `getRefineryLocations` über `has_refinery` joint), ein `manufacturer` + `ship_type` „E2E Ship Type" und eine `refining_method` „E2E Refining Method". Damit listen die Refinery-Standort-/Methoden-Dropdowns und das Hangar-ShipType-Dropdown stabile Referenzdaten, unabhängig vom (netzabhängigen) UEX-Sync.
 
-**JobOrder-Handover (umgesetzt):** der zuvor vertagte Concurrency-Flow. Vorbedingung wird komplett per REST geseedet: Auftrag (`POST /api/v1/orders`) + verknüpfter Lagereintrag (`POST /api/v1/inventory` mit `jobOrderId`, gleiches Material, Qualität ≥ `minQuality`). Im Test öffnet `JobOrderHandoverE2eTest` das Handover-Modal; dieses lädt das verknüpfte Inventar pro Material **lazy per `fetch`** und snapshottet es beim „Material auswählen"-Klick in das Dropdown — der Test muss also vor dem Hinzufügen einer Zeile per `waitForResponse` auf die `…/materials/{matId}/inventory`-Antwort warten (Snapshot füllt sich sonst leer und bleibt leer). Die Übergabezeit nutzt denselben `datetime-split-group`-Mechanismus wie Mission, hier aber ohne Race (das Modal öffnet lange nach dem Page-Load, der Splitter ist bereits initialisiert) und mit `data-validate-not-past='false'`.
+**JobOrder-Handover (umgesetzt):** der zuvor vertagte Concurrency-Flow. Vorbedingung wird komplett per REST geseedet: Auftrag (`POST /api/v1/orders`) + verknüpfter Lagereintrag (`POST /api/v1/inventory` mit `jobOrderId`, gleiches Material, Qualität ≥ `minQuality`). Im Test öffnet `JobOrderHandoverE2eTest` das Handover-Modal; dieses lädt das verknüpfte Inventar pro Material **lazy per `fetch`** und snapshottet es beim „Material auswählen"-Klick in das Dropdown — der Test muss also vor dem Hinzufügen einer Zeile per `waitForResponse` auf die `…/materials/{matId}/inventory`-Antwort warten (Snapshot füllt sich sonst leer und bleibt leer). Die Übergabezeit nutzt denselben `datetime-split-group`-Mechanismus wie beim Einsatz, hier aber ohne Race (das Modal öffnet lange nach dem Page-Load, der Splitter ist bereits initialisiert) und mit `data-validate-not-past='false'`.
 
 Login-Helper/`storageState` (offener Phase-1-Punkt) ist erledigt.
 
@@ -205,7 +205,7 @@ Beweist die heikelste Integration end-to-end, bevor in die Suite investiert wird
 
 ### Phase 3 — Funktionale Suite (ephemeral, `@Tag("e2e")`)
 
-- Page-Objects + Tests für: **Login** (storageState-Setup) -> **Mission anlegen** -> **Hangar** -> **Refinery-Order** -> **JobOrder-Handover**. Letzterer ist der Concurrency-/409-sensible Flow und bewusst als E2E-Kandidat gewählt. Playwrights Auto-Waiting deckt die AJAX-/`data-version`-/409-Timing-Themen ab.
+- Page-Objects + Tests für: **Login** (storageState-Setup) -> **Einsatz anlegen** -> **Hangar** -> **Refinery-Order** -> **JobOrder-Handover**. Letzterer ist der Concurrency-/409-sensible Flow und bewusst als E2E-Kandidat gewählt. Playwrights Auto-Waiting deckt die AJAX-/`data-version`-/409-Timing-Themen ab.
 - **Aufwand:** ~3-5 Tage. **Risiko:** mittel (Flakiness/Selektoren).
 
 ### Phase 4 — Smoke-Subset (`@Tag("smoke")`, ziel-agnostisch)
