@@ -346,6 +346,137 @@ public final class BackendSeeder {
   }
 
   /**
+   * Logs in as the given user and returns their {@code app_user} id (the JWT {@code sub}). The call
+   * also triggers {@code UserService.syncUser}, so invoking it once materialises the user's row
+   * before an admin assigns memberships to it.
+   *
+   * @param username the Keycloak username
+   * @param password the Keycloak password
+   * @return the user's app_user id
+   */
+  public String getUserId(String username, String password) {
+    try {
+      String token = passwordGrant(username, password);
+      return getJson("/api/v1/users/me", token).get("id").getAsString();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getUserId(" + username + ") failed", e);
+    }
+  }
+
+  /**
+   * Creates a second {@code SQUADRON} OrgUnit via {@code POST /api/v1/squadrons} (admin-only) and
+   * returns its id, so cross-Staffel flows have a Staffel B alongside the canonical IRIDIUM.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param name the squadron name (unique across all OrgUnits)
+   * @param shorthand the squadron shorthand (unique across all OrgUnits)
+   * @return the created squadron's id
+   */
+  public String createSquadron(
+      String adminUser, String adminPassword, String name, String shorthand) {
+    return seedEntity(
+        adminUser,
+        adminPassword,
+        "/api/v1/squadrons",
+        "{\"name\":\""
+            + name
+            + "\",\"shorthand\":\""
+            + shorthand
+            + "\",\"isPromotionEnabled\":true}");
+  }
+
+  /**
+   * Creates a {@code SPECIAL_COMMAND} OrgUnit (SK) via {@code POST /api/v1/special-commands}
+   * (admin-only) and returns its id.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param name the SK name (unique across all OrgUnits)
+   * @param shorthand the SK shorthand (unique across all OrgUnits)
+   * @return the created SK's id
+   */
+  public String createSpecialCommand(
+      String adminUser, String adminPassword, String name, String shorthand) {
+    return seedEntity(
+        adminUser,
+        adminPassword,
+        "/api/v1/special-commands",
+        "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
+  }
+
+  /**
+   * Assigns {@code targetUserId} to a Staffel with the given role flags via {@code PATCH
+   * /api/v1/users/{id}/memberships} (admin-only), re-reading the user's version on a 409 like
+   * {@link #ensureIridiumMembership}. A user has at most one Staffel membership, so this also
+   * re-homes them.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the app_user id to assign (see {@link #getUserId})
+   * @param squadronId the Staffel OrgUnit id
+   * @param isLogistician whether to set the {@code is_logistician} flag
+   * @param isMissionManager whether to set the {@code is_mission_manager} flag
+   */
+  public void assignStaffelMembership(
+      String adminUser,
+      String adminPassword,
+      String targetUserId,
+      String squadronId,
+      boolean isLogistician,
+      boolean isMissionManager) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
+        long version = getJson("/api/v1/users/" + targetUserId, token).get("version").getAsLong();
+        String body =
+            "{\"staffel\":{\"squadronId\":\""
+                + squadronId
+                + "\",\"isLogistician\":"
+                + isLogistician
+                + ",\"isMissionManager\":"
+                + isMissionManager
+                + ",\"userVersion\":"
+                + version
+                + "}}";
+        int status = patch(token, "/api/v1/users/" + targetUserId + "/memberships", body);
+        if (status >= 200 && status < 300) {
+          return;
+        }
+        if (status != 409) {
+          throw new IllegalStateException("Membership PATCH failed: HTTP " + status);
+        }
+      }
+      throw new IllegalStateException(
+          "Staffel membership assignment exhausted retries on HTTP 409");
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.assignStaffelMembership failed", e);
+    }
+  }
+
+  /**
+   * Issues an authenticated {@code PATCH} and returns the HTTP status, so callers can react to a
+   * 409.
+   *
+   * @param token bearer token
+   * @param path backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the HTTP status code
+   * @throws Exception on transport failure
+   */
+  private int patch(String token, String path, String jsonBody) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+    return http.send(request, BodyHandlers.ofString()).statusCode();
+  }
+
+  /**
    * Performs a Keycloak Resource-Owner-Password-Credentials grant on the public {@code
    * basetool-frontend} client and returns the access token.
    *
