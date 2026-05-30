@@ -320,7 +320,7 @@
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/admin/mission-data}" method="post" style="margin:0;">
-                    <button type="submit" class="btn" style="background-color: var(--color-danger);" th:text="#{info.delete}">Löschen</button>
+                    <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
         </div>

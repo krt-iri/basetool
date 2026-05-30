@@ -423,7 +423,7 @@
                 </div>
                 <!-- Buttons Box inside Details Column -->
                 <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
-                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn delete-mission-btn" style="background-color: var(--color-danger); margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
+                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger delete-mission-btn" style="margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
                     <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn" th:text="#{mission.save}">Save</button>
                     <a th:href="@{/missions}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
                 </div>
@@ -453,7 +453,7 @@
                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
                             <div th:each="manager : ${mission.managers}" style="display: flex; align-items: center; background: var(--color-surface-input); border: 1px solid var(--color-primary); padding: 0.2rem 0.5rem;">
                                 <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1); margin-right: 0.5rem;">Manager Name</span>
-                                <button th:if="${mission.canEdit}" type="button" class="btn btn-sm" style="padding: 0 0.3rem; line-height: 1; background: var(--color-danger);" 
+                                <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-danger" style="padding: 0 0.3rem; line-height: 1;"
                                         th:data-manager-id="${manager.id}"
                                         data-trigger="mission-remove-manager">&times;</button>
                             </div>
@@ -1283,7 +1283,7 @@
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/missions}" method="post" style="margin:0;">
-                    <button type="submit" class="btn" style="background-color: var(--color-danger);" th:text="#{info.delete}">Löschen</button>
+                    <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
         </div>
