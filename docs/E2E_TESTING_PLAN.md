@@ -1,8 +1,9 @@
 # E2E-Website-Tests: Umsetzungsplan (Playwright-Java + Testcontainers)
 
-**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt + Cross-Browser-Matrix (Chromium/Firefox/WebKit) ergänzt — offen bleiben nur der erste echte CI-Lauf und ein realer Staging-Host. Details unter „Phase 1/2/3 — Stand".
+**Status:** Phase 0 abgeschlossen; Phase 1 (Fundament) im Kern fertig (`./gradlew :frontend:e2eTest` fährt den Stack selbst hoch/ab); Phase 2 (`data-testid`-Hooks) abgeschlossen; Phase 3 (funktionale Flows): sechs Flows grün (Login, Mission, Job-Order, Refinery-Order, Hangar, JobOrder-Handover) — komplett; Phase 4 (Smoke-Subset, `@Tag("smoke")` + `smokeTest`-Task) abgeschlossen; Phase 5 (CI-Workflow `e2e.yml`) angelegt; Phase 6 (Doku) abgeschlossen. Alle Phasen 0–6 erledigt + Cross-Browser-Matrix (Chromium/Firefox/WebKit); die CI läuft grün (alle drei Browser + CodeQL) — offen bleibt nur ein realer Staging-Host für den Smoke-Job. Details unter „Phase 1/2/3 — Stand".
 **Datum:** 2026-05-29.
 **Scope:** automatisierte, browserbasierte Funktionstests der Frontend-Weboberfläche, lauffähig in der GitHub-CI gegen einen ephemeren Full-Stack und (später) gegen ein Staging-Deployment.
+**Use Cases:** Die einzelnen Testszenarien sind als Use Cases unter [`docs/e2e-test/`](e2e-test/README.md) dokumentiert (ein Dokument je Flow, verlinkt auf die Testklasse).
 
 ## Worum es geht
 
