@@ -1,0 +1,83 @@
+name: E2E Smoke
+
+# Non-destructive page-load checks (@Tag("smoke")) against a staging deployment,
+# fanned out over Chromium / Firefox / WebKit. Split out from e2e.yml because
+# this is a post-release / nightly concern, NOT a PR check: it triggers only on a
+# schedule or manual dispatch (never on pull_request), and the job is gated on an
+# E2E_BASE_URL repo variable, so until a staging host exists it simply does not
+# run — and never appears as a skipped matrix placeholder on pull requests.
+on:
+  schedule:
+    - cron: '0 4 * * *' # nightly 04:00 UTC (offset from the e2e flows at 03:00)
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke (${{ matrix.browser }}, staging)
+    # Dormant until a staging host exists: gated on the E2E_BASE_URL repo variable
+    # (a hostname, readable in `if:` — unlike a secret). Credentials come from
+    # secrets, passed via the environment.
+    if: ${{ vars.E2E_BASE_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          cache-read-only: true
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # E2E_BASE_URL set => E2eStackExtension targets the external deployment and
+      # does not manage Docker (no host.docker.internal remap needed — staging has
+      # a real hostname every engine resolves natively). Credentials travel via the
+      # environment (masked in logs); the smokeTest task maps E2E_USERNAME /
+      # E2E_PASSWORD to the e2e.* system properties the tests read.
+      - name: Run smoke checks against staging
+        env:
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: ./gradlew :frontend:smokeTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smoke-artifacts-${{ matrix.browser }}
+          path: |
+            frontend/build/e2e/**
+            frontend/build/test-results/smokeTest/**
+            frontend/build/reports/tests/smokeTest/**
+          retention-days: 14
+          if-no-files-found: ignore

@@ -554,10 +554,12 @@ host.docker.internal` to your hosts file to run WebKit against the local stack (
 just run WebKit against staging via `E2E_BASE_URL`). The suite fails fast with
 this hint if WebKit is selected without the mapping.
 
-CI runs both in [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml), each as
-a Chromium/Firefox/WebKit matrix: the `e2e` job on an `e2e` PR label, a nightly
-schedule, or manual dispatch; the `smoke` job against staging once the repo
-defines an `E2E_BASE_URL` variable. The full design and per-phase status live in
+CI runs these as a Chromium/Firefox/WebKit matrix:
+[`e2e.yml`](.github/workflows/e2e.yml) runs the destructive flows on an `e2e` PR
+label, a nightly schedule, or manual dispatch;
+[`e2e-smoke.yml`](.github/workflows/e2e-smoke.yml) runs the smoke checks against
+staging on a schedule or manual dispatch (never on PRs) once the repo defines an
+`E2E_BASE_URL` variable. The full design and per-phase status live in
 [`docs/E2E_TESTING_PLAN.md`](docs/E2E_TESTING_PLAN.md).
 
 ---
