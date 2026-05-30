@@ -9,11 +9,13 @@ import java.util.UUID;
 /** Data transfer record carrying Create Job Order Material payload. */
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
-    @NotNull
+    @org.jetbrains.annotations.Nullable
         @Min(700)
         @Max(700)
         @Schema(
-            description = "Minimale Qualität, wird serverseitig fest auf 700 gesetzt",
+            description =
+                "Minimale Qualität: 700 (vorgegeben) oder null für \"Keine\" (keine"
+                    + " Mindestqualität).",
             example = "700")
         Integer minQuality,
     // @Max caps the per-material amount at 100 000 units so an anonymous caller cannot push a

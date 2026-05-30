@@ -134,7 +134,10 @@
                         <tbody>
                             <tr th:each="mat : ${order.materials}">
                                 <td th:text="${mat.material.name}" th:title="${mat.material.name}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td th:text="${mat.minQuality}" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td style="border-bottom: none; white-space: nowrap;">
+                                    <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
+                                    <span th:if="${mat.minQuality == null}" th:text="#{orders.material.minQuality.none}">Keine</span>
+                                </td>
                                 <td style="border-bottom: none; white-space: nowrap;" th:switch="${mat.material.quantityType}">
                                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>

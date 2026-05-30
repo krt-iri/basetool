@@ -148,12 +148,20 @@
                         </div>
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].minQuality}" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;" th:title="#{orders.create.minQuality.hint}">
+                            <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}">
+                                <option th:value="700" th:text="700">700</option>
+                                <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+                            </select>
                         </div>
                     </div>
                 </div>
                 
                 <button type="button" class="btn btn-secondary mt-1" data-trigger="orders-add-material" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+
+                <div class="form-group mt-2">
+                    <label for="comment" th:text="#{orders.create.comment}">Kommentar</label>
+                    <textarea id="comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"></textarea>
+                </div>
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn" data-testid="order-submit" th:text="#{orders.create.save}">Speichern</button>
@@ -167,6 +175,12 @@
     <select id="material-options-template" style="display: none;">
         <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
         <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+    </select>
+
+    <!-- Template for new min-quality options (700 / Keine), cloned by addMaterialRow() -->
+    <select id="minquality-options-template" style="display: none;">
+        <option value="700">700</option>
+        <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
 </main>
 
@@ -275,7 +289,8 @@
         row.className = 'material-row';
         
         const options = document.getElementById('material-options-template').innerHTML;
-        
+        const minQualityOptions = document.getElementById('minquality-options-template').innerHTML;
+
         row.innerHTML = `
             <div class="form-group flex-2 mb-0">
                 <select name="materials[${materialIndex}].materialId" required>${options}</select>
@@ -284,7 +299,7 @@
                 <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
             </div>
             <div class="form-group flex-1 mb-0">
-                <input type="number" name="materials[${materialIndex}].minQuality" value="700" step="1" min="700" max="700" readonly disabled style="opacity: 0.6; cursor: not-allowed;">
+                <select name="materials[${materialIndex}].minQuality">${minQualityOptions}</select>
             </div>
         `;
         

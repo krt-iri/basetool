@@ -100,6 +100,7 @@ class JobOrderControllerTest {
         null,
         null,
         "alice",
+        "deliver to ArcCorp",
         1,
         JobOrderStatus.OPEN,
         List.of(),
@@ -113,7 +114,7 @@ class JobOrderControllerTest {
 
   @Test
   void createJobOrder_authenticatedCaller_passesThroughUnredacted() {
-    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", List.of(), null);
+    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
@@ -131,7 +132,7 @@ class JobOrderControllerTest {
 
   @Test
   void createJobOrder_anonymousCaller_redactsAssigneesHandoversAndVersion() {
-    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", List.of(), null);
+    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
@@ -303,7 +304,7 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", List.of(), 1L);
+    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", null, List.of(), 1L);
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 

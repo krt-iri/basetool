@@ -55,16 +55,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderService {
 
-  /**
-   * Default minimum quality assigned to every {@link
-   * de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial} when a job order is created or
-   * updated without an explicit minimum on the wire. 700 is the conventional refining-grade floor
-   * used across the squadron's existing orders; it is hard-coded for now so the value lives in code
-   * review rather than in a database row that can drift silently. If the squadron starts adjusting
-   * this per order, promote it to a {@code SystemSetting} entry.
-   */
-  private static final int MIN_QUALITY_DEFAULT = 700;
-
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -77,8 +67,8 @@ public class JobOrderService {
 
   /**
    * Persists a new job order from the create DTO. The next available priority slot is taken
-   * automatically (priority 1 is highest); minimum quality defaults to {@link #MIN_QUALITY_DEFAULT}
-   * for any material without an explicit value.
+   * automatically (priority 1 is highest); each material's minimum quality is taken verbatim from
+   * the DTO (700 or null = Keine).
    *
    * @param createDto create payload
    * @return the persisted order
@@ -99,6 +89,7 @@ public class JobOrderService {
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
+            .comment(normalizeComment(createDto.comment()))
             .priority(newPriority)
             .creatingOrgUnit(creatingSquadron)
             .requestingOrgUnit(requestingSquadron)
@@ -114,7 +105,7 @@ public class JobOrderService {
       JobOrderMaterial jobOrderMaterial =
           JobOrderMaterial.builder()
               .material(material)
-              .minQuality(MIN_QUALITY_DEFAULT)
+              .minQuality(matDto.minQuality())
               .amount(matDto.amount())
               .build();
 
@@ -428,6 +419,7 @@ public class JobOrderService {
         resolveRequestingSquadron(updateDto.requestingOrgUnitId(), creatingFallback);
     jobOrder.setRequestingOrgUnit(newRequesting);
     jobOrder.setHandle(updateDto.handle());
+    jobOrder.setComment(normalizeComment(updateDto.comment()));
 
     List<UUID> newMaterialIds =
         updateDto.materials().stream().map(CreateJobOrderMaterialDto::materialId).toList();
@@ -454,7 +446,7 @@ public class JobOrderService {
       JobOrderMaterial jobOrderMaterial =
           JobOrderMaterial.builder()
               .material(material)
-              .minQuality(MIN_QUALITY_DEFAULT)
+              .minQuality(matDto.minQuality())
               .amount(matDto.amount())
               .build();
 
@@ -674,6 +666,7 @@ public class JobOrderService {
         baseDto.creatingSquadron(),
         baseDto.requestingSquadron(),
         baseDto.handle(),
+        baseDto.comment(),
         baseDto.priority(),
         baseDto.status(),
         updatedMaterials,
@@ -796,5 +789,22 @@ public class JobOrderService {
                           + requestingOrgUnitId));
     }
     return creatingFallback;
+  }
+
+  /**
+   * Normalises an inbound free-text comment: trims surrounding whitespace and collapses a
+   * blank/empty result to {@code null} so "comment present" stays unambiguous downstream. Length is
+   * already bounded by {@code @Size} at the controller boundary; this method does not log the
+   * value.
+   *
+   * @param comment raw comment from the create/update DTO, may be {@code null}
+   * @return the trimmed comment, or {@code null} when absent/blank
+   */
+  private static String normalizeComment(String comment) {
+    if (comment == null) {
+      return null;
+    }
+    String trimmed = comment.strip();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }
