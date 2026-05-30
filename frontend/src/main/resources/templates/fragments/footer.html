@@ -20,9 +20,21 @@
             <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>
             <a th:href="@{/terms}" th:text="#{nav.terms}">Nutzungsbedingungen</a>
         </div>
-        <div class="krt-footer-version"
-             th:title="#{app.version.tooltip}"
-             th:text="#{app.version.display(${appVersion})}">v0.0.1</div>
+        <div class="krt-footer-meta">
+            <a class="krt-footer-handbook"
+               href="https://github.com/krt-iri/basetool/wiki"
+               target="_blank" rel="noopener noreferrer"
+               th:text="#{footer.handbook}">Handbuch</a>
+            <a class="krt-footer-github"
+               href="https://github.com/krt-iri/basetool"
+               target="_blank" rel="noopener noreferrer"
+               th:title="#{footer.github.title}" th:aria-label="#{footer.github.title}">
+                <svg class="krt-icon" aria-hidden="true" focusable="false"><use href="#krt-icon-github"/></svg>
+            </a>
+            <div class="krt-footer-version"
+                 th:title="#{app.version.tooltip}"
+                 th:text="#{app.version.display(${appVersion})}">v0.0.1</div>
+        </div>
     </footer>
 </th:block>
 </body>

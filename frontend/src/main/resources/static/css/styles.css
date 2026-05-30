@@ -441,12 +441,41 @@ tr:hover {
     gap: var(--space-4);
     flex-wrap: wrap;
 }
-.krt-footer-links a {
+.krt-footer-links a,
+.krt-footer-meta a {
     color: var(--color-gray-1);
     text-decoration: none;
 }
-.krt-footer-links a:hover {
+.krt-footer-links a:hover,
+.krt-footer-meta a:hover {
     color: var(--color-primary);
+}
+/*
+ * Right-hand footer group: Handbuch link, GitHub repo icon and the build
+ * version, kept on one baseline. `space-between` on `.krt-footer` pushes this
+ * block to the right edge; the inner flex row keeps the three items aligned and
+ * lets them wrap together when the footer stacks on mobile.
+ */
+.krt-footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+}
+/*
+ * Slightly enlarge the GitHub mark and pad its anchor so the icon-only link is
+ * a comfortable touch target without disturbing the baseline of its neighbours.
+ * The glyph inherits `fill: currentColor`, so the shared link hover above turns
+ * it brand-orange.
+ */
+.krt-footer-github {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1);
+}
+.krt-footer-github .krt-icon {
+    width: 1.25em;
+    height: 1.25em;
 }
 .krt-footer-version {
     color: var(--color-gray-2);
