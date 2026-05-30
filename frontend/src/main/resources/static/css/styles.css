@@ -915,6 +915,17 @@ label:has(+ [required])::after {
 .overflow-x-auto { overflow-x: auto; }
 .grid-col-full { grid-column: 1 / -1; }
 .w-15 { width: 15%; }
+.cursor-pointer { cursor: pointer; }
+
+/* Small muted "inactive" tag appended after a name in the admin master-data
+   tables (Staffeln / Aufgaben / SKs). Square by design. */
+.badge-inactive {
+    font-size: var(--fs-2xs);
+    background-color: var(--color-surface-input);
+    padding: 0.2rem 0.4rem;
+    margin-left: var(--space-2);
+    color: var(--color-gray-2);
+}
 
 .flex-gap-xs { display: flex; gap: var(--space-2); }
 .flex-gap-sm { display: flex; gap: var(--space-2); align-items: center; }

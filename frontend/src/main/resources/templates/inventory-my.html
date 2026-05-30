@@ -356,7 +356,7 @@
                 </tbody>
                 <tbody th:if="${#lists.isEmpty(groupedItems)}">
                     <tr>
-                        <td colspan="7" style="text-align: center; color: var(--color-gray-2);" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</td>
+                        <td colspan="7" class="text-center text-muted" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</td>
                     </tr>
                 </tbody>
             </table>
@@ -394,13 +394,13 @@
             <div class="form-group mb-1">
                 <label class="form-label" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-my-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="TRANSFER" data-trigger="inv-my-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.transfer}">Umbuchung</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-my-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
                     </label>
                     <span id="sellNotPossibleReason" style="display:none; color: var(--color-warning); font-size: 0.8rem; align-self: center;" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
