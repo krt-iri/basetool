@@ -460,7 +460,10 @@
                             <tbody>
                                 <tr th:each="msn : ${missions}">
                                     <td th:text="${msn.name}">Name</td>
-                                    <td th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</td>
+                                    <td>
+                                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}"
+                                              th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
+                                    </td>
                                     <td>
                                         <a class="btn" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
                                     </td>

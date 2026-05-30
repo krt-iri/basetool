@@ -63,7 +63,7 @@
              
              <strong th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong> 
              <span th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}"><a th:href="${nextMission.get('calendarLink')}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>
-             <strong th:text="#{mission.status} + ':'">Status:</strong> <span th:text="${nextMission.status}">Status</span>
+             <strong th:text="#{mission.status} + ':'">Status:</strong> <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(nextMission.status)}" th:text="${nextMission.status}">Status</span>
              <strong th:text="#{mission.meeting_time} + ':'">Treffen Teamspeak:</strong> <span class="utc-time" th:text="${nextMission.meetingTime}">Time</span>
              <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${nextMission.plannedStartTime}">Time</span>
         </div>
