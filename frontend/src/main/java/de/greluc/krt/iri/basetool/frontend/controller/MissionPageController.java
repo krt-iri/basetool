@@ -607,6 +607,57 @@ public class MissionPageController {
   }
 
   /**
+   * Form-post endpoint that assigns or clears a mission's party lead (Partyleiter). Reuses the same
+   * resolution mechanic as participant-add: the autocomplete fills the hidden {@code userId} when a
+   * registered member is picked, otherwise the free-text {@code guestName} is submitted and
+   * resolved server-side (a unique member match is linked, an unknown name is kept as a guest
+   * handle). An empty submission clears the party lead. {@code version} carries the mission's
+   * current {@code partyLeadVersion} for optimistic-lock validation. A full reload follows so the
+   * freshly bumped version is re-rendered without manual DOM version sync.
+   *
+   * @param id mission id
+   * @param userId resolved registered-user id from the autocomplete, or {@code null}
+   * @param guestName free-text party-lead handle, or {@code null}
+   * @param version expected {@code partyLeadVersion} echoed back from the rendered page
+   * @param redirectAttributes flash-scoped toast carrier
+   * @return redirect to {@code /missions/{id}}
+   */
+  @PostMapping("/{id}/party-lead")
+  public String setPartyLead(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) UUID userId,
+      @RequestParam(required = false) String guestName,
+      @RequestParam(required = false) Long version,
+      RedirectAttributes redirectAttributes) {
+    try {
+      Map<String, Object> body = new HashMap<>();
+      if (userId != null) {
+        body.put("userId", userId);
+      }
+      if (guestName != null && !guestName.isBlank()) {
+        body.put("guestName", guestName);
+      }
+      body.put("version", version != null ? version : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class, false);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
+      // 409 = either an ambiguous free-text name (matches more than one member) or a stale
+      // partyLeadVersion (someone else changed it meanwhile); a single conflict toast covers both
+      // and the reload below shows the current value.
+      String toastKey =
+          (e.getStatusCode() == 409)
+              ? "error.mission.party_lead.conflict"
+              : "error.mission.party_lead.update";
+      redirectAttributes.addFlashAttribute("errorToast", toastKey);
+    } catch (Exception e) {
+      log.error("Set party lead failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.mission.party_lead.update");
+    }
+    return "redirect:/missions/" + id;
+  }
+
+  /**
    * Form-post endpoint that marks a participant as checked in. Public for the guest-flow.
    *
    * @return redirect to {@code /missions/{id}}
@@ -1065,7 +1116,8 @@ public class MissionPageController {
         "mission",
         new MissionDto(
             null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
-            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null));
+            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null,
+            null, null, 0L));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));

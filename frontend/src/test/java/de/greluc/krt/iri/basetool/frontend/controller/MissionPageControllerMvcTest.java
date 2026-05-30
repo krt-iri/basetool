@@ -123,7 +123,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -235,7 +238,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -301,7 +307,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -403,7 +412,10 @@ class MissionPageControllerMvcTest {
             1L,
             2,
             3,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -465,7 +477,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -546,7 +561,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     MissionDto refreshed =
         new MissionDto(
             missionId,
@@ -577,7 +595,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
         .thenReturn(refreshed);
@@ -632,7 +653,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
     // The actual-time endpoint dispatches a section-scoped PATCH on /schedule. A stale
@@ -1218,7 +1242,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
@@ -1329,7 +1356,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(

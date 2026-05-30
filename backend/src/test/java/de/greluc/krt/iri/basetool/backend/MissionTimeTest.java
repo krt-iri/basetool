@@ -117,7 +117,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(
@@ -168,7 +171,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(
@@ -289,7 +295,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(

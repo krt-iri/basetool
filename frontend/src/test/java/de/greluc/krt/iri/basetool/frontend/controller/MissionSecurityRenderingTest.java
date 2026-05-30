@@ -115,7 +115,10 @@ class MissionSecurityRenderingTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -210,7 +213,10 @@ class MissionSecurityRenderingTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -304,7 +310,10 @@ class MissionSecurityRenderingTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -397,7 +406,10 @@ class MissionSecurityRenderingTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),

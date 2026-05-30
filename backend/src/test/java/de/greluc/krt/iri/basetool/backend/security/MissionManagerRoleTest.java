@@ -130,7 +130,10 @@ class MissionManagerRoleTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     return objectMapper.writeValueAsString(dto);
   }
 

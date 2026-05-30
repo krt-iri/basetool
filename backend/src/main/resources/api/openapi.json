@@ -5823,6 +5823,105 @@
         }
       }
     },
+    "/api/v1/missions/{id}/party-lead" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Set or clear the party lead of a mission",
+        "description" : "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text guestName, mirroring the participant-add resolution: a free-text name is resolved case-insensitively against registered members (unique match links the user, multiple matches return 409, no match stores a guest handle). Submitting neither clears the party lead. The version must match the mission's current partyLeadVersion or 409 (application/problem+json) is returned.",
+        "operationId" : "setPartyLead",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetPartyLeadRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Party lead updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{id}/participants/{participantId}" : {
       "put" : {
         "tags" : [ "Missions" ],
@@ -31525,6 +31624,16 @@
           },
           "owningSquadron" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "partyLeadUser" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "partyLeadGuestName" : {
+            "type" : "string"
+          },
+          "partyLeadVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name" ]
@@ -31693,6 +31802,25 @@
             "uniqueItems" : true
           }
         }
+      },
+      "SetPartyLeadRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "guestName" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "UpdateParticipantRequest" : {
         "type" : "object",
