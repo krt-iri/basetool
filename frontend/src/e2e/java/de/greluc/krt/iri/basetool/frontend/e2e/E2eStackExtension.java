@@ -53,8 +53,16 @@ public final class E2eStackExtension implements BeforeAllCallback {
   /** Local image tag the compose build override tags the freshly built images with. */
   private static final String IMAGE_TAG = "e2e-local";
 
-  /** Max time to wait for {@code docker compose up --build --wait} to finish. */
+  /** Max time to wait for one {@code docker compose up --build --wait} attempt to finish. */
   private static final Duration UP_TIMEOUT = Duration.ofMinutes(12);
+
+  /**
+   * How many times to attempt {@code docker compose up --build --wait} before giving up. The image
+   * build downloads Gradle dependencies inside Docker (e.g. {@code ./gradlew
+   * :frontend:dependencies}), which can hit a transient Maven Central 5xx and fail the whole
+   * bring-up; one retry (after a teardown) re-runs the download and almost always succeeds.
+   */
+  private static final int COMPOSE_UP_ATTEMPTS = 2;
 
   /** Max time to wait for {@code docker compose down}. */
   private static final Duration DOWN_TIMEOUT = Duration.ofMinutes(3);
@@ -227,26 +235,39 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Builds the images from the current source and brings the dev-profile stack up, blocking until
-   * every service reports healthy.
+   * every service reports healthy. Retries up to {@link #COMPOSE_UP_ATTEMPTS} times, tearing down
+   * between attempts, so a transient image-build flake (e.g. a Maven Central 5xx while downloading
+   * Gradle dependencies) does not fail the whole run.
    *
    * @param root the repository root the compose files live in
-   * @throws Exception if {@code docker compose up} exits non-zero or times out
+   * @throws Exception if every {@code docker compose up} attempt exits non-zero or times out
    */
   private void composeUp(Path root) throws Exception {
-    try {
-      runProcess(
-          root,
-          "compose-up",
-          composeCommand("up", "-d", "--build", "--wait", "--wait-timeout", "360"),
-          throwawayEnv(),
-          UP_TIMEOUT);
-    } catch (Exception up) {
-      // The stack failed to come up healthy (e.g. a service never passed its healthcheck). Dump the
-      // container logs into build/e2e so the CI artifact shows *why* — `up --wait` itself only
-      // reports "dependency failed to start", not the failing container's own output.
-      captureComposeLogs(root);
-      throw up;
+    Exception lastFailure = null;
+    for (int attempt = 1; attempt <= COMPOSE_UP_ATTEMPTS; attempt++) {
+      try {
+        runProcess(
+            root,
+            "compose-up",
+            composeCommand("up", "-d", "--build", "--wait", "--wait-timeout", "360"),
+            throwawayEnv(),
+            UP_TIMEOUT);
+        return;
+      } catch (Exception up) {
+        lastFailure = up;
+        // Dump the container logs into build/e2e so the CI artifact shows *why* — `up --wait`
+        // itself
+        // only reports "dependency failed to start", not the failing container's own output.
+        captureComposeLogs(root);
+        if (attempt < COMPOSE_UP_ATTEMPTS) {
+          System.out.printf(
+              "[E2E] compose up failed (attempt %d of %d); tearing down and retrying.%n%s%n",
+              attempt, COMPOSE_UP_ATTEMPTS, up.getMessage());
+          composeDown(root);
+        }
+      }
     }
+    throw lastFailure;
   }
 
   /**
