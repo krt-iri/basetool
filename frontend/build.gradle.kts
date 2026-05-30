@@ -250,11 +250,11 @@ tasks.named("classes").configure { dependsOn("minifyStaticCss") }
 // "only the Gradle wrapper" rule. `npmInstall` reads the committed
 // package.json / package-lock.json and is incremental.
 //
-// Rollout mirrors the staged SpotBugs introduction: the three lint tasks are
-// wired into `check` but run REPORT-ONLY (ignoreExitValue = true) so they
-// surface findings in CI without failing the build yet. Flip a task's
-// ignoreExitValue to false once its existing-violation backlog is cleared to
-// make that gate strict. The vendored, minified JS bundles are excluded in the
+// The three lint tasks are wired into `check` and run STRICT
+// (ignoreExitValue = false): any finding fails the build. Introduction
+// followed the staged SpotBugs pattern — report-only until the existing
+// backlog was cleared (ESLint 79 -> 0, Stylelint 348 -> 0, HTMLHint 0), then
+// flipped to strict. The vendored, minified JS bundles are excluded in the
 // tool configs (eslint.config.mjs / .stylelintrc.json).
 // ---------------------------------------------------------------------------
 node {
@@ -265,11 +265,11 @@ node {
 val lintCss =
     tasks.register<NpxTask>("lintCss") {
       group = "verification"
-      description = "Lints CSS sources with Stylelint (report-only)."
+      description = "Lints CSS sources with Stylelint (strict; fails the build on findings)."
       dependsOn(tasks.named("npmInstall"))
       command.set("stylelint")
       args.set(listOf("src/main/resources/static/css/**/*.css"))
-      ignoreExitValue.set(true)
+      ignoreExitValue.set(false)
       inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
       inputs.file("package.json")
       inputs.file(".stylelintrc.json")
@@ -278,11 +278,11 @@ val lintCss =
 val lintHtml =
     tasks.register<NpxTask>("lintHtml") {
       group = "verification"
-      description = "Lints Thymeleaf HTML templates with HTMLHint (report-only)."
+      description = "Lints Thymeleaf HTML templates with HTMLHint (strict; fails the build on findings)."
       dependsOn(tasks.named("npmInstall"))
       command.set("htmlhint")
       args.set(listOf("src/main/resources/templates/**/*.html"))
-      ignoreExitValue.set(true)
+      ignoreExitValue.set(false)
       inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
       inputs.file("package.json")
       inputs.file(".htmlhintrc")
@@ -291,11 +291,11 @@ val lintHtml =
 val lintJs =
     tasks.register<NpxTask>("lintJs") {
       group = "verification"
-      description = "Lints hand-written browser scripts with ESLint (report-only)."
+      description = "Lints hand-written browser scripts with ESLint (strict; fails the build on findings)."
       dependsOn(tasks.named("npmInstall"))
       command.set("eslint")
       args.set(listOf("src/main/resources/static/js/**/*.js"))
-      ignoreExitValue.set(true)
+      ignoreExitValue.set(false)
       inputs.files(fileTree("src/main/resources/static/js") { include("**/*.js") })
       inputs.file("package.json")
       inputs.file("eslint.config.mjs")

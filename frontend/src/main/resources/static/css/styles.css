@@ -7,7 +7,7 @@
  * the system fallback visible until the brand font arrives, eliminating the FOIT blank period.
  */
 @font-face {
-    font-family: 'Ethnocentric';
+    font-family: Ethnocentric;
     src: url('../fonts/Ethnocentric Rg.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
@@ -15,7 +15,7 @@
 }
 
 @font-face {
-    font-family: 'Lato';
+    font-family: Lato;
     src: url('../fonts/Lato-Light.woff2') format('woff2');
     font-weight: 300;
     font-style: normal;
@@ -23,7 +23,7 @@
 }
 
 @font-face {
-    font-family: 'Lato';
+    font-family: Lato;
     src: url('../fonts/Lato-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
@@ -31,7 +31,7 @@
 }
 
 @font-face {
-    font-family: 'Lato';
+    font-family: Lato;
     src: url('../fonts/Lato-Bold.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
@@ -42,8 +42,8 @@
     color-scheme: dark;
     /* Colors */
     --color-primary: #E77E23;
-    --color-white: #FFFFFF;
-    --color-bg-black: #000000;
+    --color-white: #FFF;
+    --color-bg-black: #000;
     --color-bg-dark-gray: #141414;
     
     --color-accent-light: #EEB64B;
@@ -124,11 +124,11 @@
     --border-heading: 2px solid var(--color-primary);
 
     /* Glows / shadows - the orange bloom is the brand's only "shadow" idiom. */
-    --glow-primary: 0 0 5px rgba(231, 126, 35, 0.3);     /* input focus */
-    --glow-primary-lg: 0 0 20px rgba(231, 126, 35, 0.2); /* toasts, modals */
-    --glow-danger-lg: 0 0 20px rgba(163, 0, 10, 0.2);
-    --shadow-drawer: 5px 0 15px rgba(0, 0, 0, 0.5);
-    --shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.8);
+    --glow-primary: 0 0 5px rgb(231 126 35 / 30%);     /* input focus */
+    --glow-primary-lg: 0 0 20px rgb(231 126 35 / 20%); /* toasts, modals */
+    --glow-danger-lg: 0 0 20px rgb(163 0 10 / 20%);
+    --shadow-drawer: 5px 0 15px rgb(0 0 0 / 50%);
+    --shadow-dropdown: 0 8px 16px rgb(0 0 0 / 80%);
 
     /* Spacing rhythm (rem multiples of 0.5). */
     --space-1: 0.25rem;
@@ -234,13 +234,14 @@ header {
 body.admin-mode header {
     border-bottom-color: var(--color-accent-dark);
 }
+
 .admin-mode-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     margin-left: auto;
     padding: 0.35rem 0.7rem;
-    background-color: rgba(196, 92, 0, 0.15);
+    background-color: rgb(196 92 0 / 15%);
     border: 1px solid var(--color-accent-dark);
     color: var(--color-accent-light);
     font-family: var(--font-headline);
@@ -248,6 +249,7 @@ body.admin-mode header {
     text-transform: uppercase;
     letter-spacing: 0.15em;
 }
+
 body:not(.admin-mode) .admin-mode-chip {
     display: none;
 }
@@ -345,7 +347,7 @@ main {
     padding-left: var(--space-6);
     padding-top: var(--space-2);
     padding-bottom: var(--space-2);
-    background: linear-gradient(90deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(90deg, rgb(20 20 20 / 100%) 0%, rgb(0 0 0 / 0%) 100%);
 }
 
 .greeting h1 {
@@ -399,7 +401,7 @@ tr {
  * `.unit-color-*` palette on mission-detail). Hover still wins.
  */
 tbody tr:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: rgb(255 255 255 / 2%);
 }
 
 tr:hover {
@@ -436,16 +438,19 @@ tr:hover {
     align-items: center;
     justify-content: space-between;
 }
+
 .krt-footer-links {
     display: flex;
     gap: var(--space-4);
     flex-wrap: wrap;
 }
+
 .krt-footer-links a,
 .krt-footer-meta a {
     color: var(--color-gray-1);
     text-decoration: none;
 }
+
 .krt-footer-links a:hover,
 .krt-footer-meta a:hover {
     color: var(--color-primary);
@@ -473,17 +478,20 @@ tr:hover {
     align-items: center;
     padding: var(--space-1);
 }
+
 .krt-footer-github .krt-icon {
     width: 1.25em;
     height: 1.25em;
 }
+
 .krt-footer-version {
     color: var(--color-gray-2);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
 }
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
     .krt-footer {
         flex-direction: column;
         align-items: flex-start;
@@ -524,7 +532,7 @@ tr:hover {
     max-width: 7rem;
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
     .datetime-split-inputs {
         flex-direction: column;
     }
@@ -577,33 +585,26 @@ input[type="datetime-local"] {
 }
 
 /*
- * <select> must NOT use a fixed height: Chrome calculates the inner content
- * box differently from Firefox when box-sizing: border-box is active, which
- * causes descenders and umlauts to be clipped at the bottom. Using only
- * min-height lets Chrome size the element naturally around its content
- * while still aligning with the 44px input/.btn baseline.
- */
-select {
-    min-height: 2.75rem;
-}
-
-/*
- * Chrome renders <select> elements differently from Firefox: it does not
- * automatically centre the option text within the content box, which
- * causes descenders (g, p, q, y, …) and umlauts to be clipped at the
- * bottom when a fixed height is combined with insufficient padding.
- * Fixes applied:
- *   - -webkit-appearance: none  removes Chrome's native widget so our
+ * <select> styling, merged into a single rule (stylelint no-duplicate-selectors).
+ *
+ * Height: <select> must NOT use a fixed height. Chrome calculates the inner
+ * content box differently from Firefox when box-sizing: border-box is active,
+ * which causes descenders and umlauts to be clipped at the bottom. Using only
+ * min-height lets Chrome size the element naturally around its content while
+ * still aligning with the 44px input/.btn baseline.
+ *
+ * Appearance: Chrome does not automatically centre the option text within the
+ * content box, which clips descenders (g, p, q, y, …) and umlauts when a fixed
+ * height meets insufficient padding. Fixes applied:
+ *   - -webkit-appearance / appearance: none  removes the native widget so our
  *     padding/line-height rules are fully respected.
- *   - line-height: 1.5          (already set on the shared rule above)
- *     gives enough vertical space for the font at 1rem.
- *   - padding: 0.375rem 2rem 0.375rem 0.75rem  provides symmetric
- *     vertical breathing room while reserving space on the right for
- *     the custom arrow indicator.
- *   - box-sizing: border-box    (already set above) ensures the
+ *   - line-height: 1.5  gives enough vertical space for the font at 1rem.
+ *   - padding reserves space on the right for the custom arrow indicator.
+ *   - box-sizing: border-box (set on the shared input rule) ensures the
  *     min-height of 2.75rem is measured from border to border.
  */
 select {
+    min-height: 2.75rem;
     -webkit-appearance: none;
     appearance: none;
     padding: 0.375rem var(--space-8) 0.375rem var(--space-3);
@@ -632,7 +633,7 @@ select.association-select {
 }
 
 /*
- * Per-template <style> blocks on the form pages (refinery-orders-*,
+ * Per-template \3c style> blocks on the form pages (refinery-orders-*,
  * orders-create, inventory-input, ship-data, hangar, materials,
  * material-detail, admin/*) ship a single combined rule of the form
  *   .form-group input, .form-group select, .form-group textarea {
@@ -742,9 +743,11 @@ main .form-group select {
     flex-direction: column;
     gap: 0.2rem;
 }
+
 .search-form-checkbox-spacer {
     height: 1.2rem;
 }
+
 .search-form-checkbox-label {
     display: flex;
     align-items: center;
@@ -769,19 +772,21 @@ main .form-group select {
     min-height: 3.95rem; /* label (1.25rem) + gap (0.2rem) + input (2.5rem) */
 }
 
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
     .search-form > div:has(> label) {
         min-height: 4.2rem; /* label (1.25rem) + gap (0.2rem) + input (2.75rem) */
     }
+
     .search-form > div.datetime-split-group {
         min-height: 4.2rem;
     }
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
     .search-form > div:has(> label) {
         min-height: 0;
     }
+
     .search-form > div.datetime-split-group {
         min-height: 0;
     }
@@ -882,7 +887,7 @@ main .form-group select {
    flex-direction: column (date over time), so a fixed wrapper height
    would clip the second input. Release the fixed height and let the
    column grow naturally. */
-@media (max-width: 768px) {
+@media (width <= 768px) {
     .search-form > div > .datetime-split-inputs {
         height: auto;
     }
@@ -976,6 +981,7 @@ label:has(+ [required])::after {
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
 }
+
 .stat-value {
     color: var(--color-gray-1);
     font-family: var(--font-body);
@@ -1099,7 +1105,7 @@ input[type="radio"]:focus {
 /*
  * Form-group spacing — central definition so every page that uses .form-group
  * gets the same vertical rhythm without having to redeclare margin-bottom in
- * its own inline <style> block. Pages that need a different cadence (e.g. the
+ * its own inline \3c style> block. Pages that need a different cadence (e.g. the
  * materials-overview filter row sitting at 0, or a row that participates in a
  * grid layout) can still override the value with a more specific selector.
  */
@@ -1119,13 +1125,14 @@ input[type="radio"]:focus {
     position: absolute;
     overflow: hidden;
 }
+
 .krt-icon {
     display: inline-block;
     width: 1em;
     height: 1em;
     vertical-align: -0.125em;
-    fill: currentColor;
-    color: currentColor;
+    fill: currentcolor;
+    color: currentcolor;
 }
 .krt-icon-lg { width: 1.5em; height: 1.5em; }
 .krt-icon-xl { width: 2em; height: 2em; }
@@ -1175,34 +1182,34 @@ input[type="radio"]:focus {
 
 .btn-danger {
     background-color: var(--color-danger);
-    color: #FFFFFF;
+    color: #FFF;
 }
 
 .btn-danger:hover {
     background-color: var(--color-danger-hover); /* Consistent with error pages hover */
-    color: #FFFFFF;
+    color: #FFF;
 }
 
 .btn-outline-danger {
-    background-color: rgba(163, 0, 10, 0.1);
+    background-color: rgb(163 0 10 / 10%);
     border: 1px solid var(--color-danger);
     color: var(--color-danger);
 }
 
 .btn-outline-danger:hover {
-    background-color: rgba(163, 0, 10, 0.2);
+    background-color: rgb(163 0 10 / 20%);
     border-color: var(--color-danger);
     color: var(--color-danger);
 }
 
 .btn-success {
     background-color: var(--color-success);
-    color: #FFFFFF;
+    color: #FFF;
 }
 
 .btn-success:hover {
     background-color: var(--color-success-hover);
-    color: #FFFFFF;
+    color: #FFF;
 }
 
 /* Disabled state for every button variant — dimmed and non-interactive.
@@ -1223,21 +1230,21 @@ input[type="radio"]:focus {
 }
 
 .alert-danger {
-    background-color: rgba(163, 0, 10, 0.2);
+    background-color: rgb(163 0 10 / 20%);
     border-color: var(--color-danger);
     color: var(--color-gray-1);
     border-left: 4px solid var(--color-danger);
 }
 
 .alert-success {
-    background-color: rgba(35, 158, 51, 0.2);
+    background-color: rgb(35 158 51 / 20%);
     border-color: var(--color-success);
     color: var(--color-gray-1);
     border-left: 4px solid var(--color-success);
 }
 
 .alert-warning {
-    background-color: rgba(255, 210, 63, 0.15);
+    background-color: rgb(255 210 63 / 15%);
     border-color: var(--color-warning);
     color: var(--color-gray-1);
     border-left: 4px solid var(--color-warning);
@@ -1255,7 +1262,7 @@ input[type="radio"]:focus {
 
 /* Sci-Fi Elements */
 .hud-box-error {
-    background-color: rgba(163, 0, 10, 0.2);
+    background-color: rgb(163 0 10 / 20%);
     border-color: var(--color-danger);
     margin-bottom: var(--space-4);
 }
@@ -1266,7 +1273,7 @@ input[type="radio"]:focus {
 }
 
 .hud-box-success {
-    background-color: rgba(35, 158, 51, 0.2);
+    background-color: rgb(35 158 51 / 20%);
     border-color: var(--color-success);
     margin-bottom: var(--space-4);
 }
@@ -1280,7 +1287,7 @@ input[type="radio"]:focus {
     border: var(--border-hairline);
     position: relative;
     padding: var(--space-4);
-    background-color: rgba(20, 20, 20, 0.5);
+    background-color: rgb(20 20 20 / 50%);
 }
 
 .hud-box::before {
@@ -1308,11 +1315,10 @@ input[type="radio"]:focus {
     right: 30px;
     z-index: 9999;
     max-width: 400px;
-    background-color: rgba(0, 0, 0, 0.95);
+    background-color: rgb(0 0 0 / 95%);
     border: var(--border-accent);
     padding: var(--space-6);
     box-shadow: var(--glow-primary-lg);
-    
     opacity: 0;
     transform: translateX(30px);
     transition: opacity 0.5s ease, transform 0.5s ease;
@@ -1475,8 +1481,7 @@ input[type="radio"]:focus {
     transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     background-color: var(--color-bg-dark-gray);
     box-shadow: var(--shadow-drawer);
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden auto;
 }
 
 .sidebar.open {
@@ -1498,7 +1503,7 @@ input[type="radio"]:focus {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgb(0 0 0 / 80%);
     backdrop-filter: blur(4px);
     z-index: 1999;
     opacity: 0;
@@ -1612,12 +1617,9 @@ input[type="radio"]:focus {
 }
 
 .sidebar .dropdown-content {
-    top: 100% !important;
-    bottom: auto !important;
+    inset: 100% auto auto 0 !important;
     margin-top: var(--space-2) !important;
     margin-bottom: 0 !important;
-    right: auto !important;
-    left: 0 !important;
 }
 
 .sidebar .dropdown-content::before {
@@ -1639,16 +1641,16 @@ input[type="radio"]:focus {
     align-items: center;
     gap: var(--space-2);
     padding: 0.35rem var(--space-3);
-    background-color: rgba(20, 20, 20, 0.85);
+    background-color: rgb(20 20 20 / 85%);
     border: var(--border-accent);
     border-radius: var(--radius-pill);
     color: var(--color-gray-1);
-    font-family: 'Lato', sans-serif;
+    font-family: Lato, sans-serif;
     font-size: 0.85rem;
     line-height: 1;
     pointer-events: none; /* tooltip-only, never intercepts clicks */
     backdrop-filter: blur(2px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 40%);
 }
 
 .squadron-context-chip-label {
@@ -1683,12 +1685,13 @@ input[type="radio"]:focus {
     color: var(--color-gray-1);
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
     /* On smartphones the chip collapses to the shorthand only - the label
        takes too much room next to the hamburger and brand at 320-768 px. */
     .squadron-context-chip-label {
         display: none;
     }
+
     .squadron-context-chip {
         top: 0.6rem;
         right: 0.6rem;
@@ -1718,7 +1721,7 @@ input[type="radio"]:focus {
     color: var(--color-gray-1);
     border: var(--border-accent);
     padding: var(--space-2) 0.6rem;
-    font-family: 'Lato', sans-serif;
+    font-family: Lato, sans-serif;
     font-size: var(--fs-sm);
     min-height: var(--touch-target); /* fat-finger target per the corporate design rule */
     cursor: pointer;
@@ -1749,7 +1752,7 @@ input[type="radio"]:focus {
     border: var(--border-accent);
     border-radius: var(--radius-pill);
     color: var(--color-primary);
-    font-family: 'Lato', sans-serif;
+    font-family: Lato, sans-serif;
     font-size: 0.75rem;
     font-weight: var(--fw-bold);
     line-height: 1.2;
@@ -1784,7 +1787,7 @@ input[type="radio"]:focus {
 .squadron-badge-sk {
     color: var(--color-gray-1);
     border-color: var(--color-gray-2);
-    background-color: rgba(255, 255, 255, 0.04);
+    background-color: rgb(255 255 255 / 4%);
 }
 
 /* Inventory rows linked to a job-order from a foreign squadron get an
@@ -1806,7 +1809,7 @@ input[type="radio"]:focus {
     font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    border: 1px solid currentColor;
+    border: 1px solid currentcolor;
 }
 
 /* Status pill — the canonical row-status indicator: an 8px square dot in the
@@ -1822,11 +1825,12 @@ input[type="radio"]:focus {
     font-size: var(--fs-2xs);
     letter-spacing: 0.08em;
 }
+
 .status-pill::before {
     content: '';
     width: 8px;
     height: 8px;
-    background: currentColor;
+    background: currentcolor;
 }
 .status-planned   { color: var(--color-info); }
 .status-active    { color: var(--color-success); }
@@ -1860,7 +1864,7 @@ input[type="radio"]:focus {
     width: 100%;
     height: 100%;
     overflow: auto;
-    background-color: rgba(0,0,0,0.8);
+    background-color: rgb(0 0 0 / 80%);
     backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
@@ -1943,7 +1947,7 @@ details.hud-details[open] > summary::after {
     left: 0;
     right: 0;
     background-color: var(--color-bg-dark-gray);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 50%);
 }
 
 .autocomplete-items div {
@@ -1969,8 +1973,7 @@ details.hud-details[open] > summary::after {
 .mission-info-grid {
     display: grid;
     grid-template-columns: max-content 1fr;
-    column-gap: var(--space-4);
-    row-gap: var(--space-2);
+    gap: var(--space-2) var(--space-4);
     align-items: baseline;
 }
 
@@ -2039,7 +2042,7 @@ textarea:focus-visible,
 }
 
 /* --- Tablet & Mobile Breakpoints --- */
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
     header {
         padding: var(--space-3) var(--space-6);
     }
@@ -2079,7 +2082,7 @@ textarea:focus-visible,
 }
 
 /* --- Mobile Breakpoints --- */
-@media (max-width: 768px) {
+@media (width <= 768px) {
     header {
         padding: var(--space-2) var(--space-4);
     }
@@ -2100,6 +2103,7 @@ textarea:focus-visible,
         grid-template-columns: 1fr;
         gap: var(--space-1);
     }
+
     .form-row {
         flex-direction: column;
         gap: var(--space-4);
@@ -2113,7 +2117,7 @@ textarea:focus-visible,
 
 
 /* --- Ultra-Wide Breakpoints --- */
-@media (min-width: 1600px) {
+@media (width >= 1600px) {
     main {
         max-width: 1600px; /* Expand the main container to utilize space */
     }
@@ -2148,7 +2152,7 @@ textarea:focus-visible,
 .krt-spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(231, 126, 35, 0.25);
+    border: 2px solid rgb(231 126 35 / 25%);
     border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: krt-spinner-rotate 0.9s linear infinite;
@@ -2170,9 +2174,9 @@ textarea:focus-visible,
    Awareness only — does not block any input.
    ========================================================================== */
 @keyframes krt-presence-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(231, 126, 35, 0.55); }
-    70%  { box-shadow: 0 0 0 6px rgba(231, 126, 35, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(231, 126, 35, 0); }
+    0%   { box-shadow: 0 0 0 0 rgb(231 126 35 / 55%); }
+    70%  { box-shadow: 0 0 0 6px rgb(231 126 35 / 0%); }
+    100% { box-shadow: 0 0 0 0 rgb(231 126 35 / 0%); }
 }
 
 .krt-presence-indicator {
@@ -2183,9 +2187,9 @@ textarea:focus-visible,
     padding: 0.15rem var(--space-2) 0.15rem 0.4rem;
     border: var(--border-accent);
     border-radius: var(--radius-pill);
-    background: rgba(231, 126, 35, 0.08);
+    background: rgb(231 126 35 / 8%);
     color: var(--color-primary);
-    font-family: 'Lato', sans-serif;
+    font-family: Lato, sans-serif;
     font-size: var(--fs-2xs);
     line-height: 1;
     cursor: default;
@@ -2220,7 +2224,7 @@ textarea:focus-visible,
 .krt-confirm-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgb(0 0 0 / 75%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2236,7 +2240,7 @@ textarea:focus-visible,
     padding: var(--space-6);
     color: var(--color-gray-1);
     font-family: var(--font-body);
-    box-shadow: 0 0 24px rgba(231, 126, 35, 0.35);
+    box-shadow: 0 0 24px rgb(231 126 35 / 35%);
 }
 
 .krt-confirm-title {
@@ -2249,7 +2253,7 @@ textarea:focus-visible,
 }
 
 .krt-confirm-message {
-    margin: 0 0 1.25rem 0;
+    margin: 0 0 1.25rem;
     line-height: 1.4;
     font-weight: var(--fw-thin);
 }
@@ -2296,13 +2300,15 @@ textarea:focus-visible,
     border-color: var(--color-accent-light);
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
     .krt-confirm-dialog {
         padding: var(--space-4);
     }
+
     .krt-confirm-actions {
         flex-direction: column-reverse;
     }
+
     .krt-confirm-actions .btn {
         width: 100%;
     }
@@ -2318,6 +2324,7 @@ textarea:focus-visible,
     min-width: 200px;
     font-family: var(--font-body);
 }
+
 .multi-select-header {
     padding: var(--space-2);
     background-color: var(--color-surface-input);
@@ -2333,15 +2340,18 @@ textarea:focus-visible,
     transition: border-color 0.2s;
     box-sizing: border-box;
 }
+
 .multi-select-header:hover {
     border-color: var(--color-primary);
 }
+
 .multi-select-header::after {
     content: '\25BC';
     font-size: 0.7em;
     margin-left: var(--space-2);
     color: var(--color-primary);
 }
+
 .multi-select-options {
     position: absolute;
     top: 100%;
@@ -2354,11 +2364,13 @@ textarea:focus-visible,
     overflow-y: auto;
     z-index: 100;
     display: none;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 6px rgb(0 0 0 / 50%);
 }
+
 .multi-select-options.open {
     display: block;
 }
+
 .multi-select-option {
     padding: var(--space-2) var(--space-3);
     display: flex;
@@ -2373,13 +2385,16 @@ textarea:focus-visible,
     white-space: nowrap;
     min-height: var(--touch-target);
 }
+
 .multi-select-option:hover {
     background-color: var(--color-gray-3);
 }
+
 .multi-select-option input[type="checkbox"] {
     margin: 0;
     flex-shrink: 0;
 }
+
 .selected-text {
     white-space: nowrap;
     overflow: hidden;
@@ -2393,27 +2408,27 @@ textarea:focus-visible,
    Dezente, dunkle Hintergrundfärbungen für Einheitsboxen.
    Nur für .mission-unit-box – keine anderen .hud-box betroffen.
    ============================================================ */
-.mission-unit-box.unit-color-0  { background-color: rgba(231, 126,  35, 0.08); }
-.mission-unit-box.unit-color-1  { background-color: rgba(  0, 180, 200, 0.08); }
-.mission-unit-box.unit-color-2  { background-color: rgba(120,  60, 200, 0.08); }
-.mission-unit-box.unit-color-3  { background-color: rgba( 30, 160,  80, 0.08); }
-.mission-unit-box.unit-color-4  { background-color: rgba(200,  40,  60, 0.08); }
-.mission-unit-box.unit-color-5  { background-color: rgba( 60, 120, 220, 0.08); }
-.mission-unit-box.unit-color-6  { background-color: rgba(180, 140,  20, 0.08); }
-.mission-unit-box.unit-color-7  { background-color: rgba(  0, 140, 160, 0.08); }
-.mission-unit-box.unit-color-8  { background-color: rgba(160,  30, 120, 0.08); }
-.mission-unit-box.unit-color-9  { background-color: rgba( 20, 180, 120, 0.08); }
-.mission-unit-box.unit-color-10 { background-color: rgba(220,  80,  20, 0.08); }
-.mission-unit-box.unit-color-11 { background-color: rgba( 80,  60, 200, 0.08); }
-.mission-unit-box.unit-color-12 { background-color: rgba(  0, 200, 100, 0.08); }
-.mission-unit-box.unit-color-13 { background-color: rgba(200,  20, 100, 0.08); }
-.mission-unit-box.unit-color-14 { background-color: rgba( 40, 100, 200, 0.08); }
-.mission-unit-box.unit-color-15 { background-color: rgba(160, 120,  20, 0.08); }
-.mission-unit-box.unit-color-16 { background-color: rgba( 20, 160, 200, 0.08); }
-.mission-unit-box.unit-color-17 { background-color: rgba(100,  20, 180, 0.08); }
-.mission-unit-box.unit-color-18 { background-color: rgba( 20, 200,  60, 0.08); }
-.mission-unit-box.unit-color-19 { background-color: rgba(180,  60,  20, 0.08); }
-.mission-unit-box.unit-color-20 { background-color: rgba( 60, 180, 160, 0.08); }
-.mission-unit-box.unit-color-21 { background-color: rgba(140,  40, 160, 0.08); }
-.mission-unit-box.unit-color-22 { background-color: rgba( 20, 120,  80, 0.08); }
-.mission-unit-box.unit-color-23 { background-color: rgba(200, 100,  40, 0.08); }
+.mission-unit-box.unit-color-0  { background-color: rgb(231 126  35 / 8%); }
+.mission-unit-box.unit-color-1  { background-color: rgb(  0 180 200 / 8%); }
+.mission-unit-box.unit-color-2  { background-color: rgb(120  60 200 / 8%); }
+.mission-unit-box.unit-color-3  { background-color: rgb( 30 160  80 / 8%); }
+.mission-unit-box.unit-color-4  { background-color: rgb(200  40  60 / 8%); }
+.mission-unit-box.unit-color-5  { background-color: rgb( 60 120 220 / 8%); }
+.mission-unit-box.unit-color-6  { background-color: rgb(180 140  20 / 8%); }
+.mission-unit-box.unit-color-7  { background-color: rgb(  0 140 160 / 8%); }
+.mission-unit-box.unit-color-8  { background-color: rgb(160  30 120 / 8%); }
+.mission-unit-box.unit-color-9  { background-color: rgb( 20 180 120 / 8%); }
+.mission-unit-box.unit-color-10 { background-color: rgb(220  80  20 / 8%); }
+.mission-unit-box.unit-color-11 { background-color: rgb( 80  60 200 / 8%); }
+.mission-unit-box.unit-color-12 { background-color: rgb(  0 200 100 / 8%); }
+.mission-unit-box.unit-color-13 { background-color: rgb(200  20 100 / 8%); }
+.mission-unit-box.unit-color-14 { background-color: rgb( 40 100 200 / 8%); }
+.mission-unit-box.unit-color-15 { background-color: rgb(160 120  20 / 8%); }
+.mission-unit-box.unit-color-16 { background-color: rgb( 20 160 200 / 8%); }
+.mission-unit-box.unit-color-17 { background-color: rgb(100  20 180 / 8%); }
+.mission-unit-box.unit-color-18 { background-color: rgb( 20 200  60 / 8%); }
+.mission-unit-box.unit-color-19 { background-color: rgb(180  60  20 / 8%); }
+.mission-unit-box.unit-color-20 { background-color: rgb( 60 180 160 / 8%); }
+.mission-unit-box.unit-color-21 { background-color: rgb(140  40 160 / 8%); }
+.mission-unit-box.unit-color-22 { background-color: rgb( 20 120  80 / 8%); }
+.mission-unit-box.unit-color-23 { background-color: rgb(200 100  40 / 8%); }

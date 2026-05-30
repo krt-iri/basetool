@@ -34,7 +34,17 @@ export default [
     rules: {
       "no-var": "error",
       eqeqeq: ["error", "smart"],
-      "no-unused-vars": "warn",
+      // Honour the codebase's "_"-prefix convention for intentionally unused
+      // bindings: unused function args and caught errors named `_e` / `_ignored`
+      // are deliberate signals, not dead code.
+      "no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
       "no-undef": "error",
     },
   },

@@ -12,7 +12,7 @@
  * template literal genuinely needs to mix markup with dynamic strings.
  */
 (function (root) {
-    var ENTITY = {
+    let ENTITY = {
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',

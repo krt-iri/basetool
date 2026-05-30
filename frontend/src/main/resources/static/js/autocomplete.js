@@ -1,3 +1,4 @@
+/* exported krtAutocomplete */
 /**
  * Initialize a custom autocomplete on an input element.
  * @param {HTMLInputElement} inp - The input element
@@ -20,7 +21,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     }
     parent.appendChild(a);
 
-    inp.addEventListener("input", function(e) {
+    inp.addEventListener("input", function() {
         const val = this.value;
         closeAllLists();
         if (!val) { return false;}
@@ -50,13 +51,13 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     inp.addEventListener("keydown", function(e) {
         let x = document.getElementById(inp.id + "-autocomplete-list");
         if (x) x = x.getElementsByTagName("div");
-        if (e.keyCode == 40) { // DOWN
+        if (e.keyCode === 40) { // DOWN
             currentFocus++;
             addActive(x);
-        } else if (e.keyCode == 38) { // UP
+        } else if (e.keyCode === 38) { // UP
             currentFocus--;
             addActive(x);
-        } else if (e.keyCode == 13) { // ENTER
+        } else if (e.keyCode === 13) { // ENTER
             if (currentFocus > -1) {
                 if (x && x.length > 0) e.preventDefault(); // Only prevent default if we have items
                 if (x && x[currentFocus]) x[currentFocus].click();
@@ -91,7 +92,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
             hidden.type = "hidden";
             hidden.value = itemVal;
             b.appendChild(hidden);
-            b.addEventListener("click", function(e) {
+            b.addEventListener("click", function() {
                 inp.value = this.getElementsByTagName("input")[0].value;
                 if (options.onSelect) {
                     options.onSelect(item);
@@ -114,15 +115,15 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     }
 
     function removeActive(x) {
-        for (var i = 0; i < x.length; i++) {
+        for (let i = 0; i < x.length; i++) {
             x[i].classList.remove("autocomplete-active");
         }
     }
 
     function closeAllLists(elmnt) {
-        var x = document.getElementsByClassName("autocomplete-items");
-        for (var i = 0; i < x.length; i++) {
-            if (elmnt != x[i] && elmnt != inp && x[i].id === inp.id + "-autocomplete-list") {
+        let x = document.getElementsByClassName("autocomplete-items");
+        for (let i = 0; i < x.length; i++) {
+            if (elmnt !== x[i] && elmnt !== inp && x[i].id === inp.id + "-autocomplete-list") {
                 x[i].innerHTML = '';
             }
         }

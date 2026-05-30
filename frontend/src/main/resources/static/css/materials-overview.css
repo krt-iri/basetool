@@ -1,7 +1,7 @@
 /*
  * Materials Overview matrix styling.
  *
- * Extracted from the inline <style> block in templates/materials-overview.html so the
+ * Extracted from the inline \3c style> block in templates/materials-overview.html so the
  * planet tint table can live in one auditable place rather than being inlined into the
  * template. The hex values for the planet-tint headers and the column box-shadows are
  * intentionally bespoke (not part of the global token set) because they encode the
@@ -197,9 +197,8 @@
 }
 
 .table-wrapper {
-    overflow-x: scroll;
+    overflow: scroll;
     max-height: 70vh;
-    overflow-y: scroll;
     border: 1px solid var(--color-gray-3);
 }
 
