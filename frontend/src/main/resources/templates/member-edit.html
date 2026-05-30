@@ -15,7 +15,7 @@
         input[type="text"], input[type="number"], input[type="date"], select, textarea {
             width: 100%;
             padding: 0.8rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -77,19 +77,19 @@
                             th:selected="${i == memberEditForm.rank}">
                     </option>
                 </select>
-                <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" class="field-error"></div>
             </div>
 
             <div class="form-group">
                 <label th:text="#{profile.display_name}">Anzeigename</label>
                 <input type="text" name="displayName" th:value="*{displayName}" />
-                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
             </div>
             
             <div class="form-group">
                 <label th:text="#{profile.description}">Beschreibung</label>
                 <textarea name="description" rows="5" th:text="*{description}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
             </div>
             
             <div class="form-group">

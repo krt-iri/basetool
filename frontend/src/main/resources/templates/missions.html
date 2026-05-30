@@ -85,7 +85,10 @@
                 <tbody>
                     <tr th:each="m : ${missions}" data-testid="mission-row">
                         <td th:text="${m.name}">Name</td>
-                        <td th:text="${m.status}">Status</td>
+                        <td>
+                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(m.status)}"
+                                  th:text="${m.status}">Status</span>
+                        </td>
                         <td class="utc-time" th:text="${m.plannedStartTime}">Start</td>
                         <td th:if="${isAllSquadronsMode}">
                             <span th:if="${m.owningSquadron != null}" class="squadron-badge"

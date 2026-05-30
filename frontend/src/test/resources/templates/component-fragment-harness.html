@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Test-only harness that exercises every reusable component fragment from
+  fragments/components.html. Rendered by ComponentFragmentsRenderTest through the
+  Spring Thymeleaf engine so a malformed fragment (which only fails at render time,
+  never at build time) is caught by the test suite.
+-->
+<div id="harness-button">
+    <th:block th:replace="~{fragments/components :: button(label='DELETE', variant='danger', type='submit', extraClass=null)}"></th:block>
+</div>
+<div id="harness-alert">
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${msgKey}, extraClass='mt-2')}"></th:block>
+</div>
+<div id="harness-alert-null">
+    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${missingKey}, extraClass=null)}"></th:block>
+</div>
+<div id="harness-table">
+    <div th:replace="~{fragments/components :: dataTable(head=~{::harnessHead}, body=~{::harnessBody})}">
+        <th:block th:fragment="harnessHead">
+            <th>COL-A</th>
+            <th>COL-B</th>
+        </th:block>
+        <th:block th:fragment="harnessBody">
+            <tr th:each="r : ${rows}">
+                <td th:text="${r}">row</td>
+                <td>static</td>
+            </tr>
+        </th:block>
+    </div>
+</div>
+</body>
+</html>

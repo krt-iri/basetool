@@ -130,7 +130,7 @@
             <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
                 <form th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;">Material:</label>
+                        <label class="form-label-xs">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                                 <span class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</span>
@@ -148,14 +148,14 @@
                         </div>
                     </div>
                     <div class="flex-gap-sm">
-                        <label for="minQuality" style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;">Qualität &ge;:</label>
-                        <select id="minQuality" name="minQuality" style="padding: 0.375rem 2.5rem 0.375rem 0.75rem; min-height: 44px; min-width: 90px; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" data-trigger="inv-admin-filter">
+                        <label for="minQuality" class="form-label-xs">Qualität &ge;:</label>
+                        <select id="minQuality" name="minQuality" style="padding: 0.375rem 2.5rem 0.375rem 0.75rem; min-height: 44px; min-width: 90px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" data-trigger="inv-admin-filter">
                             <option value="" th:text="#{filter.all}">-- Alle --</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
                         </select>
                     </div>
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
                         <div class="multi-select-container" id="jobOrderFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="jobOrderOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="jobOrderHeader">
                                 <span class="selected-text" id="jobOrderSelectedText" th:text="#{filter.all}">Alle</span>
@@ -173,7 +173,7 @@
                         </div>
                     </div>
                     <div class="flex-gap-sm">
-                        <label style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem;" th:text="#{inventory.filter.mission}">Einsatz:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.mission}">Einsatz:</label>
                         <div class="multi-select-container" id="missionFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="missionOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="missionHeader">
                                 <span class="selected-text" id="missionSelectedText" th:text="#{filter.all}">Alle</span>
@@ -190,12 +190,12 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-secondary" data-trigger="inv-admin-reset-filter" style="min-height: 44px;" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
+                    <button type="button" class="btn btn-secondary" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
             </div>
         </div>
 
-        <div style="overflow-x: auto;" id="tableContainer" th:fragment="inventoryTableFragment">
+        <div class="overflow-x-auto" id="tableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <thead>
@@ -210,7 +210,7 @@
                 </thead>
                 <tbody th:each="group : ${groupedItems}">
                     <tr class="group-header" style="cursor: pointer; background-color: rgba(255,255,255,0.05);" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
-                        <td style="text-align: center;"><span class="toggle-icon" style="color: var(--color-primary); font-size: 1.2rem;">▶</span></td>
+                        <td class="text-center"><span class="toggle-icon" style="color: var(--color-primary); font-size: 1.2rem;">▶</span></td>
                         <td th:text="${group.material.name}" style="font-weight: bold; color: var(--color-primary);">Material</td>
                         <td th:text="${group.averageQuality != null ? #numbers.formatDecimal(group.averageQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">95.50</td>
                         <td th:text="${group.maxQuality}">100</td>
@@ -221,19 +221,19 @@
                         <td></td>
                     </tr>
                     <tr class="group-items" style="display: none;">
-                        <td colspan="6" style="padding: 0;">
+                        <td colspan="6" class="p-0">
                             <div class="inventory-items-table-wrapper">
                             <table class="krt-table" style="margin: 0; background: transparent; border-top: none;">
                                 <thead>
                                     <tr>
                                         <th style="padding-left: 2rem; width: 15%;">Nutzer</th>
                                         <th th:if="${isAllSquadronsMode}" style="width: 8%;" th:text="#{inventory.owning_squadron}">Staffel</th>
-                                        <th style="width: 15%;">Ort</th>
+                                        <th class="w-15">Ort</th>
                                         <th style="width: 10%;">Qualität</th>
                                         <th style="width: 10%;">Menge</th>
-                                        <th style="width: 15%;">Auftrag</th>
+                                        <th class="w-15">Auftrag</th>
                                         <th style="width: 20%;">Einsatz</th>
-                                        <th style="width: 15%;" sec:authorize="hasRole('LOGISTICIAN')">Aktionen</th>
+                                        <th class="w-15" sec:authorize="hasRole('LOGISTICIAN')">Aktionen</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -255,7 +255,7 @@
                                             <!-- Normaler Text für Nutzer ohne Rechte -->
                                             <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                                                 <span th:if="${item.jobOrderId != null}" th:text="'Auftrag #' + ${item.jobOrderDisplayId}">Zugewiesen</span>
-                                                <span th:if="${item.jobOrderId == null}" style="color: var(--color-gray-2);">-</span>
+                                                <span th:if="${item.jobOrderId == null}" class="text-muted">-</span>
                                             </div>
                                             <!-- Dropdown für Logistiker/Offiziere/Admins -->
                                             <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
@@ -283,7 +283,7 @@
                                             <!-- Normaler Text für Nutzer ohne Rechte -->
                                             <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                                                 <span th:if="${item.missionId != null}" th:text="${item.missionName}">Einsatz</span>
-                                                <span th:if="${item.missionId == null}" style="color: var(--color-gray-2);">-</span>
+                                                <span th:if="${item.missionId == null}" class="text-muted">-</span>
                                             </div>
                                             <!-- Dropdown für Logistiker/Offiziere/Admins -->
                                             <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
@@ -350,7 +350,7 @@
                 </tbody>
                 <tbody th:if="${#lists.isEmpty(groupedItems)}">
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--color-gray-2);">Keine Einträge gefunden.</td>
+                        <td colspan="6" class="text-center text-muted">Keine Einträge gefunden.</td>
                     </tr>
                 </tbody>
             </table>
@@ -362,7 +362,7 @@
 <div id="bookOutModal" class="modal" th:style="${showBookOutModal != null ? 'display:flex' : 'display:none'}">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="inv-admin-close-bookout">&times;</span>
-        <h2 style="margin-top:0;" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
+        <h2 class="mt-0" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
             <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
                 <ul class="text-danger">
@@ -373,29 +373,29 @@
             <input type="hidden" id="maxAmount" th:field="*{maxAmount}">
             
             <div class="form-group mb-1">
-                <label for="targetAmount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetAmount}">Zielbestand</label>
-                <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" data-trigger="inv-admin-amount-from-target">
+                <label for="targetAmount" class="form-label" th:text="#{inventory.bookout.targetAmount}">Zielbestand</label>
+                <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-admin-amount-from-target">
             </div>
             
             <div class="form-group mb-1">
-                <label for="amount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.amount}">Menge ausbuchen</label>
+                <label for="amount" class="form-label" th:text="#{inventory.bookout.amount}">Menge ausbuchen</label>
                 <div class="flex-gap-sm">
-                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);" data-trigger="inv-admin-target-from-amount">
+                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-target-from-amount">
                     <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
             
             <div class="form-group mb-1">
-                <label style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
+                <label class="form-label" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-admin-toggle-bookout-type" style="margin: 0;"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" th:field="*{type}" value="TRANSFER" data-trigger="inv-admin-toggle-bookout-type" style="margin: 0;"> <span th:text="#{inventory.bookout.type.transfer}">Umbuchung</span>
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" th:field="*{type}" value="TRANSFER" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.transfer}">Umbuchung</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-admin-toggle-bookout-type" style="margin: 0;"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
                     </label>
                     <span id="sellNotPossibleReason" style="display:none; color: var(--color-warning); font-size: 0.8rem; align-self: center;" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
                 </div>
@@ -403,15 +403,15 @@
             
             <div id="transferFields" style="display:none; margin-bottom: 1rem;" class="form-group">
                 <div class="flex-gap-md">
-                    <div style="flex: 1;">
-                        <label for="targetUserId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
-                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-admin-target-user-changed" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <div class="flex-1">
+                        <label for="targetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
+                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-admin-target-user-changed" class="w-full">
                             <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
                         </select>
                     </div>
-                    <div style="flex: 1;">
-                        <label for="targetLocationId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="targetLocationId" th:field="*{targetLocationId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <div class="flex-1">
+                        <label for="targetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
+                        <select id="targetLocationId" th:field="*{targetLocationId}" class="w-full">
                             <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
                         </select>
                     </div>
@@ -423,8 +423,8 @@
                      this picker, an admin transfer to a multi-membership target user would fail
                      OwnerScopeService's 0/1/>1 matrix with HTTP 400. -->
                 <div id="targetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
-                    <label for="targetOwningOrgUnitId" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
-                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <label for="targetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
+                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" class="w-full">
                         <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
                     </select>
                 </div>
@@ -432,14 +432,14 @@
             
             <div id="sellFields" style="display:none; margin-bottom: 1rem;">
                 <div class="form-group mb-1">
-                    <label for="terminal" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.terminal}">Terminal</label>
-                    <select id="terminal" th:field="*{terminal}" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <label for="terminal" class="form-label" th:text="#{inventory.bookout.terminal}">Terminal</label>
+                    <select id="terminal" th:field="*{terminal}" class="w-full">
                         <option value="" disabled selected>...wählen...</option>
                     </select>
                 </div>
                 <div class="form-group mb-1">
-                    <label for="sellAmount" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
-                    <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <label for="sellAmount" class="form-label" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
+                    <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
                 </div>
             </div>
             
@@ -458,18 +458,18 @@
 <div id="noteModal" class="modal" style="display:none;">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="inv-admin-close-note">&times;</span>
-        <h2 style="margin-top:0;" th:text="#{inventory.note.label}">Notiz</h2>
+        <h2 class="mt-0" th:text="#{inventory.note.label}">Notiz</h2>
         <div class="form-group mb-1">
-            <label for="noteModalTextarea" style="display:block; color: var(--color-primary); margin-bottom: 0.5rem;" th:text="#{inventory.note.label}">Notiz</label>
+            <label for="noteModalTextarea" class="form-label" th:text="#{inventory.note.label}">Notiz</label>
             <textarea id="noteModalTextarea" maxlength="1000" rows="6"
                       th:placeholder="#{inventory.note.placeholder}"
                       data-trigger="inv-admin-update-note-counter"
-                      style="width: 100%; padding: 0.5rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); min-height: 44px;"></textarea>
+                      class="w-full"></textarea>
             <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
         </div>
         <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn" style="min-height: 44px;" data-trigger="inv-admin-save-note" th:text="#{inventory.note.save}">Speichern</button>
-            <button type="button" class="btn btn-secondary" style="min-height: 44px;" data-trigger="inv-admin-remove-note" th:text="#{inventory.note.remove}">Entfernen</button>
+            <button type="button" class="btn" data-trigger="inv-admin-save-note" th:text="#{inventory.note.save}">Speichern</button>
+            <button type="button" class="btn btn-secondary" data-trigger="inv-admin-remove-note" th:text="#{inventory.note.remove}">Entfernen</button>
             <button type="button" class="btn btn-secondary" style="min-height: 44px; margin-left: auto;" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
@@ -477,8 +477,8 @@
 
 <div sec:authorize="hasRole('ADMIN')" id="delete-all-global-inventory-modal" class="modal" style="display:none; z-index: 3300;">
     <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
-        <h2 th:text="#{inventory.deleteAll.modal.title}" style="margin-top:0;">Globales Lager leeren</h2>
-        <p th:text="#{inventory.deleteAll.modal.body}" style="margin-bottom: 2rem;">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
+        <h2 th:text="#{inventory.deleteAll.modal.title}" class="mt-0">Globales Lager leeren</h2>
+        <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
         <div class="flex-center-gap">
             <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>

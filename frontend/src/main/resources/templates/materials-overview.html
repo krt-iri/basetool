@@ -100,7 +100,7 @@
                 </thead>
                 <tbody>
                     <th:block th:each="entry : ${rowsByKind}">
-                        <tr class="row-kind" th:data-kind="${entry.key}" style="background-color: var(--color-gray-4); cursor: pointer;" data-trigger="mo-toggle-kind">
+                        <tr class="row-kind" th:data-kind="${entry.key}" style="background-color: var(--color-surface-input); cursor: pointer;" data-trigger="mo-toggle-kind">
                             <td th:colspan="${terminals.size() + 1}" style="font-weight: bold; color: var(--color-primary); font-family: var(--font-headline); padding-left: 1rem; text-align: left;">
                                 <span class="toggle-icon" style="display: inline-block; width: 1.5rem; text-align: center;">−</span>
                                 <span th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kind</span>

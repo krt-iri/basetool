@@ -42,42 +42,125 @@
     color-scheme: dark;
     /* Colors */
     --color-primary: #E77E23;
+    --color-white: #FFFFFF;
     --color-bg-black: #000000;
     --color-bg-dark-gray: #141414;
     
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
     
-    --color-gray-1: #D2D2D2;
-    --color-gray-2: #646464;
-    --color-gray-3: #282828;
-    --color-gray-4: #1C1C1C;
-    --color-gray-5: #141414;
+    --color-gray-1: #D2D2D2;       /* primary body text on dark */
+    --color-gray-2: #646464;       /* muted text, placeholders, disabled */
+    --color-gray-3: #282828;       /* hairline borders, hover-row fill */
+    --color-gray-4: #141414;       /* darkest standard surface (alias: --color-bg-dark-gray) */
+
+    /* Half-step between Grau 4 (#141414) and Grau 3 (#282828); NOT part of the
+       official 4-step manual grayscale. Used for input + table-head fills so
+       controls read slightly above the surface. */
+    --color-surface-input: #1C1C1C;
     
-    /* Departments */
-    --color-dept-combat: #A3000A;
-    --color-dept-sub-radar: #355DDC;
-    --color-dept-research: #37BBC0;
-    --color-dept-profit: #239E33;
-    --color-dept-search-rescue: #FFD23F;
-    --color-dept-marine: #7A5E96;
+    /* Departments - Bereichsfarben (Corporate Design Manual V2, p.14).
+       Names and hex are authoritative per the manual; the values must
+       never be altered and never used for the logo. Prefer the semantic
+       aliases below in generic UI - department hues are functional, not
+       decorative. */
+    --color-dept-raumueberlegenheit: #37BBC0; /* Raumueberlegenheit / Space Superiority (teal) */
+    --color-dept-forschung: #355DDC;          /* Forschung / Research (blue) */
+    --color-dept-sub-radar: #A3000A;          /* Sub-Radar / covert (red) */
+    --color-dept-marinekorps: #7A5E96;        /* Marinekorps / Marine Corps (purple) */
+    --color-dept-profit: #239E33;             /* Profit (green) */
+    --color-dept-search-rescue: #FFD23F;      /* Search and Rescue (yellow) */
+
+    /* Legacy aliases - previously shipped (mis-)names, kept so existing
+       code and templates still resolve. Prefer the official names above. */
+    --color-dept-combat: var(--color-dept-raumueberlegenheit);
+    --color-dept-research: var(--color-dept-forschung);
+    --color-dept-marine: var(--color-dept-marinekorps);
     
-    /* Semantic Colors */
-    --color-danger: var(--color-dept-combat);
-    --color-success: var(--color-dept-profit);
-    --color-warning: var(--color-dept-search-rescue);
-    --color-info: var(--color-dept-sub-radar);
+    /* Semantic Colors - status meaning, decoupled from the department
+       tokens so renaming a Bereichsfarbe can never shift a status colour.
+       Values reuse Bereichsfarben hues by appearance. */
+    --color-danger:  #A3000A; /* same value as Sub-Radar */
+    --color-success: #239E33; /* same value as Profit */
+    --color-warning: #FFD23F; /* same value as Search and Rescue */
+    --color-info:    #355DDC; /* same value as Forschung */
+    --color-secondary: #FFD23F; /* cross-squadron / foreign-link highlight */
+    --color-danger-hover:  #D41A25;
+    --color-success-hover: #2EBC3D;
     
     /* Typography */
     --font-headline: 'Ethnocentric', sans-serif;
     --font-body: 'Lato', sans-serif;
+    /* The brand ships no monospace face, so "mono" contexts (version strings,
+       IDs, hex codes, code) use the house font Lato with tabular figures for
+       column alignment. No system/substitute font is referenced. */
+    --font-mono: 'Lato', sans-serif;
+
+    /* Type scale (rem). Body base = 1rem/16px. Headings are uppercase. */
+    --fs-h1: 2rem;
+    --fs-h2: 1.5rem;
+    --fs-h3: 1.17rem;
+    --fs-body: 1rem;
+    --fs-sm: 0.9rem;
+    --fs-xs: 0.8rem;
+    --fs-2xs: 0.7rem;
+
+    --fw-thin: 300;       /* body default */
+    --fw-regular: 400;
+    --fw-bold: 700;       /* labels, nav, btn, strong */
+    --fw-black: 900;
+
+    --tracking-display: 0.05em;   /* Ethnocentric optical kerning fix */
+    --tracking-overline: 0.15em;  /* admin chip, overlines */
+    --lh-body: 1.5;
+
+    /* Shape / elevation - square-first. Corners are SHARP; only pills
+       (chips/badges) and the circular radio control round. */
+    --radius-none: 0;
+    --radius-pill: 999px;
+
+    --border-hairline: 1px solid var(--color-gray-3);
+    --border-accent: 1px solid var(--color-primary);
+    --border-heading: 2px solid var(--color-primary);
+
+    /* Glows / shadows - the orange bloom is the brand's only "shadow" idiom. */
+    --glow-primary: 0 0 5px rgba(231, 126, 35, 0.3);     /* input focus */
+    --glow-primary-lg: 0 0 20px rgba(231, 126, 35, 0.2); /* toasts, modals */
+    --glow-danger-lg: 0 0 20px rgba(163, 0, 10, 0.2);
+    --shadow-drawer: 5px 0 15px rgba(0, 0, 0, 0.5);
+    --shadow-dropdown: 0 8px 16px rgba(0, 0, 0, 0.8);
+
+    /* Spacing rhythm (rem multiples of 0.5). */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --touch-target: 44px;    /* min hit area for every interactive control */
+    --content-max: 1200px;   /* main column cap */
+    --measure: 80ch;         /* paragraph max line length */
 }
 
 body {
     background-color: var(--color-bg-black);
+    /*
+     * Faint ambient honeycomb (Wabenmuster) over the black page background, per the
+     * design-system UI kit. The SVG ships its #E77E23 strokes at 0.1 opacity, so it
+     * reads as a subtle texture (and shows through the translucent .hud-box surfaces)
+     * rather than decoration. background-attachment: fixed keeps the texture still
+     * while content scrolls; the 46x26.56px tile preserves the SVG's 72:41.57 ratio.
+     */
+    background-image: url("../images/honeycomb-bg.svg");
+    background-repeat: repeat;
+    background-size: 46px 26.56px;
+    background-attachment: fixed;
     color: var(--color-gray-1);
     font-family: var(--font-body);
-    font-weight: 300;
+    font-weight: var(--fw-thin);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
     margin: 0;
     padding: 0;
     /*
@@ -98,7 +181,7 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-headline);
     color: var(--color-primary);
     text-transform: uppercase;
-    letter-spacing: 0.05em; /* Optical kerning fix */
+    letter-spacing: var(--tracking-display); /* Optical kerning fix */
     font-weight: normal;
 }
 
@@ -112,10 +195,29 @@ a:hover {
     color: var(--color-accent-light);
 }
 
+/* "Mono" data contexts use Lato with tabular figures (the brand has no monospace
+   face) — see --font-mono. Aligned with the design-system update (#274). */
+code, kbd, samp {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+}
+
+strong, b {
+    font-weight: var(--fw-bold);
+}
+
+/* Brand text selection — orange highlight with black text, matching the
+   single-accent HUD palette instead of the browser default blue. */
+::selection {
+    background: var(--color-primary);
+    color: var(--color-bg-black);
+}
+
 header {
     background-color: var(--color-bg-dark-gray);
-    border-bottom: 2px solid var(--color-primary);
-    padding: 1rem 2rem;
+    border-bottom: var(--border-heading);
+    padding: var(--space-4) var(--space-8);
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -142,7 +244,7 @@ body.admin-mode header {
     border: 1px solid var(--color-accent-dark);
     color: var(--color-accent-light);
     font-family: var(--font-headline);
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     text-transform: uppercase;
     letter-spacing: 0.15em;
 }
@@ -154,7 +256,7 @@ nav {
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    gap: 2rem;
+    gap: var(--space-8);
 }
 
 .hamburger-btn {
@@ -187,7 +289,7 @@ nav {
 nav .brand {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
     text-decoration: none;
 }
 
@@ -202,10 +304,10 @@ nav .links {
 }
 
 nav .links a {
-    margin-left: 1.5rem;
+    margin-left: var(--space-6);
     font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 0.9rem;
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     color: var(--color-gray-1);
 }
@@ -215,7 +317,7 @@ nav .links a:hover {
 }
 
 main {
-    padding: 2rem;
+    padding: var(--space-8);
     /*
      * Reserve viewport-bottom space for the fixed footer (see `.krt-footer`).
      * Without this, the last line of long pages would scroll under the
@@ -232,54 +334,54 @@ main {
      */
     padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
     width: 100%;
-    max-width: 1200px;
+    max-width: var(--content-max);
     margin: 0 auto;
     box-sizing: border-box;
 }
 
 .greeting {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
     border-left: 4px solid var(--color-primary);
-    padding-left: 1.5rem;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    padding-left: var(--space-6);
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
     background: linear-gradient(90deg, rgba(20,20,20,1) 0%, rgba(0,0,0,0) 100%);
 }
 
 .greeting h1 {
     margin: 0;
-    font-size: 2rem;
+    font-size: var(--fs-h1);
 }
 
 .greeting p {
     color: var(--color-gray-1);
     font-size: 1.1rem;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
 }
 
 /* Table Styles */
-table {
+table, .krt-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
+    margin-top: var(--space-4);
     background-color: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-gray-3);
+    border: var(--border-hairline);
 }
 
 th, td {
-    padding: 1rem;
+    padding: var(--space-4);
     text-align: left;
-    border-bottom: 1px solid var(--color-gray-3);
+    border-bottom: var(--border-hairline);
 }
 
 th {
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     color: var(--color-primary);
     font-family: var(--font-body);
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 2px solid var(--color-primary);
+    border-bottom: var(--border-heading);
 }
 
 td {
@@ -323,32 +425,62 @@ tr:hover {
     left: 0;
     right: 0;
     z-index: 999;
-    padding: 1rem 2rem;
+    padding: var(--space-4) var(--space-8);
     background-color: var(--color-bg-dark-gray);
-    border-top: 1px solid var(--color-gray-3);
+    border-top: var(--border-hairline);
     color: var(--color-gray-2);
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: var(--space-4);
     align-items: center;
     justify-content: space-between;
 }
 .krt-footer-links {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-4);
     flex-wrap: wrap;
 }
-.krt-footer-links a {
+.krt-footer-links a,
+.krt-footer-meta a {
     color: var(--color-gray-1);
     text-decoration: none;
 }
-.krt-footer-links a:hover {
+.krt-footer-links a:hover,
+.krt-footer-meta a:hover {
     color: var(--color-primary);
+}
+/*
+ * Right-hand footer group: Handbuch link, GitHub repo icon and the build
+ * version, kept on one baseline. `space-between` on `.krt-footer` pushes this
+ * block to the right edge; the inner flex row keeps the three items aligned and
+ * lets them wrap together when the footer stacks on mobile.
+ */
+.krt-footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+}
+/*
+ * Slightly enlarge the GitHub mark and pad its anchor so the icon-only link is
+ * a comfortable touch target without disturbing the baseline of its neighbours.
+ * The glyph inherits `fill: currentColor`, so the shared link hover above turns
+ * it brand-orange.
+ */
+.krt-footer-github {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1);
+}
+.krt-footer-github .krt-icon {
+    width: 1.25em;
+    height: 1.25em;
 }
 .krt-footer-version {
     color: var(--color-gray-2);
-    font-family: monospace;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
 }
 @media (max-width: 768px) {
@@ -366,7 +498,7 @@ tr:hover {
 
 .datetime-split-inputs {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
     width: 100%;
 }
 
@@ -410,12 +542,12 @@ input[type="time"],
 input[type="datetime-local"],
 select,
 textarea {
-    background-color: var(--color-gray-4);
+    background-color: var(--color-surface-input);
     color: var(--color-gray-1);
-    border: 1px solid var(--color-gray-3);
-    padding: 0.5rem 0.75rem;
+    border: var(--border-hairline);
+    padding: var(--space-2) var(--space-3);
     font-family: var(--font-body);
-    font-size: 1rem;
+    font-size: var(--fs-body);
     line-height: 1.5;
     box-sizing: border-box;
     transition: all 0.2s;
@@ -474,7 +606,7 @@ select {
 select {
     -webkit-appearance: none;
     appearance: none;
-    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    padding: 0.375rem var(--space-8) 0.375rem var(--space-3);
     line-height: 1.5;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -491,8 +623,8 @@ select {
 select.association-select {
     width: 100%;
     min-width: 190px;
-    min-height: 44px;
-    padding: 0.375rem 2.5rem 0.375rem 0.75rem;
+    min-height: var(--touch-target);
+    padding: 0.375rem 2.5rem 0.375rem var(--space-3);
     background-color: var(--color-bg-dark-gray, #141414);
     border: 1px solid var(--color-primary, #E77E23);
     color: var(--color-gray-1, #d6d6d6);
@@ -529,7 +661,7 @@ select.association-select {
  * containers and stay untouched.
  */
 main .form-group select {
-    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    padding: 0.375rem var(--space-8) 0.375rem var(--space-3);
 }
 
 /*
@@ -571,8 +703,8 @@ main .form-group select {
 .search-form {
     display: flex;
     align-items: flex-end;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
     flex-wrap: wrap;
 }
 
@@ -588,7 +720,7 @@ main .form-group select {
 .search-form-actions {
     align-self: flex-end;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
 }
 
 /*
@@ -617,8 +749,8 @@ main .form-group select {
     display: flex;
     align-items: center;
     cursor: pointer;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid transparent;
 }
 
@@ -716,7 +848,7 @@ main .form-group select {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    padding: 0 0.75rem;
+    padding: 0 var(--space-3);
     line-height: 2.75rem;
     vertical-align: middle;
     overflow: hidden;
@@ -768,35 +900,99 @@ label:has(+ [required])::after {
     display: block;
     color: var(--color-primary);
     font-family: var(--font-body);
-    font-weight: 700;
-    margin-bottom: 0.5rem;
+    font-weight: var(--fw-bold);
+    margin-bottom: var(--space-2);
 }
 
 .form-label-sm {
     display: block;
     color: var(--color-primary);
     font-family: var(--font-body);
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-weight: var(--fw-bold);
+    margin-bottom: var(--space-2);
+    font-size: var(--fs-sm);
+}
+
+/* Extra-small label variant — inline (no display:block, unlike .form-label),
+   used for compact filter captions above multi-select controls. */
+.form-label-xs {
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-xs);
+}
+
+/* Inline field-validation message rendered under an input (Thymeleaf
+   th:errors). Small danger-coloured text; replaces the repeated
+   `color: var(--color-danger); font-size: 0.8rem` inline style. */
+.field-error {
+    color: var(--color-danger);
+    font-size: var(--fs-xs);
 }
 
 /* Layout Utility Classes */
-.mt-1 { margin-top: 1rem; }
-.mt-1-5 { margin-top: 1.5rem; }
-.mt-2 { margin-top: 2rem; }
-.mb-1 { margin-bottom: 1rem; }
+.mt-1 { margin-top: var(--space-4); }
+.mt-1-5 { margin-top: var(--space-6); }
+.mt-2 { margin-top: var(--space-8); }
+.mt-0 { margin-top: 0; }
+.mb-1 { margin-bottom: var(--space-4); }
+.mb-2 { margin-bottom: var(--space-8); }
+.mb-0 { margin-bottom: 0; }
+.m-0 { margin: 0; }
+.p-0 { padding: 0; }
+.nowrap { white-space: nowrap; }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.w-1 { width: 1%; }
+/* Flex-item grow shorthands (distinct from the container .flex-* helpers above). */
+.flex-1 { flex: 1; }
+.flex-2 { flex: 2; }
+.flex-gap-2xs { display: flex; align-items: center; gap: var(--space-1); }
+.text-left { text-align: left; }
+.ml-1 { margin-left: var(--space-4); }
+.overflow-x-auto { overflow-x: auto; }
+.grid-col-full { grid-column: 1 / -1; }
+.w-15 { width: 15%; }
+.cursor-pointer { cursor: pointer; }
 
-.flex-gap-xs { display: flex; gap: 0.5rem; }
-.flex-gap-sm { display: flex; gap: 0.5rem; align-items: center; }
-.flex-gap-md { display: flex; gap: 1rem; }
-.flex-gap-md-wrap { display: flex; gap: 1rem; flex-wrap: wrap; }
-.flex-col-gap { display: flex; flex-direction: column; gap: 1rem; }
+/* Small muted "inactive" tag appended after a name in the admin master-data
+   tables (Staffeln / Aufgaben / SKs). Square by design. */
+.badge-inactive {
+    font-size: var(--fs-2xs);
+    background-color: var(--color-surface-input);
+    padding: 0.2rem 0.4rem;
+    margin-left: var(--space-2);
+    color: var(--color-gray-2);
+}
+
+/* Stacked label/value pair (e.g. the refinery method-rating readout:
+   uppercase orange caption above a gray-1 value). */
+.stat-label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+}
+.stat-value {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    margin-top: 0.2rem;
+}
+
+.flex-gap-xs { display: flex; gap: var(--space-2); }
+.flex-gap-sm { display: flex; gap: var(--space-2); align-items: center; }
+.flex-gap-md { display: flex; gap: var(--space-4); }
+.flex-gap-md-wrap { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.flex-col-gap { display: flex; flex-direction: column; gap: var(--space-4); }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
-.flex-between-mb { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.flex-between-mb { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
 .flex-end { display: flex; align-items: center; justify-content: flex-end; }
-.flex-center-gap { display: flex; justify-content: center; gap: 1rem; }
-.mt-2-flex-gap { margin-top: 2rem; display: flex; gap: 1rem; }
+.flex-center-gap { display: flex; justify-content: center; gap: var(--space-4); }
+.mt-2-flex-gap { margin-top: var(--space-8); display: flex; gap: var(--space-4); }
 
 /* Custom styling for number input spin buttons to match the dark/orange KRT design */
 input[type="number"] {
@@ -838,7 +1034,7 @@ select:focus,
 textarea:focus {
     border-color: var(--color-primary);
     outline: none;
-    box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+    box-shadow: var(--glow-primary);
 }
 
 input::placeholder {
@@ -850,8 +1046,8 @@ input[type="checkbox"],
 input[type="radio"] {
     appearance: none;
     -webkit-appearance: none;
-    background-color: var(--color-gray-4);
-    border: 1px solid var(--color-gray-3);
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
     width: 1.2rem;
     height: 1.2rem;
     cursor: pointer;
@@ -872,7 +1068,7 @@ input[type="radio"]:checked {
 
 input[type="checkbox"]:checked::after {
     content: '✔';
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
     color: var(--color-bg-black);
     position: absolute;
     top: 50%;
@@ -896,7 +1092,7 @@ input[type="radio"]:checked::after {
 input[type="checkbox"]:focus,
 input[type="radio"]:focus {
     outline: none;
-    box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+    box-shadow: var(--glow-primary);
     border-color: var(--color-primary);
 }
 
@@ -945,17 +1141,21 @@ input[type="radio"]:focus {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 1rem;
-    min-height: 44px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    min-height: var(--touch-target);
     background-color: var(--color-primary);
     color: var(--color-bg-black);
     font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 0.8rem;
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-xs);
     text-transform: uppercase;
+    letter-spacing: 0.03em;
     border: none;
+    border-radius: var(--radius-none);
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease;
+    text-decoration: none;
 }
 
 .btn:hover {
@@ -979,13 +1179,13 @@ input[type="radio"]:focus {
 }
 
 .btn-danger:hover {
-    background-color: #D41A25; /* Consistent with error pages hover */
+    background-color: var(--color-danger-hover); /* Consistent with error pages hover */
     color: #FFFFFF;
 }
 
 .btn-outline-danger {
     background-color: rgba(163, 0, 10, 0.1);
-    border-color: var(--color-danger);
+    border: 1px solid var(--color-danger);
     color: var(--color-danger);
 }
 
@@ -1001,14 +1201,23 @@ input[type="radio"]:focus {
 }
 
 .btn-success:hover {
-    background-color: #2ebc3d;
+    background-color: var(--color-success-hover);
     color: #FFFFFF;
+}
+
+/* Disabled state for every button variant — dimmed and non-interactive.
+   Covers both the `disabled` attribute on <button> and the attribute set
+   reflectively on <a>/<input> elements that carry the .btn class. */
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 /* Alerts */
 .alert {
-    padding: 1rem;
-    margin-bottom: 1.5rem;
+    padding: var(--space-4);
+    margin-bottom: var(--space-6);
     border: 1px solid transparent;
     font-family: var(--font-body);
 }
@@ -1048,7 +1257,7 @@ input[type="radio"]:focus {
 .hud-box-error {
     background-color: rgba(163, 0, 10, 0.2);
     border-color: var(--color-danger);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
 }
 
 .hud-box-error p {
@@ -1059,7 +1268,7 @@ input[type="radio"]:focus {
 .hud-box-success {
     background-color: rgba(35, 158, 51, 0.2);
     border-color: var(--color-success);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
 }
 
 .hud-box-success p {
@@ -1068,9 +1277,9 @@ input[type="radio"]:focus {
 }
 
 .hud-box {
-    border: 1px solid var(--color-gray-3);
+    border: var(--border-hairline);
     position: relative;
-    padding: 1rem;
+    padding: var(--space-4);
     background-color: rgba(20, 20, 20, 0.5);
 }
 
@@ -1100,9 +1309,9 @@ input[type="radio"]:focus {
     z-index: 9999;
     max-width: 400px;
     background-color: rgba(0, 0, 0, 0.95);
-    border: 1px solid var(--color-primary);
-    padding: 1.5rem;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
+    border: var(--border-accent);
+    padding: var(--space-6);
+    box-shadow: var(--glow-primary-lg);
     
     opacity: 0;
     transform: translateX(30px);
@@ -1135,22 +1344,22 @@ input[type="radio"]:focus {
 }
 
 .notification-toast h4 {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 var(--space-2) 0;
     color: var(--color-primary);
     font-family: var(--font-headline);
-    font-size: 1rem;
+    font-size: var(--fs-body);
     text-transform: uppercase;
 }
 
 .notification-toast p {
     margin: 0;
     color: var(--color-gray-1);
-    font-size: 1rem;
+    font-size: var(--fs-body);
 }
 
 .notification-toast.error-toast {
     border-color: var(--color-danger);
-    box-shadow: 0 0 20px rgba(163, 0, 10, 0.2);
+    box-shadow: var(--glow-danger-lg);
 }
 
 .notification-toast.error-toast::before {
@@ -1171,22 +1380,22 @@ input[type="radio"]:focus {
 .dropdown {
     position: relative;
     display: inline-block;
-    margin-left: 1.5rem;
+    margin-left: var(--space-6);
 }
 
 .dropbtn {
     background-color: transparent;
     color: var(--color-gray-1);
     padding: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-sm);
     border: none;
     cursor: pointer;
     font-family: var(--font-body);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     transition: color 0.2s;
 }
 
@@ -1201,10 +1410,10 @@ input[type="radio"]:focus {
     top: 100%;
     background-color: var(--color-bg-dark-gray);
     min-width: 140px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.8);
+    box-shadow: var(--shadow-dropdown);
     z-index: 1000;
-    border: 1px solid var(--color-primary);
-    margin-top: 0.5rem;
+    border: var(--border-accent);
+    margin-top: var(--space-2);
 }
 
 /* Invisible bridge to keep hover active across the gap */
@@ -1244,7 +1453,7 @@ input[type="radio"]:focus {
     width: 24px;
     height: 16px;
     object-fit: cover;
-    border: 1px solid var(--color-gray-3);
+    border: var(--border-hairline);
 }
 
 /* Arrow indicator */
@@ -1265,7 +1474,7 @@ input[type="radio"]:focus {
     z-index: 2000;
     transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     background-color: var(--color-bg-dark-gray);
-    box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-drawer);
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -1278,7 +1487,7 @@ input[type="radio"]:focus {
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 2rem;
+    padding: var(--space-8);
     padding-top: 5rem;
     box-sizing: border-box;
 }
@@ -1309,7 +1518,7 @@ input[type="radio"]:focus {
     background: none;
     border: none;
     color: var(--color-primary);
-    font-size: 2rem;
+    font-size: var(--fs-h1);
     cursor: pointer;
     font-family: var(--font-body);
     line-height: 1;
@@ -1318,7 +1527,7 @@ input[type="radio"]:focus {
 .sidebar-links {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: var(--space-6);
 }
 
 .sidebar-links span {
@@ -1327,7 +1536,7 @@ input[type="radio"]:focus {
 
 .sidebar-links a {
     font-family: var(--font-body);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     font-size: 1.0rem;
     text-transform: uppercase;
     color: var(--color-gray-1);
@@ -1350,7 +1559,7 @@ input[type="radio"]:focus {
     list-style: none;
     cursor: pointer;
     font-family: var(--font-body);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     font-size: 1.0rem;
     text-transform: uppercase;
     color: var(--color-gray-1);
@@ -1372,7 +1581,7 @@ input[type="radio"]:focus {
 .sidebar-group > summary::after {
     content: '+';
     font-weight: bold;
-    margin-left: 0.5rem;
+    margin-left: var(--space-2);
 }
 
 .sidebar-group[open] > summary::after {
@@ -1382,11 +1591,11 @@ input[type="radio"]:focus {
 .sidebar-sublinks {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding-left: 1.5rem;
-    margin-top: 1rem;
-    border-left: 1px solid var(--color-gray-3);
-    margin-left: 0.5rem;
+    gap: var(--space-4);
+    padding-left: var(--space-6);
+    margin-top: var(--space-4);
+    border-left: var(--border-hairline);
+    margin-left: var(--space-2);
 }
 
 .sidebar-sublinks a {
@@ -1397,15 +1606,15 @@ input[type="radio"]:focus {
 /* Move Locale Dropdown in sidebar */
 .sidebar .dropdown {
     margin-left: 0;
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--color-gray-3);
+    margin-top: var(--space-8);
+    padding-top: var(--space-8);
+    border-top: var(--border-hairline);
 }
 
 .sidebar .dropdown-content {
     top: 100% !important;
     bottom: auto !important;
-    margin-top: 0.5rem !important;
+    margin-top: var(--space-2) !important;
     margin-bottom: 0 !important;
     right: auto !important;
     left: 0 !important;
@@ -1428,11 +1637,11 @@ input[type="radio"]:focus {
     z-index: 1200; /* above header, below sidebar overlay */
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.75rem;
+    gap: var(--space-2);
+    padding: 0.35rem var(--space-3);
     background-color: rgba(20, 20, 20, 0.85);
-    border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
     color: var(--color-gray-1);
     font-family: 'Lato', sans-serif;
     font-size: 0.85rem;
@@ -1446,12 +1655,12 @@ input[type="radio"]:focus {
     color: var(--color-gray-2);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
 }
 
 .squadron-context-chip-value {
     color: var(--color-primary);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
 }
 
 .squadron-context-chip-all {
@@ -1483,8 +1692,8 @@ input[type="radio"]:focus {
     .squadron-context-chip {
         top: 0.6rem;
         right: 0.6rem;
-        padding: 0.25rem 0.6rem;
-        font-size: 0.8rem;
+        padding: var(--space-1) 0.6rem;
+        font-size: var(--fs-xs);
     }
 }
 
@@ -1492,26 +1701,26 @@ input[type="radio"]:focus {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-gray-3);
+    margin-top: var(--space-6);
+    padding-top: var(--space-6);
+    border-top: var(--border-hairline);
 }
 
 .squadron-switcher-label {
     color: var(--color-gray-2);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
 }
 
 .squadron-switcher-select {
     background-color: var(--color-bg-dark-gray);
     color: var(--color-gray-1);
-    border: 1px solid var(--color-primary);
-    padding: 0.5rem 0.6rem;
+    border: var(--border-accent);
+    padding: var(--space-2) 0.6rem;
     font-family: 'Lato', sans-serif;
-    font-size: 0.9rem;
-    min-height: 44px; /* fat-finger target per the corporate design rule */
+    font-size: var(--fs-sm);
+    min-height: var(--touch-target); /* fat-finger target per the corporate design rule */
     cursor: pointer;
 }
 
@@ -1522,8 +1731,8 @@ input[type="radio"]:focus {
 
 .squadron-switcher-submit {
     align-self: flex-start;
-    margin-top: 0.5rem;
-    padding: 0.5rem 1rem;
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-4);
     background-color: var(--color-primary);
     color: #000;
     border: none;
@@ -1536,13 +1745,13 @@ input[type="radio"]:focus {
 .squadron-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.15rem 0.5rem;
-    border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    padding: 0.15rem var(--space-2);
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
     color: var(--color-primary);
     font-family: 'Lato', sans-serif;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     line-height: 1.2;
     white-space: nowrap;
 }
@@ -1564,8 +1773,8 @@ input[type="radio"]:focus {
 }
 
 .squadron-badge-foreign {
-    color: var(--color-secondary, #FFD23F);
-    border-color: var(--color-secondary, #FFD23F);
+    color: var(--color-secondary);
+    border-color: var(--color-secondary);
 }
 
 /* Spezialkommando badge variant — neutral grey style so SK pins are visually
@@ -1582,8 +1791,51 @@ input[type="radio"]:focus {
    orange-yellow left border so the cross-squadron link is visible at a
    glance during handover preparation. */
 .inventory-row-foreign-jobOrder {
-    border-left: 4px solid var(--color-secondary, #FFD23F);
+    border-left: 4px solid var(--color-secondary);
 }
+
+/* Department tag — small square chip tinted by the owning Bereichsfarbe.
+   The border inherits `currentColor`, so setting the text colour to a
+   department token (e.g. `color: var(--color-dept-forschung)`) tints both
+   the label and its outline in one declaration. Square by design. */
+.dept-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid currentColor;
+}
+
+/* Status pill — the canonical row-status indicator: an 8px square dot in the
+   status colour followed by the uppercased enum label (PLANNED / ACTIVE /
+   COMPLETED / CANCELLED). The dot uses `currentColor`, so each `.status-*`
+   modifier only needs to set `color`. Not a rounded pill despite the name —
+   the system's only rounded chips are the squadron badges. */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-headline);
+    font-size: var(--fs-2xs);
+    letter-spacing: 0.08em;
+}
+.status-pill::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+}
+.status-planned   { color: var(--color-info); }
+.status-active    { color: var(--color-success); }
+.status-completed { color: var(--color-gray-2); }
+/* Two spellings exist in the domain enums: missions use CANCELLED, operations
+   use CANCELED. Both map to the danger hue so a generated `status-<enum>` class
+   resolves regardless of which aggregate produced the value. */
+.status-cancelled,
+.status-canceled  { color: var(--color-danger); }
 
 /*
  * Modal Styles — KRT canonical modal pattern.
@@ -1618,11 +1870,11 @@ input[type="radio"]:focus {
 .modal-content {
     background-color: var(--color-bg-dark-gray);
     margin: auto;
-    padding: 2rem;
-    border: 1px solid var(--color-primary);
+    padding: var(--space-8);
+    border: var(--border-accent);
     width: 80%;
     max-width: 800px;
-    box-shadow: 0 0 20px rgba(231, 126, 35, 0.2);
+    box-shadow: var(--glow-primary-lg);
 }
 
 .close-modal {
@@ -1642,7 +1894,7 @@ input[type="radio"]:focus {
 
 /* Collapsible Details in Forms */
 details.hud-details {
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
 }
 
 details.hud-details > summary {
@@ -1652,9 +1904,9 @@ details.hud-details > summary {
     color: var(--color-primary);
     text-transform: uppercase;
     font-size: 1.17em;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-primary);
-    margin-bottom: 1.5rem;
+    padding-bottom: var(--space-2);
+    border-bottom: var(--border-accent);
+    margin-bottom: var(--space-6);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1673,7 +1925,7 @@ details.hud-details > summary:hover {
 details.hud-details > summary::after {
     content: '+';
     font-weight: bold;
-    font-size: 1.5rem;
+    font-size: var(--fs-h2);
     line-height: 1;
 }
 
@@ -1684,7 +1936,7 @@ details.hud-details[open] > summary::after {
 /* Autocomplete Dropdown */
 .autocomplete-items {
     position: absolute;
-    border: 1px solid var(--color-primary);
+    border: var(--border-accent);
     border-top: none;
     z-index: 99;
     top: 100%;
@@ -1698,7 +1950,7 @@ details.hud-details[open] > summary::after {
     padding: 10px;
     cursor: pointer;
     background-color: var(--color-bg-dark-gray);
-    border-bottom: 1px solid var(--color-gray-3);
+    border-bottom: var(--border-hairline);
     color: var(--color-gray-1);
     font-family: var(--font-body);
 }
@@ -1717,8 +1969,8 @@ details.hud-details[open] > summary::after {
 .mission-info-grid {
     display: grid;
     grid-template-columns: max-content 1fr;
-    column-gap: 1rem;
-    row-gap: 0.5rem;
+    column-gap: var(--space-4);
+    row-gap: var(--space-2);
     align-items: baseline;
 }
 
@@ -1726,12 +1978,13 @@ details.hud-details[open] > summary::after {
 .grid-auto-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
+    gap: var(--space-4);
 }
 
 /* Constrain text width for better readability on ultra-wide screens */
 main p {
-    max-width: 80ch;
+    max-width: var(--measure);
+    text-wrap: pretty;
 }
 
 /* Custom Scrollbars */
@@ -1742,8 +1995,8 @@ main p {
 
 ::-webkit-scrollbar-track {
     background-color: var(--color-bg-dark-gray);
-    border-left: 1px solid var(--color-gray-3);
-    border-top: 1px solid var(--color-gray-3);
+    border-left: var(--border-hairline);
+    border-top: var(--border-hairline);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -1788,17 +2041,17 @@ textarea:focus-visible,
 /* --- Tablet & Mobile Breakpoints --- */
 @media (max-width: 1024px) {
     header {
-        padding: 0.75rem 1.5rem;
+        padding: var(--space-3) var(--space-6);
     }
 
     main {
-        padding: 1.5rem;
+        padding: var(--space-6);
     }
 
     /* Touch target size optimization (fat-finger) */
     input, select, textarea, .btn, .hamburger-btn {
-        min-height: 44px;
-        padding: 0.75rem 1rem;
+        min-height: var(--touch-target);
+        padding: var(--space-3) var(--space-4);
     }
 
     /*
@@ -1811,15 +2064,15 @@ textarea:focus-visible,
      * custom SVG arrow added by the desktop rule above.
      */
     select {
-        padding: 0.5rem 2rem 0.5rem 0.75rem;
+        padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
         line-height: 1.5;
     }
     
     .sidebar-links a, .sidebar-group > summary {
-        min-height: 44px;
+        min-height: var(--touch-target);
         line-height: 1.5;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
+        padding-top: var(--space-2);
+        padding-bottom: var(--space-2);
         display: flex;
         align-items: center;
     }
@@ -1828,28 +2081,28 @@ textarea:focus-visible,
 /* --- Mobile Breakpoints --- */
 @media (max-width: 768px) {
     header {
-        padding: 0.5rem 1rem;
+        padding: var(--space-2) var(--space-4);
     }
 
     nav {
-        gap: 1rem;
+        gap: var(--space-4);
     }
 
     main {
-        padding: 1rem;
+        padding: var(--space-4);
     }
 
     .hud-box {
-        padding: 0.5rem;
+        padding: var(--space-2);
     }
 
     .mission-info-grid {
         grid-template-columns: 1fr;
-        gap: 0.25rem;
+        gap: var(--space-1);
     }
     .form-row {
         flex-direction: column;
-        gap: 1rem;
+        gap: var(--space-4);
     }
 
     .sidebar {
@@ -1876,16 +2129,16 @@ textarea:focus-visible,
 .krt-loading-indicator {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-primary);
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-accent);
     background: var(--color-bg-dark-gray);
     color: var(--color-primary);
     font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    min-height: 44px;
+    min-height: var(--touch-target);
 }
 
 .krt-loading-indicator[hidden] {
@@ -1927,13 +2180,13 @@ textarea:focus-visible,
     align-items: center;
     gap: 0.35rem;
     margin-left: 0.6rem;
-    padding: 0.15rem 0.5rem 0.15rem 0.4rem;
-    border: 1px solid var(--color-primary);
-    border-radius: 999px;
+    padding: 0.15rem var(--space-2) 0.15rem 0.4rem;
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
     background: rgba(231, 126, 35, 0.08);
     color: var(--color-primary);
     font-family: 'Lato', sans-serif;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     line-height: 1;
     cursor: default;
     vertical-align: middle;
@@ -1949,7 +2202,7 @@ textarea:focus-visible,
 }
 
 .krt-presence-count {
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     letter-spacing: 0.02em;
 }
 
@@ -1972,15 +2225,15 @@ textarea:focus-visible,
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    padding: 1rem;
+    padding: var(--space-4);
 }
 
 .krt-confirm-dialog {
     background: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-primary);
+    border: var(--border-accent);
     max-width: 480px;
     width: 100%;
-    padding: 1.5rem;
+    padding: var(--space-6);
     color: var(--color-gray-1);
     font-family: var(--font-body);
     box-shadow: 0 0 24px rgba(231, 126, 35, 0.35);
@@ -1991,33 +2244,32 @@ textarea:focus-visible,
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--color-primary);
-    margin: 0 0 0.75rem 0;
+    margin: 0 0 var(--space-3) 0;
     font-size: 1.05rem;
 }
 
 .krt-confirm-message {
     margin: 0 0 1.25rem 0;
     line-height: 1.4;
-    font-weight: 300;
+    font-weight: var(--fw-thin);
 }
 
 .krt-confirm-actions {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     justify-content: flex-end;
     flex-wrap: wrap;
 }
 
 .krt-confirm-actions .btn {
-    min-height: 44px;
+    min-height: var(--touch-target);
     min-width: 96px;
-    padding: 0 1rem;
+    padding: 0 var(--space-4);
     font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: 0.85rem;
     cursor: pointer;
-    border-radius: 2px;
     border: 1px solid transparent;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
@@ -2046,7 +2298,7 @@ textarea:focus-visible,
 
 @media (max-width: 768px) {
     .krt-confirm-dialog {
-        padding: 1rem;
+        padding: var(--space-4);
     }
     .krt-confirm-actions {
         flex-direction: column-reverse;
@@ -2067,16 +2319,16 @@ textarea:focus-visible,
     font-family: var(--font-body);
 }
 .multi-select-header {
-    padding: 0.5rem;
-    background-color: var(--color-gray-4);
-    border: 1px solid var(--color-gray-3);
+    padding: var(--space-2);
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
     color: var(--color-gray-1);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-family: var(--font-body);
-    min-height: 44px;
+    min-height: var(--touch-target);
     user-select: none;
     transition: border-color 0.2s;
     box-sizing: border-box;
@@ -2087,7 +2339,7 @@ textarea:focus-visible,
 .multi-select-header::after {
     content: '\25BC';
     font-size: 0.7em;
-    margin-left: 0.5rem;
+    margin-left: var(--space-2);
     color: var(--color-primary);
 }
 .multi-select-options {
@@ -2095,8 +2347,8 @@ textarea:focus-visible,
     top: 100%;
     left: 0;
     right: 0;
-    background-color: var(--color-gray-4);
-    border: 1px solid var(--color-primary);
+    background-color: var(--color-surface-input);
+    border: var(--border-accent);
     border-top: none;
     max-height: 300px;
     overflow-y: auto;
@@ -2108,18 +2360,18 @@ textarea:focus-visible,
     display: block;
 }
 .multi-select-option {
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-2);
     cursor: pointer;
     transition: background-color 0.2s;
     color: var(--color-gray-1);
     margin-bottom: 0;
     font-family: var(--font-body);
     white-space: nowrap;
-    min-height: 44px;
+    min-height: var(--touch-target);
 }
 .multi-select-option:hover {
     background-color: var(--color-gray-3);

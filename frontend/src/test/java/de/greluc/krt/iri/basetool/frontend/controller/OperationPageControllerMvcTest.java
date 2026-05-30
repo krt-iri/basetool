@@ -90,6 +90,10 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations").locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("GEPLANT")))
+        // Status renders through the design-system .status-pill component with a
+        // status-specific modifier class derived from the (lower-cased) enum.
+        .andExpect(content().string(containsString("status-pill")))
+        .andExpect(content().string(containsString("status-planned")))
         // The raw enum name must NOT survive into the table cell.
         // (The string can still appear in the <option value="PLANNED">
         // attribute of the create modal, so we assert on the visible
@@ -118,7 +122,9 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations").locale(Locale.ENGLISH))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("ACTIVE")));
+        .andExpect(content().string(containsString("ACTIVE")))
+        // Active operations carry the success-hued status-pill modifier.
+        .andExpect(content().string(containsString("status-active")));
   }
 
   // ── /operations/{id} (detail) ───────────────────────────────────────────
@@ -242,7 +248,10 @@ class OperationPageControllerMvcTest {
         // carry the enum names, so we look for the closing-tag form
         // ">VALUE<" which only the visible text matches.
         .andExpect(content().string(not(containsString(">COMPLETED<"))))
-        .andExpect(content().string(not(containsString(">CANCELLED<"))));
+        .andExpect(content().string(not(containsString(">CANCELLED<"))))
+        // The nested missions table renders status through the .status-pill
+        // component; the cancelled mission resolves to the danger-hued modifier.
+        .andExpect(content().string(containsString("status-cancelled")));
   }
 
   @Test

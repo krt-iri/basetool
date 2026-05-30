@@ -15,7 +15,7 @@
             .form-group input, .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.75rem;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 border: 1px solid var(--color-gray-3);
                 color: var(--color-gray-1);
                 font-family: var(--font-body);
@@ -34,7 +34,7 @@
                 }
             }
             /* UEX refinery yield bonus/malus next to the output-quantity label.
-               Positive = green (Profit department color), negative = red (Combat),
+               Positive = green (Profit department color), negative = red (danger),
                zero = muted. Matches the semantic-color palette in styles.css. */
             .yield-bonus-badge {
                 display: inline-block;
@@ -44,7 +44,7 @@
                 font-weight: bold;
                 font-size: 0.75rem;
                 letter-spacing: 0;
-                border-radius: 2px;
+                border-radius: var(--radius-none);
                 text-transform: none;
             }
             .yield-bonus-badge.yield-positive {
@@ -53,13 +53,13 @@
                 border: 1px solid var(--color-dept-profit);
             }
             .yield-bonus-badge.yield-negative {
-                color: var(--color-dept-combat);
+                color: var(--color-danger);
                 background-color: rgba(163, 0, 10, 0.12);
-                border: 1px solid var(--color-dept-combat);
+                border: 1px solid var(--color-danger);
             }
             .yield-bonus-badge.yield-zero {
                 color: var(--color-gray-2);
-                background-color: var(--color-gray-5);
+                background-color: var(--color-gray-4);
                 border: 1px solid var(--color-gray-3);
             }
             /*
@@ -170,7 +170,7 @@
                 <input type="hidden" th:field="*{version}" />
                 
                 <div class="material-row mt-1-5">
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -179,37 +179,37 @@
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>
 
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
                         <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten (aUEC)</label>
                         <input type="number" id="otherExpenses" th:field="*{otherExpenses}" min="0" step="1"
                                th:title="#{refineryorder.form.otherExpenses.help}"
                                th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
                         <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
                     </div>
 
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
                         <input type="text" id="profitPreview" readonly tabindex="-1"
                                th:title="#{refineryorder.form.profit.help}"
-                               style="background-color: var(--color-gray-5); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
+                               style="background-color: var(--color-gray-4); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
                     </div>
                 </div>
 
                 <div class="material-row mt-1-5">
-                    <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group datetime-split-group flex-1 mb-0" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                         <label for="startedAtLocal" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
                         <div class="flex-gap-xs">
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
-                            <div class="datetime-split-inputs" style="flex: 1;">
+                            <div class="datetime-split-inputs flex-1">
                                 <input type="date" class="date-part" th:readonly="${!canEdit}">
                                 <input type="time" class="time-part" th:readonly="${!canEdit}">
                             </div>
@@ -217,26 +217,26 @@
                         </div>
                     </div>
                     
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label th:text="#{refineryorder.form.duration}">Dauer</label>
                         <div class="flex-gap-sm">
-                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" style="flex: 1;" th:readonly="${!canEdit}">
-                            <span style="color: var(--color-gray-2);">h</span>
-                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" style="flex: 1;" th:readonly="${!canEdit}">
-                            <span style="color: var(--color-gray-2);">m</span>
+                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" class="flex-1" th:readonly="${!canEdit}">
+                            <span class="text-muted">h</span>
+                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" class="flex-1" th:readonly="${!canEdit}">
+                            <span class="text-muted">m</span>
                         </div>
                     </div>
 
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group flex-1 mb-0">
                         <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
-                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
                             <span>-</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="material-row mt-1-5">
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="form-group flex-2 mb-0">
                         <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
                         <select id="locationId" th:field="*{locationId}" required th:disabled="${!canEdit}" data-trigger="rod-location-change">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -244,7 +244,7 @@
                         </select>
                     </div>
                     
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="form-group flex-2 mb-0">
                         <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
                         <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -253,7 +253,7 @@
                         </select>
                     </div>
 
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="form-group flex-2 mb-0">
                         <label for="status" th:text="#{refineryorder.form.status}">Status</label>
                         <select id="status" th:field="*{status}">
                             <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
@@ -265,7 +265,7 @@
                 </div>
 
                 <div class="material-row mt-1-5">
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="form-group flex-2 mb-0">
                         <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
                         <select id="refiningMethodId" th:field="*{refiningMethodId}" data-trigger="rod-update-method" th:disabled="${!canEdit}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -273,18 +273,18 @@
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
                         </select>
                     </div>
-                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-5); border: 1px solid var(--color-gray-3); border-radius: 4px; min-height: 44px;">
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); min-height: 44px;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
-                            <span id="ratingYieldVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingYieldVal" class="stat-value">-</span>
                         </div>
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.cost}">Kosten</span>
-                            <span id="ratingCostVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingCostVal" class="stat-value">-</span>
                         </div>
-                        <div style="display: flex; flex-direction: column; font-size: 0.85rem; color: var(--color-primary); text-transform: uppercase; font-family: var(--font-body); font-weight: bold;">
+                        <div class="stat-label">
                             <span th:text="#{refineryorder.rating.speed}">Dauer</span>
-                            <span id="ratingSpeedVal" style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin-top: 0.2rem;">-</span>
+                            <span id="ratingSpeedVal" class="stat-value">-</span>
                         </div>
                     </div>
                 </div>
@@ -294,14 +294,14 @@
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
                         </div>
 
                         <div class="material-row">
-                            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                            <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
                                 <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -309,26 +309,26 @@
                                 </select>
                             </div>
 
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'inputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge</label>
                                 <input type="text" inputmode="numeric" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required th:readonly="${!canEdit}">
                             </div>
 
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'quality_' + ${stat.index}" th:text="#{refineryorder.form.material.quality}">Qualität</label>
                                 <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" th:readonly="${!canEdit}">
                             </div>
                         </div>
 
                         <div class="material-row mt-1-5">
-                            <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                            <div class="form-group flex-2 mb-0">
                                 <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
                                 <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
                                     <span th:id="'outputMaterialDisplay_' + ${stat.index}" style="opacity: 0.7;">-</span>
                                 </div>
                             </div>
 
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'outputQuantity_' + ${stat.index}">
                                     <span th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</span>
                                     <span class="yield-bonus-badge"
@@ -342,9 +342,9 @@
                                 <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
                             </div>
 
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
-                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-5); cursor: not-allowed;">
+                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-4); cursor: not-allowed;">
                             </div>
                         </div>
                     </div>
@@ -360,8 +360,8 @@
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
-                    <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" style="margin: 0;">
-                        <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
+                    <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
+                        <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
                     </form>
                 </th:block>
                 <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{profile.back}">Zurück</a>
@@ -370,7 +370,7 @@
     </div>
 
     <div id="storeModal" class="modal" th:style="${showStoreModal} ? 'display: flex;' : 'display: none;'">
-        <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: 4px;">
+        <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h2 style="margin: 0; color: var(--color-primary); font-family: var(--font-headline); text-transform: uppercase;" th:text="#{refineryorder.action.store}">Einlagern</h2>
                 <span class="close" data-trigger="rod-close-store" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
@@ -378,7 +378,7 @@
             
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
                 <div id="storeItemsContainer">
-                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: 4px; background-color: var(--color-gray-4); margin-bottom: 1rem;">
+                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-surface-input); margin-bottom: 1rem;">
                         <div class="flex-between-mb">
                             <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
                             <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
@@ -390,7 +390,7 @@
                         <input type="hidden" th:field="*{items[__${stat.index}__].quantityType}" />
                         
                         <div class="material-row">
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeAmount_' + ${stat.index}">
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
@@ -398,20 +398,20 @@
                                 </label>
                                 <input type="number" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
                                 <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
                             </div>
                         </div>
                         <div class="material-row mt-1">
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>
                                 <select th:id="'storeLocation_' + ${stat.index}" th:field="*{items[__${stat.index}__].locationId}" required>
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="loc : ${allLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                                 </select>
                             </div>
-                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
                                 <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required>
                                     <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
