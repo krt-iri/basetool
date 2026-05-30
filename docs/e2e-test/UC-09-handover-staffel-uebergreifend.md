@@ -3,7 +3,8 @@
 | | |
 |---|---|
 | **ID** | UC-09 |
-| **Tag** | `e2e` (geplant) |
+| **Tag** | `e2e` |
+| **Testklasse** | [`CrossStaffelHandoverE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/CrossStaffelHandoverE2eTest.java) |
 | **Basis-Flow** | [UC-06](UC-06-job-order-handover.md) · Vorbedingung: [UC-08](UC-08-job-order-staffel-uebergreifend.md) |
 
 ## Akteur

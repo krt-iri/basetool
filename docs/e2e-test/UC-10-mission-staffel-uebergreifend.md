@@ -3,7 +3,8 @@
 | | |
 |---|---|
 | **ID** | UC-10 |
-| **Tag** | `e2e` (geplant) |
+| **Tag** | `e2e` |
+| **Testklasse** | [`PublicMissionCrossStaffelE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/PublicMissionCrossStaffelE2eTest.java) |
 | **Basis-Flow** | [UC-02](UC-02-mission-anlegen.md) · Scope-Regeln: [Rollen & Scope](rollen-und-scope.md) |
 
 > Code-/Englisch-Begriff *Mission* = dt. **Einsatz** (Entity `Mission`, Endpunkt `/missions`).

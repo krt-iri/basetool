@@ -6,6 +6,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,9 +36,14 @@ class JobOrderCreateE2eTest {
 
   private static Playwright playwright;
   private static Browser browser;
-  private static String materialId;
 
-  /** Launches the browser and, for the ephemeral stack, seeds the membership and a material. */
+  /**
+   * Launches the browser and, for the ephemeral stack, seeds the membership and guarantees at least
+   * one {@code isJobOrder} material exists for the create-form dropdown. The specific id is not
+   * retained: the frontend caches the job-order material list ({@code getCached}), so in the shared
+   * stack the dropdown may show a material seeded by another test rather than this one — the test
+   * therefore selects whatever the dropdown offers.
+   */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
@@ -45,7 +51,7 @@ class JobOrderCreateE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Job Material");
+      seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Job Material");
     }
   }
 
@@ -78,7 +84,8 @@ class JobOrderCreateE2eTest {
         page.navigate(baseUrl + "/orders/create");
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill("E2E Contact");
-        page.getByTestId("order-material-select").selectOption(materialId);
+        // Select whatever material the (frontend-cached) dropdown offers — see setUp().
+        page.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
         page.getByTestId("order-material-amount").fill("100");
         page.getByTestId("order-submit").click();
         page.waitForLoadState();

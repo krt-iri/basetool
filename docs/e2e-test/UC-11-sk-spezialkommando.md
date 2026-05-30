@@ -3,7 +3,8 @@
 | | |
 |---|---|
 | **ID** | UC-11 |
-| **Tag** | `e2e` (geplant) |
+| **Tag** | `e2e` |
+| **Testklasse** | [`SpecialCommandE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/SpecialCommandE2eTest.java) |
 | **Scope-Regeln** | [Rollen & Scope](rollen-und-scope.md) |
 
 ## Akteure

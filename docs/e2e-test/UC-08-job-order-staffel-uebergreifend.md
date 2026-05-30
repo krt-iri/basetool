@@ -3,7 +3,8 @@
 | | |
 |---|---|
 | **ID** | UC-08 |
-| **Tag** | `e2e` (geplant) |
+| **Tag** | `e2e` |
+| **Testklasse** | [`CrossStaffelJobOrderE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/CrossStaffelJobOrderE2eTest.java) |
 | **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md) · Scope-Regeln: [Rollen & Scope](rollen-und-scope.md) |
 
 ## Akteure

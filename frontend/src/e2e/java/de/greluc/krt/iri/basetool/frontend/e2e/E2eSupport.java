@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.frontend.e2e;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.io.IOException;
@@ -189,6 +190,23 @@ final class E2eSupport {
     } catch (IOException e) {
       throw new IllegalStateException("Could not persist authenticated storageState", e);
     }
+  }
+
+  /**
+   * Activates a form submit control that can be covered by the {@code position: fixed} global
+   * footer ({@code .krt-footer}, introduced with the das-kartell design system). A long form's
+   * bottom submit button sits at the viewport edge, behind the footer, so a coordinate click is
+   * intercepted and times out — and Playwright's {@code click} re-runs its own scroll-into-view,
+   * which puts the button back behind the footer, so scrolling first does not help. A dispatched
+   * click is untrusted and does not submit. This instead focuses the button and presses Enter:
+   * keyboard activation goes to the focused element with no coordinate hit-test the footer could
+   * block, and (unlike a dispatched click) it is a trusted activation that submits the button's
+   * form.
+   *
+   * @param submit the submit control (a focusable {@code <button>}) to activate
+   */
+  static void clickSubmitClearingFooter(Locator submit) {
+    submit.press("Enter");
   }
 
   /**

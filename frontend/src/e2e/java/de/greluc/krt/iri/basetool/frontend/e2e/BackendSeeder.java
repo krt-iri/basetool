@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
@@ -346,6 +347,118 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a Mission via {@code POST /api/v1/missions} as the given user and returns its id, so
+   * cross-Staffel visibility flows have a mission owned by the caller's Staffel. {@code
+   * owningOrgUnitId} is omitted, so the resolver auto-stamps the caller's home Staffel (the caller
+   * must have exactly one membership). The planned start is set a week out to clear the
+   * not-in-the-past check.
+   *
+   * @param username the Keycloak username of the creating user (a member of the owning Staffel)
+   * @param password the Keycloak password
+   * @param name the mission name (used to find its row in the list)
+   * @param isInternal {@code true} for an internal (staffel-private) mission, {@code false} for a
+   *     public one visible cross-Staffel
+   * @return the created mission's id
+   */
+  public String createMission(String username, String password, String name, boolean isInternal) {
+    String plannedStart = Instant.now().plus(Duration.ofDays(7)).toString();
+    String body =
+        "{\"name\":\""
+            + name
+            + "\",\"status\":\"PLANNED\",\"isInternal\":"
+            + isInternal
+            + ",\"plannedStartTime\":\""
+            + plannedStart
+            + "\"}";
+    return seedEntity(username, password, "/api/v1/missions", body);
+  }
+
+  /**
+   * Attempts {@code POST /api/v1/orders} with explicit creating + requesting OrgUnit ids and
+   * returns the HTTP status WITHOUT throwing, so a test can assert the documented 400 when a
+   * Spezialkommando is named as a job order's OrgUnit (the legacy {@code owning_squadron_id} column
+   * is still {@code NOT NULL}, so the picker resolver rejects SK ownership until the destructive
+   * cleanup release).
+   *
+   * @param username the Keycloak username (an admin, to name an explicit creating squadron)
+   * @param password the Keycloak password
+   * @param creatingOrgUnitId the creating OrgUnit id under test (an SK to trigger the 400)
+   * @param requestingOrgUnitId the requesting OrgUnit id
+   * @param handle the order contact handle
+   * @param materialId the requested material id
+   * @param minQuality the minimum quality ({@code >= 700})
+   * @param amount the requested amount
+   * @return the HTTP status code of the create attempt
+   */
+  public int attemptCreateJobOrderStatus(
+      String username,
+      String password,
+      String creatingOrgUnitId,
+      String requestingOrgUnitId,
+      String handle,
+      String materialId,
+      int minQuality,
+      double amount) {
+    try {
+      String token = passwordGrant(username, password);
+      String body =
+          "{\"creatingSquadronId\":\""
+              + creatingOrgUnitId
+              + "\",\"requestingOrgUnitId\":\""
+              + requestingOrgUnitId
+              + "\",\"handle\":\""
+              + handle
+              + "\",\"materials\":[{\"materialId\":\""
+              + materialId
+              + "\",\"minQuality\":"
+              + minQuality
+              + ",\"amount\":"
+              + amount
+              + "}]}";
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/orders"))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      return http.send(request, BodyHandlers.ofString()).statusCode();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptCreateJobOrderStatus failed", e);
+    }
+  }
+
+  /**
+   * Issues an authenticated {@code GET} as the given user and returns the raw response body, so a
+   * test can assert on its contents — e.g. that a foreign-Staffel inventory item id does NOT appear
+   * in this user's org-scoped Lager-View. Throws on a non-2xx status.
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @return the raw response body
+   */
+  public String getBody(String username, String password, String path) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+              .header("Authorization", "Bearer " + token)
+              .GET()
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException(
+            "GET " + path + " failed: HTTP " + response.statusCode() + " " + response.body());
+      }
+      return response.body();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getBody(" + path + ") failed", e);
+    }
+  }
+
+  /**
    * Logs in as the given user and returns their {@code app_user} id (the JWT {@code sub}). The call
    * also triggers {@code UserService.syncUser}, so invoking it once materialises the user's row
    * before an admin assigns memberships to it.
@@ -406,10 +519,11 @@ public final class BackendSeeder {
   }
 
   /**
-   * Assigns {@code targetUserId} to a Staffel with the given role flags via {@code PATCH
-   * /api/v1/users/{id}/memberships} (admin-only), re-reading the user's version on a 409 like
+   * Assigns {@code targetUserId} to a Staffel via {@code PATCH /api/v1/users/{id}/squadron}
+   * (admin-only, body {@code {squadronId, version}}), re-reading the user's version on a 409 like
    * {@link #ensureIridiumMembership}. A user has at most one Staffel membership, so this also
-   * re-homes them.
+   * re-homes them. Optional role flags are then set via the dedicated {@code /logistician} and
+   * {@code /mission-manager} query-param toggles.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -429,22 +543,19 @@ public final class BackendSeeder {
       String token = passwordGrant(adminUser, adminPassword);
       for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
         long version = getJson("/api/v1/users/" + targetUserId, token).get("version").getAsLong();
-        String body =
-            "{\"staffel\":{\"squadronId\":\""
-                + squadronId
-                + "\",\"isLogistician\":"
-                + isLogistician
-                + ",\"isMissionManager\":"
-                + isMissionManager
-                + ",\"userVersion\":"
-                + version
-                + "}}";
-        int status = patch(token, "/api/v1/users/" + targetUserId + "/memberships", body);
+        String body = "{\"squadronId\":\"" + squadronId + "\",\"version\":" + version + "}";
+        int status = patch(token, "/api/v1/users/" + targetUserId + "/squadron", body);
         if (status >= 200 && status < 300) {
+          if (isLogistician) {
+            patchFlag(token, targetUserId, "logistician", "isLogistician");
+          }
+          if (isMissionManager) {
+            patchFlag(token, targetUserId, "mission-manager", "isMissionManager");
+          }
           return;
         }
         if (status != 409) {
-          throw new IllegalStateException("Membership PATCH failed: HTTP " + status);
+          throw new IllegalStateException("Squadron assignment PATCH failed: HTTP " + status);
         }
       }
       throw new IllegalStateException(
@@ -453,6 +564,38 @@ public final class BackendSeeder {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.assignStaffelMembership failed", e);
+    }
+  }
+
+  /**
+   * Sets a boolean user flag to {@code true} via its admin-only query-param PATCH endpoint (e.g.
+   * {@code PATCH /api/v1/users/{id}/logistician?isLogistician=true}). Throws on a non-2xx status.
+   *
+   * @param token a bearer token for an admin
+   * @param userId the target user id
+   * @param pathSegment the endpoint path segment ({@code logistician} or {@code mission-manager})
+   * @param paramName the boolean query parameter name to set to {@code true}
+   * @throws Exception on transport failure
+   */
+  private void patchFlag(String token, String userId, String pathSegment, String paramName)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    BACKEND_BASE_URL
+                        + "/api/v1/users/"
+                        + userId
+                        + "/"
+                        + pathSegment
+                        + "?"
+                        + paramName
+                        + "=true"))
+            .header("Authorization", "Bearer " + token)
+            .method("PATCH", HttpRequest.BodyPublishers.noBody())
+            .build();
+    int status = http.send(request, BodyHandlers.ofString()).statusCode();
+    if (status < 200 || status >= 300) {
+      throw new IllegalStateException("Flag PATCH " + pathSegment + " failed: HTTP " + status);
     }
   }
 

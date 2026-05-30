@@ -78,7 +78,9 @@ class HangarAddShipE2eTest {
         // The add-ship modal opens via JS; the ship-type / insurance selects are server-rendered.
         page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
         page.locator("#ship-insurance").selectOption("LTI");
-        page.getByTestId("hangar-ship-submit").click();
+        // Footer-safe submit: the position:fixed footer can cover the modal's save button (seen on
+        // WebKit, where the coordinate click hit the footer and the ship was never created).
+        E2eSupport.clickSubmitClearingFooter(page.getByTestId("hangar-ship-submit"));
         page.waitForLoadState();
 
         // Back on the hangar, the new ship row must show the selected ship type.
