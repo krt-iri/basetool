@@ -89,7 +89,7 @@
             <tr>
                 <th th:text="#{hangar.ship.type}">Schiffstyp</th>
                 <th th:text="#{hangar.squadron.count}">Anzahl</th>
-                <th th:text="#{general.actions}" style="white-space: nowrap;">Aktionen</th>
+                <th th:text="#{general.actions}" class="nowrap">Aktionen</th>
             </tr>
             </thead>
             <tbody>
@@ -128,7 +128,7 @@
             </tr>
             </th:block>
             <tr th:if="${#lists.isEmpty(overview)}">
-                <td colspan="3" style="text-align: center;" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
+                <td colspan="3" class="text-center" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
             </tr>
             </tbody>
         </table>

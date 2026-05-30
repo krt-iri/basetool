@@ -26,7 +26,7 @@
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
             <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
-            <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" style="margin: 0;">
+            <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>
         </div>
@@ -140,7 +140,7 @@
                     <span th:text="${user.effectiveName}"></span>
                     
                     <form th:if="${currentUserId != null and currentUserId.equals(user.id)} or ${#authorization.expression('hasAnyRole(''ADMIN'', ''OFFICER'')')}"
-                          th:action="@{/orders/{id}/assignees/remove(id=${order.id})}" method="post" style="margin: 0;">
+                          th:action="@{/orders/{id}/assignees/remove(id=${order.id})}" method="post" class="m-0">
                         <input type="hidden" name="userId" th:value="${user.id}">
                         <button type="submit" class="btn btn-outline-danger" style="padding: 0.1rem 0.5rem; font-size: 0.8rem;">&times;</button>
                     </form>
@@ -152,7 +152,7 @@
 
             <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
                 <form th:if="${currentUserId != null and (order.assignees == null or !#lists.contains(order.assignees.![id], currentUserId))}"
-                      th:action="@{/orders/{id}/assignees(id=${order.id})}" method="post" style="margin: 0;">
+                      th:action="@{/orders/{id}/assignees(id=${order.id})}" method="post" class="m-0">
                     <input type="hidden" name="userId" th:value="${currentUserId}">
                     <button type="submit" class="btn" th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
                 </form>
@@ -297,7 +297,7 @@
                 </div>
             </div>
             
-            <button type="button" id="add-material-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+            <button type="button" id="add-material-btn" class="btn btn-secondary mb-2" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
                 <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="edit-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
@@ -321,7 +321,7 @@
 <div id="material-delete-confirm-modal" class="modal" style="display: none; z-index: 1050;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 400px; position: relative; text-align: center;">
         <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
-        <p style="margin-bottom: 2rem;" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
+        <p class="mb-2" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
         <div style="display: flex; gap: 1rem; justify-content: center;">
             <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="material-delete-confirm-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
             <button type="button" class="btn btn-outline-danger" data-trigger="od-confirm-remove-material" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
@@ -362,12 +362,12 @@
             <div id="handover-items-container">
             </div>
 
-            <button type="button" id="add-handover-item-btn" class="btn btn-secondary" style="margin-bottom: 2rem;" data-trigger="od-add-handover-item" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
+            <button type="button" id="add-handover-item-btn" class="btn btn-secondary mb-2" data-trigger="od-add-handover-item" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
                 <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-secondary"
-                        style="min-height: 44px;"
+                       
                         th:text="#{orders.handover.report.preview}"
                         th:data-order-id="${order.id}"
                         data-trigger="od-preview-handover">Vorschau als PDF</button>
@@ -960,7 +960,7 @@
                     : `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
                 const unlinkCell = IS_LOGISTICIAN ? `
                                         <td data-trigger="stop-propagation">
-                                            <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" style="margin: 0;"
+                                            <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" class="m-0"
                                                   data-trigger="od-disable-submit">
                                                 <input type="hidden" name="_csrf" value="${escapeAttr(csrfTokenValue)}">
                                                 <button type="submit" class="btn btn-outline-danger"

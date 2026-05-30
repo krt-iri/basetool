@@ -209,7 +209,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(myShips)}">
-                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" style="text-align: center;" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
+                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
                     </tr>
                 </tbody>
             </table>
@@ -309,7 +309,7 @@
     <!-- Fleetview Import Result Modal -->
     <div id="import-result-modal" class="modal" style="display:none; z-index:3200;">
         <div class="modal-content hud-box" style="max-width:560px;">
-            <h2 id="import-result-title" th:text="#{hangar.import.result.title}" style="margin-top:0;">Import-Ergebnis</h2>
+            <h2 id="import-result-title" th:text="#{hangar.import.result.title}" class="mt-0">Import-Ergebnis</h2>
             <div class="stat-row">
                 <span th:text="#{hangar.import.result.imported}">Importiert</span>
                 <span id="import-res-imported">0</span>
@@ -339,8 +339,8 @@
     <!-- Delete All Ships Confirmation Modal -->
     <div id="delete-all-confirm-modal" class="modal" style="display:none; z-index: 3300;">
         <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
-            <h2 th:text="#{hangar.delete_all.modal.title}" style="margin-top:0;">Hangar leeren</h2>
-            <p th:text="#{hangar.delete_all.modal.body}" style="margin-bottom: 2rem;">Alle eigenen Schiffe wirklich löschen?</p>
+            <h2 th:text="#{hangar.delete_all.modal.title}" class="mt-0">Hangar leeren</h2>
+            <p th:text="#{hangar.delete_all.modal.body}" class="mb-2">Alle eigenen Schiffe wirklich löschen?</p>
             <div class="flex-center-gap">
                 <button type="button" id="delete-all-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
@@ -351,11 +351,11 @@
     <!-- Delete Confirmation Modal -->
     <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
-            <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
-            <p th:text="#{hangar.ship.delete_confirm}" style="margin-bottom: 2rem;">Schiff wirklich löschen?</p>
+            <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+            <p th:text="#{hangar.ship.delete_confirm}" class="mb-2">Schiff wirklich löschen?</p>
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
-                <form id="delete-confirm-form" th:action="@{/hangar}" method="post" style="margin:0;">
+                <form id="delete-confirm-form" th:action="@{/hangar}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{hangar.ship.delete}">Löschen</button>
                 </form>
             </div>

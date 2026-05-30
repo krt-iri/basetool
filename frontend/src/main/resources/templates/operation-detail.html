@@ -384,7 +384,7 @@
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
             <div class="greeting hud-box flex-between">
-                <h1 style="margin: 0;" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
+                <h1 class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
                 <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
             </div>
         </main>
@@ -622,7 +622,7 @@
                             </div>
                         </div>
                     </div>
-                    <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" th:text="#{mission.empty}" style="text-align: center;">Keine Missionen vorhanden.</p>
+                    <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" th:text="#{mission.empty}" class="text-center">Keine Missionen vorhanden.</p>
                 </div>
             </div>
         </div>

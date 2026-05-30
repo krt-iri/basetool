@@ -884,11 +884,26 @@ label:has(+ [required])::after {
     font-size: var(--fs-sm);
 }
 
+/* Inline field-validation message rendered under an input (Thymeleaf
+   th:errors). Small danger-coloured text; replaces the repeated
+   `color: var(--color-danger); font-size: 0.8rem` inline style. */
+.field-error {
+    color: var(--color-danger);
+    font-size: var(--fs-xs);
+}
+
 /* Layout Utility Classes */
 .mt-1 { margin-top: var(--space-4); }
 .mt-1-5 { margin-top: var(--space-6); }
 .mt-2 { margin-top: var(--space-8); }
+.mt-0 { margin-top: 0; }
 .mb-1 { margin-bottom: var(--space-4); }
+.mb-2 { margin-bottom: var(--space-8); }
+.m-0 { margin: 0; }
+.nowrap { white-space: nowrap; }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.w-1 { width: 1%; }
 
 .flex-gap-xs { display: flex; gap: var(--space-2); }
 .flex-gap-sm { display: flex; gap: var(--space-2); align-items: center; }

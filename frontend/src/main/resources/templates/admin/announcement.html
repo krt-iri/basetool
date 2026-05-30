@@ -56,11 +56,11 @@
     <!-- Delete Confirmation Modal -->
     <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
-            <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
-            <p th:text="#{info.delete.confirm.message}" style="margin-bottom: 2rem;">Wirklich löschen?</p>
+            <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+            <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
-                <form th:action="@{/admin/announcement/delete}" method="post" style="margin:0;">
+                <form th:action="@{/admin/announcement/delete}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>

@@ -279,15 +279,15 @@
                             </span>
                         </span>
                         <div class="uex-parent-controls" sec:authorize="hasRole('ADMIN')">
-                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="uex">
                                 <button type="submit" class="btn" th:classappend="${!cityNode.city.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
                             </form>
-                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="yes">
                                 <button type="submit" class="btn" th:classappend="${cityNode.city.hasLoadingDockOverridden && cityNode.city.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
                             </form>
-                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="no">
                                 <button type="submit" class="btn" th:classappend="${cityNode.city.hasLoadingDockOverridden && !cityNode.city.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                             </form>
@@ -341,15 +341,15 @@
                             </span>
                         </span>
                         <div class="uex-parent-controls" sec:authorize="hasRole('ADMIN')">
-                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="uex">
                                 <button type="submit" class="btn" th:classappend="${!stationNode.station.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
                             </form>
-                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="yes">
                                 <button type="submit" class="btn" th:classappend="${stationNode.station.hasLoadingDockOverridden && stationNode.station.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
                             </form>
-                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" style="margin: 0;" class="uex-button-form">
+                            <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="no">
                                 <button type="submit" class="btn" th:classappend="${stationNode.station.hasLoadingDockOverridden && !stationNode.station.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                             </form>
@@ -403,15 +403,15 @@
                                 <td th:text="${outpost.planetName}">Planet</td>
                                 <td>
                                     <div class="flex-gap-xs" sec:authorize="hasRole('ADMIN')">
-                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
                                             <button type="submit" class="btn" th:classappend="${!outpost.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
                                         </form>
-                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" class="m-0">
                                             <input type="hidden" name="action" value="yes">
                                             <button type="submit" class="btn" th:classappend="${outpost.hasLoadingDockOverridden && outpost.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
                                         </form>
-                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" class="m-0">
                                             <input type="hidden" name="action" value="no">
                                             <button type="submit" class="btn" th:classappend="${outpost.hasLoadingDockOverridden && !outpost.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                                         </form>
@@ -445,15 +445,15 @@
                                 <td th:text="${poi.planetName}">Planet</td>
                                 <td>
                                     <div class="flex-gap-xs" sec:authorize="hasRole('ADMIN')">
-                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
                                             <button type="submit" class="btn" th:classappend="${!poi.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
                                         </form>
-                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" class="m-0">
                                             <input type="hidden" name="action" value="yes">
                                             <button type="submit" class="btn" th:classappend="${poi.hasLoadingDockOverridden && poi.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.yes}">Yes</button>
                                         </form>
-                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" style="margin: 0;">
+                                        <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" class="m-0">
                                             <input type="hidden" name="action" value="no">
                                             <button type="submit" class="btn" th:classappend="${poi.hasLoadingDockOverridden && !poi.hasLoadingDock} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.no}">No</button>
                                         </form>

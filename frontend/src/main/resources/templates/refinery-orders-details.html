@@ -360,7 +360,7 @@
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
-                    <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" style="margin: 0;">
+                    <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
                         <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
                     </form>
                 </th:block>

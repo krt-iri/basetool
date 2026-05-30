@@ -40,9 +40,9 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; cursor: pointer;" id="info-header" data-trigger="index-toggle-info">
              <div style="display:flex; align-items:center; gap: 0.5rem;">
                  <span id="info-toggle-icon" th:text="${unreadAnnouncement ? '▼' : '▶'}">▼</span>
-                 <h2 th:text="#{info.title}" style="margin:0;">Information</h2>
+                 <h2 th:text="#{info.title}" class="m-0">Information</h2>
              </div>
-             <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" style="margin:0;" data-trigger="stop-propagation">
+             <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" class="m-0" data-trigger="stop-propagation">
                  <input type="hidden" name="id" th:value="${announcement.id}" />
                  <button type="submit" class="btn" th:text="#{info.mark_read}">Als gelesen markieren</button>
              </form>

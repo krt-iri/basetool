@@ -130,7 +130,7 @@
                         <td th:text="${a.createdBy}">system</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" style="margin: 0;">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0">
                                     <button type="submit" class="btn btn-secondary" th:text="#{admin.materialAlias.action.delete}">Löschen</button>
                                 </form>
                             </div>
