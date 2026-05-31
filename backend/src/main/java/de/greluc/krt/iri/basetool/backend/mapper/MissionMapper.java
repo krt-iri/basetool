@@ -56,8 +56,9 @@ public abstract class MissionMapper {
    * <p>After R9 Step 2 the mission entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
    * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
    * stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto} so SK-owned missions surface as {@code null} on the wire
-   * while Staffel-owned ones continue to project as before.
+   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
+   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned missions now
+   * surface their SK badge instead of a blank cell.
    *
    * @param mission the mission entity to project; {@code null} returns {@code null}.
    * @return the populated mission DTO.
@@ -108,8 +109,7 @@ public abstract class MissionMapper {
    * Slim list-row DTO of a mission; same description redaction as the full DTO. Also routes the
    * mission's {@code owningOrgUnit} through {@code SquadronMapper.orgUnitToReferenceDto} for the
    * {@code owningSquadron} DTO slot so the column on the missions list renders without an extra
-   * round-trip (and stays {@code null} for SK-owned missions until the DTO is widened to carry an
-   * SK reference too).
+   * round-trip, projecting either a Staffel or a Spezialkommando owner into the slim reference.
    *
    * @param mission the mission entity to project; {@code null} returns {@code null}.
    * @return the slim list-row DTO.
