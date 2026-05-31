@@ -116,11 +116,18 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return a page of orderable game items
    */
   @Query(
-      "SELECT DISTINCT b.outputItem FROM Blueprint b JOIN b.ingredients i WHERE b.scwikiDeletedAt"
-          + " IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
-          + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE AND"
-          + " i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
-          + " LOWER(CONCAT('%', :q, '%')))")
+      value =
+          "SELECT DISTINCT b.outputItem FROM Blueprint b JOIN b.ingredients i WHERE"
+              + " b.scwikiDeletedAt IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
+              + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE"
+              + " AND i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
+              + " LOWER(CONCAT('%', :q, '%')))",
+      countQuery =
+          "SELECT COUNT(DISTINCT b.outputItem) FROM Blueprint b JOIN b.ingredients i WHERE"
+              + " b.scwikiDeletedAt IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
+              + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE"
+              + " AND i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
+              + " LOWER(CONCAT('%', :q, '%')))")
   Page<de.greluc.krt.iri.basetool.backend.model.GameItem> findOrderableItems(
       @Param("q") String q, Pageable pageable);
 }

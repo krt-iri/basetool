@@ -14,14 +14,18 @@ import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.DerivedMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.GameItemReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SubAssemblySuggestionDto;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +34,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -206,16 +212,8 @@ public class JobOrderItemService {
     Blueprint blueprint = item.getBlueprint();
     return new JobOrderItemDto(
         item.getId(),
-        gameItem == null
-            ? null
-            : new GameItemReferenceDto(
-                gameItem.getId(),
-                gameItem.getName(),
-                gameItem.getKind() == null ? null : gameItem.getKind().name()),
-        blueprint == null
-            ? null
-            : new BlueprintReferenceDto(
-                blueprint.getId(), blueprint.getOutputName(), blueprint.getScwikiKey()),
+        gameItem == null ? null : gameItemRef(gameItem),
+        blueprint == null ? null : blueprintRef(blueprint),
         item.getAmount(),
         item.getDeliveredAmount(),
         item.getParentItem() == null ? null : item.getParentItem().getId(),
@@ -247,8 +245,8 @@ public class JobOrderItemService {
   }
 
   /**
-   * Resolves the available blueprint references for a game item, newest output name first. Exposed
-   * for the create UI's blueprint picker.
+   * Resolves the available blueprint references for a game item, by output name. Exposed for the
+   * create UI's blueprint picker (shown when an item has more than one recipe).
    *
    * @param gameItemId the ordered item
    * @return blueprint references producing that item; empty when none exist
@@ -256,11 +254,94 @@ public class JobOrderItemService {
   @NotNull
   public List<BlueprintReferenceDto> blueprintsForItem(@NotNull UUID gameItemId) {
     return blueprintRepository.findByOutputItemId(gameItemId).stream()
-        .map(b -> new BlueprintReferenceDto(b.getId(), b.getOutputName(), b.getScwikiKey()))
+        .map(this::blueprintRef)
         .sorted(
             Comparator.comparing(
                 (BlueprintReferenceDto b) -> b.outputName() != null ? b.outputName() : "",
                 String.CASE_INSENSITIVE_ORDER))
         .toList();
+  }
+
+  /**
+   * Page of orderable items (blueprint outputs with at least one resolvable material) for the
+   * create UI's item picker. An optional name filter narrows the list.
+   *
+   * @param search case-insensitive name substring, or {@code null}/blank for no filter
+   * @param pageable page request (whitelisted sort)
+   * @return a page of orderable item references
+   */
+  @NotNull
+  public Page<GameItemReferenceDto> findOrderableItems(String search, @NotNull Pageable pageable) {
+    String q = search != null && !search.isBlank() ? search.strip() : null;
+    return blueprintRepository.findOrderableItems(q, pageable).map(this::gameItemRef);
+  }
+
+  /**
+   * Previews the material derivation for a chosen blueprint at a given amount: the resolved
+   * material requirements (scaled, with their default quality), the adoptable sub-assembly
+   * suggestions, and the names of unresolved ingredient lines (for the create-form warning banner).
+   *
+   * @param blueprintId the chosen blueprint
+   * @param amount the whole-unit amount to scale by (clamped to at least 1)
+   * @return the derivation preview
+   * @throws NotFoundException when the blueprint id is unknown
+   */
+  @NotNull
+  public ItemDerivationDto deriveForPreview(@NotNull UUID blueprintId, int amount) {
+    Blueprint blueprint =
+        blueprintRepository
+            .findById(blueprintId)
+            .orElseThrow(() -> new NotFoundException("Blueprint not found: " + blueprintId));
+    int scaledBy = Math.max(1, amount);
+
+    List<DerivedMaterialDto> materials = new ArrayList<>();
+    List<SubAssemblySuggestionDto> subAssemblies = new ArrayList<>();
+    List<String> unresolved = new ArrayList<>();
+
+    for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
+      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
+        Material material = ingredient.getMaterial();
+        if (material == null) {
+          unresolved.add(unresolvedLabel(ingredient));
+          continue;
+        }
+        double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
+        materials.add(
+            new DerivedMaterialDto(
+                materialMapper.toDto(material),
+                roundForQuantityType(perUnit * scaledBy, material),
+                defaultQuality(ingredient.getMinQuality())));
+      } else {
+        GameItem subItem = ingredient.getGameItem();
+        if (subItem == null) {
+          unresolved.add(unresolvedLabel(ingredient));
+          continue;
+        }
+        int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
+        subAssemblies.add(
+            new SubAssemblySuggestionDto(
+                gameItemRef(subItem), perUnit * scaledBy, blueprintsForItem(subItem.getId())));
+      }
+    }
+    return new ItemDerivationDto(
+        blueprintRef(blueprint), scaledBy, materials, subAssemblies, unresolved);
+  }
+
+  private GameItemReferenceDto gameItemRef(GameItem gameItem) {
+    return new GameItemReferenceDto(
+        gameItem.getId(),
+        gameItem.getName(),
+        gameItem.getKind() == null ? null : gameItem.getKind().name());
+  }
+
+  private BlueprintReferenceDto blueprintRef(Blueprint blueprint) {
+    return new BlueprintReferenceDto(
+        blueprint.getId(), blueprint.getOutputName(), blueprint.getScwikiKey());
+  }
+
+  private static String unresolvedLabel(BlueprintIngredient ingredient) {
+    return ingredient.getWikiNameSnapshot() != null
+        ? ingredient.getWikiNameSnapshot()
+        : "(unresolved ingredient)";
   }
 }

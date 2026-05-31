@@ -19,6 +19,7 @@ import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
@@ -148,6 +149,32 @@ class JobOrderItemServiceTest {
             .orElseThrow();
     assertThat(good.totalQuantity()).isEqualTo(8.0);
     assertThat(none.totalQuantity()).isEqualTo(2.0);
+  }
+
+  @Test
+  void deriveForPreviewReturnsResolvedMaterialsSubAssembliesAndUnresolvedNames() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Material steel = material("Steel", QuantityType.SCU);
+    stubMapper(steel);
+    GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(steel, 2.0, 700));
+    blueprint.addIngredient(itemIngredient(scope, 2));
+    blueprint.addIngredient(unresolvedResource(5.0));
+
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(blueprintRepository.findByOutputItemId(scope.getId())).thenReturn(List.of());
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 3);
+
+    assertThat(preview.amount()).isEqualTo(3);
+    assertThat(preview.materials()).hasSize(1);
+    assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(6.0);
+    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo(QualityRequirement.GOOD);
+    assertThat(preview.subAssemblies()).hasSize(1);
+    assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
+    assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
+    assertThat(preview.unresolvedIngredients()).containsExactly("Unknownium");
   }
 
   // ── helpers ──────────────────────────────────────────────────────────
