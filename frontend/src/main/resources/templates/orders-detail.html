@@ -1034,7 +1034,7 @@
                 headers: downloadHeaders
             });
             if (!response.ok) {
-                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
                 return;
             }
             const blob = await response.blob();
@@ -1048,7 +1048,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
         }
     }
 
@@ -1063,7 +1063,7 @@
                 return true;
             }
         }
-        showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, 'error');
+        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
         return false;
     }
 
