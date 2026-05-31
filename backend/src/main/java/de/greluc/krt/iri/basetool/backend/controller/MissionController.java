@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddCrewRequest;
@@ -17,6 +18,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateCrewRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
@@ -100,6 +102,7 @@ public class MissionController {
   private final UserService userService;
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
+  private final ShipMapper shipMapper;
   private final MissionSecurityService missionSecurityService;
   private final AuthHelperService authHelperService;
 
@@ -1545,6 +1548,29 @@ public class MissionController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     missionService.removeMissionUnit(id, unitId);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Lists the ships a unit of this mission may be crewed with: ships owned by registered
+   * participants (regardless of OrgUnit, so a cross-OrgUnit participant's ship is selectable) plus
+   * ships already pinned to one of the mission's units. Used by the mission detail page to populate
+   * the unit ship pickers without exposing the caller's whole hangar scope. Gated by {@code
+   * canManageMission} so only users who may edit the mission's units see participant ship details.
+   *
+   * @param id mission id
+   * @return the candidate ships for this mission's unit ship pickers
+   */
+  @GetMapping("/{id}/unit-ship-options")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "List selectable ships for a mission's units",
+      description =
+          "Returns the ships a unit of this mission may be crewed with: ships owned by registered "
+              + "participants (regardless of OrgUnit) plus ships already assigned to a unit of the "
+              + "mission. Restricted to callers who may manage the mission.")
+  public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
+    return missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList();
   }
 
   // --- Crew ---
