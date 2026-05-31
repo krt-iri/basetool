@@ -3,9 +3,11 @@ package de.greluc.krt.iri.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintRequirementModifierDto;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintModifierSegment;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintRequirementGroup;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintRequirementModifier;
 import java.util.UUID;
@@ -63,5 +65,54 @@ class BlueprintMapperTest {
     assertEquals("Hadanite", dto.ingredients().get(0).name());
     assertEquals("ITEM", dto.ingredients().get(0).kind());
     assertEquals(7, dto.ingredients().get(0).quantityUnits());
+  }
+
+  @Test
+  void toModifierDto_linearModifierKeepsRawBandAsEffectiveBand() {
+    BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
+    modifier.setQualityMin(0.0);
+    modifier.setQualityMax(1000.0);
+    modifier.setModifierAtMinQuality(0.95);
+    modifier.setModifierAtMaxQuality(1.05);
+
+    BlueprintRequirementModifierDto dto = mapper.toModifierDto(modifier);
+
+    // No segments: the effective band equals the raw endpoint band.
+    assertEquals(0.0, dto.effectiveQualityMin());
+    assertEquals(1000.0, dto.effectiveQualityMax());
+  }
+
+  @Test
+  void toModifierDto_steppedModifierSpansUnionOfSegmentBoundsNotFirstSegmentOnly() {
+    // Mirrors the live SC Wiki "Durango" Integrity modifier: the raw quality_range only carries the
+    // first segment's bounds (0..500), while the segments together cover the full 0..1000 band.
+    BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
+    modifier.setQualityMin(0.0);
+    modifier.setQualityMax(500.0);
+
+    BlueprintModifierSegment first = new BlueprintModifierSegment();
+    first.setOrderIndex(0);
+    first.setQualityMin(0.0);
+    first.setQualityMax(500.0);
+    first.setModifierAtStart(0.8);
+    first.setModifierAtEnd(1.0);
+    modifier.addSegment(first);
+
+    BlueprintModifierSegment second = new BlueprintModifierSegment();
+    second.setOrderIndex(1);
+    second.setQualityMin(501.0);
+    second.setQualityMax(1000.0);
+    second.setModifierAtStart(1.0);
+    second.setModifierAtEnd(1.2);
+    modifier.addSegment(second);
+
+    BlueprintRequirementModifierDto dto = mapper.toModifierDto(modifier);
+
+    // Raw band stays as the Wiki delivered it (first segment only)...
+    assertEquals(0.0, dto.qualityMin());
+    assertEquals(500.0, dto.qualityMax());
+    // ...but the effective band spans every segment so the slider reaches quality 1000.
+    assertEquals(0.0, dto.effectiveQualityMin());
+    assertEquals(1000.0, dto.effectiveQualityMax());
   }
 }
