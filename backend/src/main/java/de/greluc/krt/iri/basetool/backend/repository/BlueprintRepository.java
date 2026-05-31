@@ -90,4 +90,37 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           + "AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) "
           + "OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))")
   Page<Blueprint> searchActive(@Param("q") String q, Pageable pageable);
+
+  /**
+   * Active (non-soft-deleted) blueprints that produce the given game item — the candidate recipes
+   * an item-order line may pick. Used both to validate a chosen blueprint and to feed the create
+   * UI's blueprint picker when an item has more than one recipe (issue #304 decision 2).
+   *
+   * @param gameItemId the produced item's id
+   * @return active blueprints whose {@code outputItem} is that game item
+   */
+  @Query(
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputItem.id = :gameItemId")
+  java.util.List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
+
+  /**
+   * Page of distinct game items that are orderable as item-order lines: the output item of at least
+   * one active blueprint that has a resolved RESOURCE ingredient (so a non-empty material list can
+   * be derived). Items whose every blueprint resolves no usable material are excluded (issue #304
+   * decision 3). An optional case-insensitive name filter narrows the picker; {@code q} must be
+   * non-null and non-blank when supplied (a {@code null} bind into {@code LOWER(CONCAT(...))} types
+   * as {@code bytea} on PostgreSQL).
+   *
+   * @param q case-insensitive item-name substring, or {@code null} for no filter
+   * @param pageable page request (whitelisted sort)
+   * @return a page of orderable game items
+   */
+  @Query(
+      "SELECT DISTINCT b.outputItem FROM Blueprint b JOIN b.ingredients i WHERE b.scwikiDeletedAt"
+          + " IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
+          + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE AND"
+          + " i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
+          + " LOWER(CONCAT('%', :q, '%')))")
+  Page<de.greluc.krt.iri.basetool.backend.model.GameItem> findOrderableItems(
+      @Param("q") String q, Pageable pageable);
 }

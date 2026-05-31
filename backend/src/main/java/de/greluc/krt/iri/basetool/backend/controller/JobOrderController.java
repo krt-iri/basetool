@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
@@ -199,13 +200,41 @@ public class JobOrderController {
   }
 
   /**
+   * Creates a new item-based job order. {@code permitAll()} for parity with the material-order
+   * create endpoint, with the same guest redaction. The required materials are derived server-side
+   * from each ordered item's chosen blueprint and snapshotted onto the order; the response carries
+   * the derived per-item materials and the aggregated material view.
+   *
+   * @param dto item-order create payload (ordered finished items + per-material quality choices)
+   * @param jwt the caller's JWT, or {@code null} for anonymous callers
+   * @return the persisted DTO (redacted for anonymous callers)
+   */
+  @PostMapping("/items")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Create a new item job order",
+      description =
+          "Creates an item-based job order; the required materials are derived from each ordered"
+              + " item's blueprint.")
+  @PreAuthorize("permitAll()")
+  public JobOrderDto createItemJobOrder(
+      @RequestBody @Valid CreateJobOrderItemRequestDto dto, @AuthenticationPrincipal Jwt jwt) {
+    JobOrderDto created = jobOrderService.createItemJobOrder(dto);
+    if (jwt == null) {
+      created = cleanupJobOrderForGuest(created);
+    }
+    return created;
+  }
+
+  /**
    * Strips fields from a job-order DTO that an anonymous caller has no business seeing or that
    * carry no value for them: the {@code assignees} list (would expose member PII if the order ever
    * had assignees at create time — defence-in-depth), the {@code handovers} list (logistician audit
    * trail) and the optimistic-lock {@code version} (anonymous cannot update the order). The {@code
-   * id} / {@code displayId} / squadron references / materials / status are preserved so the public
-   * form can show a confirmation page with the order number. The order's own free-text {@code
-   * comment} is preserved — it is the order's own note, not collaborator-identifying data.
+   * id} / {@code displayId} / squadron references / {@code type} / {@code materials} / {@code items}
+   * / {@code aggregatedMaterials} / status are preserved so the public form can show a confirmation
+   * page with the order number for either order kind. The order's own free-text {@code comment} is
+   * preserved — it is the order's own note, not collaborator-identifying data.
    *
    * @param dto the persisted job-order DTO
    * @return a slim acknowledgement DTO safe for anonymous callers
@@ -220,7 +249,10 @@ public class JobOrderController {
         dto.comment(),
         dto.priority(),
         dto.status(),
+        dto.type(),
         dto.materials(),
+        dto.items(),
+        dto.aggregatedMaterials(),
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         dto.createdAt(),
