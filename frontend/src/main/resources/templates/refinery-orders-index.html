@@ -59,7 +59,6 @@
                 <th th:text="#{refineryorder.index.id}">ID</th>
                 <th th:text="#{refineryorder.index.owner}">Besitzer</th>
                 <th th:text="#{refineryorder.index.status}">Status</th>
-                <th class="nowrap" style="width: 1%;" th:text="#{refineryorder.index.startedAt}">Gestartet</th>
                 <th class="nowrap" style="width: 1%;" th:text="#{refineryorder.index.endsAt}">Ende</th>
                 <th th:text="#{refineryorder.index.location}">Ort</th>
                 <th th:text="#{refineryorder.index.mission}">Einsatz</th>
@@ -77,9 +76,6 @@
                 <td th:text="${order.status != null ? #messages.msg('refineryorder.status.' + order.status) : '-'}"></td>
                 <td class="nowrap">
                     <!-- Server-Rendering explizit in UTC, Anzeige wird im Browser per JS in Browser-Lokalzeit (DST-korrekt) konvertiert. -->
-                    <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${order.startedAt != null ? #temporals.format(order.startedAt, 'dd.MM. HH:mm', 'UTC') + ' UTC' : '-'}"></span>
-                </td>
-                <td class="nowrap">
                     <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM. HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>
@@ -105,7 +101,7 @@
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td th:attr="colspan=${isAllSquadronsMode ? 10 : 9}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
+                <td th:attr="colspan=${isAllSquadronsMode ? 9 : 8}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>
