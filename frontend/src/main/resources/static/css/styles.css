@@ -1805,7 +1805,7 @@ input[type="radio"]:focus {
     display: inline-flex;
     align-items: center;
     padding: 0.15rem var(--space-2);
-    border: 1px solid currentColor;
+    border: 1px solid currentcolor;
     border-radius: var(--radius-pill);
     font-family: Lato, sans-serif;
     font-size: 0.7rem;
@@ -1831,7 +1831,7 @@ input[type="radio"]:focus {
     display: inline-flex;
     align-items: center;
     padding: 0.15rem var(--space-2);
-    border: 1px solid currentColor;
+    border: 1px solid currentcolor;
     border-radius: var(--radius-pill);
     font-family: Lato, sans-serif;
     font-size: 0.7rem;

@@ -85,6 +85,58 @@ public class JobOrderHandoverReportProxyController {
   }
 
   /**
+   * Proxies the download of a persisted item-handover report PDF to the backend. Item orders use
+   * their own delivery-note endpoint ({@code /item-handovers/{id}/report}); the material variant
+   * above stays on {@code /handovers/{id}/report}.
+   *
+   * @param jobOrderId the job order UUID
+   * @param handoverId the item-handover UUID
+   * @param userTimeZone the caller's IANA time zone, forwarded so the PDF renders local times
+   * @return the PDF as a byte array with appropriate headers
+   */
+  @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<byte[]> downloadItemHandoverReport(
+      @PathVariable @NotNull UUID jobOrderId,
+      @PathVariable @NotNull UUID handoverId,
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    try {
+      byte[] pdf =
+          webClient
+              .get()
+              .uri("/api/v1/orders/" + jobOrderId + "/item-handovers/" + handoverId + "/report")
+              .headers(
+                  h -> {
+                    if (userTimeZone != null && !userTimeZone.isBlank()) {
+                      h.set("X-User-Time-Zone", userTimeZone);
+                    }
+                  })
+              .retrieve()
+              .bodyToMono(byte[].class)
+              .block();
+
+      String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
+      HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.APPLICATION_PDF);
+      headers.setContentDispositionFormData("attachment", filename);
+      return ResponseEntity.ok().headers(headers).body(pdf);
+    } catch (WebClientResponseException e) {
+      log.warn(
+          "Item-handover report proxy: backend returned {} — {}",
+          e.getStatusCode(),
+          e.getMessage());
+      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
+    } catch (ResponseStatusException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Item-handover report proxy: unexpected error", e);
+      throw new ResponseStatusException(
+          org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
+          "An unexpected error occurred while generating the item-handover report.");
+    }
+  }
+
+  /**
    * Proxies the preview of a handover report PDF (unsaved data) to the backend.
    *
    * @param jobOrderId the job order UUID

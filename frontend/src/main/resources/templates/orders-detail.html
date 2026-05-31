@@ -330,6 +330,58 @@
             </div>
         </div>
         </th:block>
+
+        <!-- ITEM orders: handover workflow. Logisticians log per-line whole-unit deliveries; the
+             backend decrements outstanding amounts and auto-completes the order once every line is
+             fully delivered. Each persisted handover offers a PDF delivery note. -->
+        <th:block th:if="${order.type == 'ITEM'}">
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
+
+        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${hasOutstandingItemLines}" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button type="button" class="btn" style="min-height: 44px;" th:text="#{orders.detail.itemHandover}" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal">Item-Übergabe protokollieren</button>
+        </div>
+        <p sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+
+        <div th:if="${order.itemHandovers != null and !order.itemHandovers.isEmpty()}" class="mt-2">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
+                        <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
+                        <th th:text="#{orders.detail.handover.items}">Items</th>
+                        <th sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="ho : ${order.itemHandovers}" data-testid="item-handover-row">
+                        <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
+                        <td th:text="${ho.recipientHandle}"></td>
+                        <td>
+                            <ul style="list-style-type: none; padding: 0; margin: 0;">
+                                <li th:each="entry : ${ho.entries}">
+                                    <span th:text="${entry.gameItem != null ? entry.gameItem.name() : '-'}"></span>:
+                                    <span th:text="${#numbers.formatInteger(entry.amount, 1)}"></span>
+                                </li>
+                            </ul>
+                        </td>
+                        <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    style="min-height: 44px; font-size: 0.85rem; white-space: nowrap;"
+                                    th:data-order-id="${order.id}"
+                                    th:data-handover-id="${ho.id}"
+                                    th:data-handover-time="${ho.handoverTime}"
+                                    th:title="#{orders.handover.report.download}"
+                                    th:text="#{orders.handover.report.download}"
+                                    data-trigger="od-download-item-report">Übergabeprotokoll herunterladen</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </th:block>
     </div>
 </main>
 
@@ -494,6 +546,62 @@
     </div>
 </div>
 
+<!-- Item-handover modal (ITEM orders). One row per still-outstanding ordered-item line; each row's
+     amount input is capped at that line's outstanding quantity. Submits as a normal form POST so the
+     page reloads on success and the refreshed @Version is picked up (no stale-version 409). -->
+<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
+
+        <form data-testid="item-handover-form" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
+            <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
+                <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
+                <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                </div>
+            </div>
+
+            <div class="form-group mb-1">
+                <label for="itemRecipientHandle" th:text="#{orders.handover.handle}" class="form-label">Empfänger (Handle)</label>
+                <input type="text" id="itemRecipientHandle" th:field="*{recipientHandle}" required class="w-full">
+            </div>
+
+            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
+
+            <!-- One row per outstanding ordered-item line. Inputs are named by request-param index so
+                 Spring binds them onto itemHandoverForm.entries; the controller drops empty rows. The
+                 outstanding value is computed once on the iterating th:block (th:with runs after
+                 th:each) so the inner th:if and the cap can both read it. -->
+            <th:block th:each="item, stat : ${order.items}"
+                      th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
+                <div th:if="${outstanding > 0}" class="item-handover-line" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                    <div>
+                        <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
+                        <div class="text-muted" style="font-size: 0.8rem;">
+                            <span th:text="#{orders.detail.item.outstanding}">Ausstehend</span>:
+                            <span th:text="${#numbers.formatInteger(outstanding, 1)}">0</span>
+                        </div>
+                        <input type="hidden" th:name="|entries[${stat.index}].jobOrderItemId|" th:value="${item.id}">
+                    </div>
+                    <div>
+                        <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
+                        <input type="number" step="1" min="0" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value="" style="width: 100%; min-height: 44px; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                    </div>
+                </div>
+            </th:block>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="submit" class="btn" style="min-height: 44px;" data-testid="item-handover-submit" th:text="#{orders.detail.save}">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     let cachedInventoryItems = [];
     let isInventoryCached = false;
@@ -620,6 +728,14 @@
         if (handoverForm) {
             handoverForm.addEventListener('submit', (e) => {
                 if (!validateHandoverAmounts()) {
+                    e.preventDefault();
+                }
+            });
+        }
+        const itemHandoverForm = document.querySelector('#item-handover-modal form');
+        if (itemHandoverForm) {
+            itemHandoverForm.addEventListener('submit', (e) => {
+                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) {
                     e.preventDefault();
                 }
             });
@@ -885,6 +1001,72 @@
         }
     }
 
+    // Item-order delivery-note download. Mirrors downloadHandoverReport but targets the item-handover
+    // proxy endpoint; the backend renders date/time in the user's IANA zone forwarded below.
+    async function downloadItemHandoverReport(btn) {
+        const orderId = btn.getAttribute('data-order-id');
+        const handoverId = btn.getAttribute('data-handover-id');
+        const handoverTimeRaw = btn.getAttribute('data-handover-time');
+        const orderNumberRaw = document.getElementById('order-display-id')?.getAttribute('data-order-number')
+            || document.getElementById('order-display-id')?.textContent?.trim()
+            || ('#' + orderId);
+        const orderNumber = orderNumberRaw.replace(/^#/, '');
+        let dateStr = '';
+        let timeStr = '';
+        if (handoverTimeRaw) {
+            const d = new Date(handoverTimeRaw);
+            dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            timeStr = String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
+        }
+        const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+        try {
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+            const userTimeZone = (Intl && Intl.DateTimeFormat)
+                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                : '';
+            const downloadHeaders = { [csrfHeader]: csrfToken };
+            if (userTimeZone) {
+                downloadHeaders['X-User-Time-Zone'] = userTimeZone;
+            }
+            const response = await fetch('/api/v1/orders/' + orderId + '/item-handovers/' + handoverId + '/report', {
+                method: 'GET',
+                headers: downloadHeaders
+            });
+            if (!response.ok) {
+                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                return;
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+        }
+    }
+
+    // Block submission of an empty item handover (every amount blank/zero) so the user gets a toast
+    // instead of a server-side "no items" round-trip. The per-row max attribute enforces the upper
+    // bound natively; this only guards the lower bound across the whole form.
+    function validateItemHandoverForm() {
+        const inputs = document.querySelectorAll('#item-handover-modal input[type="number"]');
+        for (const inp of inputs) {
+            const val = parseInt(inp.value, 10);
+            if (!isNaN(val) && val > 0) {
+                return true;
+            }
+        }
+        showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, 'error');
+        return false;
+    }
+
     async function previewHandoverReport(btn) {
         const orderId = btn.getAttribute('data-order-id');
         const orderNumber = document.getElementById('order-display-id')?.getAttribute('data-order-number')
@@ -1130,6 +1312,7 @@
         window.krtEvents.on('click', 'od-toggle-inventory', function (el) { toggleInventory(el); });
         window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
         window.krtEvents.on('click', 'od-download-report', function (el) { downloadHandoverReport(el); });
+        window.krtEvents.on('click', 'od-download-item-report', function (el) { downloadItemHandoverReport(el); });
         window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
         window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
         window.krtEvents.on('click', 'od-confirm-remove-material', function () {

@@ -14,6 +14,9 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
@@ -24,6 +27,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderItemForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.Cookie;
@@ -319,6 +323,14 @@ public class JobOrderPageController {
             order.requestingSquadron() != null ? order.requestingSquadron().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
+
+      // Item orders carry their own handover form (per-line whole-unit delivery). Empty by default;
+      // the modal renders one row per still-outstanding ordered-item line, bound by request-param
+      // name. The flag gates the "log handover" button so it hides once every line is delivered.
+      if (!model.containsAttribute("itemHandoverForm")) {
+        model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
+      }
+      model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);
@@ -787,6 +799,79 @@ public class JobOrderPageController {
   }
 
   /**
+   * Records an item handover for an item order: relays the per-line delivered whole-unit quantities
+   * to the Phase 3 backend endpoint, which decrements outstanding amounts and auto-completes the
+   * order once every line is fully delivered. Rows with a null or non-positive amount are dropped;
+   * an empty result short-circuits with an error toast. On success the page redirects (a full
+   * reload), so the refreshed {@code @Version} is picked up and no stale-version 409 can follow.
+   *
+   * @param id the item order's id
+   * @param form the bound item-handover form (per-line amounts + recipient + time)
+   * @param redirectAttributes flash channel for the success/error toast
+   * @return redirect to the order detail page
+   */
+  @PostMapping("/{id}/item-handovers")
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  public String createItemHandover(
+      @PathVariable UUID id,
+      @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
+      RedirectAttributes redirectAttributes) {
+    try {
+      List<JobOrderItemHandoverEntryCreateDto> entries =
+          form.getEntries().stream()
+              .filter(
+                  e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
+              .map(
+                  e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
+              .collect(Collectors.toList());
+
+      if (entries.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
+        return "redirect:/orders/" + id;
+      }
+
+      // handoverTime arrives as a client-produced UTC ISO-Instant (see orders-detail.html); parse
+      // as Instant to preserve the absolute point in time, falling back to local-datetime parsing
+      // and finally now() so a malformed value never blocks the handover. Mirrors createHandover.
+      Instant handoverTime = Instant.now();
+      String rawHandoverTime = form.getHandoverTime();
+      if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
+        try {
+          handoverTime = Instant.parse(rawHandoverTime);
+        } catch (Exception eiso) {
+          try {
+            handoverTime =
+                LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant();
+          } catch (Exception elocal) {
+            log.warn("Could not parse item handoverTime {}, using now()", rawHandoverTime);
+          }
+        }
+      }
+
+      JobOrderItemHandoverCreateDto dto =
+          new JobOrderItemHandoverCreateDto(handoverTime, form.getRecipientHandle(), entries);
+      backendApiClient.post(
+          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/item-handovers", id, bse);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+    } catch (Exception e) {
+      log.error(
+          "Failed to create item handover for jobOrder={} via POST"
+              + " /api/v1/orders/{}/item-handovers",
+          id,
+          id,
+          e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+    }
+    return "redirect:/orders/" + id;
+  }
+
+  /**
    * Removes a material requirement from the order without deleting any associated inventory items
    * (the items keep their job-order link cleared by the backend).
    *
@@ -958,6 +1043,29 @@ public class JobOrderPageController {
       }
     }
     return names;
+  }
+
+  /**
+   * Reports whether an item order still has at least one ordered-item line with outstanding
+   * (ordered minus delivered) whole units. Gates the item-handover button: once every line is fully
+   * delivered the order is COMPLETED and the button is hidden. Always {@code false} for material
+   * orders or an order with no item lines.
+   *
+   * @param order the loaded order (any kind)
+   * @return {@code true} if any item line has a positive outstanding quantity
+   */
+  private boolean hasOutstandingItemLines(JobOrderDto order) {
+    if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
+      return false;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      int ordered = item.amount() != null ? item.amount() : 0;
+      int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
+      if (ordered - delivered > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private List<SquadronDto> fetchSquadrons() {

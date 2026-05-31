@@ -13,6 +13,8 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemMaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -195,5 +197,93 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("material requirement rows are gated out")
         .doesNotContain("data-material-id=");
+  }
+
+  @Test
+  void itemOrderDetail_RendersHandoverModalAndHistory() throws Exception {
+    // Given: an item order with one outstanding line (3 ordered, 1 delivered -> 2 outstanding) and
+    // one already-recorded item handover. The handover button + modal must render (outstanding > 0)
+    // and the history row must offer a PDF delivery note.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID lineId = UUID.randomUUID();
+    UUID handoverId = UUID.randomUUID();
+
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            lineId,
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
+            1,
+            null,
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            1L);
+    JobOrderItemHandoverDto handover =
+        new JobOrderItemHandoverDto(
+            handoverId,
+            orderId,
+            Instant.now(),
+            "Recipient",
+            null,
+            null,
+            List.of(
+                new JobOrderItemHandoverEntryDto(
+                    UUID.randomUUID(),
+                    lineId,
+                    new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+                    1)),
+            1L);
+
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            8,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "IN_PROGRESS",
+            "ITEM",
+            List.of(),
+            List.of(line),
+            List.of(new AggregatedMaterialDto(material("Agricium", "SCU"), "NONE", 12.0)),
+            List.of(),
+            List.of(),
+            List.of(handover),
+            Instant.now(),
+            1L);
+
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    // When
+    MvcResult result =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    String html = result.getResponse().getContentAsString();
+
+    // Then: the handover button and modal render (an outstanding line exists), targeting the
+    // item-handover POST and exposing one bind-able line row.
+    assertThat(html).as("item-handover open button").contains("data-testid=\"item-handover-open\"");
+    assertThat(html).as("item-handover modal").contains("id=\"item-handover-modal\"");
+    assertThat(html).as("modal posts to the item-handover endpoint").contains("/item-handovers");
+    assertThat(html)
+        .as("line amount input bound by request-param name")
+        .contains("entries[0].amount");
+    assertThat(html)
+        .as("line id hidden input bound by request-param name")
+        .contains("entries[0].jobOrderItemId");
+
+    // Then: the history table shows the recorded handover with a PDF download trigger.
+    assertThat(html).as("item-handover history row").contains("data-testid=\"item-handover-row\"");
+    assertThat(html).as("PDF download trigger").contains("od-download-item-report");
+    assertThat(html).as("recipient handle in history").contains("Recipient");
   }
 }
