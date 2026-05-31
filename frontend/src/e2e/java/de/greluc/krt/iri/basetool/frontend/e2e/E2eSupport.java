@@ -6,6 +6,7 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -21,6 +22,19 @@ import java.util.Map;
  * tests.
  */
 final class E2eSupport {
+
+  /**
+   * Total attempts for the Keycloak login flow before giving up. The OIDC round-trip is the suite's
+   * documented high-risk flakiness class (issuer timing under CI load — see {@code
+   * docs/E2E_TESTING_PLAN.md}): when the runner is simultaneously building the stack, driving a
+   * browser and running the JVM, Keycloak occasionally stalls past the post-credential redirect's
+   * 30 s wait, surfacing as a {@link TimeoutError} on an otherwise-correct login. Retrying the
+   * whole flow on a freshly re-navigated page absorbs that transient stall; a genuinely broken
+   * login still fails every attempt and propagates, so the retry hardens against timing without
+   * masking real breakage. Three keeps the worst case bounded well inside the job's 45-minute
+   * budget.
+   */
+  private static final int LOGIN_MAX_ATTEMPTS = 3;
 
   private E2eSupport() {}
 
@@ -148,14 +162,55 @@ final class E2eSupport {
 
   /**
    * Drives the Keycloak default-theme login form and waits for the redirect back to the frontend
-   * origin.
+   * origin, retrying the whole flow up to {@link #LOGIN_MAX_ATTEMPTS} times when an attempt times
+   * out. A timed-out {@code waitForURL} means Keycloak never issued the redirect back and so set no
+   * authenticated session, which makes the retry safe and effective: re-navigating to the
+   * authorization endpoint on the same page reliably shows the form again (and aborts any
+   * navigation the stalled attempt left in flight), so a fresh attempt clears the transient
+   * issuer-timing stall. Because login is read-only this never re-runs a destructive mutation —
+   * unlike a whole-test retry — and every login in the suite gets the same resilience: the {@link
+   * #authenticatedStorageState} callers funnel through here, as do the multi-user tests that drive
+   * {@code login} directly. The final attempt's {@link TimeoutError} propagates unchanged, so a
+   * genuinely broken login is not masked.
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
    * @param username Keycloak username
    * @param password Keycloak password
+   * @throws TimeoutError if the login does not complete within {@link #LOGIN_MAX_ATTEMPTS} attempts
    */
   static void login(Page page, String baseUrl, String username, String password) {
+    for (int attempt = 1; attempt <= LOGIN_MAX_ATTEMPTS; attempt++) {
+      try {
+        attemptLogin(page, baseUrl, username, password);
+        return;
+      } catch (TimeoutError timeout) {
+        if (attempt == LOGIN_MAX_ATTEMPTS) {
+          throw timeout;
+        }
+        System.out.printf(
+            "[E2E][login] attempt %d/%d did not reach %s in time; retrying with a fresh"
+                + " navigation%n",
+            attempt, LOGIN_MAX_ATTEMPTS, baseUrl);
+      }
+    }
+  }
+
+  /**
+   * Performs a single Keycloak login attempt: navigates to the authorization endpoint (which aborts
+   * any navigation a previous attempt left in flight and re-renders the default-theme form), fills
+   * and submits the credentials, then waits up to 30 s for the redirect back to the frontend
+   * origin. Extracted from {@link #login} so the retry loop there can re-run the complete flow on a
+   * clean navigation rather than from a half-redirected page.
+   *
+   * @param page the page to drive
+   * @param baseUrl the frontend origin
+   * @param username Keycloak username
+   * @param password Keycloak password
+   * @throws TimeoutError if the form never appears or the redirect back to {@code baseUrl} does not
+   *     arrive within 30 s
+   */
+  private static void attemptLogin(Page page, String baseUrl, String username, String password) {
     page.navigate(baseUrl + "/oauth2/authorization/keycloak");
     page.waitForSelector("#username");
     page.fill("#username", username);
