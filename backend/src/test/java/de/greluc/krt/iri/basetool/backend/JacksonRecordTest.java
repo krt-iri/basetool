@@ -1,10 +1,10 @@
 package de.greluc.krt.iri.basetool.backend;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import tools.jackson.databind.json.JsonMapper;
 
 public class JacksonRecordTest {
   @Test
@@ -13,7 +13,7 @@ public class JacksonRecordTest {
         new MaterialDto(
             null, "Test", "RAW", "SCU", "desc", null, null, true, true, true, false, false, false,
             true, 1L);
-    ObjectMapper mapper = new ObjectMapper();
+    JsonMapper mapper = JsonMapper.builder().build();
     String json = mapper.writeValueAsString(dto);
 
     ExpressionParser parser = new SpelExpressionParser();

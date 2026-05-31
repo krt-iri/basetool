@@ -2,9 +2,6 @@ package de.greluc.krt.iri.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -13,6 +10,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Round-trip serialisation tests for the temporal types used at the REST boundary.
@@ -37,19 +36,17 @@ import org.junit.jupiter.api.Test;
  *       {@link OffsetDateTime} with their wall-clock value intact.
  * </ul>
  *
- * <p>All tests configure the {@link ObjectMapper} the same way Spring Boot does by default ({@code
- * JavaTimeModule} registered, {@code WRITE_DATES_AS_TIMESTAMPS} disabled) so that any regression in
- * this configuration here also surfaces in production.
+ * <p>All tests configure the {@link JsonMapper} the same way Spring Boot does by default (java.time
+ * support is built into Jackson 3, {@code WRITE_DATES_AS_TIMESTAMPS} disabled) so that any
+ * regression in this configuration here also surfaces in production.
  */
 class TimezoneSerializationTest {
 
-  private ObjectMapper objectMapper;
+  private JsonMapper objectMapper;
 
   @BeforeEach
   void setUp() {
-    objectMapper = new ObjectMapper();
-    objectMapper.registerModule(new JavaTimeModule());
-    objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+    objectMapper = JsonMapper.builder().disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS).build();
   }
 
   // -----------------------------------------------------------------------

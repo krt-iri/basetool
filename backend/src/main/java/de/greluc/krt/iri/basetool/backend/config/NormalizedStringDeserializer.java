@@ -1,11 +1,10 @@
 package de.greluc.krt.iri.basetool.backend.config;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import java.io.IOException;
 import java.text.Normalizer;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 
 /**
  * Jackson deserializer that trims, NFC-normalizes and length-caps every JSON string field.
@@ -17,12 +16,12 @@ import org.springframework.util.StringUtils;
  * longest free-text column in the schema; an oversized payload throws {@link
  * IllegalArgumentException} which {@code GlobalExceptionHandler} maps to a 400.
  */
-public class NormalizedStringDeserializer extends JsonDeserializer<String> {
+public class NormalizedStringDeserializer extends ValueDeserializer<String> {
 
   private static final int MAX_LENGTH = 8000;
 
   @Override
-  public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+  public String deserialize(JsonParser p, DeserializationContext ctxt) {
     String text = p.getValueAsString();
     if (text == null) {
       return null;

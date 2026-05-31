@@ -89,14 +89,14 @@ springBoot {
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
-  // Jackson databind for RFC7807 Problem+JSON parsing in BackendServiceException
+  // Jackson 2 — kept ONLY for ThymeleafJavaScriptSerializerConfig, the JS-inlining bridge that must
+  // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3 (tools.jackson).
+  // Thymeleaf 3.1.x (via thymeleaf-spring6) only supports Jackson 2 internally: the bridge delegates
+  // primitive values to Thymeleaf's StandardJavaScriptSerializer and mirrors its character-escape
+  // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
+  // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
+  // and the bridge is migrated — tracked in https://github.com/krt-iri/basetool/issues/294.
   implementation("com.fasterxml.jackson.core:jackson-databind")
-  // Jackson JSR-310 module — required by ThymeleafJavaScriptSerializerConfig so
-  // [[${dto}]] inline expressions can render objects carrying java.time.* fields
-  // (Instant/OffsetDateTime/LocalDateTime). Thymeleaf 3.1.x ships its own Jackson
-  // ObjectMapper without modules, and Spring Boot 4 has moved its primary mapper to
-  // Jackson 3 (tools.jackson.core), so neither path brings JSR-310 transitively for
-  // the Jackson 2 (com.fasterxml) instance Thymeleaf still uses internally.
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")

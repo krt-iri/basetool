@@ -1,48 +1,61 @@
 package de.greluc.krt.iri.basetool.backend.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.module.SimpleModule;
 
 /**
- * Replaces Spring Boot's auto-configured Jackson {@link ObjectMapper} with one that applies {@link
- * NormalizedStringDeserializer} to every JSON {@code String}.
+ * Applies the project's two REST-layer Jackson defaults to Spring Boot's auto-configured Jackson 3
+ * {@code JsonMapper}:
  *
- * <p>The deserializer trims and collapses internal whitespace exactly like {@link
- * GlobalBindingAdvice} does for form posts, so a JSON request body and an x-www-form-urlencoded
- * body cannot lead to subtly different stored values (e.g. one with trailing spaces, the other
- * without). {@code @Primary} ensures the project's mapper wins over the auto-configured one
- * wherever both are eligible (typically: WebMvc's HTTP message converters).
+ * <ol>
+ *   <li>registers {@link NormalizedStringDeserializer} so every JSON {@code String} read by the
+ *       REST layer is trimmed, NFC-normalized and length-capped — the same normalization {@link
+ *       GlobalBindingAdvice} performs for x-www-form-urlencoded posts, so a JSON body and a form
+ *       body cannot produce subtly different stored values;
+ *   <li>restores {@code FAIL_ON_NULL_FOR_PRIMITIVES = false}. Jackson 3 flipped this feature's
+ *       default to {@code true}; Jackson 2 (which the project's DTOs were written against) mapped
+ *       an absent/null JSON value for a primitive field to its type default. Without this, a
+ *       request body that omits a nested primitive — e.g. {@code location.hidden} (a {@code
+ *       boolean} on {@code LocationDto}) in a RefineryOrder create payload — would start returning
+ *       400 instead of defaulting to {@code false}.
+ * </ol>
+ *
+ * <p><b>Why a customizer and not a {@code @Primary ObjectMapper} bean.</b> Spring Boot 4 /
+ * Framework 7 drive the REST message converters (and the reactive WebClient codec) with their own
+ * Jackson 3 {@code JsonMapper}. A hand-rolled {@code @Primary} mapper — especially a Jackson 2 one
+ * — is not the instance Spring actually uses, so configuring it would silently leave the REST layer
+ * on the framework's bare defaults. {@link JsonMapperBuilderCustomizer} is the supported hook:
+ * Spring Boot applies it to the very builder it constructs the primary {@code JsonMapper} from.
  */
 @Configuration
 public class JacksonConfig {
 
   /**
-   * Returns the project's primary {@link ObjectMapper} with the normalized-string module
-   * registered; used wherever Spring's auto-wired mapper would otherwise win.
+   * Applies the normalized-string module and the {@code FAIL_ON_NULL_FOR_PRIMITIVES = false}
+   * compatibility setting to the builder Spring Boot uses to construct its primary Jackson 3 {@code
+   * JsonMapper}, so both govern every payload the REST layer parses.
    *
-   * @return the project's primary {@link ObjectMapper} with the normalized-string module
-   *     registered; used wherever Spring's auto-wired mapper would otherwise win
+   * @return a customizer that registers {@link NormalizedStringDeserializer} and restores the
+   *     Jackson 2 primitive-null leniency on the primary mapper
    */
   @Bean
-  @Primary
-  public ObjectMapper objectMapper() {
-    ObjectMapper mapper = new ObjectMapper();
-    mapper.registerModule(normalizedStringModule());
-    return mapper;
+  public JsonMapperBuilderCustomizer appJsonMapperBuilderCustomizer() {
+    return builder ->
+        builder
+            .addModule(normalizedStringModule())
+            .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false);
   }
 
   /**
-   * Returns Jackson module that installs {@link NormalizedStringDeserializer} for every JSON string
-   * field, exposed as a bean so tests can register it on their own mappers.
+   * Builds the Jackson 3 module that installs {@link NormalizedStringDeserializer} for every JSON
+   * {@code String} field.
    *
-   * @return Jackson module that installs {@link NormalizedStringDeserializer} for every JSON string
-   *     field, exposed as a bean so tests can register it on their own mappers
+   * @return a module wiring {@link NormalizedStringDeserializer} as the {@code String} deserializer
    */
-  @Bean
-  public SimpleModule normalizedStringModule() {
+  private static SimpleModule normalizedStringModule() {
     SimpleModule module = new SimpleModule();
     module.addDeserializer(String.class, new NormalizedStringDeserializer());
     return module;
