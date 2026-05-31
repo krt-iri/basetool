@@ -91,6 +91,25 @@
         </div>
 
         <div class="form-container">
+            <div class="form-group">
+                <label th:text="#{orders.create.kind}">Auftragsart</label>
+                <div class="flex-gap-sm" style="display:flex; gap:1.5rem;">
+                    <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
+                        <input type="radio" name="orderModeToggle" value="material" checked
+                               data-trigger="order-mode-toggle" style="width:auto;"
+                               data-testid="order-mode-material" />
+                        <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
+                        <input type="radio" name="orderModeToggle" value="item"
+                               data-trigger="order-mode-toggle" style="width:auto;"
+                               data-testid="order-mode-item" />
+                        <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="mode-material">
             <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
                 
@@ -168,6 +187,54 @@
                     <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
+            </div>
+
+            <div id="mode-item" hidden>
+            <form th:action="@{/orders/items}" method="post" th:object="${jobOrderItemForm}">
+                <input type="hidden" th:field="*{source}" />
+
+                <div class="form-group">
+                    <label for="item-requestingOrgUnitId" th:text="#{orders.create.squadron}">Staffel</label>
+                    <select id="item-requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required>
+                        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
+                            <option th:each="o : ${ownerOptions}" th:if="${o.kind() == 'SQUADRON'}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Staffel</option>
+                        </optgroup>
+                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
+                            <option th:each="o : ${ownerOptions}" th:if="${o.kind() == 'SPECIAL_COMMAND'}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Spezialkommando</option>
+                        </optgroup>
+                        <th:block th:unless="${ownerOptionsHasSpecialCommand}">
+                            <option th:each="o : ${ownerOptions}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Org Unit</option>
+                        </th:block>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="item-handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
+                    <input type="text" id="item-handle" th:field="*{handle}" autocomplete="off" required>
+                </div>
+
+                <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.items.title}">Items</h3>
+
+                <div th:if="${#lists.isEmpty(orderableItems)}" class="hud-box hud-box-error">
+                    <p th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</p>
+                </div>
+
+                <div id="item-lines"></div>
+
+                <button type="button" class="btn btn-secondary mt-1" data-trigger="orders-add-item" th:text="#{orders.create.item.add}">+ Item hinzufügen</button>
+
+                <div class="form-group mt-2">
+                    <label for="item-comment" th:text="#{orders.create.comment}">Kommentar</label>
+                    <textarea id="item-comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"></textarea>
+                </div>
+
+                <div class="mt-2-flex-gap">
+                    <button type="submit" class="btn" data-testid="order-item-submit" th:text="#{orders.create.save}">Speichern</button>
+                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                </div>
+            </form>
+            </div>
         </div>
     </div>
     
@@ -181,6 +248,12 @@
     <select id="minquality-options-template" style="display: none;">
         <option value="700">700</option>
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+    </select>
+
+    <!-- Template for orderable-item options, cloned by addItemLine() -->
+    <select id="item-options-template" style="display: none;">
+        <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
+        <option th:each="gi : ${orderableItems}" th:value="${gi.id()}" th:text="${gi.name()}"></option>
     </select>
 </main>
 
@@ -307,11 +380,191 @@
         materialIndex++;
     }
 
+    // ── Item-order editor ────────────────────────────────────────────────
+    const ITEM_I18N = {
+        item: /*[[#{orders.create.item}]]*/ 'Item',
+        blueprint: /*[[#{orders.create.item.blueprint}]]*/ 'Bauplan',
+        amount: /*[[#{orders.create.item.amount}]]*/ 'Anzahl',
+        remove: /*[[#{orders.create.item.remove}]]*/ 'Entfernen',
+        materialsTitle: /*[[#{orders.create.item.materials.title}]]*/ 'Materialien',
+        qualityGood: /*[[#{orders.create.item.quality.good}]]*/ 'Gut (700+)',
+        qualityNone: /*[[#{orders.create.item.quality.none}]]*/ 'Keine',
+        subTitle: /*[[#{orders.create.item.subassembly.title}]]*/ 'Unterbaugruppen',
+        subAdopt: /*[[#{orders.create.item.subassembly.adopt}]]*/ 'Uebernehmen',
+        unresolved: /*[[#{orders.create.item.unresolved}]]*/ 'Nicht aufgeloeste Zutaten:'
+    };
+    let itemLineIndex = 0;
+
+    function escapeName(s) {
+        if (window.escapeHtml) { return window.escapeHtml(String(s)); }
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function setFormDisabled(containerId, disabled) {
+        const c = document.getElementById(containerId);
+        if (!c) return;
+        c.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = disabled; });
+    }
+
+    function toggleOrderMode() {
+        const checked = document.querySelector('input[name="orderModeToggle"]:checked');
+        const mode = checked ? checked.value : 'material';
+        document.getElementById('mode-material').hidden = (mode !== 'material');
+        document.getElementById('mode-item').hidden = (mode !== 'item');
+        // Disable the hidden form's controls so their `required` fields never block the visible
+        // form's submit (disabled controls are also omitted from the POST body).
+        setFormDisabled('mode-material', mode !== 'material');
+        setFormDisabled('mode-item', mode !== 'item');
+    }
+
+    function addItemLine(prefill) {
+        prefill = prefill || {};
+        const idx = itemLineIndex++;
+        const container = document.getElementById('item-lines');
+        if (!container) return null;
+        const row = document.createElement('div');
+        row.className = 'item-line';
+        row.dataset.lineIndex = idx;
+        row.style.cssText = 'border:1px solid var(--color-gray-3); padding:1rem; margin-bottom:1rem;';
+        const options = document.getElementById('item-options-template').innerHTML;
+        row.innerHTML = `
+            <input type="hidden" name="items[${idx}].clientLineId" value="${idx}">
+            <input type="hidden" name="items[${idx}].parentClientLineId" value="${prefill.parentId != null ? prefill.parentId : ''}">
+            <div style="display:flex; gap:1rem; align-items:flex-end;">
+                <div class="form-group flex-2 mb-0">
+                    <label>${ITEM_I18N.item}</label>
+                    <select name="items[${idx}].gameItemId" data-role="item-select" required>${options}</select>
+                </div>
+                <div class="form-group flex-1 mb-0" data-role="blueprint-wrap" hidden>
+                    <label>${ITEM_I18N.blueprint}</label>
+                    <select name="items[${idx}].blueprintId" data-role="blueprint-select"></select>
+                </div>
+                <div class="form-group flex-1 mb-0">
+                    <label>${ITEM_I18N.amount}</label>
+                    <input type="number" name="items[${idx}].amount" data-role="amount" min="1" value="${prefill.amount || 1}" required>
+                </div>
+                <button type="button" class="btn btn-secondary mb-0" data-trigger="orders-remove-item" style="white-space:nowrap;">${ITEM_I18N.remove}</button>
+            </div>
+            <div data-role="derived" style="margin-top:0.75rem;"></div>
+            <div data-role="unresolved" class="hud-box hud-box-error" style="margin-top:0.5rem; display:none;"></div>
+            <div data-role="subassemblies" style="margin-top:0.5rem;"></div>
+        `;
+        container.appendChild(row);
+        if (prefill.gameItemId) {
+            row.querySelector('[data-role="item-select"]').value = prefill.gameItemId;
+            loadBlueprints(row);
+        }
+        return row;
+    }
+
+    function clearDerived(row) {
+        row.querySelector('[data-role="derived"]').innerHTML = '';
+        const u = row.querySelector('[data-role="unresolved"]');
+        u.style.display = 'none';
+        u.innerHTML = '';
+        row.querySelector('[data-role="subassemblies"]').innerHTML = '';
+    }
+
+    function loadBlueprints(row) {
+        const gameItemId = row.querySelector('[data-role="item-select"]').value;
+        const wrap = row.querySelector('[data-role="blueprint-wrap"]');
+        const bpSelect = row.querySelector('[data-role="blueprint-select"]');
+        clearDerived(row);
+        if (!gameItemId) { wrap.hidden = true; bpSelect.innerHTML = ''; return; }
+        fetch('/orders/item-blueprints/' + encodeURIComponent(gameItemId), {headers: {'Accept': 'application/json'}})
+            .then(r => r.ok ? r.json() : [])
+            .then(list => {
+                list = list || [];
+                bpSelect.innerHTML = list.map(b => `<option value="${b.id}">${escapeName(b.outputName || b.scwikiKey || b.id)}</option>`).join('');
+                wrap.hidden = list.length <= 1;
+                if (list.length > 0) { bpSelect.value = list[0].id; loadDerivation(row); }
+            })
+            .catch(() => { wrap.hidden = true; });
+    }
+
+    function loadDerivation(row) {
+        const blueprintId = row.querySelector('[data-role="blueprint-select"]').value;
+        const amount = parseInt(row.querySelector('[data-role="amount"]').value, 10) || 1;
+        if (!blueprintId) { clearDerived(row); return; }
+        const idx = row.dataset.lineIndex;
+        const derived = row.querySelector('[data-role="derived"]');
+        const unresolved = row.querySelector('[data-role="unresolved"]');
+        const subs = row.querySelector('[data-role="subassemblies"]');
+        fetch('/orders/item-derivation/' + encodeURIComponent(blueprintId) + '?amount=' + amount, {headers: {'Accept': 'application/json'}})
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (!d) { clearDerived(row); return; }
+                let html = `<strong style="color:var(--color-primary);">${ITEM_I18N.materialsTitle}</strong>`;
+                (d.materials || []).forEach((m, mi) => {
+                    const mat = m.material || {};
+                    const unit = (mat.quantityType === 'PIECE') ? 'Stk' : 'SCU';
+                    const qty = (mat.quantityType === 'PIECE') ? Math.round(m.requiredQuantity || 0) : (m.requiredQuantity || 0);
+                    const goodSel = (m.defaultQuality === 'GOOD') ? ' selected' : '';
+                    const noneSel = (m.defaultQuality !== 'GOOD') ? ' selected' : '';
+                    html += `
+                        <div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
+                            <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
+                            <span style="flex:2;">${escapeName(mat.name || '')}</span>
+                            <span style="flex:1;">${qty} ${unit}</span>
+                            <select name="items[${idx}].materials[${mi}].quality" style="flex:1;">
+                                <option value="GOOD"${goodSel}>${ITEM_I18N.qualityGood}</option>
+                                <option value="NONE"${noneSel}>${ITEM_I18N.qualityNone}</option>
+                            </select>
+                        </div>`;
+                });
+                derived.innerHTML = (d.materials || []).length ? html : '';
+                if ((d.unresolvedIngredients || []).length) {
+                    unresolved.style.display = 'block';
+                    unresolved.innerHTML = `<p>${ITEM_I18N.unresolved} ${d.unresolvedIngredients.map(escapeName).join(', ')}</p>`;
+                } else {
+                    unresolved.style.display = 'none';
+                    unresolved.innerHTML = '';
+                }
+                if ((d.subAssemblies || []).length) {
+                    let s = `<strong style="color:var(--color-primary);">${ITEM_I18N.subTitle}</strong>`;
+                    d.subAssemblies.forEach(sa => {
+                        const gi = sa.gameItem || {};
+                        s += `<div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
+                            <span style="flex:2;">${escapeName(gi.name || '')} &times; ${sa.quantity}</span>
+                            <button type="button" class="btn btn-secondary mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
+                        </div>`;
+                    });
+                    subs.innerHTML = s;
+                } else {
+                    subs.innerHTML = '';
+                }
+            })
+            .catch(() => clearDerived(row));
+    }
+
+    const itemLinesContainer = document.getElementById('item-lines');
+    if (itemLinesContainer) {
+        itemLinesContainer.addEventListener('change', e => {
+            const row = e.target.closest('.item-line');
+            if (!row) return;
+            if (e.target.matches('[data-role="item-select"]')) { loadBlueprints(row); }
+            else if (e.target.matches('[data-role="blueprint-select"]')) { loadDerivation(row); }
+            else if (e.target.matches('[data-role="amount"]')) { loadDerivation(row); }
+        });
+        itemLinesContainer.addEventListener('click', e => {
+            const removeBtn = e.target.closest('[data-trigger="orders-remove-item"]');
+            if (removeBtn) { const row = removeBtn.closest('.item-line'); if (row) { row.remove(); } return; }
+            const adoptBtn = e.target.closest('[data-trigger="orders-adopt-sub"]');
+            if (adoptBtn) {
+                addItemLine({gameItemId: adoptBtn.dataset.gameItemId, amount: parseInt(adoptBtn.dataset.amount, 10) || 1, parentId: adoptBtn.dataset.parent});
+            }
+        });
+        addItemLine();
+    }
+    document.querySelectorAll('input[name="orderModeToggle"]').forEach(r => r.addEventListener('change', toggleOrderMode));
+    toggleOrderMode();
+
     // CSP-safe delegated bindings (replaces onclick="importFromScmdb()" and
     // onclick="addMaterialRow()" inline handlers).
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
         window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
+        window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
     }
     /*]]>*/
 </script>
