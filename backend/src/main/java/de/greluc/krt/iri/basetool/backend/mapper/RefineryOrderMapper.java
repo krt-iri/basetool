@@ -27,8 +27,9 @@ public interface RefineryOrderMapper {
    * <p>After R9 Step 2 the refinery-order entity exposes {@code owningOrgUnit} (typed {@code
    * OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for
    * API stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto} so SK-owned orders surface as {@code null} on the wire
-   * while Staffel-owned ones continue to project as before.
+   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
+   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned orders now
+   * surface their SK badge instead of a blank cell.
    *
    * @param entity the refinery-order entity to project; {@code null} returns {@code null}.
    * @return the populated refinery-order DTO.
@@ -77,8 +78,16 @@ public interface RefineryOrderMapper {
         base.owningOrgUnitId());
   }
 
-  /** Slim list-row DTO of a {@link RefineryOrder}; reuses the same profit computation. */
+  /**
+   * Slim list-row DTO of a {@link RefineryOrder}; reuses the same profit computation. Like {@link
+   * #toDto(RefineryOrder)} it routes the entity's {@code owningOrgUnit} through {@code
+   * SquadronMapper.orgUnitToReferenceDto} into the DTO's {@code owningSquadron} slot — without this
+   * explicit mapping the renamed source property ({@code owningOrgUnit} since R9 Step 2) no longer
+   * matches the target name and the IGNORE policy would leave every list row's owner {@code null},
+   * blanking the Staffel/SK column in the refinery overview.
+   */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   RefineryOrderListDto toListDto(RefineryOrder entity);
 
   /**

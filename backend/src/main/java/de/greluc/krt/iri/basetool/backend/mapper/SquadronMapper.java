@@ -38,18 +38,26 @@ public interface SquadronMapper {
    * legacy {@code owningSquadron} / {@code creatingSquadron} / {@code requestingSquadron} fields
    * from those aggregates. The aggregates now expose an {@code OrgUnit}-typed owner; the DTOs still
    * publish a {@code SquadronReferenceDto} field so the API contract and the frontend templates
-   * stay stable. Squadron-owned aggregates project through {@link #toReferenceDto(Squadron)};
-   * Spezialkommando-owned ones surface as {@code null} on the wire (the DTOs have no SK slot yet —
-   * that widening lands in a follow-up release).
+   * stay stable.
+   *
+   * <p>The reference triplet ({@code id}, {@code name}, {@code shorthand}) lives entirely on the
+   * shared {@link OrgUnit} base, so both kinds project identically: a {@code Squadron} and a {@code
+   * Spezialkommando} each surface their own id/name/shorthand into the slim DTO. This deliberately
+   * supersedes the earlier "SK surfaces as {@code null}" behaviour so an SK-owned mission, order,
+   * ship, etc. renders its SK badge in the list columns instead of a blank {@code -}. Reading the
+   * base getters directly (rather than {@code instanceof}-dispatching to {@link
+   * #toReferenceDto(Squadron)}) also sidesteps the lazy-proxy {@code instanceof} pitfall, where an
+   * uninitialised {@code OrgUnit} proxy would not match its concrete subclass.
    *
    * @param orgUnit the owning org unit; may be {@code null}.
-   * @return the squadron reference DTO when {@code orgUnit} is a Squadron, {@code null} otherwise.
+   * @return the reference DTO carrying the org unit's id/name/shorthand, or {@code null} when the
+   *     {@code orgUnit} is {@code null}.
    */
   default SquadronReferenceDto orgUnitToReferenceDto(OrgUnit orgUnit) {
-    if (orgUnit instanceof Squadron squadron) {
-      return toReferenceDto(squadron);
+    if (orgUnit == null) {
+      return null;
     }
-    return null;
+    return new SquadronReferenceDto(orgUnit.getId(), orgUnit.getName(), orgUnit.getShorthand());
   }
 
   /**

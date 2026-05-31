@@ -21,9 +21,9 @@ public interface ShipMapper {
    *
    * <p>After R9 Step 2 the ship entity exposes {@code owningOrgUnit} (typed {@code OrgUnit}); the
    * DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API stability.
-   * The explicit mapping routes the source through {@code SquadronMapper.orgUnitToReferenceDto} so
-   * SK-owned ships surface as {@code null} on the wire while Staffel-owned ones continue to project
-   * as before.
+   * The explicit mapping routes the source through {@code SquadronMapper.orgUnitToReferenceDto},
+   * which projects either kind — a Staffel or a Spezialkommando — into the slim owner reference
+   * (id/name/shorthand), so SK-owned ships now surface their SK badge instead of a blank cell.
    *
    * @param ship the ship entity to project; {@code null} returns {@code null}.
    * @return the populated ship DTO.
