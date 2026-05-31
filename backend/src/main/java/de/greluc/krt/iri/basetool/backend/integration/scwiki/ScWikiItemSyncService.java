@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -126,6 +127,7 @@ public class ScWikiItemSyncService {
     int filled = 0;
     int created = 0;
     int missing = 0;
+    int deferred = 0;
 
     for (UUID uuid : targets) {
       // Pace + fetch OUTSIDE any transaction so no game_item write lock is ever held across the
@@ -145,6 +147,13 @@ public class ScWikiItemSyncService {
         } else {
           missing++;
         }
+      } catch (OptimisticLockingFailureException e) {
+        // Expected transient race: a concurrent sync (typically the parallel UEX game_item sync)
+        // updated the same row between this REQUIRES_NEW transaction's read and commit. The row is
+        // refreshed on the next scheduled closure run, so this is a benign skip — logged at WARN
+        // without a stack trace, not as an ERROR.
+        deferred++;
+        log.warn("Optimistic lock collision filling SC Wiki item {}; deferring to next run", uuid);
       } catch (Exception e) {
         log.error("Failed to fill SC Wiki item {}", uuid, e);
       }
@@ -152,10 +161,12 @@ public class ScWikiItemSyncService {
 
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
-        "Finished SC Wiki item sync: {} filled, {} created WIKI_ONLY, {} missing on Wiki.",
+        "Finished SC Wiki item sync: {} filled, {} created WIKI_ONLY, {} missing on Wiki, {}"
+            + " deferred (lock collision).",
         filled,
         created,
-        missing);
+        missing,
+        deferred);
   }
 
   /**
@@ -261,10 +272,12 @@ public class ScWikiItemSyncService {
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki item sync (full backfill): {} created WIKI_ONLY, {} linked"
-            + " UEX_ONLY→BOTH, {} skipped (junk), {} pass(es) empty/capped.",
+            + " UEX_ONLY→BOTH, {} skipped (junk), {} deferred (lock collision), {} pass(es)"
+            + " empty/capped.",
         ctx.created,
         ctx.linked,
         ctx.skipped,
+        ctx.deferred,
         ctx.failedPasses);
   }
 
@@ -387,6 +400,14 @@ public class ScWikiItemSyncService {
         } else if (outcome == BackfillOutcome.SKIPPED) {
           ctx.skipped++;
         }
+      } catch (OptimisticLockingFailureException e) {
+        // Expected transient race with the parallel UEX game_item sync (see syncItemsClosure); the
+        // row is refreshed on the next run, so defer it with a WARN rather than an ERROR.
+        ctx.deferred++;
+        log.warn(
+            "Optimistic lock collision upserting SC Wiki item {} ({}); deferring to next run",
+            dto.uuid(),
+            pass.kind());
       } catch (Exception e) {
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
@@ -594,6 +615,7 @@ public class ScWikiItemSyncService {
     private int created;
     private int linked;
     private int skipped;
+    private int deferred;
     private int failedPasses;
 
     /**

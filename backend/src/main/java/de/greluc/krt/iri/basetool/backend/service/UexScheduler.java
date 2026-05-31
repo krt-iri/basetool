@@ -31,6 +31,12 @@ import org.springframework.stereotype.Component;
  * (it resolves {@code game_item} + {@code terminal} FKs, both synced earlier in the tick), behind
  * its own {@code krt.uex.item-price-sync-enabled} flag (default off) so it stays a no-op until an
  * operator opts in.
+ *
+ * <p>Cross-scheduler exclusion: the sweep runs through a shared {@link SyncCoordinator} so it never
+ * overlaps the SC Wiki sync. UEX starts at boot ({@code initialDelay = 0}) and SC Wiki is staggered
+ * an hour later; should their daily cadences ever align, whichever fires second waits for the first
+ * to finish instead of running concurrently (which previously caused {@code game_item} write
+ * races).
  */
 @Slf4j
 @Component
@@ -51,15 +57,31 @@ public class UexScheduler {
   private final UexCategoryRefService uexCategoryRefService;
   private final UexItemSyncService uexItemSyncService;
   private final UexItemPriceSyncService uexItemPriceSyncService;
+  private final SyncCoordinator syncCoordinator;
 
   /**
-   * Runs the full UEX sync sweep on a fixed delay. Order matters — topology imports first so later
-   * imports can resolve parent locations. Exceptions are swallowed at the top level so a single
-   * failing service does not abort the remaining ones.
+   * Periodic UEX sync entry point on a fixed delay, started immediately on boot ({@code
+   * initialDelay = 0}) so it leads the staggered SC Wiki tick. Funnels the whole sweep through
+   * {@link SyncCoordinator#runExclusively(String, Runnable)} so it never runs at the same time as
+   * the SC Wiki sync: if that sync is in progress this tick waits for it to finish and then runs
+   * (it is not dropped), bounded by the coordinator's hung-sync wait cap.
    */
   @Async(AsyncConfig.UEX_EXECUTOR)
-  @Scheduled(fixedDelayString = "${krt.uex.scheduler-delay:86400000}")
+  @Scheduled(
+      fixedDelayString = "${krt.uex.scheduler-delay:86400000}",
+      initialDelayString = "${krt.uex.scheduler-initial-delay:0}")
   public void scheduleCommodityPriceUpdate() {
+    syncCoordinator.runExclusively("UEX", this::runAllSyncSteps);
+  }
+
+  /**
+   * Runs the full UEX sync sweep. Order matters — topology imports first so later imports can
+   * resolve parent locations. Exceptions are swallowed at the top level so a single failing service
+   * does not abort the remaining ones. Only ever invoked through {@link
+   * SyncCoordinator#runExclusively(String, Runnable)} by {@link #scheduleCommodityPriceUpdate()},
+   * so it holds the cross-scheduler lock for its whole duration — the SC Wiki sync waits behind it.
+   */
+  private void runAllSyncSteps() {
     log.info("Running scheduled task to update UEX data...");
     try {
       uexUniverseSyncService.syncFactions();
