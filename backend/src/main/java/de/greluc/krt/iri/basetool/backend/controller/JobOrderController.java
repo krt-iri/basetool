@@ -17,6 +17,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
@@ -74,6 +75,7 @@ public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
+  private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
   private final UserService userService;
@@ -117,6 +119,54 @@ public class JobOrderController {
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
+  }
+
+  /**
+   * Renders a persisted item handover as a downloadable PDF delivery note. The optional {@code
+   * X-User-Time-Zone} header overrides UTC for the document timestamps; an invalid IANA zone is
+   * silently dropped (the service falls back to UTC). Same authorisation as the material report.
+   *
+   * @param jobOrderId job-order id
+   * @param handoverId item-handover id
+   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
+  @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
+  @Operation(
+      summary = "Download item-handover report PDF",
+      description = "Generates and downloads a PDF delivery note for a persisted item handover.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "PDF generated successfully"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Forbidden"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Job order or item handover not found")
+  })
+  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  public ResponseEntity<byte[]> downloadItemHandoverReport(
+      @PathVariable UUID jobOrderId,
+      @PathVariable UUID handoverId,
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    java.time.ZoneId userZone = null;
+    if (userTimeZone != null && !userTimeZone.isBlank()) {
+      try {
+        userZone = java.time.ZoneId.of(userTimeZone);
+      } catch (java.time.DateTimeException ex) {
+        // Invalid IANA zone in header → fall back to UTC inside the service.
+      }
+    }
+    byte[] pdf =
+        jobOrderItemHandoverReportService.generateItemHandoverReport(
+            jobOrderId, handoverId, userZone);
+    String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", filename);
+    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 
   /**
