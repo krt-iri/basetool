@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Unit tests for {@link MaterialMatrixItemDto}. */
 public class MaterialMatrixItemDtoTest {
@@ -36,7 +36,7 @@ public class MaterialMatrixItemDtoTest {
             true,
             true,
             true);
-    ObjectMapper mapper = new ObjectMapper();
+    JsonMapper mapper = JsonMapper.builder().build();
     String json = mapper.writeValueAsString(dto);
     assertNotNull(json);
     assertTrue(json.contains("\"planetName\":\"Hurston\""));

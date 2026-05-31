@@ -747,17 +747,17 @@ public class GlobalExceptionHandler {
       // Cause message may be long but does NOT contain raw user values (Jackson masks them);
       // it carries the JSON path/line/column needed for triage.
       extra.put("causeMessage", rootCause.getMessage());
-      if (rootCause instanceof com.fasterxml.jackson.databind.JsonMappingException jme
+      if (rootCause instanceof tools.jackson.databind.DatabindException jme
           && jme.getPath() != null) {
         StringBuilder path = new StringBuilder();
         jme.getPath()
             .forEach(
                 ref -> {
-                  if (ref.getFieldName() != null) {
+                  if (ref.getPropertyName() != null) {
                     if (path.length() > 0) {
                       path.append('.');
                     }
-                    path.append(ref.getFieldName());
+                    path.append(ref.getPropertyName());
                   } else if (ref.getIndex() >= 0) {
                     path.append('[').append(ref.getIndex()).append(']');
                   }

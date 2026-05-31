@@ -78,7 +78,6 @@ dependencies {
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
-  testImplementation("com.fasterxml.jackson.core:jackson-databind")
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.testcontainers.postgresql)
   // ArchUnit core (no archunit-junit5: the latter brings its own JUnit Platform

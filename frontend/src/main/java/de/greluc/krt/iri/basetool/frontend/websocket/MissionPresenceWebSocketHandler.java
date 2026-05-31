@@ -1,9 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.websocket;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.greluc.krt.iri.basetool.frontend.service.MissionPresenceService;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
@@ -29,6 +25,11 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Native WebSocket handler for the mission-detail presence/awareness feature.
@@ -152,7 +153,7 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     JsonNode node;
     try {
       node = objectMapper.readTree(message.getPayload());
-    } catch (IOException e) {
+    } catch (JacksonException e) {
       log.debug("Discarding malformed presence message", e);
       return;
     }
@@ -248,7 +249,7 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     String payload;
     try {
       payload = objectMapper.writeValueAsString(buildSnapshot(missionId));
-    } catch (IOException e) {
+    } catch (JacksonException e) {
       log.warn("Failed to serialise presence snapshot for mission {}", missionId, e);
       return;
     }
@@ -262,7 +263,7 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     try {
       String payload = objectMapper.writeValueAsString(buildSnapshot(missionId));
       sendSafe(session, new TextMessage(payload));
-    } catch (IOException e) {
+    } catch (JacksonException e) {
       log.warn("Failed to serialise initial presence snapshot for mission {}", missionId, e);
     }
   }
@@ -365,10 +366,10 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
 
   private static String textValue(@NotNull JsonNode node, @NotNull String field) {
     JsonNode value = node.get(field);
-    if (value == null || !value.isTextual()) {
+    if (value == null || !value.isString()) {
       return null;
     }
-    String s = value.asText();
+    String s = value.asString();
     return Objects.equals(s, "") ? null : s;
   }
 }

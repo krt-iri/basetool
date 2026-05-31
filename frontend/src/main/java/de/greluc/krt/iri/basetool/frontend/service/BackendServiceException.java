@@ -1,7 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,6 +8,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Exception raised when a backend call performed by the frontend module fails.
@@ -135,19 +135,19 @@ public class BackendServiceException extends RuntimeException {
       try {
         JsonNode root = mapper.readTree(body);
         if (root.hasNonNull("code")) {
-          code = root.get("code").asText(code);
+          code = root.get("code").asString(code);
         }
         if (root.hasNonNull("correlationId")) {
-          correlationId = root.get("correlationId").asText();
+          correlationId = root.get("correlationId").asString();
         }
         if (root.hasNonNull("detail")) {
-          detail = root.get("detail").asText();
+          detail = root.get("detail").asString();
         }
         JsonNode fieldErrorsNode = root.get("fieldErrors");
         if (fieldErrorsNode != null && fieldErrorsNode.isArray()) {
           for (JsonNode fe : fieldErrorsNode) {
-            String field = fe.hasNonNull("field") ? fe.get("field").asText() : "";
-            String msg = fe.hasNonNull("message") ? fe.get("message").asText() : "";
+            String field = fe.hasNonNull("field") ? fe.get("field").asString() : "";
+            String msg = fe.hasNonNull("message") ? fe.get("message").asString() : "";
             fieldErrors.add(new FieldError(field, msg));
           }
         }

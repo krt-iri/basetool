@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +12,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for {@link BackendServiceException} — the single seam through which the frontend
@@ -25,11 +25,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  */
 class BackendServiceExceptionTest {
 
-  private ObjectMapper mapper;
+  private JsonMapper mapper;
 
   @BeforeEach
   void setUp() {
-    mapper = new ObjectMapper();
+    mapper = JsonMapper.builder().build();
   }
 
   // ---------------------------------------------------------------
