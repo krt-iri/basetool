@@ -233,7 +233,7 @@ public class JobOrderItemHandoverReportService {
    * PdfPageEvent painting the KRT corporate-design background (dark fill, orange accent bars, logo)
    * on every page, mirroring {@link JobOrderHandoverReportService}.
    */
-  private class KrtPageBackground extends PdfPageEventHelper {
+  private static class KrtPageBackground extends PdfPageEventHelper {
 
     @Override
     public void onStartPage(PdfWriter writer, Document document) {
