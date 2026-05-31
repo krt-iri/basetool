@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
@@ -103,6 +104,10 @@ class JobOrderControllerTest {
         "deliver to ArcCorp",
         1,
         JobOrderStatus.OPEN,
+        JobOrderType.MATERIAL,
+        List.of(),
+        List.of(),
+        List.of(),
         List.of(),
         List.of(),
         List.of(),

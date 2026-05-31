@@ -12946,6 +12946,105 @@
         }
       }
     },
+    "/api/v1/orders/{id}/item-handovers" : {
+      "post" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Create an item handover",
+        "description" : "Logs a handover of produced items for this item order.",
+        "operationId" : "createItemHandover",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JobOrderItemHandoverCreateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderItemHandoverDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/handovers" : {
       "post" : {
         "tags" : [ "Orders" ],
@@ -13166,6 +13265,96 @@
         "responses" : {
           "200" : {
             "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/items" : {
+      "post" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Create a new item job order",
+        "description" : "Creates an item-based job order; the required materials are derived from each ordered item's blueprint.",
+        "operationId" : "createItemJobOrder",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobOrderItemRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -24462,6 +24651,128 @@
         }
       }
     },
+    "/api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Download item-handover report PDF",
+        "description" : "Generates and downloads a PDF delivery note for a persisted item handover.",
+        "operationId" : "downloadItemHandoverReport",
+        "parameters" : [ {
+          "name" : "jobOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "handoverId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "X-User-Time-Zone",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "PDF generated successfully",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{jobOrderId}/handovers/{handoverId}/report" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -24731,6 +25042,361 @@
                   "items" : {
                     "$ref" : "#/components/schemas/JobOrderReferenceDto"
                   }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/item-catalog" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "List orderable items",
+        "description" : "Returns a paginated list of items that can be ordered (blueprint outputs with at least one resolvable material).",
+        "operationId" : "getOrderableItems",
+        "parameters" : [ {
+          "name" : "search",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "name,asc"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseGameItemReferenceDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/item-catalog/{gameItemId}/blueprints" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "List blueprints for an orderable item",
+        "description" : "Returns the blueprints that produce the given item.",
+        "operationId" : "getBlueprintsForItem",
+        "parameters" : [ {
+          "name" : "gameItemId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BlueprintReferenceDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/item-catalog/blueprints/{blueprintId}/derivation" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Preview blueprint material derivation",
+        "description" : "Returns the materials, sub-assembly suggestions and unresolved ingredients derived from a blueprint at the given amount.",
+        "operationId" : "getBlueprintDerivation",
+        "parameters" : [ {
+          "name" : "blueprintId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "amount",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ItemDerivationDto"
                 }
               }
             }
@@ -31243,6 +31909,52 @@
         },
         "required" : [ "amount", "materialId" ]
       },
+      "AggregatedMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          },
+          "totalQuantity" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "BlueprintReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "outputName" : {
+            "type" : "string"
+          },
+          "scwikiKey" : {
+            "type" : "string"
+          }
+        }
+      },
+      "GameItemReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          }
+        }
+      },
       "JobOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -31274,10 +31986,26 @@
             "type" : "string",
             "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED" ]
           },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          },
           "materials" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/JobOrderMaterialDto"
+            }
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemDto"
+            }
+          },
+          "aggregatedMaterials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AggregatedMaterialDto"
             }
           },
           "assignees" : {
@@ -31290,6 +32018,12 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/JobOrderHandoverDto"
+            }
+          },
+          "itemHandovers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemHandoverDto"
             }
           },
           "createdAt" : {
@@ -31365,6 +32099,123 @@
           },
           "locationName" : {
             "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
+          },
+          "blueprint" : {
+            "$ref" : "#/components/schemas/BlueprintReferenceDto"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "deliveredAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "parentItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemMaterialDto"
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderItemHandoverDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "handoverTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recipientHandle" : {
+            "type" : "string"
+          },
+          "executingUser" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "executingSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemHandoverEntryDto"
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderItemHandoverEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "JobOrderItemMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "requiredQuantity" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
           },
           "version" : {
             "type" : "integer",
@@ -32724,6 +33575,43 @@
         },
         "required" : [ "handoverTime", "items", "jobOrderNumber", "recipientHandle" ]
       },
+      "JobOrderItemHandoverCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "handoverTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recipientHandle" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemHandoverEntryCreateDto"
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [ "entries", "handoverTime", "recipientHandle" ]
+      },
+      "JobOrderItemHandoverEntryCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrderItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          }
+        },
+        "required" : [ "amount", "jobOrderItemId" ]
+      },
       "JobOrderHandoverCreateDto" : {
         "type" : "object",
         "properties" : {
@@ -32761,6 +33649,91 @@
           }
         },
         "required" : [ "amount", "inventoryItemId" ]
+      },
+      "CreateJobOrderItemLineDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "blueprintId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemMaterialDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "clientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "parentClientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "amount", "blueprintId", "gameItemId" ]
+      },
+      "CreateJobOrderItemMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quality" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          }
+        },
+        "required" : [ "materialId", "quality" ]
+      },
+      "CreateJobOrderItemRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "creatingSquadronId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "requestingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "handle" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemLineDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "items" ]
       },
       "OperationCreateDto" : {
         "type" : "object",
@@ -34368,6 +35341,103 @@
           }
         }
       },
+      "PageResponseGameItemReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GameItemReferenceDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "DerivedMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "requiredQuantity" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "defaultQuality" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          }
+        }
+      },
+      "ItemDerivationDto" : {
+        "type" : "object",
+        "properties" : {
+          "blueprint" : {
+            "$ref" : "#/components/schemas/BlueprintReferenceDto"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DerivedMaterialDto"
+            }
+          },
+          "subAssemblies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SubAssemblySuggestionDto"
+            }
+          },
+          "unresolvedIngredients" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "SubAssemblySuggestionDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItem" : {
+            "$ref" : "#/components/schemas/GameItemReferenceDto"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "blueprints" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintReferenceDto"
+            }
+          }
+        }
+      },
       "PageResponseOperationDto" : {
         "type" : "object",
         "properties" : {
@@ -35449,6 +36519,14 @@
             "items" : {
               "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
             }
+          },
+          "effectiveQualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "effectiveQualityMax" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },

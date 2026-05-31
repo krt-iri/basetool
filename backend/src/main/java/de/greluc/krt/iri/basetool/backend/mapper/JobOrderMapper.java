@@ -41,6 +41,9 @@ public interface JobOrderMapper {
    */
   @Mapping(target = "creatingSquadron", source = "creatingOrgUnit")
   @Mapping(target = "requestingSquadron", source = "requestingOrgUnit")
+  @Mapping(target = "items", ignore = true)
+  @Mapping(target = "aggregatedMaterials", ignore = true)
+  @Mapping(target = "itemHandovers", ignore = true)
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**

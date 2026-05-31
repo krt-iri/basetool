@@ -95,6 +95,17 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private JobOrderStatus status = JobOrderStatus.OPEN;
 
+  /**
+   * Order kind. {@link JobOrderType#MATERIAL} (the default, and the value backfilled onto every
+   * pre-existing row by migration V123) requests raw materials directly via {@link #materials};
+   * {@link JobOrderType#ITEM} requests finished items via {@link #items}, from which the material
+   * requirements are derived. Never {@code null}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  @Builder.Default
+  private JobOrderType type = JobOrderType.MATERIAL;
+
   @OneToMany(
       mappedBy = "jobOrder",
       cascade = CascadeType.ALL,
@@ -120,6 +131,30 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Set<JobOrderHandover> handovers = new HashSet<>();
 
   /**
+   * Ordered finished-item lines, populated only for {@link JobOrderType#ITEM} orders. Empty for
+   * material orders.
+   */
+  @OneToMany(
+      mappedBy = "jobOrder",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @Builder.Default
+  private Set<JobOrderItem> items = new HashSet<>();
+
+  /**
+   * Item-handover fulfilment events, populated only for {@link JobOrderType#ITEM} orders. Empty for
+   * material orders (which use {@link #handovers}).
+   */
+  @OneToMany(
+      mappedBy = "jobOrder",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @Builder.Default
+  private Set<JobOrderItemHandover> itemHandovers = new HashSet<>();
+
+  /**
    * Adds a material and keeps the bidirectional back-reference in sync.
    *
    * @param material the child material row to attach; mutated so its {@code jobOrder} back-link
@@ -128,5 +163,27 @@ public class JobOrder extends AbstractEntity<UUID> {
   public void addMaterial(JobOrderMaterial material) {
     materials.add(material);
     material.setJobOrder(this);
+  }
+
+  /**
+   * Adds an ordered finished-item line and keeps the bidirectional back-reference in sync.
+   *
+   * @param item the child item line to attach; mutated so its {@code jobOrder} back-link points at
+   *     this order.
+   */
+  public void addItem(JobOrderItem item) {
+    items.add(item);
+    item.setJobOrder(this);
+  }
+
+  /**
+   * Adds an item-handover fulfilment event and keeps the bidirectional back-reference in sync.
+   *
+   * @param itemHandover the child handover to attach; mutated so its {@code jobOrder} back-link
+   *     points at this order.
+   */
+  public void addItemHandover(JobOrderItemHandover itemHandover) {
+    itemHandovers.add(itemHandover);
+    itemHandover.setJobOrder(this);
   }
 }
