@@ -158,29 +158,22 @@
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
     <script th:attr="nonce=${cspNonce}">
-        // Global click handler for hamburger menu to prevent any DOM/TextNode issues
-        document.addEventListener('click', function(e) {
-            let target = e.target;
-            let isHamburger = false;
-            while (target && target !== document) {
-                if (target.id === 'hamburger') {
-                    isHamburger = true;
-                    break;
-                }
-                target = target.parentNode;
-            }
-            
-            if (isHamburger) {
-                e.preventDefault();
-                e.stopPropagation();
-                const sidebarEl = document.getElementById('sidebar');
-                const overlayEl = document.getElementById('sidebar-overlay');
-                if (sidebarEl) sidebarEl.classList.add('open');
-                if (overlayEl) overlayEl.classList.add('visible');
-            }
-        });
-
         document.addEventListener("DOMContentLoaded", function() {
+            // Direct listener on the hamburger button. Clicks on its inner
+            // <span> bars bubble up to the button, so a single listener here
+            // covers them without scanning the parent chain on every click.
+            const hamburgerEl = document.getElementById('hamburger');
+            if (hamburgerEl) {
+                hamburgerEl.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const sidebarEl = document.getElementById('sidebar');
+                    const overlayEl = document.getElementById('sidebar-overlay');
+                    if (sidebarEl) sidebarEl.classList.add('open');
+                    if (overlayEl) overlayEl.classList.add('visible');
+                });
+            }
+
             // Admin-mode visual marker: every page under /admin/* gets a
             // `.admin-mode` body class plus a small "ADMIN" chip injected
             // into the page header. Pure UX cue — does NOT grant any
