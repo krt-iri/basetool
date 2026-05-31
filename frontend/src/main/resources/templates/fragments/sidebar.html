@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 <th:block th:fragment="sidebar">
@@ -35,11 +35,11 @@
             <button id="close-sidebar" class="close-sidebar-btn">&times;</button>
             <div class="sidebar-links">
                 <a th:href="@{/}" th:text="#{nav.home}">Home</a>
-                <a th:href="@{/missions}" th:text="#{nav.missions}">Missions</a>
+                <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
                 <span sec:authorize="isAuthenticated()">
                 <a th:href="@{/operations}" th:text="#{nav.operations}">Operations</a>
-                <a th:href="@{/orders}" th:text="#{nav.orders}">Aufträge</a>
-                <a th:href="@{/refinery-orders}" th:text="#{nav.refinery}">Raffinerie</a>
+                <a th:href="@{/orders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
+                <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
                 <a th:href="@{/inventory}" th:text="#{nav.inventory}">Lager</a>
                 <details class="sidebar-group">
                     <summary th:text="#{nav.materials}">Materialien</summary>
@@ -49,7 +49,7 @@
                         <a th:href="@{/materials/profit-calculation}" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
                     </div>
                 </details>
-                <a th:href="@{/hangar}" th:text="#{nav.hangar}">Hangar</a>
+                <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
                 <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory}">Persönliches Inventar</a>
                 <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
@@ -75,6 +75,7 @@
                         <a th:href="@{/admin/materials}" th:text="#{nav.admin.materials}">Materialien</a>
                         <a th:href="@{/admin/material-aliases}" th:text="#{nav.admin.materialAliases}">Material-Aliase</a>
                         <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
+                        <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                         <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}" sec:authorize="hasRole('ADMIN')">Pers. Inventar (Admin)</a>
                     </div>

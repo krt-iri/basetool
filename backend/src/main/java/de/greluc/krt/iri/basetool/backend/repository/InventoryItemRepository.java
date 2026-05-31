@@ -170,8 +170,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
   /**
    * Returns the total {@code amount} of one material assigned to one job-order whose quality meets
-   * or exceeds the threshold; {@code 0.0} if there is no matching row. Native query because the
-   * {@code COALESCE} + {@code SUM} combination simplifies the null-handling at the call site (the
+   * or exceeds the threshold; {@code 0.0} if there is no matching row. A {@code null} minQuality
+   * (Keine) imposes no quality floor — all qualities count. Native query because the {@code
+   * COALESCE} + {@code SUM} combination simplifies the null-handling at the call site (the
    * job-order completion check would otherwise need a separate empty/null guard).
    */
   @Query(
@@ -179,7 +180,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           "SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item "
               + "WHERE material_id = :materialId "
               + "AND job_order_id = :jobOrderId "
-              + "AND quality >= :minQuality",
+              + "AND (:minQuality IS NULL OR quality >= :minQuality)",
       nativeQuery = true)
   Double sumAmountByMaterialAndJobOrderAndMinQuality(
       @Param("materialId") UUID materialId,

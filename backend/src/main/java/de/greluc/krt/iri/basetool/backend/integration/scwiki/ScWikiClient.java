@@ -1,7 +1,5 @@
 package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import jakarta.annotation.PostConstruct;
@@ -19,6 +17,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Read-only HTTP client for the SC Wiki catalogue API ({@code https://api.star-citizen.wiki}).
@@ -81,12 +82,13 @@ public class ScWikiClient {
 
   /**
    * Jackson mapper used by {@link #fetchOne} to unwrap the optional single-resource {@code {data:
-   * …}} envelope and bind the payload. A plain instance is sufficient: the SC Wiki DTOs use only
-   * core types (UUID / String / Double / Boolean / Map / nested records), so no extra modules are
-   * needed. Declared {@code final} with an initializer so Lombok keeps it off the generated
-   * constructor — existing unit tests that build the client directly stay source-compatible.
+   * …}} envelope and bind the payload. A default Jackson 3 mapper is sufficient: the SC Wiki DTOs
+   * use only core types (UUID / String / Double / Boolean / Map / nested records), so no extra
+   * modules are needed. Declared {@code final} with an initializer so Lombok keeps it off the
+   * generated constructor — existing unit tests that build the client directly stay
+   * source-compatible.
    */
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
   /**
    * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
@@ -248,7 +250,12 @@ public class ScWikiClient {
    */
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
-    JsonNode body =
+    // Decode to a raw String, then parse + unwrap with this client's own mapper. The Wiki wraps
+    // some
+    // single-resource responses in {"data": {…}} and returns others flat, so reading the body as a
+    // tree and unwrapping a top-level "data" node before binding is simpler and more robust than a
+    // codec-level bind that would have to know about the envelope.
+    String rawBody =
         client
             .get()
             .uri(uri)
@@ -256,12 +263,12 @@ public class ScWikiClient {
                 response -> {
                   int status = response.statusCode().value();
                   if (status == 404 || status == 304) {
-                    return Mono.<JsonNode>empty();
+                    return Mono.<String>empty();
                   }
                   if (!response.statusCode().is2xxSuccessful()) {
                     return response.createError();
                   }
-                  return response.bodyToMono(JsonNode.class);
+                  return response.bodyToMono(String.class);
                 })
             .timeout(CALL_TIMEOUT)
             .onErrorResume(
@@ -271,11 +278,12 @@ public class ScWikiClient {
                 })
             .blockOptional()
             .orElse(null);
-    if (body == null) {
+    if (rawBody == null || rawBody.isBlank()) {
       return null;
     }
-    JsonNode payload = body.has("data") ? body.get("data") : body;
     try {
+      JsonNode body = objectMapper.readTree(rawBody);
+      JsonNode payload = body.has("data") ? body.get("data") : body;
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
       log.error("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);

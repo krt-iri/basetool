@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.list} + ' - ' + ${appTitle}">Materialien - Profit Basetool</title>
@@ -57,7 +57,7 @@
         .form-group input {
             width: 100%;
             padding: 0.5rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -109,7 +109,7 @@
         </div>
 
         <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
-            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-gray-4); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
+            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-surface-input); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
                 <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
                 <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
             </div>

@@ -5,7 +5,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.repository.*;
 import java.time.Instant;
@@ -20,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -46,8 +46,7 @@ class MissionManagerJobTypeTest {
 
   @Autowired private SquadronRepository squadronRepository;
 
-  private ObjectMapper objectMapper =
-      new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+  private JsonMapper objectMapper = JsonMapper.builder().build();
 
   private User manager;
   private Mission mission;

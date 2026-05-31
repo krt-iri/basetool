@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
+import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.iri.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import java.util.List;
@@ -237,6 +238,61 @@ class ScWikiClientTest {
         rows.size(),
         "page-1 succeeded with one row; the page-2 5xx must not wipe what we already have");
     assertEquals("Iron", rows.get(0).name());
+  }
+
+  // ─── fetchOne single-resource bind ──────────────────────────────────────
+
+  @Test
+  void fetchOne_dataWrappedDetail_bindsThroughRealCodec() throws Exception {
+    // Regression: Spring Boot 4 wires the WebClient to the Jackson 3 codec, which cannot construct
+    // a
+    // Jackson 2 JsonNode — the previous bodyToMono(JsonNode.class) aborted every blueprint/item
+    // detail fetch with "Cannot construct instance of JsonNode". This binds the {data:{…}} envelope
+    // end-to-end through that real codec, so a reintroduction fails here instead of only in prod.
+    server.enqueue(
+        jsonOk(
+            """
+            {"data":{"uuid":"00000000-0000-0000-0000-0000000000bb",
+            "key":"BP_CRAFT_TEST","output_name":"Test Output"}}
+            """));
+
+    ScWikiBlueprintDto detail =
+        client.fetchOne(
+            "/api/blueprints/00000000-0000-0000-0000-0000000000bb",
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertNotNull(detail, "data-wrapped detail must bind, not fail the Jackson codec");
+    assertEquals("BP_CRAFT_TEST", detail.key());
+    assertEquals("Test Output", detail.outputName());
+  }
+
+  @Test
+  void fetchOne_flatDetailWithoutDataEnvelope_binds() throws Exception {
+    server.enqueue(
+        jsonOk(
+            """
+            {"uuid":"00000000-0000-0000-0000-0000000000cc","key":"BP_FLAT","output_name":"Flat"}
+            """));
+
+    ScWikiBlueprintDto detail =
+        client.fetchOne(
+            "/api/blueprints/00000000-0000-0000-0000-0000000000cc",
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertNotNull(detail, "a flat (un-enveloped) body must bind too");
+    assertEquals("BP_FLAT", detail.key());
+  }
+
+  @Test
+  void fetchOne_notFound_returnsNull() {
+    server.enqueue(new MockResponse().setResponseCode(404));
+
+    ScWikiBlueprintDto detail =
+        client.fetchOne("/api/blueprints/missing", ScWikiBlueprintDto.class, "blueprint");
+
+    assertNull(detail, "404 must resolve to null (Wiki doesn't know this one), not throw");
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────

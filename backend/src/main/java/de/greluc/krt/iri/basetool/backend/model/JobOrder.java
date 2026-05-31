@@ -34,6 +34,13 @@ import lombok.Setter;
 @Table(name = "job_order")
 public class JobOrder extends AbstractEntity<UUID> {
 
+  /**
+   * Maximum length, in characters, of the optional {@link #comment}. The same bound is enforced at
+   * the DTO validation boundary ({@code @Size}), in the {@code comment} column definition, and by
+   * the Flyway migration, so the cap holds end-to-end for untrusted (incl. anonymous) input.
+   */
+  public static final int COMMENT_MAX_LENGTH = 1000;
+
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -71,6 +78,17 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Column private String handle;
 
   @Column private Integer priority;
+
+  /**
+   * Optional free-text comment captured from the order creator at creation time (context, delivery
+   * notes, …). Stored as plain text and always rendered HTML-escaped in the UI — never interpreted
+   * as markup. Because anonymous users may create job orders this value is fully untrusted: its
+   * length is bounded to {@value #COMMENT_MAX_LENGTH} characters at the DTO boundary and by the
+   * column definition, and it is never written to application logs. {@code null} when the creator
+   * left the field empty.
+   */
+  @Column(name = "comment", length = COMMENT_MAX_LENGTH)
+  private String comment;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)

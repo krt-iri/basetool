@@ -1,16 +1,14 @@
 package de.greluc.krt.iri.basetool.backend;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 public class JacksonRefineryOrderTest {
   @Test
   public void testDeserialization() throws Exception {
-    ObjectMapper mapper = new ObjectMapper();
-    mapper.registerModule(new JavaTimeModule());
+    JsonMapper mapper = JsonMapper.builder().build();
 
     Map<String, Object> orderDto = new HashMap<>();
     orderDto.put("startedAt", "2026-03-27T18:35:59Z");

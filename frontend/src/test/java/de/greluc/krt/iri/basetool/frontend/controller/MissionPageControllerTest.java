@@ -137,6 +137,46 @@ class MissionPageControllerTest {
   }
 
   @Test
+  void setPartyLead_ShouldCallBackendPutAndExposeSuccessToast() {
+    UUID id = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionPageController controller = new MissionPageController(backendApiClient);
+    RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
+
+    String view = controller.setPartyLead(id, userId, "Alice", 2L, redirectAttributes);
+
+    assertEquals("redirect:/missions/" + id, view);
+    verify(backendApiClient)
+        .put(eq("/api/v1/missions/" + id + "/party-lead"), any(), eq(Void.class), eq(false));
+    verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
+  }
+
+  @Test
+  void setPartyLead_Conflict_ShouldExposeLocalizedToast() {
+    // Backend returns 409 for an ambiguous free-text name or a stale partyLeadVersion; the
+    // frontend must surface the dedicated conflict toast key rather than the generic update error.
+    UUID id = UUID.randomUUID();
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionPageController controller = new MissionPageController(backendApiClient);
+    RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false)))
+        .thenThrow(
+            new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                "conflict", null, 409));
+
+    String view = controller.setPartyLead(id, null, "Shared Alias", 0L, redirectAttributes);
+
+    assertEquals("redirect:/missions/" + id, view);
+    verify(redirectAttributes).addFlashAttribute("errorToast", "error.mission.party_lead.conflict");
+    verify(redirectAttributes, never())
+        .addFlashAttribute("errorToast", "error.mission.party_lead.update");
+  }
+
+  @Test
   void deleteParticipant_ShouldCallWebClient() {
     // Arrange
     UUID id = UUID.randomUUID();
@@ -346,7 +386,10 @@ class MissionPageControllerTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
@@ -414,7 +457,10 @@ class MissionPageControllerTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))

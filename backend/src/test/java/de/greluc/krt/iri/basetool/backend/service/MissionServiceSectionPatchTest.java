@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -348,5 +350,101 @@ class MissionServiceSectionPatchTest {
     long v = missionService.getMissionOwnershipVersion(missionId);
 
     assertEquals(5L, v);
+  }
+
+  // -----------------------------------------------------------------------------------------
+  // Party lead (Partyleiter): section-scoped attribute. setPartyLead persists exactly what the
+  // controller hands it (the free-text -> user resolution happens controller-side, mirroring the
+  // participant-add endpoints), validates/bumps only partyLeadVersion, and links XOR guest-handle
+  // are mutually exclusive.
+  // -----------------------------------------------------------------------------------------
+
+  @Test
+  void setPartyLead_shouldLinkRegisteredUser_whenUserIdProvided() {
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    // A pre-existing guest handle must be cleared when a registered user is linked.
+    existing.setPartyLeadGuestName("Old Guest Lead");
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
+
+    assertSame(user, result.getPartyLeadUser());
+    assertNull(result.getPartyLeadGuestName());
+    assertEquals(1L, result.getPartyLeadVersion());
+  }
+
+  @Test
+  void setPartyLead_shouldStoreGuestName_whenOnlyGuestNameProvided() {
+    User previous = new User();
+    previous.setId(UUID.randomUUID());
+    // A pre-existing linked user must be cleared when a free-text handle is stored.
+    existing.setPartyLeadUser(previous);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.setPartyLead(missionId, null, "  Ghost Pilot  ", 0L);
+
+    assertNull(result.getPartyLeadUser());
+    // The handle is trimmed before persisting.
+    assertEquals("Ghost Pilot", result.getPartyLeadGuestName());
+    assertEquals(1L, result.getPartyLeadVersion());
+  }
+
+  @Test
+  void setPartyLead_shouldClearPartyLead_whenNeitherUserNorGuestNameProvided() {
+    existing.setPartyLeadGuestName("Someone");
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.setPartyLead(missionId, null, "   ", 0L);
+
+    assertNull(result.getPartyLeadUser());
+    assertNull(result.getPartyLeadGuestName());
+    assertEquals(1L, result.getPartyLeadVersion());
+  }
+
+  @Test
+  void setPartyLead_shouldBumpOnlyPartyLeadVersion_andNotCallParentVersion() {
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
+
+    // Only the party-lead counter advances; the other section counters and the global version
+    // stay put so concurrent edits on other sections are not invalidated.
+    assertEquals(1L, result.getPartyLeadVersion());
+    assertEquals(4L, result.getCoreVersion());
+    assertEquals(5L, result.getScheduleVersion());
+    assertEquals(6L, result.getFlagsVersion());
+    assertEquals(7L, result.getVersion());
+  }
+
+  @Test
+  void setPartyLead_shouldThrow409_whenPartyLeadVersionMismatch() {
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+
+    // Mission partyLeadVersion is 0 (fresh Mission); a stale expected version must fail with 409
+    // even though every other counter is untouched.
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> missionService.setPartyLead(missionId, null, "Whoever", 5L));
+  }
+
+  @Test
+  void setPartyLead_shouldThrow404_whenReferencedUserUnknown() {
+    UUID userId = UUID.randomUUID();
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+    assertThrows(
+        NotFoundException.class, () -> missionService.setPartyLead(missionId, userId, null, 0L));
   }
 }

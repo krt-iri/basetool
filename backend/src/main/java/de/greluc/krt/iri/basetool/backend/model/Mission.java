@@ -86,6 +86,16 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Long flagsVersion = 0L;
 
+  /**
+   * Section-scoped optimistic-lock counter for the {@code party-lead} endpoint ({@link
+   * #partyLeadUser} / {@link #partyLeadGuestName}). Independent of the global {@link
+   * AbstractEntity#getVersion()} and marked {@code @OptimisticLock(excluded = true)} so assigning a
+   * party lead does not invalidate other users' open forms on the same mission.
+   */
+  @Column(name = "party_lead_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long partyLeadVersion = 0L;
+
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionParticipant> participants = new HashSet<>();
@@ -133,6 +143,27 @@ public class Mission extends AbstractEntity<UUID> {
   @JoinColumn(name = "owner_id")
   @OptimisticLock(excluded = true)
   private User owner;
+
+  /**
+   * Optional party lead (Partyleiter) of this mission, as a linked registered user. Mutually
+   * exclusive with {@link #partyLeadGuestName}: a registered party lead clears the guest handle and
+   * vice versa. {@code null} when no party lead is assigned or when the lead is an unregistered
+   * person captured via {@link #partyLeadGuestName}. Excluded from the global optimistic-lock; the
+   * dedicated {@link #partyLeadVersion} guards concurrent edits instead.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "party_lead_user_id")
+  @OptimisticLock(excluded = true)
+  private User partyLeadUser;
+
+  /**
+   * Optional free-text party-lead handle for an unregistered/anonymous person, mirroring {@link
+   * MissionParticipant#getGuestName()}. Mutually exclusive with {@link #partyLeadUser}. {@code
+   * null} when no party lead is assigned or when the lead is a registered user.
+   */
+  @Column(name = "party_lead_guest_name", length = 100)
+  @OptimisticLock(excluded = true)
+  private String partyLeadGuestName;
 
   @ManyToMany
   @JoinTable(

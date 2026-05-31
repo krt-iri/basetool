@@ -6,7 +6,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -33,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -51,7 +51,7 @@ class MissionTimeTest {
 
   @Autowired private MissionService missionService;
 
-  private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+  private final JsonMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -117,7 +117,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(
@@ -168,7 +171,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(
@@ -289,7 +295,10 @@ class MissionTimeTest {
             0L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     mockMvc
         .perform(

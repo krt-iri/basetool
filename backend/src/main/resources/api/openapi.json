@@ -5823,6 +5823,105 @@
         }
       }
     },
+    "/api/v1/missions/{id}/party-lead" : {
+      "put" : {
+        "tags" : [ "Missions" ],
+        "summary" : "Set or clear the party lead of a mission",
+        "description" : "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text guestName, mirroring the participant-add resolution: a free-text name is resolved case-insensitively against registered members (unique match links the user, multiple matches return 409, no match stores a guest handle). Submitting neither clears the party lead. The version must match the mission's current partyLeadVersion or 409 (application/problem+json) is returned.",
+        "operationId" : "setPartyLead",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetPartyLeadRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Party lead updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{id}/participants/{participantId}" : {
       "put" : {
         "tags" : [ "Missions" ],
@@ -24921,7 +25020,7 @@
       "get" : {
         "tags" : [ "Operations" ],
         "summary" : "Search operations (paginated)",
-        "description" : "Returns operations matching the supplied filters (free-text query + status list). Operations have no `plannedStartTime` of their own - that field lives on the underlying missions - so the missions' date-range filter has no equivalent here. Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. `id` is appended automatically as a stable tiebreaker.",
+        "description" : "Returns operations matching the supplied filters (free-text query + status list + time range). Operations have no `plannedStartTime` of their own - that field lives on the underlying missions - so `start` filters on the earliest linked mission's planned start and `end` on the latest linked mission's planned end. Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. `id` is appended automatically as a stable tiebreaker.",
         "operationId" : "searchOperations",
         "parameters" : [ {
           "name" : "query",
@@ -24929,6 +25028,22 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "name" : "start",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "end",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }, {
           "name" : "status",
@@ -25322,6 +25437,115 @@
               "*/*" : {
                 "schema" : {
                   "type" : "number"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/{id}/unit-ship-options" : {
+      "get" : {
+        "tags" : [ "Missions" ],
+        "summary" : "List selectable ships for a mission's units",
+        "description" : "Returns the ships a unit of this mission may be crewed with: ships owned by registered participants (regardless of OrgUnit) plus ships already assigned to a unit of the mission. Restricted to callers who may manage the mission.",
+        "operationId" : "getUnitShipOptions",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ShipDto"
+                  }
                 }
               }
             }
@@ -28611,6 +28835,134 @@
         }
       }
     },
+    "/api/v1/blueprints" : {
+      "get" : {
+        "tags" : [ "blueprint-controller" ],
+        "summary" : "List synced crafting blueprints",
+        "description" : "Admin-only. Returns synced SC Wiki blueprints with their ingredients and the per-slot stat modifiers (requirement groups), filtered by output-item name / Wiki key.",
+        "operationId" : "getBlueprints",
+        "parameters" : [ {
+          "name" : "search",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Blueprint page returned",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseBlueprintDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/announcement/admin" : {
       "get" : {
         "tags" : [ "announcement-controller" ],
@@ -30847,6 +31199,11 @@
             "maxLength" : 200,
             "minLength" : 0
           },
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
           "materials" : {
             "type" : "array",
             "items" : {
@@ -30872,7 +31229,7 @@
           "minQuality" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Minimale Qualität, wird serverseitig fest auf 700 gesetzt",
+            "description" : "Minimale Qualität: 700 (vorgegeben) oder null für \"Keine\" (keine Mindestqualität).",
             "example" : 700,
             "maximum" : 700,
             "minimum" : 700
@@ -30884,7 +31241,7 @@
             "minimum" : 0
           }
         },
-        "required" : [ "amount", "materialId", "minQuality" ]
+        "required" : [ "amount", "materialId" ]
       },
       "JobOrderDto" : {
         "type" : "object",
@@ -30904,6 +31261,9 @@
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "handle" : {
+            "type" : "string"
+          },
+          "comment" : {
             "type" : "string"
           },
           "priority" : {
@@ -31517,6 +31877,16 @@
           },
           "owningSquadron" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "partyLeadUser" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "partyLeadGuestName" : {
+            "type" : "string"
+          },
+          "partyLeadVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name" ]
@@ -31685,6 +32055,25 @@
             "uniqueItems" : true
           }
         }
+      },
+      "SetPartyLeadRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "guestName" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "UpdateParticipantRequest" : {
         "type" : "object",
@@ -34859,6 +35248,252 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/CityDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "BlueprintDismantleReturnDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "quantityScu" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "BlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "scwikiUuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "scwikiKey" : {
+            "type" : "string"
+          },
+          "outputName" : {
+            "type" : "string"
+          },
+          "craftTimeSeconds" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "isAvailableByDefault" : {
+            "type" : "boolean"
+          },
+          "ingredientCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unlockingMissionsCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "gameVersionSeen" : {
+            "type" : "string"
+          },
+          "dismantleTimeSeconds" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "dismantleEfficiency" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "scwikiSyncedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "requirementGroups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementGroupDto"
+            }
+          },
+          "ingredients" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementIngredientDto"
+            }
+          },
+          "summaryProperties" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintSummaryPropertyDto"
+            }
+          },
+          "dismantleReturns" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintDismantleReturnDto"
+            }
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "BlueprintRequirementGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "groupKey" : {
+            "type" : "string"
+          },
+          "requiredCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "modifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
+          },
+          "ingredients" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementIngredientDto"
+            }
+          }
+        }
+      },
+      "BlueprintRequirementIngredientDto" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantityScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "quantityUnits" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "BlueprintRequirementModifierDto" : {
+        "type" : "object",
+        "properties" : {
+          "propertyKey" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "betterWhen" : {
+            "type" : "string"
+          },
+          "qualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityMax" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtMinQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtMaxQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "valueRangeType" : {
+            "type" : "string"
+          },
+          "segments" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
+            }
+          }
+        }
+      },
+      "BlueprintRequirementModifierSegmentDto" : {
+        "type" : "object",
+        "properties" : {
+          "qualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityMax" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtStart" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "modifierAtEnd" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "BlueprintSummaryPropertyDto" : {
+        "type" : "object",
+        "properties" : {
+          "propertyKey" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "betterWhen" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PageResponseBlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintDto"
             }
           },
           "page" : {

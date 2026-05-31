@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{info.title} + ' - ' + ${appTitle}">Informationen - Profit Basetool</title>
@@ -7,7 +7,7 @@
         .form-group textarea {
             width: 100%;
             padding: 0.5rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -48,7 +48,7 @@
              
              <div class="flex-between">
                  <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
-                 <button type="button" id="trigger-delete-confirm" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                 <button type="button" id="trigger-delete-confirm" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
              </div>
         </form>
     </div>
@@ -56,12 +56,12 @@
     <!-- Delete Confirmation Modal -->
     <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
         <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
-            <h2 th:text="#{info.delete.confirm.title}" style="margin-top:0;">Löschen bestätigen</h2>
-            <p th:text="#{info.delete.confirm.message}" style="margin-bottom: 2rem;">Wirklich löschen?</p>
+            <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+            <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
             <div class="flex-center-gap">
                 <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
-                <form th:action="@{/admin/announcement/delete}" method="post" style="margin:0;">
-                    <button type="submit" class="btn" style="background-color: var(--color-dept-combat);" th:text="#{info.delete}">Löschen</button>
+                <form th:action="@{/admin/announcement/delete}" method="post" class="m-0">
+                    <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
         </div>

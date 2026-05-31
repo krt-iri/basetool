@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Missions - Profit Basetool</title>
@@ -61,7 +61,7 @@
 
             <div class="search-form-actions">
                 <button type="button" id="missions-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zurücksetzen</button>
-                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" th:text="#{mission.create}">Create New</a>
+                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" data-testid="missions-create-link" th:text="#{mission.create}">Create New</a>
             </div>
         </form>
 
@@ -83,9 +83,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="m : ${missions}">
+                    <tr th:each="m : ${missions}" data-testid="mission-row">
                         <td th:text="${m.name}">Name</td>
-                        <td th:text="${m.status}">Status</td>
+                        <td>
+                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(m.status)}"
+                                  th:text="${m.status}">Status</span>
+                        </td>
                         <td class="utc-time" th:text="${m.plannedStartTime}">Start</td>
                         <td th:if="${isAllSquadronsMode}">
                             <span th:if="${m.owningSquadron != null}" class="squadron-badge"

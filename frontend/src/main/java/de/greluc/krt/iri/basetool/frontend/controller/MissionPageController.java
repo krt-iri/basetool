@@ -302,10 +302,30 @@ public class MissionPageController {
       model.addAttribute("participantsByLeadType", participantsByLeadType);
       model.addAttribute("missionLeadTypes", missionLeadTypes);
 
+      // User ids of every account-backed participant (guests have no account and thus no hangar
+      // ships). The unit ADD modal offers only ships owned by these users; the EDIT modal also
+      // keeps already-assigned ships (see assignedUnitShipIds) so a unit can only be crewed with a
+      // ship brought by someone registered for the mission, without dropping an existing one.
+      java.util.Set<UUID> participantUserIds = new java.util.HashSet<>();
+      for (MissionParticipantDto p : participants) {
+        if (p.user() != null && p.user().id() != null) {
+          participantUserIds.add(p.user().id());
+        }
+      }
+      model.addAttribute("participantUserIds", participantUserIds);
+
       // Sort crew members and build groupings
       Map<UUID, String> assignedUnitByParticipantId = new java.util.HashMap<>();
+      // Ids of ships already pinned to a unit of this mission. The unit EDIT modal keeps offering
+      // these even when the owner is no longer a participant, so editing an unrelated field on such
+      // a unit doesn't silently drop the ship — the client-side picker pre-selects the current ship
+      // by value and needs the <option> to exist.
+      java.util.Set<UUID> assignedUnitShipIds = new java.util.HashSet<>();
       if (mission.assignedUnits() != null) {
         for (MissionUnitDto unit : mission.assignedUnits()) {
+          if (unit.ship() != null && unit.ship().id() != null) {
+            assignedUnitShipIds.add(unit.ship().id());
+          }
           String unitName = unit.name() != null ? unit.name() : "";
           if (unit.crew() != null) {
             for (MissionCrewDto c : unit.crew()) {
@@ -318,6 +338,7 @@ public class MissionPageController {
         }
       }
       model.addAttribute("assignedUnitByParticipantId", assignedUnitByParticipantId);
+      model.addAttribute("assignedUnitShipIds", assignedUnitShipIds);
 
       // "Crew zuweisen"-Dropdown zeigt nur Teilnehmer, die noch keiner Einheit zugewiesen sind.
       // Sortierung wird aus `participants` (oben bereits alphabetisch nach extractParticipantName)
@@ -485,14 +506,22 @@ public class MissionPageController {
 
       // Fetch Ships (Only if authenticated)
       if (principal != null) {
-        try {
-          PageResponse<ShipDto> allShipsPage =
-              backendApiClient.getCached(
-                  "/api/v1/hangar/ships?size=1000",
-                  new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
-          model.addAttribute("allShips", allShipsPage.content());
-        } catch (Exception e) {
-          // Ignore, e.g. if user has no HANGAR_READ or other issue
+        // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
+        // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
+        // ships already assigned to a unit. Only fetched when the caller may edit the mission —
+        // otherwise the modals don't render and the endpoint would 403.
+        Boolean canEdit = mission.canEdit();
+        if (canEdit != null && canEdit) {
+          try {
+            List<ShipDto> unitShipOptions =
+                backendApiClient.get(
+                    "/api/v1/missions/" + id + "/unit-ship-options",
+                    new ParameterizedTypeReference<List<ShipDto>>() {},
+                    false);
+            model.addAttribute("unitShipOptions", unitShipOptions);
+          } catch (Exception e) {
+            // Ignore, e.g. if the caller cannot manage the mission
+          }
         }
 
         try {
@@ -602,6 +631,57 @@ public class MissionPageController {
     } catch (Exception e) {
       log.error("Add participant failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.add");
+    }
+    return "redirect:/missions/" + id;
+  }
+
+  /**
+   * Form-post endpoint that assigns or clears a mission's party lead (Partyleiter). Reuses the same
+   * resolution mechanic as participant-add: the autocomplete fills the hidden {@code userId} when a
+   * registered member is picked, otherwise the free-text {@code guestName} is submitted and
+   * resolved server-side (a unique member match is linked, an unknown name is kept as a guest
+   * handle). An empty submission clears the party lead. {@code version} carries the mission's
+   * current {@code partyLeadVersion} for optimistic-lock validation. A full reload follows so the
+   * freshly bumped version is re-rendered without manual DOM version sync.
+   *
+   * @param id mission id
+   * @param userId resolved registered-user id from the autocomplete, or {@code null}
+   * @param guestName free-text party-lead handle, or {@code null}
+   * @param version expected {@code partyLeadVersion} echoed back from the rendered page
+   * @param redirectAttributes flash-scoped toast carrier
+   * @return redirect to {@code /missions/{id}}
+   */
+  @PostMapping("/{id}/party-lead")
+  public String setPartyLead(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) UUID userId,
+      @RequestParam(required = false) String guestName,
+      @RequestParam(required = false) Long version,
+      RedirectAttributes redirectAttributes) {
+    try {
+      Map<String, Object> body = new HashMap<>();
+      if (userId != null) {
+        body.put("userId", userId);
+      }
+      if (guestName != null && !guestName.isBlank()) {
+        body.put("guestName", guestName);
+      }
+      body.put("version", version != null ? version : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class, false);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
+      // 409 = either an ambiguous free-text name (matches more than one member) or a stale
+      // partyLeadVersion (someone else changed it meanwhile); a single conflict toast covers both
+      // and the reload below shows the current value.
+      String toastKey =
+          (e.getStatusCode() == 409)
+              ? "error.mission.party_lead.conflict"
+              : "error.mission.party_lead.update";
+      redirectAttributes.addFlashAttribute("errorToast", toastKey);
+    } catch (Exception e) {
+      log.error("Set party lead failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.mission.party_lead.update");
     }
     return "redirect:/missions/" + id;
   }
@@ -1065,7 +1145,8 @@ public class MissionPageController {
         "mission",
         new MissionDto(
             null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
-            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null));
+            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null,
+            null, null, 0L));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));

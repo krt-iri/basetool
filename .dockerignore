@@ -58,3 +58,8 @@ ToDo.md
 **/*.log
 **/*.log.zip
 log.txt
+
+# E2E (Playwright) source set: test-only, never shipped in the image. Excluding it
+# from the build context also stops e2e-test edits from busting the backend/frontend
+# image layer cache (the Dockerfiles COPY the whole module src/ tree).
+**/src/e2e

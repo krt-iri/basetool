@@ -1,6 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.frontend.service.MissionPresenceService;
 import de.greluc.krt.iri.basetool.frontend.websocket.MissionPresenceWebSocketHandler;
 import java.util.List;
@@ -10,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires the mission-detail presence WebSocket endpoint.
@@ -26,10 +26,9 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
  * attacker page on a third-party origin. Default falls back to the production hostname ({@code
  * https://profit-base.online}) plus localhost variants for dev (audit finding H-7).
  *
- * <p>The handler uses its own {@link ObjectMapper} rather than the Spring-auto-configured bean:
- * Spring Boot 4 has moved its primary mapper to Jackson 3 ({@code tools.jackson.core}), but this
- * presence feature still talks Jackson 2 ({@code com.fasterxml}) — the same trade-off the
- * Thymeleaf-JS-serialiser already documents in the frontend's {@code build.gradle.kts}.
+ * <p>The handler is constructed directly here (not component-scanned), so it is given its own plain
+ * Jackson 3 {@link JsonMapper} rather than an auto-wired bean. The presence wire format is a
+ * minimal hand-built {@code {type, sections}} tree, so no extra modules are needed.
  */
 @Configuration
 @EnableWebSocket
@@ -62,7 +61,7 @@ public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
    */
   @Bean
   public MissionPresenceWebSocketHandler missionPresenceWebSocketHandler() {
-    return new MissionPresenceWebSocketHandler(presenceService, new ObjectMapper());
+    return new MissionPresenceWebSocketHandler(presenceService, JsonMapper.builder().build());
   }
 
   /** {@inheritDoc} */

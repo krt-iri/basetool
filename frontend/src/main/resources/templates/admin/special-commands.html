@@ -17,7 +17,7 @@
             .form-group input, .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.5rem;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 border: 1px solid var(--color-gray-3);
                 color: var(--color-gray-1);
                 font-family: var(--font-body);
@@ -52,17 +52,15 @@
         </p>
     </div>
 
-    <!-- Error / success toasts -->
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-dept-combat);">
-        <p th:text="#{${error}}" style="color: var(--color-dept-combat);">Fehler beim Laden</p>
-    </div>
+    <!-- Error alert -->
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <!-- SK List Section -->
     <div class="hud-box data-section mt-2" id="specialcommands-box">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 th:text="#{admin.specialcommands.title}" style="margin: 0;">Spezialkommandos</h2>
+            <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
-                <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}" data-trigger="submit-form-by-id" data-form-id="sc-filter-form">
                     <label for="includeInactive" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
                 </form>
@@ -88,7 +86,7 @@
                         <tr th:each="sc : ${specialCommands}" th:style="${!sc.active} ? 'opacity: 0.6;' : ''">
                             <td>
                                 <span th:text="${sc.name}">Name</span>
-                                <span th:if="${!sc.active}" style="font-size: 0.7rem; background-color: var(--color-gray-4); padding: 0.2rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
+                                <span th:if="${!sc.active}" class="badge-inactive" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
                             </td>
                             <td th:text="${sc.shorthand}">Kürzel</td>
                             <td th:text="${sc.description}">Desc</td>
@@ -106,7 +104,7 @@
                                 <button th:if="${sc.active}" type="button" class="btn btn-secondary delete-btn"
                                         th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
                                         th:text="#{info.delete}">Löschen</button>
-                                <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" style="margin: 0;">
+                                <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="m-0">
                                     <button type="submit" class="btn btn-secondary" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
                                 </form>
                             </td>
@@ -128,17 +126,17 @@
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.name}">Name</label>
                 <input type="text" name="name" id="sc-name" th:value="*{name}" required>
-                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
             </div>
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.shorthand}">Kürzel</label>
                 <input type="text" name="shorthand" id="sc-shorthand" th:value="*{shorthand}" required>
-                <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
             </div>
             <div class="form-group">
                 <label th:text="#{admin.specialcommands.column.description}">Beschreibung</label>
                 <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-dept-combat); font-size: 0.8rem;"></div>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
             </div>
             <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
         </form>

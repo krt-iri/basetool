@@ -17,12 +17,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -114,13 +116,16 @@ public class OperationController {
   /**
    * Filtered + paged operation search. Mirrors {@link
    * de.greluc.krt.iri.basetool.backend.controller.MissionController#searchMissions} within the
-   * limits of the operation aggregate: free-text query and status list. Operations have no {@code
-   * plannedStartTime} of their own (that field lives on the underlying missions), so the missions'
-   * date-range filter has no meaningful equivalent here and is deliberately omitted. Empty {@code
-   * status} from the caller is forwarded as-is and the service falls back to every {@code
-   * OperationStatus}; an explicit list narrows the result.
+   * limits of the operation aggregate: free-text query, status list and a time range. Operations
+   * have no {@code plannedStartTime} of their own (that field lives on the underlying missions), so
+   * the {@code start}/{@code end} bounds filter on the operation's derived span — {@code start}
+   * against the planned start of the earliest linked mission, {@code end} against the planned end
+   * of the latest linked mission. Empty {@code status} from the caller is forwarded as-is and the
+   * service falls back to every {@code OperationStatus}; an explicit list narrows the result.
    *
    * @param query free-text name/description fragment
+   * @param start inclusive lower bound on the earliest linked mission's planned start (ISO-8601)
+   * @param end inclusive upper bound on the latest linked mission's planned end (ISO-8601)
    * @param status status filter (one or more)
    * @param page zero-based page index
    * @param size page size
@@ -132,11 +137,12 @@ public class OperationController {
   @Operation(
       summary = "Search operations (paginated)",
       description =
-          "Returns operations matching the supplied filters (free-text query + status list). "
-              + "Operations have no `plannedStartTime` of their own - that field lives on the "
-              + "underlying missions - so the missions' date-range filter has no equivalent here. "
-              + "Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. "
-              + "`id` is appended automatically as a stable tiebreaker.")
+          "Returns operations matching the supplied filters (free-text query + status list + time"
+              + " range). Operations have no `plannedStartTime` of their own - that field lives on"
+              + " the underlying missions - so `start` filters on the earliest linked mission's"
+              + " planned start and `end` on the latest linked mission's planned end. Whitelisted"
+              + " sort fields: id, name, status, description, createdAt, updatedAt. `id` is"
+              + " appended automatically as a stable tiebreaker.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paginated list of operations."),
     @ApiResponse(responseCode = "400", description = "Unsupported sort field."),
@@ -145,6 +151,10 @@ public class OperationController {
   @Transactional(readOnly = true)
   public PageResponse<OperationDto> searchOperations(
       @RequestParam(required = false) String query,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant start,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant end,
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "10") Integer size,
@@ -152,7 +162,9 @@ public class OperationController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
     Page<OperationDto> dtoPage =
-        operationService.searchOperations(query, status, pageable).map(operationMapper::toDto);
+        operationService
+            .searchOperations(query, start, end, status, pageable)
+            .map(operationMapper::toDto);
     return new PageResponse<>(
         dtoPage.getContent(),
         dtoPage.getNumber(),

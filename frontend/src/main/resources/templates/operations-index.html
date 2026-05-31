@@ -53,65 +53,110 @@
         <p th:text="#{operations.description}">Manage and view operations.</p>
     </div>
 
-    <div th:if="${successMessage}" class="alert alert-success mt-2" th:text="#{${successMessage}}"></div>
-    <div th:if="${errorMessage}" class="alert alert-danger mt-2" th:text="#{${errorMessage}}"></div>
-    <div th:if="${error}" class="alert alert-danger mt-2" th:text="#{${error}}"></div>
+    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <div class="hud-box mt-2">
 
-        <div sec:authorize="hasRole('MISSION_MANAGER')" style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-            <button type="button" class="btn" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
+        <form id="operations-filter-form" method="get" th:action="@{/operations}" class="search-form no-track">
+            <div class="search-form-flex-1">
+                <label for="operation-search" th:text="#{operation.search}">Search</label>
+                <input type="text" id="operation-search" name="search" th:value="${search}" th:placeholder="#{operation.search.placeholder}">
+            </div>
+
+            <div class="datetime-split-group" data-datetime-filter-role="start">
+                <label for="operation-start" th:text="#{operation.filter.start}">From</label>
+                <input type="hidden" name="start" id="operation-start" th:value="${start}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part">
+                    <input type="time" class="time-part">
+                </div>
+            </div>
+
+            <div class="datetime-split-group" data-datetime-filter-role="end" th:attr="data-validate-after='operation-start', data-error-after=#{validation.datetime.after}">
+                <label for="operation-end" th:text="#{operation.filter.end}">To</label>
+                <input type="hidden" name="end" id="operation-end" th:value="${end}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part">
+                    <input type="time" class="time-part">
+                </div>
+            </div>
+
+            <div class="search-form-checkbox-col" sec:authorize="isAuthenticated()">
+                <div class="search-form-checkbox-spacer"></div>
+                <label class="search-form-checkbox-label">
+                    <input type="checkbox" name="showPast" th:checked="${showPast}">
+                    <span th:text="#{operation.filter.show_past}">Show Past</span>
+                </label>
+            </div>
+
+            <div class="search-form-actions">
+                <button type="button" id="operations-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Reset</button>
+                <button sec:authorize="hasRole('MISSION_MANAGER')" type="button" class="btn" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
+            </div>
+        </form>
+
+        <div id="operations-loading-indicator" style="display:none; text-align:center; padding: 1rem;">
+            <span class="krt-loading-indicator"></span>
         </div>
 
-        <div class="table-responsive">
-            <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{operation.name}">Name</th>
-                        <th th:text="#{operation.status}">Status</th>
-                        <th class="op-desc" th:text="#{operation.description}">Description</th>
-                        <th class="op-action" th:text="#{general.action}">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="op : ${operations}">
-                        <td th:text="${op.name}">Name</td>
-                        <td th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</td>
-                        <td class="op-desc" th:text="${op.description}">Description</td>
-                        <td class="op-action">
-                            <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                            <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
-                                    th:data-id="${op.id}"
-                                    data-trigger="operations-open-delete">Delete</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <div id="operations-results">
+            <th:block th:fragment="operationsResults">
+            <div class="table-responsive">
+                <table th:if="${operations != null and !operations.isEmpty()}" class="operations-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{operation.name}">Name</th>
+                            <th th:text="#{operation.status}">Status</th>
+                            <th class="op-desc" th:text="#{operation.description}">Description</th>
+                            <th class="op-action" th:text="#{general.action}">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="op : ${operations}">
+                            <td th:text="${op.name}">Name</td>
+                            <td>
+                                <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(op.status)}"
+                                      th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</span>
+                            </td>
+                            <td class="op-desc" th:text="${op.description}">Description</td>
+                            <td class="op-action">
+                                <a class="btn" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
+                                <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" th:text="#{general.delete}"
+                                        th:data-id="${op.id}"
+                                        data-trigger="operations-open-delete">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
-        <div th:if="${operationsPage != null}">
-            <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
-        </div>
+            <div th:if="${operationsPage != null}">
+                <div th:replace="~{fragments/pagination :: pagination(pageResponse=${operationsPage}, baseUrl='/operations')}"></div>
+            </div>
 
-        <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
+            <p th:if="${operations == null or operations.isEmpty()}" th:text="#{operation.empty}">No operations.</p>
+            </th:block>
+        </div>
     </div>
 
     <!-- Create Modal -->
     <div id="create-operation-modal" class="modal" style="display:none;">
         <div class="modal-content hud-box" style="max-width:500px;">
-            <h2 th:text="#{operation.create}">Create Operation</h2>
+            <h2 class="mt-0" th:text="#{operation.create}">Create Operation</h2>
             <form th:action="@{/operations/create}" method="post">
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="create-name" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.name}">Name</label>
-                    <input type="text" id="create-name" name="name" style="width: 100%;" required>
+                <div class="form-group">
+                    <label for="create-name" class="form-label" th:text="#{operation.name}">Name</label>
+                    <input type="text" id="create-name" name="name" class="w-full" required>
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="create-desc" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.description}">Description</label>
-                    <textarea id="create-desc" name="description" style="width: 100%;"></textarea>
+                <div class="form-group">
+                    <label for="create-desc" class="form-label" th:text="#{operation.description}">Description</label>
+                    <textarea id="create-desc" name="description" class="w-full"></textarea>
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="create-status" style="display: block; margin-bottom: 0.5rem; color: var(--color-primary); font-weight: 700;" th:text="#{operation.status}">Status</label>
-                    <select id="create-status" name="status" style="width: 100%;" required>
+                <div class="form-group">
+                    <label for="create-status" class="form-label" th:text="#{operation.status}">Status</label>
+                    <select id="create-status" name="status" class="w-full" required>
                         <option value="PLANNED" th:text="#{operation.status.planned}">PLANNED</option>
                         <option value="ACTIVE" th:text="#{operation.status.active}">ACTIVE</option>
                         <option value="COMPLETED" th:text="#{operation.status.completed}">COMPLETED</option>
@@ -130,13 +175,13 @@
 
     <!-- Delete Modal -->
     <div id="delete-operation-modal" class="modal" style="display:none;">
-        <div class="modal-content hud-box" style="max-width:500px; border-color: var(--color-danger);">
-            <h2 th:text="#{general.confirm}" class="text-danger">Confirm Delete</h2>
-            <p th:text="#{operation.delete.confirm}" style="margin: 1.5rem 0;">Confirm that you want to delete this operation.</p>
+        <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+            <h2 class="mt-0" th:text="#{general.confirm}">Confirm Delete</h2>
+            <p class="mb-2" th:text="#{operation.delete.confirm}">Confirm that you want to delete this operation.</p>
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
+                <div class="flex-center-gap">
                     <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
+                    <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
                 </div>
             </form>
         </div>
@@ -156,5 +201,6 @@
         });
     }
 </script>
+<script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

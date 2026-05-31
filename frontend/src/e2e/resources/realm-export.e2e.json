@@ -1,0 +1,100 @@
+{
+  "realm": "iri",
+  "displayName": "IRI (E2E TEST REALM - throwaway, do not use in prod)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 36000,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      { "name": "Admin", "description": "E2E test role" },
+      { "name": "Officer", "description": "E2E test role" },
+      { "name": "Logistician", "description": "E2E test role" },
+      { "name": "Mission Manager", "description": "E2E test role" },
+      { "name": "Squadron Member", "description": "E2E test role" },
+      { "name": "Guest", "description": "E2E test role" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "basetool-frontend",
+      "name": "Basetool Frontend (E2E)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://localhost:18081/*",
+        "https://frontend:18081/*",
+        "https://host.docker.internal:18081/*",
+        "http://localhost:18081/*",
+        "http://frontend:18081/*",
+        "http://host.docker.internal:18081/*"
+      ],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    },
+    {
+      "clientId": "backend-service",
+      "name": "Backend Service Account (E2E)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-client-secret-do-not-use-in-prod",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true
+    }
+  ],
+  "users": [
+    {
+      "username": "test-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-admin@example.test",
+      "firstName": "Test",
+      "lastName": "Admin",
+      "credentials": [
+        { "type": "password", "value": "test-admin-pw", "temporary": false }
+      ],
+      "realmRoles": ["Admin", "Officer", "Squadron Member"]
+    },
+    {
+      "username": "test-officer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-officer@example.test",
+      "firstName": "Test",
+      "lastName": "Officer",
+      "credentials": [
+        { "type": "password", "value": "test-officer-pw", "temporary": false }
+      ],
+      "realmRoles": ["Officer", "Squadron Member"]
+    },
+    {
+      "username": "test-member",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-member@example.test",
+      "firstName": "Test",
+      "lastName": "Member",
+      "credentials": [
+        { "type": "password", "value": "test-member-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
+    }
+  ]
+}

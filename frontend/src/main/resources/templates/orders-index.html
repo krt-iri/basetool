@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{nav.orders}">Aufträge</title>
@@ -29,19 +29,19 @@
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{status.OPEN}">Offen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
                 <span th:text="#{status.IN_PROGRESS}">In Bearbeitung</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="REJECTED" th:checked="${selectedStatuses != null and selectedStatuses.contains('REJECTED')}">
                 <span th:text="#{status.REJECTED}">Abgelehnt</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
             </label>
@@ -51,11 +51,11 @@
                  (admins in "all squadrons" mode) — the backend filter is a display preference,
                  not an access-control gate. -->
             <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary); margin-left: 1rem;">Staffel:</span>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
                 <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem;">
+            <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="all" th:checked="${selectedScope == 'all'}">
                 <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
             </label>
@@ -73,55 +73,55 @@
         <div class="table-responsive">
         <table class="data-table">
             <colgroup>
-                <col style="width: 1%;">
-                <col style="width: 1%;">
-                <col style="width: 1%;">
-                <col style="width: 1%;">
-                <col style="width: 1%;">
-                <col style="width: 100%;">
-                <col style="width: 1%;">
+                <col class="w-1">
+                <col class="w-1">
+                <col class="w-1">
+                <col class="w-1">
+                <col class="w-1">
+                <col class="w-full">
+                <col class="w-1">
             </colgroup>
             <thead>
             <tr>
-                <th th:text="#{orders.index.id}" style="white-space: nowrap;">ID</th>
-                <th th:text="#{orders.index.prio}" style="white-space: nowrap;">Prio</th>
-                <th th:text="#{orders.index.status}" style="white-space: nowrap;">Status</th>
-                <th th:text="#{orders.index.squadron}" style="white-space: nowrap;">Staffel</th>
-                <th th:text="#{orders.index.handle}" style="white-space: nowrap;">Handle</th>
+                <th th:text="#{orders.index.id}" class="nowrap">ID</th>
+                <th th:text="#{orders.index.prio}" class="nowrap">Prio</th>
+                <th th:text="#{orders.index.status}" class="nowrap">Status</th>
+                <th th:text="#{orders.index.squadron}" class="nowrap">Staffel</th>
+                <th th:text="#{orders.index.handle}" class="nowrap">Handle</th>
                 <th th:text="#{orders.index.materials}">Materialien</th>
-                <th th:text="#{orders.index.actions}" style="white-space: nowrap;">Aktionen</th>
+                <th th:text="#{orders.index.actions}" class="nowrap">Aktionen</th>
             </tr>
             </thead>
             <tbody>
-            <tr th:each="order, stat : ${orders}"
+            <tr th:each="order, stat : ${orders}" data-testid="order-row"
                 th:attr="data-id=${order.id}, data-priority=${order.priority}"
                 th:classappend="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'draggable-row' : ''"
                 th:draggable="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'true' : 'false'">
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span class="order-id-display" th:data-utc="${order.createdAt}" th:text="'#' + ${order.displayId}"></span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
                     <span th:text="${order.priority != null ? order.priority : '-'}"></span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
                           th:title="${order.requestingSquadron.name()}"
                           th:text="${order.requestingSquadron.shorthand()}">IRI</span>
                     <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
                 </td>
-                <td th:text="${order.handle}" style="white-space: nowrap;"></td>
-                <td style="padding: 0;">
+                <td th:text="${order.handle}" class="nowrap"></td>
+                <td class="p-0">
                     <div class="table-responsive">
                     <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
                         <colgroup>
-                            <col style="width: 100%;">
-                            <col style="width: 1%;">
-                            <col style="width: 1%;">
-                            <col style="width: 1%;">
+                            <col class="w-full">
+                            <col class="w-1">
+                            <col class="w-1">
+                            <col class="w-1">
                         </colgroup>
                         <thead>
                             <tr>
@@ -134,7 +134,10 @@
                         <tbody>
                             <tr th:each="mat : ${order.materials}">
                                 <td th:text="${mat.material.name}" th:title="${mat.material.name}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td th:text="${mat.minQuality}" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td style="border-bottom: none; white-space: nowrap;">
+                                    <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
+                                    <span th:if="${mat.minQuality == null}" th:text="#{orders.material.minQuality.none}">Keine</span>
+                                </td>
                                 <td style="border-bottom: none; white-space: nowrap;" th:switch="${mat.material.quantityType}">
                                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
@@ -145,14 +148,14 @@
                     </table>
                     </div>
                 </td>
-                <td style="white-space: nowrap;">
+                <td class="nowrap">
                     <div class="flex-gap-xs">
                         <a th:href="@{/orders/{id}(id=${order.id})}" class="btn">Details</a>
                     </div>
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td colspan="7" style="text-align: center;" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
+                <td colspan="7" class="text-center" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>

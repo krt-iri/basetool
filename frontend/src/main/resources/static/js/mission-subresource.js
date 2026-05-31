@@ -168,7 +168,7 @@
             return { ok: false, status: 0, body: null };
         }
 
-        let body = null;
+        let body;
         const contentType = response.headers.get('Content-Type') || '';
         try {
             if (contentType.indexOf('application/json') >= 0

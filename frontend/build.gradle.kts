@@ -1,3 +1,4 @@
+import com.github.gradle.node.npm.task.NpxTask
 import org.cyclonedx.Version
 
 plugins {
@@ -10,6 +11,11 @@ plugins {
   id("com.github.spotbugs-base") version "6.5.4"
   id("info.solidsoft.pitest") version "1.19.0"
   id("com.diffplug.spotless")
+  // Node toolchain for the web-asset linters (ESLint / Stylelint / HTMLHint). The
+  // plugin downloads its own Node + npm under `.gradle/nodejs` (download = true
+  // below), so neither the developer machine nor the CI runner needs a
+  // pre-installed Node — consistent with the "only the Gradle wrapper" rule.
+  id("com.github.node-gradle.node") version "7.1.0"
 }
 
 description = "frontend"
@@ -83,14 +89,14 @@ springBoot {
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
-  // Jackson databind for RFC7807 Problem+JSON parsing in BackendServiceException
+  // Jackson 2 — kept ONLY for ThymeleafJavaScriptSerializerConfig, the JS-inlining bridge that must
+  // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3 (tools.jackson).
+  // Thymeleaf 3.1.x (via thymeleaf-spring6) only supports Jackson 2 internally: the bridge delegates
+  // primitive values to Thymeleaf's StandardJavaScriptSerializer and mirrors its character-escape
+  // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
+  // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
+  // and the bridge is migrated — tracked in https://github.com/krt-iri/basetool/issues/294.
   implementation("com.fasterxml.jackson.core:jackson-databind")
-  // Jackson JSR-310 module — required by ThymeleafJavaScriptSerializerConfig so
-  // [[${dto}]] inline expressions can render objects carrying java.time.* fields
-  // (Instant/OffsetDateTime/LocalDateTime). Thymeleaf 3.1.x ships its own Jackson
-  // ObjectMapper without modules, and Spring Boot 4 has moved its primary mapper to
-  // Jackson 3 (tools.jackson.core), so neither path brings JSR-310 transitively for
-  // the Jackson 2 (com.fasterxml) instance Thymeleaf still uses internally.
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
@@ -175,6 +181,16 @@ tasks.cyclonedxBom {
   includeBuildSystem = true
 }
 
+// Keep the e2e (Playwright / Testcontainers) source-set dependencies out of the shipped SBOM:
+// they are test-only and never enter the bootJar or the published image. In cyclonedx-gradle 3.x
+// the dependency scan runs in the `cyclonedxDirectBom` task (CyclonedxDirectTask), which exposes
+// `skipConfigs` (regexes matched against configuration names); the aggregate `cyclonedxBom` task
+// only formats the output. Skipping every `e2e*` configuration there stops Playwright from
+// polluting `frontend-bom.*`.
+tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+  skipConfigs.set(listOf("^e2e.*"))
+}
+
 // L-2 from the performance audit: minify CSS files inside the built jar so the
 // shipped payload is smaller than the readable sources under
 // `src/main/resources/static/css/`. The source files stay untouched (so editing
@@ -235,4 +251,149 @@ tasks.register("minifyStaticCss") {
   }
 }
 tasks.named("classes").configure { dependsOn("minifyStaticCss") }
+
+// ---------------------------------------------------------------------------
+// E2E (Playwright) source set + task — Phase 0 spike (docs/E2E_TESTING_PLAN.md).
+//
+// Deliberately NOT wired into `check` / `test` / `build`: the suite needs a
+// running stack and a downloaded Chromium, so it only runs on an explicit
+// `./gradlew :frontend:e2eTest`. The `e2e` source set reuses the test
+// dependencies (JUnit 5 + assertions from spring-boot-starter-test) and adds
+// the Playwright Java binding on top.
+// ---------------------------------------------------------------------------
+sourceSets { create("e2e") }
+
+configurations["e2eImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
+dependencies {
+  "e2eImplementation"(libs.playwright)
+  // PostgreSQL driver for the JDBC catalog seeding (UEX-owned reference data the admin API can't
+  // create); version is managed by the Spring Boot BOM.
+  "e2eImplementation"("org.postgresql:postgresql")
+  // JUnit Platform launcher so the custom Test task can discover Jupiter tests.
+  "e2eRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+}
+
+// Checkstyle auto-creates `checkstyleE2e` and wires it into `check`. E2E code,
+// like test code (see the root build's `checkstyleTest` disable), uses
+// conventions Google style flags as noise — disable it to keep `check` green.
+tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
+
+// Installs the Playwright-managed browsers into the per-user cache (~/.cache/ms-playwright).
+// Cached in CI; a no-op once present. On a CI Linux runner it additionally installs the browsers'
+// OS libraries via `--with-deps` — WebKit needs libs ubuntu-latest lacks and otherwise fails to
+// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI Linux;
+// local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
+val playwrightInstall by tasks.registering(JavaExec::class) {
+  group = "verification"
+  description = "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
+  classpath = sourceSets["e2e"].runtimeClasspath
+  mainClass.set("com.microsoft.playwright.CLI")
+  val withDeps =
+      System.getenv("CI") == "true" &&
+          System.getProperty("os.name").orEmpty().lowercase().contains("linux")
+  val browsers = listOf("chromium", "firefox", "webkit")
+  setArgs(
+      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers)
+}
+
+// Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
+// provisioned Chromium and forward the same `e2e.*` knobs; they differ only in the JUnit tag they
+// select (and therefore the target they assume). E2E_BASE_URL is read straight from the inherited
+// environment by E2eStackExtension, so it needs no forwarding; -Pe2e.baseUrl switches to
+// external/staging mode.
+val playwrightSuiteConfig: Test.() -> Unit = {
+  group = "verification"
+  testClassesDirs = sourceSets["e2e"].output.classesDirs
+  classpath = sourceSets["e2e"].runtimeClasspath
+  dependsOn(playwrightInstall)
+  // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
+  // the full browser set (Firefox + WebKit) on first run.
+  environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+  // CI passes credentials through the environment (masked in logs) rather than on the command line;
+  // map them onto the e2e.* system properties the tests read. An explicit -P value (below) wins.
+  // E2E_BASE_URL needs no mapping — E2eStackExtension reads it straight from the environment.
+  mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
+    System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
+  }
+  listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
+      .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
+}
+
+// Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).
+tasks.register<Test>("e2eTest") {
+  description = "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("e2e") }
+}
+
+// Non-destructive login + core-page checks; target-agnostic, safe to run against staging.
+tasks.register<Test>("smokeTest") {
+  description =
+    "Runs the non-destructive Playwright smoke checks (JUnit tag: smoke); set E2E_BASE_URL for staging."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("smoke") }
+}
+
+// ---------------------------------------------------------------------------
+// Web-asset linting: ESLint (JS), Stylelint (CSS), HTMLHint (Thymeleaf HTML).
+//
+// The Gradle Node plugin downloads a private Node + npm under `.gradle/nodejs`
+// (download = true) so no host Node install is required — consistent with the
+// "only the Gradle wrapper" rule. `npmInstall` reads the committed
+// package.json / package-lock.json and is incremental.
+//
+// The three lint tasks are wired into `check` and run STRICT
+// (ignoreExitValue = false): any finding fails the build. Introduction
+// followed the staged SpotBugs pattern — report-only until the existing
+// backlog was cleared (ESLint 79 -> 0, Stylelint 348 -> 0, HTMLHint 0), then
+// flipped to strict. The vendored, minified JS bundles are excluded in the
+// tool configs (eslint.config.mjs / .stylelintrc.json).
+// ---------------------------------------------------------------------------
+node {
+  version.set("24.16.0")
+  download.set(true)
+}
+
+val lintCss =
+    tasks.register<NpxTask>("lintCss") {
+      group = "verification"
+      description = "Lints CSS sources with Stylelint (strict; fails the build on findings)."
+      dependsOn(tasks.named("npmInstall"))
+      command.set("stylelint")
+      args.set(listOf("src/main/resources/static/css/**/*.css"))
+      ignoreExitValue.set(false)
+      inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
+      inputs.file("package.json")
+      inputs.file(".stylelintrc.json")
+    }
+
+val lintHtml =
+    tasks.register<NpxTask>("lintHtml") {
+      group = "verification"
+      description = "Lints Thymeleaf HTML templates with HTMLHint (strict; fails the build on findings)."
+      dependsOn(tasks.named("npmInstall"))
+      command.set("htmlhint")
+      args.set(listOf("src/main/resources/templates/**/*.html"))
+      ignoreExitValue.set(false)
+      inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
+      inputs.file("package.json")
+      inputs.file(".htmlhintrc")
+    }
+
+val lintJs =
+    tasks.register<NpxTask>("lintJs") {
+      group = "verification"
+      description = "Lints hand-written browser scripts with ESLint (strict; fails the build on findings)."
+      dependsOn(tasks.named("npmInstall"))
+      command.set("eslint")
+      args.set(listOf("src/main/resources/static/js/**/*.js"))
+      ignoreExitValue.set(false)
+      inputs.files(fileTree("src/main/resources/static/js") { include("**/*.js") })
+      inputs.file("package.json")
+      inputs.file("eslint.config.mjs")
+    }
+
+tasks.named("check").configure { dependsOn(lintCss, lintHtml, lintJs) }
 

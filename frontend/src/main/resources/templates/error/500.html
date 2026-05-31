@@ -6,7 +6,7 @@
 <style th:attr="nonce=${cspNonce}">
         .error-container {
             text-align: center;
-            border: 2px solid var(--color-dept-combat);
+            border: 2px solid var(--color-danger);
             box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
             background: rgba(20, 20, 20, 0.6);
             padding: 2.5rem 2rem;
@@ -17,7 +17,7 @@
         .error-code {
             font-family: var(--font-headline);
             font-size: 4rem;
-            color: var(--color-dept-combat);
+            color: var(--color-danger);
             margin-bottom: 0.5rem;
         }
         .error-title {
@@ -35,7 +35,7 @@
         .btn-return {
             display: inline-block;
             padding: 0.8rem 1.5rem;
-            background-color: var(--color-dept-combat);
+            background-color: var(--color-danger);
             color: #FFFFFF;
             font-family: var(--font-headline);
             text-decoration: none;
@@ -63,7 +63,7 @@
 
 <header>
     <nav>
-        <a th:href="@{/}" class="brand" style="margin-left: 1rem;">
+        <a th:href="@{/}" class="brand ml-1">
             <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
             <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
         </a>

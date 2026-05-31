@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Material Details - Profit Basetool</title>
@@ -12,7 +12,7 @@
         }
         .material-select {
             padding: 0.5rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -54,7 +54,7 @@
             </div>
         </div>
 
-        <div style="overflow-x: auto;">
+        <div class="overflow-x-auto">
             <div class="table-responsive">
             <table class="krt-table">
                 <thead>
@@ -76,7 +76,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(items)}">
-                        <td colspan="4" style="text-align: center; color: var(--color-gray-2);">Keine Einträge für dieses Material gefunden.</td>
+                        <td colspan="4" class="text-center text-muted">Keine Einträge für dieses Material gefunden.</td>
                     </tr>
                 </tbody>
             </table>

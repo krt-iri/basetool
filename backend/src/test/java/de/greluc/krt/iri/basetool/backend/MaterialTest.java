@@ -7,7 +7,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
@@ -28,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -42,7 +42,7 @@ class MaterialTest {
 
   @Autowired private UserRepository userRepository;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
 

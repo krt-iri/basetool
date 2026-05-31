@@ -1,6 +1,5 @@
 package de.greluc.krt.iri.basetool.backend.filter;
 
-import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.iri.basetool.backend.config.AppProblemProperties;
@@ -24,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.core.io.JsonStringEncoder;
 
 /**
  * Per-IP token-bucket rate limiter implemented with Bucket4j buckets in a Caffeine cache.
@@ -319,8 +319,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     // top-level fields, polluting the RFC 7807 contract a client may rely on (JSON-injection,
     // CodeQL: java/xss). Escape via Jackson's {@link JsonStringEncoder} so that {@code "},
     // {@code \}, control chars and unicode separators land as proper JSON escapes.
+    // Jackson 3 dropped the String -> char[] overload; quote into a StringBuilder instead.
     JsonStringEncoder jsonEncoder = JsonStringEncoder.getInstance();
-    String instanceEscaped = new String(jsonEncoder.quoteAsString(request.getRequestURI()));
+    StringBuilder instanceEscapedBuilder = new StringBuilder();
+    jsonEncoder.quoteAsString(request.getRequestURI(), instanceEscapedBuilder);
+    String instanceEscaped = instanceEscapedBuilder.toString();
     String body =
         "{"
             + "\"type\":\""

@@ -193,14 +193,18 @@ public class MissionService {
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission(boolean allowInternal) {
-    if (allowInternal) {
-      return missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(
-          Instant.now());
-    } else {
-      return missionRepository
-          .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(
-              Instant.now());
-    }
+    Instant now = Instant.now();
+    Optional<Mission> next =
+        allowInternal
+            ? missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(now)
+            : missionRepository
+                .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(now);
+    // The limit-1 lookup above is intentionally not graphed — a collection fetch combined with the
+    // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
+    // through the graphed findById so participants / assignedUnits are eagerly loaded for the
+    // mapper
+    // (and the home-page guest redaction) without paginating the whole upcoming-mission set.
+    return next.map(Mission::getId).flatMap(missionRepository::findById);
   }
 
   /**
@@ -529,6 +533,15 @@ public class MissionService {
     }
   }
 
+  private void assertPartyLeadVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
   private void bumpCoreVersion(@NotNull Mission mission) {
     long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
     mission.setCoreVersion(current + 1L);
@@ -542,6 +555,11 @@ public class MissionService {
   private void bumpFlagsVersion(@NotNull Mission mission) {
     long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
     mission.setFlagsVersion(current + 1L);
+  }
+
+  private void bumpPartyLeadVersion(@NotNull Mission mission) {
+    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
+    mission.setPartyLeadVersion(current + 1L);
   }
 
   /**
@@ -1075,6 +1093,10 @@ public class MissionService {
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
+      if (!isOwnerRegisteredParticipant(mission, ship)) {
+        throw new IllegalArgumentException(
+            "Ship owner is not a registered participant of the mission");
+      }
       missionUnit.setShip(ship);
       if (shipTypeId == null) {
         missionUnit.setShipType(ship.getShipType());
@@ -1143,6 +1165,19 @@ public class MissionService {
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
+      // A ship already pinned to any unit of this mission is grandfathered: unrelated edits (name,
+      // frequency, HVU) on a unit whose ship owner has since left the roster must not 400, and the
+      // edit picker keeps offering every already-assigned ship so it round-trips. Only a ship new
+      // to the mission must belong to a current participant.
+      boolean alreadyAssignedInMission =
+          mission.getAssignedUnits().stream()
+              .map(MissionUnit::getShip)
+              .filter(assigned -> assigned != null)
+              .anyMatch(assigned -> assigned.getId().equals(shipId));
+      if (!alreadyAssignedInMission && !isOwnerRegisteredParticipant(mission, ship)) {
+        throw new IllegalArgumentException(
+            "Ship owner is not a registered participant of the mission");
+      }
       missionUnit.setShip(ship);
       if (shipTypeId == null) {
         missionUnit.setShipType(ship.getShipType());
@@ -1165,6 +1200,69 @@ public class MissionService {
 
     missionUnitRepository.save(missionUnit);
     return mission;
+  }
+
+  /**
+   * Tests whether the given ship's owner is signed up as a participant of the mission. Only
+   * participants backed by a real {@link User} account count — guest participants have no account
+   * and therefore never own hangar ships. Used by {@link #addUnitToMission} and {@link
+   * #updateMissionUnit} to keep a unit's assigned ship constrained to ships brought by people
+   * actually registered for the mission.
+   *
+   * @param mission the mission whose participant roster is searched, never {@code null}
+   * @param ship the ship whose owner is checked for participation, never {@code null}
+   * @return {@code true} if the ship's owner is a registered (account-backed) participant
+   */
+  private boolean isOwnerRegisteredParticipant(@NotNull Mission mission, @NotNull Ship ship) {
+    UUID ownerId = ship.getOwner().getId();
+    return mission.getParticipants().stream()
+        .map(MissionParticipant::getUser)
+        .filter(user -> user != null)
+        .anyMatch(user -> user.getId().equals(ownerId));
+  }
+
+  /**
+   * Collects the ships a unit of this mission may be crewed with: every ship owned by a registered
+   * participant <em>plus</em> every ship already pinned to one of the mission's units. Participant
+   * ships are intentionally NOT OrgUnit-scoped — a participant brings their own ship regardless of
+   * which OrgUnit they belong to (so a cross-OrgUnit participant's ship becomes selectable), which
+   * is why this reads {@link ShipRepository#findByOwnerIdIn} rather than the scoped hangar query.
+   * Already-assigned ships are kept so editing a unit never silently drops a ship whose owner has
+   * since left the roster. The result is deduplicated by ship id, participant ships first.
+   *
+   * @param missionId the mission whose selectable unit ships are collected, never {@code null}
+   * @return the candidate ships for this mission's unit ship pickers
+   * @throws NotFoundException when the mission id does not resolve
+   */
+  @Transactional(readOnly = true)
+  public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+
+    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
+
+    Set<UUID> participantUserIds =
+        mission.getParticipants().stream()
+            .map(MissionParticipant::getUser)
+            .filter(user -> user != null)
+            .map(User::getId)
+            .collect(java.util.stream.Collectors.toSet());
+    if (!participantUserIds.isEmpty()) {
+      shipRepository
+          .findByOwnerIdIn(participantUserIds)
+          .forEach(ship -> byId.put(ship.getId(), ship));
+    }
+
+    for (MissionUnit unit : mission.getAssignedUnits()) {
+      Ship ship = unit.getShip();
+      if (ship != null) {
+        byId.putIfAbsent(ship.getId(), ship);
+      }
+    }
+
+    return new java.util.ArrayList<>(byId.values());
   }
 
   /**
@@ -1478,6 +1576,66 @@ public class MissionService {
     }
     ownership.setOwner(newOwner);
     missionOwnershipRepository.save(ownership);
+  }
+
+  /**
+   * Assigns or clears a mission's party lead (Partyleiter). The party lead is either a linked
+   * registered user or a free-text guest handle — mutually exclusive, mirroring the participant
+   * {@code user}/{@code guestName} model. Free-text-to-user resolution is performed by the caller
+   * (controller, like the participant-add endpoints); this method persists whatever {@code userId}
+   * / {@code guestName} it is handed:
+   *
+   * <ul>
+   *   <li>{@code userId != null} → link the registered user, clear any guest handle;
+   *   <li>{@code userId == null} and {@code guestName} non-blank → store the trimmed guest handle,
+   *       clear any linked user;
+   *   <li>both {@code null}/blank → clear the party lead entirely.
+   * </ul>
+   *
+   * <p>Versioning: validates and bumps the dedicated {@code partyLeadVersion} counter only. The
+   * association and columns are {@code @OptimisticLock(excluded = true)}, so the global {@code
+   * Mission.version} and the other section counters stay untouched and concurrent edits on other
+   * sections of the same mission remain valid (Option A / multi-user concurrency).
+   *
+   * @param missionId mission to update
+   * @param userId registered party-lead reference, or {@code null}
+   * @param guestName free-text party-lead handle, or {@code null}
+   * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
+   * @return the managed mission with the party lead applied
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the mission or the
+   *     referenced user is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedPartyLeadVersion} is stale
+   */
+  @Transactional
+  public Mission setPartyLead(
+      @NotNull UUID missionId,
+      UUID userId,
+      String guestName,
+      @NotNull Long expectedPartyLeadVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertPartyLeadVersion(mission, expectedPartyLeadVersion, missionId);
+
+    if (userId != null) {
+      User user =
+          userRepository
+              .findById(userId)
+              .orElseThrow(() -> new NotFoundException("User not found"));
+      mission.setPartyLeadUser(user);
+      mission.setPartyLeadGuestName(null);
+    } else if (guestName != null && !guestName.isBlank()) {
+      mission.setPartyLeadUser(null);
+      mission.setPartyLeadGuestName(guestName.trim());
+    } else {
+      mission.setPartyLeadUser(null);
+      mission.setPartyLeadGuestName(null);
+    }
+
+    bumpPartyLeadVersion(mission);
+    return missionRepository.save(mission);
   }
 
   /**

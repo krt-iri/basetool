@@ -24,7 +24,7 @@
         // bypasses the fragment.
         return;
     }
-    var on = window.krtEvents.on;
+    let on = window.krtEvents.on;
 
     /**
      * Strict whitelist regex for same-origin path URLs. Matches a string that starts with
@@ -35,7 +35,7 @@
      * can be assigned to the corresponding {@link HTMLAnchorElement} setter, which validates
      * its argument structurally and cannot be tricked into changing the URL's scheme.
      */
-    var SAFE_PATH_REGEX = /^(\/[^\/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
+    let SAFE_PATH_REGEX = /^(\/[^/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
 
     /**
      * Navigate to a same-origin path safely. Sets {@code pathname} / {@code search} /
@@ -53,9 +53,9 @@
      */
     function navigateSafe(raw) {
         if (typeof raw !== 'string') return false;
-        var match = SAFE_PATH_REGEX.exec(raw);
+        let match = SAFE_PATH_REGEX.exec(raw);
         if (!match) return false;
-        var a = document.createElement('a');
+        let a = document.createElement('a');
         a.href = window.location.origin;
         a.pathname = match[1];
         if (match[2]) a.search = match[2];
@@ -84,7 +84,7 @@
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
-        var template = el.getAttribute('data-url-template');
+        let template = el.getAttribute('data-url-template');
         if (!template) return;
         navigateSafe(template.replace('{value}', encodeURIComponent(el.value)));
     });
@@ -130,9 +130,9 @@
      * leaves the {@code change} handler as the single submit trigger).
      */
     function submitFormByIdHandler(el, event) {
-        var id = el.getAttribute('data-form-id');
+        let id = el.getAttribute('data-form-id');
         if (!id) return;
-        var form = document.getElementById(id);
+        let form = document.getElementById(id);
         if (!form || typeof form.submit !== 'function') return;
         if (event && typeof event.preventDefault === 'function' && el.tagName === 'BUTTON') {
             event.preventDefault();
@@ -149,7 +149,7 @@
      */
     function filterTableHandler(el) {
         if (typeof window.filterTable !== 'function') return;
-        var tableId = el.getAttribute('data-table-id');
+        let tableId = el.getAttribute('data-table-id');
         if (!tableId) return;
         window.filterTable(tableId, el.value);
     }
@@ -162,9 +162,9 @@
      * convention from {@code fragments/toast.html} / {@code personal-inventory.html}).
      */
     on('click', 'open-modal', function (el, event) {
-        var id = el.getAttribute('data-modal-id');
+        let id = el.getAttribute('data-modal-id');
         if (!id) return;
-        var modal = document.getElementById(id);
+        let modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
         modal.classList.add('active');
@@ -177,13 +177,13 @@
      */
     on('click', 'close-modal', function (el, event) {
         event.preventDefault();
-        var id = el.getAttribute('data-modal-id');
+        let id = el.getAttribute('data-modal-id');
         if (id) {
-            var modal = document.getElementById(id);
+            let modal = document.getElementById(id);
             if (modal) modal.classList.remove('active');
             return;
         }
-        var ancestor = el.closest('.modal-overlay, .modal, .modal-box');
+        let ancestor = el.closest('.modal-overlay, .modal, .modal-box');
         if (!ancestor) return;
         // `.modal-box` is the inner element — climb one level to the overlay if needed.
         if (ancestor.classList.contains('modal-box')) {
@@ -198,9 +198,9 @@
      * info-boxes and "show details" reveals.
      */
     on('click', 'toggle-display', function (el, event) {
-        var id = el.getAttribute('data-target');
+        let id = el.getAttribute('data-target');
         if (!id) return;
-        var target = document.getElementById(id);
+        let target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
         target.style.display = target.style.display === 'none' ? '' : 'none';
@@ -216,9 +216,9 @@
      * handler attribute.
      */
     on('click', 'set-display', function (el, event) {
-        var id = el.getAttribute('data-target');
+        let id = el.getAttribute('data-target');
         if (!id) return;
-        var target = document.getElementById(id);
+        let target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
         target.style.display = el.getAttribute('data-display') || '';
@@ -231,9 +231,9 @@
      * {@code data-display="none"}, or its own {@code close-modal-display}.
      */
     on('click', 'open-modal-display', function (el, event) {
-        var id = el.getAttribute('data-modal-id');
+        let id = el.getAttribute('data-modal-id');
         if (!id) return;
-        var modal = document.getElementById(id);
+        let modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
         modal.style.display = el.getAttribute('data-modal-display') || 'flex';
@@ -244,9 +244,9 @@
      * {@code style.display}-based modal pattern.
      */
     on('click', 'close-modal-display', function (el, event) {
-        var id = el.getAttribute('data-modal-id');
+        let id = el.getAttribute('data-modal-id');
         if (!id) return;
-        var modal = document.getElementById(id);
+        let modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
         modal.style.display = 'none';

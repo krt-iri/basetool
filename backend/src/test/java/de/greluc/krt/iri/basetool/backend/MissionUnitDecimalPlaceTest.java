@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
@@ -15,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -47,7 +48,9 @@ class MissionUnitDecimalPlaceTest {
 
   @Autowired private ShipTypeRepository shipTypeRepository;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  @Autowired private MissionService missionService;
+
+  private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -79,6 +82,9 @@ class MissionUnitDecimalPlaceTest {
     mission.setName("Test Mission Decimal");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
+
+    // The ship owner must be a registered participant before the ship can be pinned to a unit.
+    missionService.addParticipant(mission.getId(), officerUser.getId());
   }
 
   @Test

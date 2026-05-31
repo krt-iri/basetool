@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.locations.title} + ' - ' + ${appTitle}">Orte - Profit Basetool</title>
@@ -17,7 +17,7 @@
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.5rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -85,7 +85,7 @@
                         <td th:text="${loc.description}">Desc</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" style="margin: 0;">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0">
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
                                     <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
                                 </form>

@@ -1,6 +1,5 @@
 package de.greluc.krt.iri.basetool.frontend.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.frontend.config.CacheConfig;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -15,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * WebClient wrapper for the backend REST API. Centralises RFC-7807 problem-response parsing into
@@ -49,7 +50,7 @@ public class BackendApiClient {
    * internal instance — not auto-wired — because some frontend test slices run without Spring
    * Boot's JacksonAutoConfiguration and therefore without a shared ObjectMapper bean.
    */
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   @Retry(name = "backend")

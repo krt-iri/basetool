@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.settings.title} + ' - ' + ${appTitle}">Systemeinstellungen - Profit Basetool</title>
@@ -17,7 +17,7 @@
             .form-group input, .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.5rem;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 border: 1px solid var(--color-gray-3);
                 color: var(--color-gray-1);
                 font-family: var(--font-body);
@@ -51,7 +51,7 @@
     <div class="hud-box mt-2">
         <div class="data-section">
             <h2 th:text="#{admin.settings.orders}">Auftragsverwaltung</h2>
-            <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.orders.description}">Konfiguration der Farbcodierung für ältere Aufträge (in Tagen).</p>
+            <p class="mb-1 text-muted" th:text="#{admin.settings.orders.description}">Konfiguration der Farbcodierung für ältere Aufträge (in Tagen).</p>
             
             <form th:action="@{/admin/settings}" method="post">
                 <input type="hidden" name="ageYellowVersion" th:value="${ageYellowVersion}">
@@ -71,7 +71,7 @@
 
                 <div class="data-section mt-2">
                     <h2 th:text="#{admin.settings.refinery}">Raffinerie</h2>
-                    <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
+                    <p class="mb-1 text-muted" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
 
                     <div class="form-group" style="max-width: 300px;">
                         <label for="refineryRoundingMode" th:text="#{admin.settings.refinery.roundingMode}">Rundungsmodus (Units -> SCU)</label>
@@ -84,7 +84,7 @@
 
                 <div class="data-section mt-2">
                     <h2 th:text="#{admin.settings.operations}">Operationen</h2>
-                    <p style="margin-bottom: 1rem; color: var(--color-gray-2);" th:text="#{admin.settings.operations.description}">Konfiguration der ingame-Überweisungsgebühr, die vom Auszahlungsbetrag jedes Teilnehmers abgezogen wird.</p>
+                    <p class="mb-1 text-muted" th:text="#{admin.settings.operations.description}">Konfiguration der ingame-Überweisungsgebühr, die vom Auszahlungsbetrag jedes Teilnehmers abgezogen wird.</p>
 
                     <div class="form-group" style="max-width: 300px;">
                         <label for="transferFeePercent" th:text="#{admin.settings.operations.transferFeeRate}">Überweisungsgebühr (%)</label>
@@ -105,13 +105,14 @@
         -->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.promotion}">Beförderungssystem pro Staffel</h2>
-            <p style="margin-bottom: 1rem; color: var(--color-gray-2);"
+            <p class="mb-1 text-muted"
                th:text="#{admin.settings.squadron.promotion.description}">Schaltet das gesamte Beförderungssystem (Themenbereiche, Bewertungen, Rangvoraussetzungen) für die Mitglieder einer Staffel an oder aus. Bestehende Daten bleiben beim Deaktivieren erhalten und werden beim Aktivieren wieder sichtbar.</p>
 
             <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
                  th:text="#{admin.settings.squadron.promotion.empty}">Keine Staffeln gefunden.</div>
 
-            <table th:unless="${#lists.isEmpty(squadrons)}" class="data-table" style="max-width: 600px;">
+            <div th:unless="${#lists.isEmpty(squadrons)}" class="table-responsive">
+            <table class="krt-table" style="max-width: 600px;">
                 <thead>
                     <tr>
                         <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
@@ -135,6 +136,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 </main>

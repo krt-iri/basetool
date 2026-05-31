@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.hangar_data} + ' - ' + ${appTitle}">Schiffsdaten - Profit Basetool</title>
@@ -17,7 +17,7 @@
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.5rem;
-            background-color: var(--color-gray-4);
+            background-color: var(--color-surface-input);
             border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1);
             font-family: var(--font-body);
@@ -157,7 +157,7 @@
             <p style="margin:1.5rem 0; font-family:var(--font-body); color:var(--color-gray-1);" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
             <div style="display:flex; gap:1rem; justify-content:center;">
                 <button type="button" class="btn btn-secondary" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
-                <button type="button" class="btn" style="background-color:var(--color-dept-combat);" data-trigger="submit-form-by-id" data-form-id="reset-fitted-form" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
+                <button type="button" class="btn btn-danger" data-trigger="submit-form-by-id" data-form-id="reset-fitted-form" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>
         </div>
     </div>

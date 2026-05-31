@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.AddCrewRequest;
@@ -17,6 +18,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateCrewRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
@@ -100,6 +102,7 @@ public class MissionController {
   private final UserService userService;
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
+  private final ShipMapper shipMapper;
   private final MissionSecurityService missionSecurityService;
   private final AuthHelperService authHelperService;
 
@@ -337,7 +340,14 @@ public class MissionController {
         dto.registeredParticipants(),
         // Squadron shorthand is not sensitive (MULTI_SQUADRON_PLAN.md section 7) — forward
         // through to guests so the public detail view shows the owning-squadron badge.
-        dto.owningSquadron());
+        dto.owningSquadron(),
+        // Party lead is a public leadership designation (like the Führungspositionen list) and the
+        // UserReferenceDto carries only the callsign tuple
+        // (username/displayName/effectiveName/rank)
+        // — no email or real name — so it is forwarded to guests unchanged.
+        dto.partyLeadUser(),
+        dto.partyLeadGuestName(),
+        dto.partyLeadVersion());
   }
 
   /**
@@ -1324,6 +1334,83 @@ public class MissionController {
     return missionMapper.toDto(mission);
   }
 
+  /**
+   * Assigns or clears the mission's party lead (Partyleiter). Reuses the participant-add resolution
+   * mechanic: the caller submits either an explicit {@code userId} (from the user autocomplete) or
+   * a free-text {@code guestName}. A non-blank free-text name with no {@code userId} is resolved
+   * case-insensitively against registered members:
+   *
+   * <ul>
+   *   <li>unique match → linked as a registered party lead;
+   *   <li>no match → stored as a free-text/anonymous handle;
+   *   <li>multiple matches → 409 (ambiguous name).
+   * </ul>
+   *
+   * <p>Submitting neither {@code userId} nor a non-blank {@code guestName} clears the party lead.
+   * Manager-gated ({@code canManageMission}), so — unlike {@link #addParticipantPublic} — there is
+   * no anonymous caller and therefore no name-spoofing branch. The {@code version} in the request
+   * must match the mission's current {@code partyLeadVersion}.
+   *
+   * @param id mission id
+   * @param request party-lead payload (userId XOR guestName + expected partyLeadVersion)
+   * @return the updated mission DTO
+   */
+  @PutMapping("/{id}/party-lead")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Set or clear the party lead of a mission",
+      description =
+          "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text"
+              + " guestName, mirroring the participant-add resolution: a free-text name is resolved"
+              + " case-insensitively against registered members (unique match links the user,"
+              + " multiple matches return 409, no match stores a guest handle). Submitting neither"
+              + " clears the party lead. The version must match the mission's current"
+              + " partyLeadVersion or 409 (application/problem+json) is returned.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Party lead updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Validation error"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Caller may not manage this mission"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Mission or referenced user not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "Ambiguous party-lead name or stale partyLeadVersion")
+  })
+  public MissionDto setPartyLead(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.iri.basetool.backend.model.dto.request.SetPartyLeadRequest request) {
+    UUID finalUserId = request.userId();
+    String finalGuestName = request.guestName();
+
+    // Reuse the participant free-text resolution: a free-text name with no explicit userId is
+    // resolved case-insensitively against registered members (exact match on username or
+    // displayName). A unique match links the registered user; multiple matches are ambiguous (409);
+    // no match falls back to a guest handle. The caller is always a mission manager here
+    // (canManageMission), so there is no anonymous-spoofing branch like in addParticipantPublic.
+    if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
+      List<User> matches = userService.findMatchesByExactName(finalGuestName);
+      if (matches.size() > 1) {
+        log.debug("Party lead name is ambiguous ({} matches) for mission {}", matches.size(), id);
+        throw new BusinessConflictException("Party lead name is ambiguous.");
+      }
+      if (matches.size() == 1) {
+        finalUserId = matches.get(0).getId();
+        finalGuestName = null;
+      }
+    }
+
+    return missionMapper.toDto(
+        missionService.setPartyLead(id, finalUserId, finalGuestName, request.version()));
+  }
+
   // =====================================================================================
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
 
@@ -1461,6 +1548,29 @@ public class MissionController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     missionService.removeMissionUnit(id, unitId);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Lists the ships a unit of this mission may be crewed with: ships owned by registered
+   * participants (regardless of OrgUnit, so a cross-OrgUnit participant's ship is selectable) plus
+   * ships already pinned to one of the mission's units. Used by the mission detail page to populate
+   * the unit ship pickers without exposing the caller's whole hangar scope. Gated by {@code
+   * canManageMission} so only users who may edit the mission's units see participant ship details.
+   *
+   * @param id mission id
+   * @return the candidate ships for this mission's unit ship pickers
+   */
+  @GetMapping("/{id}/unit-ship-options")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "List selectable ships for a mission's units",
+      description =
+          "Returns the ships a unit of this mission may be crewed with: ships owned by registered "
+              + "participants (regardless of OrgUnit) plus ships already assigned to a unit of the "
+              + "mission. Restricted to callers who may manage the mission.")
+  public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
+    return missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList();
   }
 
   // --- Crew ---

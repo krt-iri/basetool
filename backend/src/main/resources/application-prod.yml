@@ -63,3 +63,19 @@ app:
       - 172.17.0.0/16
       - 172.18.0.0/16
       - 172.19.0.0/16
+
+# SC Wiki catalogue sync. The per-sync feature flags default to false in code
+# (ScWikiProperties -- "ships dark"); enabled here so each scheduler step runs on the
+# live instance and the admin sync-report log (/admin/sync-reports) gets populated.
+# This generates real traffic against api.star-citizen.wiki (item sync ~5000+ fetches
+# at 5 req/s per cycle). sync-all-items stays false (closure mode, not the full backfill).
+# Any flag is overridable per the deployment runbook via env var, e.g.
+# KRT_SCWIKI_ITEM_SYNC_ENABLED=false, without a redeploy.
+krt:
+  scwiki:
+    scheduler-enabled: true
+    commodity-sync-enabled: true
+    vehicle-sync-enabled: true
+    item-sync-enabled: true
+    blueprint-sync-enabled: true
+    manufacturer-sync-enabled: true

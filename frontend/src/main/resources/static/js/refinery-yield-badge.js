@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    var state = {
+    let state = {
         yieldByMaterialId: {},
         helpText: ''
     };
@@ -35,9 +35,9 @@
      * (treated as "no UEX data for this material at this refinery").
      */
     function setBadge(rowIndex, bonus) {
-        var label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
+        let label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
         if (!label) return;
-        var badge = label.querySelector('#yieldBonus_' + rowIndex);
+        let badge = label.querySelector('#yieldBonus_' + rowIndex);
         if (bonus === undefined || bonus === null) {
             if (badge) badge.remove();
             return;
@@ -69,11 +69,11 @@
      */
     function refreshFor(inputMaterialSelect) {
         if (!inputMaterialSelect || !inputMaterialSelect.id) return;
-        var indexMatch = inputMaterialSelect.id.match(/_(\d+)$/);
+        let indexMatch = inputMaterialSelect.id.match(/_(\d+)$/);
         if (!indexMatch) return;
-        var rowIndex = indexMatch[1];
-        var materialId = inputMaterialSelect.value;
-        var bonus = (materialId && state.yieldByMaterialId)
+        let rowIndex = indexMatch[1];
+        let materialId = inputMaterialSelect.value;
+        let bonus = (materialId && state.yieldByMaterialId)
             ? state.yieldByMaterialId[materialId]
             : undefined;
         setBadge(rowIndex, bonus);
@@ -92,7 +92,7 @@
      * form stays usable when UEX or the backend is misbehaving.
      */
     function onLocationChange(selectElement) {
-        var locationId = selectElement && selectElement.value;
+        let locationId = selectElement && selectElement.value;
         if (!locationId) {
             state.yieldByMaterialId = {};
             refreshAll();

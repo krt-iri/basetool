@@ -5,7 +5,7 @@
     <th:block th:fragment="extraLinks">
         <style th:attr="nonce=${cspNonce}">
             label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
-            input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
+            input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
             input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
             .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
             .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
@@ -91,7 +91,7 @@
                 box-sizing: border-box;
                 width: 100%;
                 min-height: 44px;
-                background-color: var(--color-gray-4);
+                background-color: var(--color-surface-input);
                 padding: 0.8rem 1rem;
                 border: 1px solid var(--color-primary);
                 cursor: pointer;
@@ -339,7 +339,7 @@
             .operation-mission-fin {
                 margin-bottom: 1rem;
                 border: 1px solid var(--color-gray-3);
-                background: var(--color-gray-4);
+                background: var(--color-surface-input);
             }
             .operation-mission-fin-header {
                 padding: 0.8rem;
@@ -355,7 +355,7 @@
             .operation-mission-fin-content {
                 display: none;
                 padding: 0.8rem;
-                background: var(--color-gray-4);
+                background: var(--color-surface-input);
             }
             .operation-mission-fin-content.expanded { display: block; }
             .operation-mission-fin .toggle-icon-msn { margin-left: 10px; }
@@ -384,7 +384,7 @@
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
             <div class="greeting hud-box flex-between">
-                <h1 style="margin: 0;" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
+                <h1 class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
                 <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
             </div>
         </main>
@@ -460,7 +460,10 @@
                             <tbody>
                                 <tr th:each="msn : ${missions}">
                                     <td th:text="${msn.name}">Name</td>
-                                    <td th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</td>
+                                    <td>
+                                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}"
+                                              th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
+                                    </td>
                                     <td>
                                         <a class="btn" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
                                     </td>
@@ -587,9 +590,9 @@
                                     <table style="font-size: 0.9em;">
                                         <thead>
                                             <tr>
-                                                <th th:text="#{general.type}" style="text-align: left;">Typ</th>
-                                                <th th:text="#{general.user}" style="text-align: left;">Nutzer</th>
-                                                <th th:text="#{mission.finance.note}" style="text-align: left;">Notiz</th>
+                                                <th th:text="#{general.type}" class="text-left">Typ</th>
+                                                <th th:text="#{general.user}" class="text-left">Nutzer</th>
+                                                <th th:text="#{mission.finance.note}" class="text-left">Notiz</th>
                                                 <th th:text="#{mission.finance.amount}">Betrag</th>
                                             </tr>
                                         </thead>
@@ -619,7 +622,7 @@
                             </div>
                         </div>
                     </div>
-                    <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" th:text="#{mission.empty}" style="text-align: center;">Keine Missionen vorhanden.</p>
+                    <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" th:text="#{mission.empty}" class="text-center">Keine Missionen vorhanden.</p>
                 </div>
             </div>
         </div>

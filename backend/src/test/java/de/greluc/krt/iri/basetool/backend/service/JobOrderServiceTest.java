@@ -131,6 +131,7 @@ class JobOrderServiceTest {
             null,
             null,
             "Tester",
+            null,
             1,
             JobOrderStatus.OPEN,
             List.of(jomDto),
@@ -145,7 +146,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -177,11 +178,12 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void createJobOrder_ShouldAlwaysSetMinQualityTo700() {
-    // Given — DTO carries 700 (the only valid value), service must persist exactly 700
+  void createJobOrder_ShouldHonorMinQualityFromDto() {
+    // Given — DTO carries 700 (the predefined value); the service must persist it verbatim (700),
+    // not force a default.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -200,9 +202,79 @@ class JobOrderServiceTest {
     // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — the saved JobOrder must have minQuality == 700 on every material
+    // Then — the saved JobOrder must carry minQuality == 700 (honored, not forced) on every
+    // material.
     verify(jobOrderRepository)
-        .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == 700)));
+        .save(
+            argThat(
+                jo ->
+                    jo.getMaterials().stream()
+                        .allMatch(m -> m.getMinQuality() != null && m.getMinQuality() == 700)));
+  }
+
+  @Test
+  void createJobOrder_NullMinQuality_PersistsNull() {
+    // Given — DTO carries a null minQuality ("Keine"); the service must persist null (no floor),
+    // not coerce it to 700 or 0.
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
+    CreateJobOrderDto createDto =
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When
+    jobOrderService.createJobOrder(createDto);
+
+    // Then — every saved material's minQuality must be null. Use == null (not == 700) to avoid an
+    // NPE unbox.
+    verify(jobOrderRepository)
+        .save(argThat(jo -> jo.getMaterials().stream().allMatch(m -> m.getMinQuality() == null)));
+  }
+
+  @Test
+  void createJobOrder_PersistsComment() {
+    // Given
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When — comment with surrounding whitespace must be trimmed before persisting.
+    jobOrderService.createJobOrder(
+        new CreateJobOrderDto(null, null, "Tester", "  Deliver fast  ", List.of(createMat), null));
+
+    // Then — trimmed value persisted.
+    verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
+
+    // When — a blank comment must normalise to null.
+    jobOrderService.createJobOrder(
+        new CreateJobOrderDto(null, null, "Tester", "   ", List.of(createMat), null));
+
+    // Then — null comment persisted.
+    verify(jobOrderRepository).save(argThat(jo -> jo.getComment() == null));
   }
 
   @Test
@@ -210,7 +282,7 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -238,7 +310,8 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, requestingSquadronId, "anon-handle", List.of(createMat), null);
+        new CreateJobOrderDto(
+            null, requestingSquadronId, "anon-handle", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -281,7 +354,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "anon-handle", List.of(createMat), null);
+        new CreateJobOrderDto(null, null, "anon-handle", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -490,7 +563,8 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, "Tester", List.of(updateMat), 1L); // version mismatch
+        new CreateJobOrderDto(
+            null, null, "Tester", null, List.of(updateMat), 1L); // version mismatch
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -531,7 +605,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, bravoId, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(null, bravoId, "Tester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(squadronRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
@@ -565,7 +639,7 @@ class JobOrderServiceTest {
     UUID attemptedOverride = UUID.randomUUID();
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(attemptedOverride, null, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(attemptedOverride, null, "Tester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -596,7 +670,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(creatingId, null, "Tester", List.of(updateMat), null);
+        new CreateJobOrderDto(creatingId, null, "Tester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -624,7 +698,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 700, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, betaId, "NewTester", List.of(updateMat), null);
+        new CreateJobOrderDto(null, betaId, "NewTester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(squadronRepository.findById(betaId)).thenReturn(Optional.of(beta));

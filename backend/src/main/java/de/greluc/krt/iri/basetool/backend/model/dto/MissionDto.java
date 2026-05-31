@@ -20,6 +20,12 @@ import java.util.UUID;
  * matching the column already exposed by {@link MissionListDto} on the list endpoint
  * (MULTI_SQUADRON_PLAN.md section 4.5: read DTOs of staffel-scoped aggregates carry the squadron
  * mini-record). May be {@code null} for historic rows persisted before V82.
+ *
+ * <p>{@code partyLeadUser} / {@code partyLeadGuestName} carry the mission's optional party lead
+ * (Partyleiter): a registered user reference or a free-text handle, mutually exclusive (mirroring
+ * the participant {@code user}/{@code guestName} duo). {@code partyLeadVersion} is the dedicated
+ * section-scoped optimistic-lock counter the party-lead endpoint validates, in the same family as
+ * {@code coreVersion}/{@code scheduleVersion}/{@code flagsVersion}.
  */
 public record MissionDto(
     UUID id,
@@ -50,4 +56,7 @@ public record MissionDto(
     Long flagsVersion,
     Integer checkedInParticipants,
     Integer registeredParticipants,
-    SquadronReferenceDto owningSquadron) {}
+    SquadronReferenceDto owningSquadron,
+    UserReferenceDto partyLeadUser,
+    String partyLeadGuestName,
+    Long partyLeadVersion) {}

@@ -123,7 +123,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -235,7 +238,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -301,7 +307,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -403,7 +412,10 @@ class MissionPageControllerMvcTest {
             1L,
             2,
             3,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -465,7 +477,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -546,7 +561,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     MissionDto refreshed =
         new MissionDto(
             missionId,
@@ -577,7 +595,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
         .thenReturn(refreshed);
@@ -632,7 +653,10 @@ class MissionPageControllerMvcTest {
             1L,
             0,
             0,
-            null);
+            null,
+            null,
+            null,
+            0L);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
     // The actual-time endpoint dispatches a section-scoped PATCH on /schedule. A stale
@@ -1218,7 +1242,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
@@ -1329,7 +1356,10 @@ class MissionPageControllerMvcTest {
             1L,
             1,
             1,
-            null);
+            null,
+            null,
+            null,
+            0L);
 
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
@@ -1410,5 +1440,329 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId + "/participants/unassigned/ajax"))
         .andExpect(status().isNotFound());
+  }
+
+  // --- Unit ship picker is restricted to ships of registered participants ----
+
+  @Test
+  void missionDetail_UnitShipPicker_OnlyOffersShipsOfRegisteredParticipants() throws Exception {
+    // Given: one registered (account-backed) participant who owns a ship, plus an outsider who
+    // owns another ship. Both ships are in `allShips`, but only the participant's may be offered.
+    UUID missionId = UUID.randomUUID();
+    UUID participantUserId = UUID.randomUUID();
+    UUID outsiderUserId = UUID.randomUUID();
+    UUID participantShipId = UUID.randomUUID();
+    UUID outsiderShipId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.UserDto participantUser =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.UserDto(
+            participantUserId,
+            "pilot1",
+            "Pilot One",
+            "Pilot One",
+            "Pilot",
+            "One",
+            "pilot@example.com",
+            1,
+            null,
+            java.util.Set.of("MEMBER"),
+            java.util.Set.of(),
+            null,
+            false,
+            false,
+            true,
+            null,
+            1L,
+            null);
+    de.greluc.krt.iri.basetool.frontend.model.dto.UserDto outsiderUser =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.UserDto(
+            outsiderUserId,
+            "outsider1",
+            "Out Sider",
+            "Out Sider",
+            "Out",
+            "Sider",
+            "outsider@example.com",
+            1,
+            null,
+            java.util.Set.of("MEMBER"),
+            java.util.Set.of(),
+            null,
+            false,
+            false,
+            true,
+            null,
+            1L,
+            null);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto participant =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+            UUID.randomUUID(),
+            participantUser,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT,
+            1L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto shipType =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto(
+            shipTypeId, "Fighter", null, null, null, false);
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto participantShip =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto(
+            participantShipId, "P-Ship", shipType, "10", null, false, participantUser, null, 1L);
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto outsiderShip =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto(
+            outsiderShipId, "O-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Test Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            java.util.Set.of(participant),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true, // canEdit -> unit add/edit modals (and their ship pickers) render
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            1,
+            1,
+            null,
+            null,
+            null,
+            0L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
+            Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
+    when(backendApiClient.getCached(
+            anyString(),
+            any(ParameterizedTypeReference.class),
+            org.mockito.ArgumentMatchers.anyBoolean()))
+        .thenReturn(emptyPage);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(mission);
+    // Unit ship pickers are populated from the mission-scoped endpoint; specific stub AFTER the
+    // generic get(...) so it wins for this URL.
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(List.of(participantShip, outsiderShip));
+
+    // When / Then: the rendered ship pickers offer the participant's ship but not the outsider's.
+    mockMvc
+        .perform(
+            get("/missions/" + missionId)
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.oidcLogin()
+                        .idToken(
+                            token ->
+                                token
+                                    .subject(participantUserId.toString())
+                                    .claim("preferred_username", "pilot1"))))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(participantShipId.toString())))
+        .andExpect(content().string(not(containsString(outsiderShipId.toString()))));
+  }
+
+  @Test
+  void missionDetail_UnitShipPicker_KeepsAlreadyAssignedShipEvenIfOwnerNotParticipant()
+      throws Exception {
+    // Given: a unit already holds a ship whose owner is NOT (or no longer) a participant. The edit
+    // picker must keep offering that ship so editing the unit doesn't silently drop it. A stray
+    // non-participant ship that is not assigned anywhere must still be excluded.
+    UUID missionId = UUID.randomUUID();
+    UUID participantUserId = UUID.randomUUID();
+    UUID outsiderUserId = UUID.randomUUID();
+    UUID participantShipId = UUID.randomUUID();
+    UUID assignedShipId = UUID.randomUUID();
+    UUID strayShipId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.UserDto participantUser =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.UserDto(
+            participantUserId,
+            "pilot1",
+            "Pilot One",
+            "Pilot One",
+            "Pilot",
+            "One",
+            "pilot@example.com",
+            1,
+            null,
+            java.util.Set.of("MEMBER"),
+            java.util.Set.of(),
+            null,
+            false,
+            false,
+            true,
+            null,
+            1L,
+            null);
+    de.greluc.krt.iri.basetool.frontend.model.dto.UserDto outsiderUser =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.UserDto(
+            outsiderUserId,
+            "outsider1",
+            "Out Sider",
+            "Out Sider",
+            "Out",
+            "Sider",
+            "outsider@example.com",
+            1,
+            null,
+            java.util.Set.of("MEMBER"),
+            java.util.Set.of(),
+            null,
+            false,
+            false,
+            true,
+            null,
+            1L,
+            null);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto participant =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+            UUID.randomUUID(),
+            participantUser,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT,
+            1L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto shipType =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto(
+            shipTypeId, "Fighter", null, null, null, false);
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto participantShip =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto(
+            participantShipId, "P-Ship", shipType, "10", null, false, participantUser, null, 1L);
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto assignedShip =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto(
+            assignedShipId, "A-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+    de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto strayShip =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto(
+            strayShipId, "S-Ship", shipType, "10", null, false, outsiderUser, null, 1L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto assignedUnit =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto(
+            UUID.randomUUID(),
+            "Alpha",
+            shipType,
+            assignedShip,
+            123.45,
+            false,
+            Collections.emptyList());
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Test Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            java.util.Set.of(participant),
+            List.of(assignedUnit),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            1,
+            1,
+            null,
+            null,
+            null,
+            0L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
+            Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
+    when(backendApiClient.getCached(
+            anyString(),
+            any(ParameterizedTypeReference.class),
+            org.mockito.ArgumentMatchers.anyBoolean()))
+        .thenReturn(emptyPage);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(mission);
+    // The endpoint returns participant ships plus already-assigned ships; the stray ship is neither
+    // and must be filtered out by the template. Specific stub AFTER the generic get(...).
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(List.of(participantShip, assignedShip, strayShip));
+
+    // When / Then: the assigned ship is still selectable as an <option value="..."> (so the
+    // client-side edit picker can pre-select it), while the unassigned stray ship is excluded.
+    mockMvc
+        .perform(
+            get("/missions/" + missionId)
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.oidcLogin()
+                        .idToken(
+                            token ->
+                                token
+                                    .subject(participantUserId.toString())
+                                    .claim("preferred_username", "pilot1"))))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("value=\"" + participantShipId + "\"")))
+        .andExpect(content().string(containsString("value=\"" + assignedShipId + "\"")))
+        .andExpect(content().string(not(containsString("value=\"" + strayShipId + "\""))));
   }
 }

@@ -259,6 +259,7 @@ public class JobOrderPageController {
           form.setRequestingOrgUnitId(
               order.requestingSquadron() != null ? order.requestingSquadron().id() : null);
           form.setHandle(order.handle());
+          form.setComment(order.comment());
           form.setVersion(order.version());
           form.getMaterials().clear();
           if (order.materials() != null) {
@@ -383,7 +384,10 @@ public class JobOrderPageController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 700, m.getAmount()))
+              .map(
+                  m ->
+                      new CreateJobOrderMaterialDto(
+                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
               .collect(Collectors.toList());
 
       if (materials.isEmpty()) {
@@ -395,7 +399,12 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null, form.getRequestingOrgUnitId(), form.getHandle(), materials, form.getVersion());
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -487,7 +496,10 @@ public class JobOrderPageController {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
               .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m -> new CreateJobOrderMaterialDto(m.getMaterialId(), 700, m.getAmount()))
+              .map(
+                  m ->
+                      new CreateJobOrderMaterialDto(
+                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
               .collect(Collectors.toList());
 
       if (materials.isEmpty()) {
@@ -498,7 +510,12 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null, form.getRequestingOrgUnitId(), form.getHandle(), materials, form.getVersion());
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
       backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
