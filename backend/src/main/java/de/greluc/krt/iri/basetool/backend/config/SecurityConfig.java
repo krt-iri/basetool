@@ -153,6 +153,7 @@ public class SecurityConfig {
                       "/api/v1/missions/**",
                       "/api/v1/operations/**",
                       "/api/v1/orders",
+                      "/api/v1/orders/items",
                       "/api/v1/finance-entries"));
     }
 
@@ -272,6 +273,17 @@ public class SecurityConfig {
                         "/api/v1/missions/*/participants/*/check-out/slim")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/orders")
+                    .permitAll()
+                    // Item-order create + its catalog reads mirror the material create's anonymous
+                    // access (the public request form). The item-handover / report endpoints are
+                    // NOT listed here — they stay behind the authenticated catch-all +
+                    // @PreAuthorize.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/orders/items")
+                    .permitAll()
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/orders/item-catalog",
+                        "/api/v1/orders/item-catalog/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/finance-entries")
                     .permitAll()

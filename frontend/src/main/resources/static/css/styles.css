@@ -1801,6 +1801,76 @@ input[type="radio"]:focus {
     border-left: 4px solid var(--color-secondary);
 }
 
+/* Order-kind chip — distinguishes the two job-order kinds (Material procurement
+   vs finished-Item manufacture) in the list and on the detail header. Reuses the
+   squadron-badge pill chrome with currentColor borders: Material orders take the
+   brand orange, Item orders the Forschung blue (manufacturing/derivation semantic). */
+.order-kind-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem var(--space-2);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-pill);
+    font-family: Lato, sans-serif;
+    font-size: 0.7rem;
+    font-weight: var(--fw-bold);
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.order-kind-material {
+    color: var(--color-primary);
+}
+
+.order-kind-item {
+    color: var(--color-info);
+}
+
+/* Quality chip for an item order's aggregated-materials panel — one row per
+   (material, quality). GOOD (700+) reads as the Profit green; NONE ("Keine")
+   takes the muted grey so "no quality floor" never competes for attention. */
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem var(--space-2);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-pill);
+    font-family: Lato, sans-serif;
+    font-size: 0.7rem;
+    font-weight: var(--fw-bold);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.quality-good {
+    color: var(--color-success);
+}
+
+.quality-none {
+    color: var(--color-gray-1);
+    border-color: var(--color-gray-2);
+}
+
+/* Sub-assembly provenance marker on an ordered item line that was adopted from a
+   parent item's blueprint ITEM ingredient. Square, muted, low-key — it annotates
+   provenance without pulling focus from the item name. */
+.subassembly-tag {
+    display: inline-flex;
+    align-items: center;
+    margin-left: var(--space-2);
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--color-gray-2);
+    color: var(--color-gray-1);
+    font-family: Lato, sans-serif;
+    font-size: 0.65rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
 /* Department tag — small square chip tinted by the owning Bereichsfarbe.
    The border inherits `currentColor`, so setting the text colour to a
    department token (e.g. `color: var(--color-dept-forschung)`) tints both

@@ -5,22 +5,31 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +72,9 @@ public class JobOrderService {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final JobOrderMapper jobOrderMapper;
+  private final JobOrderItemService jobOrderItemService;
+  private final de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
+      jobOrderItemHandoverMapper;
   private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
   /**
@@ -110,6 +122,69 @@ public class JobOrderService {
               .build();
 
       jobOrder.addMaterial(jobOrderMaterial);
+    }
+
+    jobOrder = jobOrderRepository.save(jobOrder);
+    jobOrderRepository.flush();
+    normalizePriorities();
+    return mapToDtoWithStock(jobOrder);
+  }
+
+  /**
+   * Persists a new {@code ITEM} job order from the create DTO. Org-unit stamping and priority
+   * assignment mirror {@link #createJobOrder(CreateJobOrderDto)}; the finished-item lines are built
+   * (and their required materials derived + snapshotted from each line's blueprint) by {@link
+   * JobOrderItemService}. Sub-assembly provenance is reconstructed from the transient {@code
+   * clientLineId} / {@code parentClientLineId} hints after every line exists.
+   *
+   * @param createDto item-order create payload
+   * @return the persisted order as a DTO (with derived per-item materials + aggregation)
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when a referenced game
+   *     item or blueprint id is unknown
+   * @throws BadRequestException when a chosen blueprint does not produce its line's game item, or
+   *     when org-unit stamping cannot be resolved
+   */
+  @Transactional
+  public JobOrderDto createItemJobOrder(CreateJobOrderItemRequestDto createDto) {
+    jobOrderRepository.lockAllJobOrders();
+    Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
+
+    Squadron creatingSquadron =
+        resolveCreatingSquadronForCreate(
+            createDto.creatingSquadronId(), createDto.requestingOrgUnitId());
+    Squadron requestingSquadron =
+        resolveRequestingSquadron(createDto.requestingOrgUnitId(), creatingSquadron);
+
+    JobOrder jobOrder =
+        JobOrder.builder()
+            .handle(createDto.handle())
+            .comment(normalizeComment(createDto.comment()))
+            .priority(newPriority)
+            .type(JobOrderType.ITEM)
+            .creatingOrgUnit(creatingSquadron)
+            .requestingOrgUnit(requestingSquadron)
+            .build();
+
+    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
+    List<JobOrderItem> built = new ArrayList<>();
+    for (CreateJobOrderItemLineDto line : createDto.items()) {
+      JobOrderItem item = jobOrderItemService.buildItemLine(line);
+      jobOrder.addItem(item);
+      built.add(item);
+      if (line.clientLineId() != null) {
+        byClientId.put(line.clientLineId(), item);
+      }
+    }
+    // Resolve sub-assembly provenance once every line exists, ignoring dangling or self references.
+    for (int i = 0; i < createDto.items().size(); i++) {
+      Integer parentClientId = createDto.items().get(i).parentClientLineId();
+      if (parentClientId == null) {
+        continue;
+      }
+      JobOrderItem parent = byClientId.get(parentClientId);
+      if (parent != null && parent != built.get(i)) {
+        built.get(i).setParentItem(parent);
+      }
     }
 
     jobOrder = jobOrderRepository.save(jobOrder);
@@ -660,6 +735,15 @@ public class JobOrderService {
                 })
             .toList();
 
+    boolean isItem = jobOrder.getType() == JobOrderType.ITEM;
+    List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
+    List<AggregatedMaterialDto> aggregatedMaterials =
+        isItem ? jobOrderItemService.aggregateMaterials(jobOrder) : List.of();
+    List<de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
+        isItem
+            ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
+            : List.of();
+
     return new JobOrderDto(
         baseDto.id(),
         baseDto.displayId(),
@@ -669,9 +753,13 @@ public class JobOrderService {
         baseDto.comment(),
         baseDto.priority(),
         baseDto.status(),
+        baseDto.type(),
         updatedMaterials,
+        items,
+        aggregatedMaterials,
         baseDto.assignees(),
         baseDto.handovers(),
+        itemHandovers,
         baseDto.createdAt(),
         baseDto.version());
   }

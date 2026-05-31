@@ -1,16 +1,25 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverReportService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
@@ -64,6 +73,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Orders", description = "Operations related to job orders")
 public class JobOrderController {
   private final JobOrderService jobOrderService;
+  private final JobOrderItemService jobOrderItemService;
+  private final JobOrderItemHandoverService jobOrderItemHandoverService;
+  private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
   private final UserService userService;
@@ -87,6 +99,74 @@ public class JobOrderController {
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
+  }
+
+  /**
+   * Records an item handover for an item order: increments each ordered line's delivered count and
+   * auto-completes the order once every line is fully delivered. Same authorisation as the material
+   * handover (LOGISTICIAN+).
+   *
+   * @param id job-order id
+   * @param dto item-handover payload (per-line delivered quantities)
+   * @return the persisted item-handover DTO
+   */
+  @PostMapping("/{id}/item-handovers")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Create an item handover",
+      description = "Logs a handover of produced items for this item order.")
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  public JobOrderItemHandoverDto createItemHandover(
+      @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
+    return jobOrderItemHandoverService.createItemHandover(id, dto);
+  }
+
+  /**
+   * Renders a persisted item handover as a downloadable PDF delivery note. The optional {@code
+   * X-User-Time-Zone} header overrides UTC for the document timestamps; an invalid IANA zone is
+   * silently dropped (the service falls back to UTC). Same authorisation as the material report.
+   *
+   * @param jobOrderId job-order id
+   * @param handoverId item-handover id
+   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
+  @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
+  @Operation(
+      summary = "Download item-handover report PDF",
+      description = "Generates and downloads a PDF delivery note for a persisted item handover.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "PDF generated successfully"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Forbidden"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Job order or item handover not found")
+  })
+  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  public ResponseEntity<byte[]> downloadItemHandoverReport(
+      @PathVariable UUID jobOrderId,
+      @PathVariable UUID handoverId,
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    java.time.ZoneId userZone = null;
+    if (userTimeZone != null && !userTimeZone.isBlank()) {
+      try {
+        userZone = java.time.ZoneId.of(userTimeZone);
+      } catch (java.time.DateTimeException ex) {
+        // Invalid IANA zone in header → fall back to UTC inside the service.
+      }
+    }
+    byte[] pdf =
+        jobOrderItemHandoverReportService.generateItemHandoverReport(
+            jobOrderId, handoverId, userZone);
+    String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", filename);
+    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 
   /**
@@ -199,12 +279,116 @@ public class JobOrderController {
   }
 
   /**
+   * Creates a new item-based job order. {@code permitAll()} for parity with the material-order
+   * create endpoint, with the same guest redaction. The required materials are derived server-side
+   * from each ordered item's chosen blueprint and snapshotted onto the order; the response carries
+   * the derived per-item materials and the aggregated material view.
+   *
+   * @param dto item-order create payload (ordered finished items + per-material quality choices)
+   * @param jwt the caller's JWT, or {@code null} for anonymous callers
+   * @return the persisted DTO (redacted for anonymous callers)
+   */
+  @PostMapping("/items")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Create a new item job order",
+      description =
+          "Creates an item-based job order; the required materials are derived from each ordered"
+              + " item's blueprint.")
+  @PreAuthorize("permitAll()")
+  public JobOrderDto createItemJobOrder(
+      @RequestBody @Valid CreateJobOrderItemRequestDto dto, @AuthenticationPrincipal Jwt jwt) {
+    JobOrderDto created = jobOrderService.createItemJobOrder(dto);
+    if (jwt == null) {
+      created = cleanupJobOrderForGuest(created);
+    }
+    return created;
+  }
+
+  /**
+   * Paged picker of orderable items (blueprint outputs with at least one resolvable material) for
+   * the item-order create form. {@code permitAll()} for parity with the public create endpoint so
+   * the anonymous request form can populate its item picker. Returns game reference data only (no
+   * PII).
+   *
+   * @param search optional case-insensitive item-name filter
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec (only {@code name} is whitelisted)
+   * @return paged orderable item references
+   */
+  @GetMapping("/item-catalog")
+  @Operation(
+      summary = "List orderable items",
+      description =
+          "Returns a paginated list of items that can be ordered (blueprint outputs with at least"
+              + " one resolvable material).")
+  @PreAuthorize("permitAll()")
+  @Transactional(readOnly = true)
+  public PageResponse<GameItemReferenceDto> getOrderableItems(
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false, defaultValue = "20") int size,
+      @RequestParam(required = false, defaultValue = "name,asc") String sort) {
+    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
+    Page<GameItemReferenceDto> p = jobOrderItemService.findOrderableItems(search, pageable);
+    return new PageResponse<>(
+        p.getContent(),
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  /**
+   * Lists the blueprints that produce a given orderable item. Drives the create form's blueprint
+   * picker, shown when an item has more than one recipe (issue #304 decision 2).
+   *
+   * @param gameItemId the orderable item
+   * @return blueprint references producing that item
+   */
+  @GetMapping("/item-catalog/{gameItemId}/blueprints")
+  @Operation(
+      summary = "List blueprints for an orderable item",
+      description = "Returns the blueprints that produce the given item.")
+  @PreAuthorize("permitAll()")
+  @Transactional(readOnly = true)
+  public List<BlueprintReferenceDto> getBlueprintsForItem(@PathVariable UUID gameItemId) {
+    return jobOrderItemService.blueprintsForItem(gameItemId);
+  }
+
+  /**
+   * Previews the material derivation for a chosen blueprint at a given amount: resolved materials
+   * (with default quality), adoptable sub-assembly suggestions, and unresolved-ingredient names for
+   * the create-form warning banner.
+   *
+   * @param blueprintId the chosen blueprint
+   * @param amount the whole-unit amount to scale by (defaults to 1)
+   * @return the derivation preview
+   */
+  @GetMapping("/item-catalog/blueprints/{blueprintId}/derivation")
+  @Operation(
+      summary = "Preview blueprint material derivation",
+      description =
+          "Returns the materials, sub-assembly suggestions and unresolved ingredients derived from"
+              + " a blueprint at the given amount.")
+  @PreAuthorize("permitAll()")
+  @Transactional(readOnly = true)
+  public ItemDerivationDto getBlueprintDerivation(
+      @PathVariable UUID blueprintId,
+      @RequestParam(required = false, defaultValue = "1") int amount) {
+    return jobOrderItemService.deriveForPreview(blueprintId, amount);
+  }
+
+  /**
    * Strips fields from a job-order DTO that an anonymous caller has no business seeing or that
    * carry no value for them: the {@code assignees} list (would expose member PII if the order ever
    * had assignees at create time — defence-in-depth), the {@code handovers} list (logistician audit
    * trail) and the optimistic-lock {@code version} (anonymous cannot update the order). The {@code
-   * id} / {@code displayId} / squadron references / materials / status are preserved so the public
-   * form can show a confirmation page with the order number. The order's own free-text {@code
+   * id} / {@code displayId} / squadron references / {@code type} / {@code materials} / {@code
+   * items} / {@code aggregatedMaterials} / status are preserved so the public form can show a
+   * confirmation page with the order number for either order kind. The order's own free-text {@code
    * comment} is preserved — it is the order's own note, not collaborator-identifying data.
    *
    * @param dto the persisted job-order DTO
@@ -220,7 +404,11 @@ public class JobOrderController {
         dto.comment(),
         dto.priority(),
         dto.status(),
+        dto.type(),
         dto.materials(),
+        dto.items(),
+        dto.aggregatedMaterials(),
+        java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         dto.createdAt(),

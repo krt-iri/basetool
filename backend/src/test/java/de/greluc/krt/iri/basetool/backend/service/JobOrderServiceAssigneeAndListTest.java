@@ -15,6 +15,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto;
@@ -84,6 +85,10 @@ class JobOrderServiceAssigneeAndListTest {
                   o.getComment(),
                   o.getPriority(),
                   o.getStatus(),
+                  JobOrderType.MATERIAL,
+                  List.of(),
+                  List.of(),
+                  List.of(),
                   List.of(),
                   List.of(),
                   List.of(),
