@@ -35449,6 +35449,14 @@
             "items" : {
               "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
             }
+          },
+          "effectiveQualityMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "effectiveQualityMax" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },

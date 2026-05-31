@@ -49,7 +49,11 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
-  implementation(libs.springdoc.openapi.starter.webmvc.ui)
+  // springdoc -api (NOT -ui): generates the OpenAPI document at /v3/api-docs without bundling the
+  // Swagger UI webjar. The committed openapi.json is the single documentation artifact (produced by
+  // OpenApiGeneratorTest); /v3/api-docs is additionally disabled in the prod profile so the spec is
+  // never reachable from outside a deployed environment.
+  implementation(libs.springdoc.openapi.starter.webmvc.api)
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation(libs.bucket4j.core)
   implementation(libs.semver4j.core)

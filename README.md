@@ -297,8 +297,9 @@ fast restarts; only the dependencies live in containers.
    ```bash
    ./gradlew :backend:bootRun
    ```
-   Backend at `https://localhost:11261`, Swagger UI at
-   `https://localhost:11261/swagger-ui.html`.
+   Backend at `https://localhost:11261`. The OpenAPI document is served at
+   `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles (disabled
+   in `prod`); there is no Swagger UI.
 
 3. **Run the frontend** (uses the `dev` profile by default, HTTP):
    ```bash
@@ -338,7 +339,7 @@ images.
 Access in either flavour:
 * **Frontend**: `http://localhost:18081`
 * **Backend API**: `http://localhost:11261`
-* **Swagger UI**: `http://localhost:11261/swagger-ui.html`
+* **OpenAPI document** (dev/test only): `http://localhost:11261/v3/api-docs`
 * **Keycloak**: `http://localhost:18080`
 
 ### 4.4 Running the local test stack
@@ -465,7 +466,7 @@ worktree; the commands are identical).
 7. **Access** (same ports as the regular dev stack):
    * **Frontend**: `http://localhost:18081`
    * **Backend API**: `https://localhost:11261` (self-signed cert from the test keystore)
-   * **Swagger UI**: `https://localhost:11261/swagger-ui.html`
+   * **OpenAPI document** (dev/test only): `https://localhost:11261/v3/api-docs`
    * **Keycloak**: `http://localhost:18080` — log in with the bootstrap admin from `.env.test`
    * **Realm `iri` test user**: username `test-admin`, password `test-admin-pw`
 
@@ -575,7 +576,7 @@ staging on a schedule or manual dispatch (never on PRs) once the repo defines an
 * **Session store** — Redis (`spring-session-data-redis`)
 * **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26)
 * **Frontend** — Thymeleaf, Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
-* **API documentation** — SpringDoc / OpenAPI, Swagger UI at `/swagger-ui.html`
+* **API documentation** — SpringDoc / OpenAPI; the committed `backend/src/main/resources/api/openapi.json` is the single documentation artifact. No Swagger UI is bundled, and `/v3/api-docs` is disabled in the `prod` profile.
 * **DTO mapping** — MapStruct (`@Mapper(componentModel = "spring")`)
 * **Containerization** — Docker and Docker Compose; images published to GHCR, signed with Cosign keyless and shipped with SLSA provenance + SPDX SBOM attestations
 
@@ -675,7 +676,7 @@ using RFC 7807 Problem Details with content type `application/problem+json`.
 }
 ```
 
-Swagger UI documents standard 4xx / 5xx responses with this schema.
+The OpenAPI document (`openapi.json`) documents standard 4xx / 5xx responses with this schema.
 
 **API versioning and deprecation.** The REST API uses semantic versioning
 via URI paths (`/api/v1/...`). Endpoints slated for removal are marked as
