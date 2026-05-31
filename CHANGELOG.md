@@ -8,6 +8,9 @@
 - **Mindestqualität eines Auftrags-Materials kann jetzt „Keine" sein.** Neben dem vorgegebenen Wert 700 lässt sich „Keine" wählen, wenn keine bestimmte Qualität gefordert ist; der Lagerbestand zählt dann Einträge aller Qualitäten (V118 macht `min_quality` nullable, V117 ergänzt die Kommentar-Spalte).
 - **Einsätze können jetzt einen „Partyleiter" tragen.** In den Einsatz-Details lässt sich – mit derselben Such-Mechanik wie beim Hinzufügen eines Teilnehmers – ein bestehender Nutzer oder ein freier (auch anonymer) Name als Partyleiter eintragen; eindeutige Namen werden auf das Mitglied aufgelöst, unbekannte bleiben Freitext. Bearbeitbar durch Einsatz-Manager, sichtbar für alle; optimistisch gesperrt über einen eigenen `party_lead_version`-Zähler (V119 ergänzt die Spalten).
 
+### Changed
+- **Blueprint-Namen auf der Admin-Seite (`/admin/blueprints`) stehen jetzt in der Body-Schrift (Lato Bold) statt der Headline-Schrift (Ethnocentric).** Die langen Output-Namen sind in Lato deutlich besser lesbar; `.bp-name` verweist nun auf `--font-body` ohne Headline-Letterspacing.
+
 ### Fixed
 - **SC-Wiki-Blueprint-Detail-Sync schlug bei jedem Bauplan fehl — die Stat-Modifier (Slider-Daten) der Admin-Blueprint-Seite blieben dadurch leer.** `ScWikiClient.fetchOne` ließ den reaktiven `WebClient` direkt in einen Jackson-2-`JsonNode` deserialisieren; Spring Boot 4 verdrahtet den Client aber auf den Jackson-3-Codec, der einen Jackson-2-`JsonNode` nicht instanziieren kann und jeden Detail-Abruf mit `Cannot construct instance of JsonNode` abbrach (im Log: „N detail fetch miss(es)"). Behoben, indem der Body als `String` decodiert und mit dem clienteigenen Jackson-2-`ObjectMapper` geparst wird — der Baum-/Bind-Pfad bleibt so auf einer Jackson-Version. Betraf auch den Item-Closure-Sync (gleicher `fetchOne`-Pfad); neue `ScWikiClientTest`-Fälle decken den Detail-Abruf jetzt durch den echten Codec ab. (Die generelle Umstellung auf Jackson 3 bleibt ein separater Schritt.)
 
