@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,13 +74,22 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Free-text + status + scope search across operations. Mirrors the contract of {@code
-   * MissionRepository.searchMissions} within the limits of the operation aggregate: operations have
-   * no {@code plannedStartTime} of their own (that field lives on the underlying missions), so the
-   * missions' date-range filter has no meaningful equivalent here and is deliberately omitted.
-   * {@code query} is optional - a {@code null} cast removes the corresponding clause; the {@code
-   * status IN (:status)} list is always applied (pass the full enum set to disable status
-   * filtering).
+   * Free-text + status + time-range + scope search across operations. Mirrors the contract of
+   * {@code MissionRepository.searchMissions} within the limits of the operation aggregate. {@code
+   * query} is optional - a {@code null} cast removes the corresponding clause; the {@code status IN
+   * (:status)} list is always applied (pass the full enum set to disable status filtering).
+   *
+   * <p><strong>Time-range filter.</strong> An operation has no {@code plannedStartTime} of its own
+   * — that field lives on the underlying missions — so its effective span is derived from its
+   * linked missions: the operation "starts" at the planned start of its earliest mission ({@code
+   * MIN(plannedStartTime)}) and "ends" at the planned end of its latest mission ({@code
+   * MAX(plannedEndTime)}). The {@code start} bound (inclusive) keeps operations whose earliest
+   * mission starts at or after it; the {@code end} bound (inclusive) keeps operations whose latest
+   * mission ends at or before it. Both are optional ({@code null} cast removes the clause) and are
+   * evaluated via correlated subqueries so the main query still returns one row per operation and
+   * SQL-level pagination is preserved. An operation with no linked missions yields {@code NULL} for
+   * both aggregates and is therefore excluded whenever either bound is supplied — consistent with
+   * how the missions search drops missions with a {@code null plannedStartTime}.
    *
    * <p>Operations are a strict-staffel aggregate: a non-null {@code owningSquadronId} restricts the
    * result to operations owned by that squadron; {@code null} means "all squadrons" (admin mode).
@@ -91,6 +101,10 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * representation.
    *
    * @param query free-text name/description fragment, may be {@code null}
+   * @param start inclusive lower bound on the operation's earliest mission planned start ({@code
+   *     MIN(plannedStartTime)}), or {@code null} to disable
+   * @param end inclusive upper bound on the operation's latest mission planned end ({@code
+   *     MAX(plannedEndTime)}), or {@code null} to disable
    * @param status status list (string names of {@code OperationStatus}); always applied
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
@@ -106,9 +120,14 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
           + " ) AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%')) AND (CAST(o.status AS string) IN (:status))")
+          + " string), '%')) AND (CAST(o.status AS string) IN (:status)) AND (CAST(:start AS"
+          + " timestamp) IS NULL OR (SELECT MIN(m.plannedStartTime) FROM Mission m WHERE"
+          + " m.operation = o) >= :start) AND (CAST(:end AS timestamp) IS NULL OR (SELECT"
+          + " MAX(m.plannedEndTime) FROM Mission m WHERE m.operation = o) <= :end)")
   Page<Operation> searchOperations(
       @Param("query") String query,
+      @Param("start") Instant start,
+      @Param("end") Instant end,
       @Param("status") List<String> status,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,

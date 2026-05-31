@@ -123,15 +123,23 @@ public class OperationService {
   }
 
   /**
-   * Free-text + status + scope search across operations. Mirrors {@code
-   * MissionService.searchMissions} within the limits of the operation aggregate: operations have no
-   * {@code plannedStartTime} of their own (that field lives on the underlying missions), so the
-   * missions' date-range filter has no meaningful equivalent here and is deliberately omitted.
-   * Falls back to the full {@link OperationStatus} enum set when {@code status} is {@code null} or
-   * empty - the SQL contract requires a non-empty list. The squadron scope is resolved through
-   * {@link OwnerScopeService} (admin "all squadrons" mode resolves to {@code null}).
+   * Free-text + status + time-range + scope search across operations. Mirrors {@code
+   * MissionService.searchMissions} within the limits of the operation aggregate. Falls back to the
+   * full {@link OperationStatus} enum set when {@code status} is {@code null} or empty - the SQL
+   * contract requires a non-empty list. The squadron scope is resolved through {@link
+   * OwnerScopeService} (admin "all squadrons" mode resolves to {@code null}).
+   *
+   * <p>Because an operation has no {@code plannedStartTime} of its own, the {@code start}/{@code
+   * end} bounds filter on the operation's derived span — {@code start} against the planned start of
+   * the earliest linked mission, {@code end} against the planned end of the latest linked mission
+   * (see {@link OperationRepository#searchOperations}). Both are optional and forwarded verbatim;
+   * the repository's {@code CAST(... AS timestamp) IS NULL} guard disables a {@code null} bound.
    *
    * @param query free-text name/description fragment, may be {@code null}
+   * @param start inclusive lower bound on the earliest linked mission's planned start, or {@code
+   *     null} to disable
+   * @param end inclusive upper bound on the latest linked mission's planned end, or {@code null} to
+   *     disable
    * @param status status list (string names of {@link OperationStatus}); {@code null}/empty means
    *     all statuses
    * @param pageable page request
@@ -139,7 +147,11 @@ public class OperationService {
    */
   @NotNull
   public Page<Operation> searchOperations(
-      @Nullable String query, @Nullable List<String> status, @NotNull Pageable pageable) {
+      @Nullable String query,
+      @Nullable Instant start,
+      @Nullable Instant end,
+      @Nullable List<String> status,
+      @NotNull Pageable pageable) {
     List<String> effectiveStatus =
         (status == null || status.isEmpty())
             ? Arrays.stream(OperationStatus.values()).map(Enum::name).toList()
@@ -147,6 +159,8 @@ public class OperationService {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return operationRepository.searchOperations(
         query,
+        start,
+        end,
         effectiveStatus,
         scope.adminAllScope(),
         scope.activeOrgUnitId(),

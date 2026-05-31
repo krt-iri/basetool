@@ -61,14 +61,20 @@ public class OperationPageController {
   /**
    * Renders the paginated, filtered operations list. Mirrors the missions overview filter contract
    * within the limits of the operation aggregate: free-text {@code search} matches name +
-   * description, and {@code showPast} flips the default status filter from {@code PLANNED}+{@code
-   * ACTIVE} to the full set. Operations have no {@code plannedStartTime} of their own (that field
-   * lives on the underlying missions), so the date-range filter from the missions overview has no
-   * meaningful equivalent here and is deliberately omitted. When {@code fragment=results} is
-   * supplied the controller returns just the results fragment so the client-side AJAX filter can
-   * patch the list in place without a full page reload.
+   * description, {@code showPast} flips the default status filter from {@code PLANNED}+{@code
+   * ACTIVE} to the full set, and the {@code start}/{@code end} time range filters on the
+   * operation's derived span — an operation has no {@code plannedStartTime} of its own, so the
+   * backend bounds {@code start} against the planned start of the earliest linked mission and
+   * {@code end} against the planned end of the latest linked mission. The two bounds arrive as
+   * ISO-8601 instants assembled client-side by {@code datetime-splitter.js} and are forwarded
+   * verbatim. When {@code fragment=results} is supplied the controller returns just the results
+   * fragment so the client-side AJAX filter can patch the list in place without a full page reload.
    *
    * @param search free-text query, may be {@code null}
+   * @param start inclusive lower bound (ISO-8601) on the earliest linked mission's planned start,
+   *     may be {@code null}/blank
+   * @param end inclusive upper bound (ISO-8601) on the latest linked mission's planned end, may be
+   *     {@code null}/blank
    * @param showPast when {@code true} (and authenticated), include COMPLETED and CANCELED
    * @param page zero-based page index
    * @param size page size (default 20)
@@ -82,6 +88,8 @@ public class OperationPageController {
   @PreAuthorize("isAuthenticated()")
   public String listOperations(
       @RequestParam(required = false) String search,
+      @RequestParam(required = false) String start,
+      @RequestParam(required = false) String end,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
@@ -91,6 +99,12 @@ public class OperationPageController {
     StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
     if (search != null && !search.isBlank()) {
       uri.append("query=").append(URLEncoder.encode(search, StandardCharsets.UTF_8)).append("&");
+    }
+    if (start != null && !start.isBlank()) {
+      uri.append("start=").append(URLEncoder.encode(start, StandardCharsets.UTF_8)).append("&");
+    }
+    if (end != null && !end.isBlank()) {
+      uri.append("end=").append(URLEncoder.encode(end, StandardCharsets.UTF_8)).append("&");
     }
     uri.append("page=").append(page).append("&");
     uri.append("size=").append(size).append("&");
@@ -112,6 +126,8 @@ public class OperationPageController {
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
+      model.addAttribute("start", start);
+      model.addAttribute("end", end);
       model.addAttribute("showPast", effectiveShowPast);
     } catch (Exception e) {
       log.error("Error loading operations", e);
