@@ -61,20 +61,33 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Paged, filtered list of non-soft-deleted blueprints for the admin blueprint page. When {@code
-   * q} is non-null it matches case-insensitively against the output-item name or the Wiki key;
-   * {@code null} returns every active blueprint. Sorting is supplied by the caller via {@code
-   * Pageable} against a whitelisted field set; the owned collections are left lazy (batched on
-   * access by their {@code @BatchSize}).
+   * Unfiltered page of active (non-soft-deleted) blueprints for the admin blueprint page when no
+   * search term is supplied. Kept separate from {@link #searchActive(String, Pageable)} so the
+   * common no-filter load stays a plain indexed predicate and never binds a {@code null} into a
+   * string function: passing a {@code null} named parameter into {@code LOWER(CONCAT(...))} makes
+   * PostgreSQL infer {@code bytea} and fail the whole request with {@code function lower(bytea)
+   * does not exist}. Sorting comes from the caller's whitelisted {@code Pageable}; the owned
+   * collections stay lazy (batched on access by their {@code @BatchSize}).
    *
-   * @param q case-insensitive output-name / key substring, or {@code null} for no filter
    * @param pageable page request (whitelisted sort)
-   * @return a page of matching blueprints
+   * @return a page of active blueprints
+   */
+  Page<Blueprint> findByScwikiDeletedAtIsNull(Pageable pageable);
+
+  /**
+   * Page of active (non-soft-deleted) blueprints whose output-item name or Wiki key contains {@code
+   * q}, matched case-insensitively. The caller guarantees {@code q} is non-null and non-blank, so
+   * the {@code LOWER(CONCAT(...))} predicate never receives a {@code null} bind (which PostgreSQL
+   * would type as {@code bytea}). Sorting comes from the caller's whitelisted {@code Pageable}; the
+   * owned collections stay lazy (batched on access by their {@code @BatchSize}).
+   *
+   * @param q case-insensitive output-name / Wiki-key substring; must be non-null and non-blank
+   * @param pageable page request (whitelisted sort)
+   * @return a page of matching active blueprints
    */
   @Query(
       "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL "
-          + "AND (:q IS NULL "
-          + "OR LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) "
+          + "AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) "
           + "OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))")
-  Page<Blueprint> findActiveFiltered(@Param("q") String q, Pageable pageable);
+  Page<Blueprint> searchActive(@Param("q") String q, Pageable pageable);
 }
