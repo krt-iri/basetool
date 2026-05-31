@@ -506,14 +506,22 @@ public class MissionPageController {
 
       // Fetch Ships (Only if authenticated)
       if (principal != null) {
-        try {
-          PageResponse<ShipDto> allShipsPage =
-              backendApiClient.getCached(
-                  "/api/v1/hangar/ships?size=1000",
-                  new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
-          model.addAttribute("allShips", allShipsPage.content());
-        } catch (Exception e) {
-          // Ignore, e.g. if user has no HANGAR_READ or other issue
+        // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
+        // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
+        // ships already assigned to a unit. Only fetched when the caller may edit the mission —
+        // otherwise the modals don't render and the endpoint would 403.
+        Boolean canEdit = mission.canEdit();
+        if (canEdit != null && canEdit) {
+          try {
+            List<ShipDto> unitShipOptions =
+                backendApiClient.get(
+                    "/api/v1/missions/" + id + "/unit-ship-options",
+                    new ParameterizedTypeReference<List<ShipDto>>() {},
+                    false);
+            model.addAttribute("unitShipOptions", unitShipOptions);
+          } catch (Exception e) {
+            // Ignore, e.g. if the caller cannot manage the mission
+          }
         }
 
         try {

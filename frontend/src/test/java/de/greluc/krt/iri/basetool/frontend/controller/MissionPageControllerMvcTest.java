@@ -1558,12 +1558,6 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<
-            de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto>
-        shipsPage =
-            new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
-                List.of(participantShip, outsiderShip), 0, 0, 2, 1, Collections.emptyList());
-
     when(backendApiClient.getCached(
             anyString(),
             any(ParameterizedTypeReference.class),
@@ -1571,16 +1565,19 @@ class MissionPageControllerMvcTest {
         .thenReturn(emptyPage);
     when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(emptyPage);
-    // Specific stub AFTER the generic getCached so it wins for the hangar ship list URL.
-    when(backendApiClient.getCached(
-            eq("/api/v1/hangar/ships?size=1000"), any(ParameterizedTypeReference.class)))
-        .thenReturn(shipsPage);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
         .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
         .thenReturn(mission);
+    // Unit ship pickers are populated from the mission-scoped endpoint; specific stub AFTER the
+    // generic get(...) so it wins for this URL.
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(List.of(participantShip, outsiderShip));
 
     // When / Then: the rendered ship pickers offer the participant's ship but not the outsider's.
     mockMvc
@@ -1729,17 +1726,6 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<
-            de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto>
-        shipsPage =
-            new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
-                List.of(participantShip, assignedShip, strayShip),
-                0,
-                0,
-                3,
-                1,
-                Collections.emptyList());
-
     when(backendApiClient.getCached(
             anyString(),
             any(ParameterizedTypeReference.class),
@@ -1747,15 +1733,19 @@ class MissionPageControllerMvcTest {
         .thenReturn(emptyPage);
     when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(
-            eq("/api/v1/hangar/ships?size=1000"), any(ParameterizedTypeReference.class)))
-        .thenReturn(shipsPage);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
         .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
         .thenReturn(mission);
+    // The endpoint returns participant ships plus already-assigned ships; the stray ship is neither
+    // and must be filtered out by the template. Specific stub AFTER the generic get(...).
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(List.of(participantShip, assignedShip, strayShip));
 
     // When / Then: the assigned ship is still selectable as an <option value="..."> (so the
     // client-side edit picker can pre-select it), while the unassigned stray ship is excluded.
