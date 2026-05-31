@@ -180,20 +180,22 @@ final class E2eSupport {
    * @throws TimeoutError if the login does not complete within {@link #LOGIN_MAX_ATTEMPTS} attempts
    */
   static void login(Page page, String baseUrl, String username, String password) {
-    for (int attempt = 1; attempt <= LOGIN_MAX_ATTEMPTS; attempt++) {
+    // Attempts 1..N-1 retry on a timeout; the final attempt runs uncaught so a persistent
+    // failure propagates rather than being swallowed. Structuring it this way keeps the loop
+    // condition the genuine bound (instead of an in-body throw that the linter — rightly —
+    // flags as making the condition always true).
+    for (int attempt = 1; attempt < LOGIN_MAX_ATTEMPTS; attempt++) {
       try {
         attemptLogin(page, baseUrl, username, password);
         return;
       } catch (TimeoutError timeout) {
-        if (attempt == LOGIN_MAX_ATTEMPTS) {
-          throw timeout;
-        }
         System.out.printf(
             "[E2E][login] attempt %d/%d did not reach %s in time; retrying with a fresh"
                 + " navigation%n",
             attempt, LOGIN_MAX_ATTEMPTS, baseUrl);
       }
     }
+    attemptLogin(page, baseUrl, username, password);
   }
 
   /**
