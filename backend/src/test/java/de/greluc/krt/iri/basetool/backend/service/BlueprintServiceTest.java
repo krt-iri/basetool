@@ -31,26 +31,36 @@ class BlueprintServiceTest {
   @InjectMocks private BlueprintService blueprintService;
 
   @Test
-  void getBlueprints_blankSearch_passesNullFilterAndMaps() {
+  void getBlueprints_blankSearch_usesUnfilteredQueryAndMaps() {
     Blueprint bp = new Blueprint();
-    when(blueprintRepository.findActiveFiltered(eq(null), any(Pageable.class)))
+    when(blueprintRepository.findByScwikiDeletedAtIsNull(any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(bp)));
     when(blueprintMapper.toDto(bp)).thenReturn(minimalDto());
 
     Page<BlueprintDto> result = blueprintService.getBlueprints("   ", PageRequest.of(0, 10));
 
     assertEquals(1, result.getContent().size());
-    verify(blueprintRepository).findActiveFiltered(eq(null), any(Pageable.class));
+    verify(blueprintRepository).findByScwikiDeletedAtIsNull(any(Pageable.class));
+  }
+
+  @Test
+  void getBlueprints_nullSearch_usesUnfilteredQuery() {
+    when(blueprintRepository.findByScwikiDeletedAtIsNull(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    blueprintService.getBlueprints(null, PageRequest.of(0, 10));
+
+    verify(blueprintRepository).findByScwikiDeletedAtIsNull(any(Pageable.class));
   }
 
   @Test
   void getBlueprints_trimsSearchBeforeQuerying() {
-    when(blueprintRepository.findActiveFiltered(eq("omni"), any(Pageable.class)))
+    when(blueprintRepository.searchActive(eq("omni"), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
 
     blueprintService.getBlueprints("  omni  ", PageRequest.of(0, 10));
 
-    verify(blueprintRepository).findActiveFiltered(eq("omni"), any(Pageable.class));
+    verify(blueprintRepository).searchActive(eq("omni"), any(Pageable.class));
   }
 
   private static BlueprintDto minimalDto() {
