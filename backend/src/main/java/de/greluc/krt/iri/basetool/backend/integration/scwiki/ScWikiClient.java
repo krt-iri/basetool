@@ -248,7 +248,12 @@ public class ScWikiClient {
    */
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
-    JsonNode body =
+    // Decode to a raw String, not directly to a JsonNode: Spring Boot 4 / Framework 7 wires the
+    // reactive WebClient to the Jackson 3 (tools.jackson) codec, which cannot construct a Jackson 2
+    // com.fasterxml.jackson JsonNode and aborts every detail fetch with "Cannot construct instance
+    // of JsonNode (no Creators)". String is codec-version-agnostic; we then parse it with this
+    // client's own Jackson 2 ObjectMapper so the whole tree/bind path stays on one Jackson version.
+    String rawBody =
         client
             .get()
             .uri(uri)
@@ -256,12 +261,12 @@ public class ScWikiClient {
                 response -> {
                   int status = response.statusCode().value();
                   if (status == 404 || status == 304) {
-                    return Mono.<JsonNode>empty();
+                    return Mono.<String>empty();
                   }
                   if (!response.statusCode().is2xxSuccessful()) {
                     return response.createError();
                   }
-                  return response.bodyToMono(JsonNode.class);
+                  return response.bodyToMono(String.class);
                 })
             .timeout(CALL_TIMEOUT)
             .onErrorResume(
@@ -271,11 +276,12 @@ public class ScWikiClient {
                 })
             .blockOptional()
             .orElse(null);
-    if (body == null) {
+    if (rawBody == null || rawBody.isBlank()) {
       return null;
     }
-    JsonNode payload = body.has("data") ? body.get("data") : body;
     try {
+      JsonNode body = objectMapper.readTree(rawBody);
+      JsonNode payload = body.has("data") ? body.get("data") : body;
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
       log.error("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
