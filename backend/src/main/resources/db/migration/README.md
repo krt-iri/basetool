@@ -212,3 +212,7 @@ comment should answer the obvious "why now?" question before they need to.
       knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
       / `### Changed` / `### Migration` heading.
+- [ ] Version numbering passes the `Flyway Migrations` CI check (no duplicate
+      `V<n>`, new files numbered after the current tip on `main`). Run it
+      locally before pushing:
+      `FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh`.
