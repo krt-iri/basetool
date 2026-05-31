@@ -119,17 +119,20 @@
                                     <span class="bp-stat-bw" th:if="${m.betterWhen() == 'lower'}" th:text="'(' + #{admin.blueprint.betterWhen.lower} + ')'">(niedriger ist besser)</span>
                                     <span class="bp-stat-bw" th:if="${m.betterWhen() == 'neutral'}" th:text="'(' + #{admin.blueprint.betterWhen.neutral} + ')'">(neutral)</span>
 
-                                    <!-- Interactive slider when a usable quality band is present. -->
+                                    <!-- Interactive slider when a usable quality band is present.
+                                         Extents use the effective band (union of segment bounds for a
+                                         stepped modifier) so the track spans the full covered range -
+                                         the raw qualityMin/Max only reflect the first segment. -->
                                     <span class="bp-slider"
-                                          th:if="${m.qualityMin() != null and m.qualityMax() != null and m.qualityMax() > m.qualityMin()}"
-                                          th:attr="data-qmin=${m.qualityMin()},data-qmax=${m.qualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()}">
+                                          th:if="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}"
+                                          th:attr="data-qmin=${m.effectiveQualityMin()},data-qmax=${m.effectiveQualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()},data-vrt=${m.valueRangeType()}">
                                         <span class="bp-seg" th:each="seg : ${m.segments()}"
                                               th:attr="data-qmin=${seg.qualityMin()},data-qmax=${seg.qualityMax()},data-vstart=${seg.modifierAtStart()},data-vend=${seg.modifierAtEnd()}"></span>
                                         <span class="bp-slider-row">
-                                            <span class="bp-slider-end" th:text="${#numbers.formatDecimal(m.qualityMin(),1,0,'POINT')}">0</span>
+                                            <span class="bp-slider-end" th:text="${#numbers.formatDecimal(m.effectiveQualityMin(),1,0,'POINT')}">0</span>
                                             <input type="range" class="bp-range" step="1"
-                                                   th:attr="min=${m.qualityMin()},max=${m.qualityMax()},value=${m.qualityMax()}">
-                                            <span class="bp-slider-end bp-slider-end-max" th:text="${#numbers.formatDecimal(m.qualityMax(),1,0,'POINT')}">1000</span>
+                                                   th:attr="min=${m.effectiveQualityMin()},max=${m.effectiveQualityMax()},value=${m.effectiveQualityMax()}">
+                                            <span class="bp-slider-end bp-slider-end-max" th:text="${#numbers.formatDecimal(m.effectiveQualityMax(),1,0,'POINT')}">1000</span>
                                         </span>
                                         <span class="bp-slider-out">
                                             <output class="bp-q">&ndash;</output>
@@ -139,7 +142,7 @@
                                     </span>
                                     <!-- Fallback when there is no usable quality band to slide over. -->
                                     <span class="bp-dep"
-                                          th:unless="${m.qualityMin() != null and m.qualityMax() != null and m.qualityMax() > m.qualityMin()}">
+                                          th:unless="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}">
                                         <span class="bp-dep-val" th:if="${m.modifierAtMaxQuality() != null}"
                                               th:text="'×' + ${#numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'POINT')}">&times;1.05</span>
                                         <span class="bp-empty-hint" th:unless="${m.modifierAtMaxQuality() != null}">&ndash;</span>
@@ -196,7 +199,11 @@
       var value = null;
       var segs = slider.querySelectorAll('.bp-seg');
       if (segs.length) {
-        // Stepped / piecewise-linear: interpolate within the segment containing q.
+        // Segmented modifier: locate the segment containing q. How the value behaves *within* a
+        // segment depends on value_range_type: a 'linear' curve interpolates from start to end
+        // across the segment, whereas a stepped form (e.g. 'linear_integer_additive') holds a
+        // constant value inside the segment and only changes when q crosses into the next one.
+        var stepped = (slider.getAttribute('data-vrt') || 'linear').toLowerCase() !== 'linear';
         for (var i = 0; i < segs.length; i++) {
           var a = num(segs[i], 'data-qmin');
           var b = num(segs[i], 'data-qmax');
@@ -204,8 +211,12 @@
           var ve = num(segs[i], 'data-vend');
           if (a === null || b === null) { continue; }
           if (q <= b || i === segs.length - 1) {
-            var t = (b === a) ? 0 : clamp01((q - a) / (b - a));
-            value = (vs === null || ve === null) ? vs : lerp(vs, ve, t);
+            if (stepped) {
+              value = (vs === null) ? ve : vs;
+            } else {
+              var t = (b === a) ? 0 : clamp01((q - a) / (b - a));
+              value = (vs === null || ve === null) ? vs : lerp(vs, ve, t);
+            }
             break;
           }
         }
