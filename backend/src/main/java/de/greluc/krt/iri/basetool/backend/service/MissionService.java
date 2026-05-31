@@ -1093,6 +1093,10 @@ public class MissionService {
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
+      if (!isOwnerRegisteredParticipant(mission, ship)) {
+        throw new IllegalArgumentException(
+            "Ship owner is not a registered participant of the mission");
+      }
       missionUnit.setShip(ship);
       if (shipTypeId == null) {
         missionUnit.setShipType(ship.getShipType());
@@ -1161,6 +1165,19 @@ public class MissionService {
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
+      // A ship already pinned to any unit of this mission is grandfathered: unrelated edits (name,
+      // frequency, HVU) on a unit whose ship owner has since left the roster must not 400, and the
+      // edit picker keeps offering every already-assigned ship so it round-trips. Only a ship new
+      // to the mission must belong to a current participant.
+      boolean alreadyAssignedInMission =
+          mission.getAssignedUnits().stream()
+              .map(MissionUnit::getShip)
+              .filter(assigned -> assigned != null)
+              .anyMatch(assigned -> assigned.getId().equals(shipId));
+      if (!alreadyAssignedInMission && !isOwnerRegisteredParticipant(mission, ship)) {
+        throw new IllegalArgumentException(
+            "Ship owner is not a registered participant of the mission");
+      }
       missionUnit.setShip(ship);
       if (shipTypeId == null) {
         missionUnit.setShipType(ship.getShipType());
@@ -1183,6 +1200,69 @@ public class MissionService {
 
     missionUnitRepository.save(missionUnit);
     return mission;
+  }
+
+  /**
+   * Tests whether the given ship's owner is signed up as a participant of the mission. Only
+   * participants backed by a real {@link User} account count — guest participants have no account
+   * and therefore never own hangar ships. Used by {@link #addUnitToMission} and {@link
+   * #updateMissionUnit} to keep a unit's assigned ship constrained to ships brought by people
+   * actually registered for the mission.
+   *
+   * @param mission the mission whose participant roster is searched, never {@code null}
+   * @param ship the ship whose owner is checked for participation, never {@code null}
+   * @return {@code true} if the ship's owner is a registered (account-backed) participant
+   */
+  private boolean isOwnerRegisteredParticipant(@NotNull Mission mission, @NotNull Ship ship) {
+    UUID ownerId = ship.getOwner().getId();
+    return mission.getParticipants().stream()
+        .map(MissionParticipant::getUser)
+        .filter(user -> user != null)
+        .anyMatch(user -> user.getId().equals(ownerId));
+  }
+
+  /**
+   * Collects the ships a unit of this mission may be crewed with: every ship owned by a registered
+   * participant <em>plus</em> every ship already pinned to one of the mission's units. Participant
+   * ships are intentionally NOT OrgUnit-scoped — a participant brings their own ship regardless of
+   * which OrgUnit they belong to (so a cross-OrgUnit participant's ship becomes selectable), which
+   * is why this reads {@link ShipRepository#findByOwnerIdIn} rather than the scoped hangar query.
+   * Already-assigned ships are kept so editing a unit never silently drops a ship whose owner has
+   * since left the roster. The result is deduplicated by ship id, participant ships first.
+   *
+   * @param missionId the mission whose selectable unit ships are collected, never {@code null}
+   * @return the candidate ships for this mission's unit ship pickers
+   * @throws NotFoundException when the mission id does not resolve
+   */
+  @Transactional(readOnly = true)
+  public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+
+    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
+
+    Set<UUID> participantUserIds =
+        mission.getParticipants().stream()
+            .map(MissionParticipant::getUser)
+            .filter(user -> user != null)
+            .map(User::getId)
+            .collect(java.util.stream.Collectors.toSet());
+    if (!participantUserIds.isEmpty()) {
+      shipRepository
+          .findByOwnerIdIn(participantUserIds)
+          .forEach(ship -> byId.put(ship.getId(), ship));
+    }
+
+    for (MissionUnit unit : mission.getAssignedUnits()) {
+      Ship ship = unit.getShip();
+      if (ship != null) {
+        byId.putIfAbsent(ship.getId(), ship);
+      }
+    }
+
+    return new java.util.ArrayList<>(byId.values());
   }
 
   /**

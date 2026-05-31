@@ -87,6 +87,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
+   * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
+   * DTO projection. Unlike {@link #findAllScoped}, this is intentionally NOT OrgUnit-scoped: it
+   * surfaces the ships of a mission's participants regardless of which OrgUnit each participant
+   * belongs to, so a cross-OrgUnit participant's ship can be assigned to a unit.
+   *
+   * @param ownerIds the owner user ids to match; an empty collection yields an empty list
+   * @return ships owned by those users
+   */
+  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
+  List<Ship> findByOwnerIdIn(java.util.Collection<UUID> ownerIds);
+
+  /**
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

@@ -302,10 +302,30 @@ public class MissionPageController {
       model.addAttribute("participantsByLeadType", participantsByLeadType);
       model.addAttribute("missionLeadTypes", missionLeadTypes);
 
+      // User ids of every account-backed participant (guests have no account and thus no hangar
+      // ships). The unit ADD modal offers only ships owned by these users; the EDIT modal also
+      // keeps already-assigned ships (see assignedUnitShipIds) so a unit can only be crewed with a
+      // ship brought by someone registered for the mission, without dropping an existing one.
+      java.util.Set<UUID> participantUserIds = new java.util.HashSet<>();
+      for (MissionParticipantDto p : participants) {
+        if (p.user() != null && p.user().id() != null) {
+          participantUserIds.add(p.user().id());
+        }
+      }
+      model.addAttribute("participantUserIds", participantUserIds);
+
       // Sort crew members and build groupings
       Map<UUID, String> assignedUnitByParticipantId = new java.util.HashMap<>();
+      // Ids of ships already pinned to a unit of this mission. The unit EDIT modal keeps offering
+      // these even when the owner is no longer a participant, so editing an unrelated field on such
+      // a unit doesn't silently drop the ship — the client-side picker pre-selects the current ship
+      // by value and needs the <option> to exist.
+      java.util.Set<UUID> assignedUnitShipIds = new java.util.HashSet<>();
       if (mission.assignedUnits() != null) {
         for (MissionUnitDto unit : mission.assignedUnits()) {
+          if (unit.ship() != null && unit.ship().id() != null) {
+            assignedUnitShipIds.add(unit.ship().id());
+          }
           String unitName = unit.name() != null ? unit.name() : "";
           if (unit.crew() != null) {
             for (MissionCrewDto c : unit.crew()) {
@@ -318,6 +338,7 @@ public class MissionPageController {
         }
       }
       model.addAttribute("assignedUnitByParticipantId", assignedUnitByParticipantId);
+      model.addAttribute("assignedUnitShipIds", assignedUnitShipIds);
 
       // "Crew zuweisen"-Dropdown zeigt nur Teilnehmer, die noch keiner Einheit zugewiesen sind.
       // Sortierung wird aus `participants` (oben bereits alphabetisch nach extractParticipantName)
@@ -485,14 +506,22 @@ public class MissionPageController {
 
       // Fetch Ships (Only if authenticated)
       if (principal != null) {
-        try {
-          PageResponse<ShipDto> allShipsPage =
-              backendApiClient.getCached(
-                  "/api/v1/hangar/ships?size=1000",
-                  new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
-          model.addAttribute("allShips", allShipsPage.content());
-        } catch (Exception e) {
-          // Ignore, e.g. if user has no HANGAR_READ or other issue
+        // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
+        // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
+        // ships already assigned to a unit. Only fetched when the caller may edit the mission —
+        // otherwise the modals don't render and the endpoint would 403.
+        Boolean canEdit = mission.canEdit();
+        if (canEdit != null && canEdit) {
+          try {
+            List<ShipDto> unitShipOptions =
+                backendApiClient.get(
+                    "/api/v1/missions/" + id + "/unit-ship-options",
+                    new ParameterizedTypeReference<List<ShipDto>>() {},
+                    false);
+            model.addAttribute("unitShipOptions", unitShipOptions);
+          } catch (Exception e) {
+            // Ignore, e.g. if the caller cannot manage the mission
+          }
         }
 
         try {

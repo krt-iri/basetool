@@ -1,6 +1,10 @@
 package de.greluc.krt.iri.basetool.backend;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -80,6 +84,9 @@ class MissionUnitManagementTest {
                 null,
                 null));
 
+    // The ship owner must be a registered participant before the ship can be pinned to a unit.
+    missionService.addParticipant(mission.getId(), officerUser.getId());
+
     mission =
         missionService.addUnitToMission(
             mission.getId(), "Initial Unit", st.getId(), ship.getId(), false, 123.45);
@@ -137,5 +144,114 @@ class MissionUnitManagementTest {
     Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
     assertFalse(
         updatedMission.getAssignedUnits().stream().anyMatch(u -> u.getId().equals(unit.getId())));
+  }
+
+  @Test
+  void testAddUnit_ShipOwnerNotParticipant_Rejected() {
+    // Given: a ship owned by a user who is NOT registered for the mission.
+    Ship outsiderShip = shipOwnedByNonParticipant();
+
+    // When / Then: pinning that ship to a new unit is rejected.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            missionService.addUnitToMission(
+                mission.getId(),
+                "Outsider Unit",
+                outsiderShip.getShipType().getId(),
+                outsiderShip.getId(),
+                false,
+                null));
+  }
+
+  @Test
+  void testAddUnit_ShipOwnerIsParticipant_Allowed() {
+    // officerUser is a registered participant (see setUp) and owns `ship`, so the assignment
+    // passes.
+    Mission updated =
+        missionService.addUnitToMission(
+            mission.getId(),
+            "Participant Unit",
+            ship.getShipType().getId(),
+            ship.getId(),
+            false,
+            null);
+
+    assertTrue(
+        updated.getAssignedUnits().stream()
+            .anyMatch(
+                u ->
+                    "Participant Unit".equals(u.getName())
+                        && u.getShip() != null
+                        && ship.getId().equals(u.getShip().getId())));
+  }
+
+  @Test
+  void testUpdateUnit_ChangeToShipOfNonParticipant_Rejected() {
+    // Switching an existing unit to a ship owned by a non-participant is rejected.
+    Ship outsiderShip = shipOwnedByNonParticipant();
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            missionService.updateMissionUnit(
+                mission.getId(),
+                unit.getId(),
+                "Initial Unit",
+                outsiderShip.getShipType().getId(),
+                outsiderShip.getId(),
+                false,
+                null));
+  }
+
+  @Test
+  void testUpdateUnit_KeepsExistingShipAfterOwnerLeftMission_Allowed() {
+    // The unit holds officerUser's ship, assigned while officerUser was a participant. Remove
+    // officerUser from the roster so the ship owner is no longer registered, then edit the unit
+    // keeping the same ship: the already-assigned ship is grandfathered and the edit still passes.
+    UUID participantId =
+        missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
+            .filter(p -> p.getUser() != null && p.getUser().getId().equals(officerUser.getId()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    missionService.removeParticipant(mission.getId(), participantId);
+
+    missionService.updateMissionUnit(
+        mission.getId(),
+        unit.getId(),
+        "Renamed Unit",
+        ship.getShipType().getId(),
+        ship.getId(),
+        false,
+        222.22);
+
+    MissionUnit reloaded =
+        missionRepository.findById(mission.getId()).orElseThrow().getAssignedUnits().stream()
+            .filter(u -> u.getId().equals(unit.getId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("Renamed Unit", reloaded.getName());
+    assertNotNull(reloaded.getShip());
+    assertEquals(ship.getId(), reloaded.getShip().getId());
+  }
+
+  /**
+   * Persists a ship owned by a freshly created user who is not a participant of the mission under
+   * test, reusing the {@code ship} field's ship type so the ship-to-type match still holds.
+   *
+   * @return the saved ship whose owner is absent from the mission roster
+   */
+  private Ship shipOwnedByNonParticipant() {
+    User outsider = new User();
+    outsider.setId(UUID.randomUUID());
+    outsider.setUsername("outsider_" + UUID.randomUUID());
+    userRepository.save(outsider);
+
+    Ship outsiderShip = new Ship();
+    outsiderShip.setName("Outsider Ship");
+    outsiderShip.setOwner(outsider);
+    outsiderShip.setShipType(ship.getShipType());
+    return shipRepository.save(outsiderShip);
   }
 }
