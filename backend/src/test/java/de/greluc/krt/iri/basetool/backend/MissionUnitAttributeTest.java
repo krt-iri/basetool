@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.MissionService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,8 @@ class MissionUnitAttributeTest {
 
   @Autowired private ShipTypeRepository shipTypeRepository;
 
+  @Autowired private MissionService missionService;
+
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -79,6 +82,9 @@ class MissionUnitAttributeTest {
     mission.setName("Test Mission Attribute");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
+
+    // The ship owner must be a registered participant before the ship can be pinned to a unit.
+    missionService.addParticipant(mission.getId(), officerUser.getId());
   }
 
   @Test

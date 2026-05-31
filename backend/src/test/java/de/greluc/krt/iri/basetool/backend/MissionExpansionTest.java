@@ -63,18 +63,19 @@ class MissionExpansionTest {
             new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
                 "Test Mission", null, null, "PLANNED", null, null, null, false, null, null));
 
-    // 4. Add Ship to Mission
-    mission =
-        missionService.addUnitToMission(
-            mission.getId(), "Expansion Unit", fighter.getId(), ship.getId(), false, null);
-
-    // 4b. Add Participant (Required before adding as crew)
+    // 4. Add Participant first — a unit's ship must belong to a registered participant, so the
+    // ship owner has to be signed up before the ship can be assigned to the unit.
     mission = missionService.addParticipant(mission.getId(), savedUser.getId());
     MissionParticipant participant =
         mission.getParticipants().stream()
             .filter(p -> p.getUser().getId().equals(savedUser.getId()))
             .findFirst()
             .orElseThrow();
+
+    // 4b. Add Ship to Mission
+    mission =
+        missionService.addUnitToMission(
+            mission.getId(), "Expansion Unit", fighter.getId(), ship.getId(), false, null);
 
     assertNotNull(mission.getAssignedUnits());
     assertEquals(1, mission.getAssignedUnits().size());

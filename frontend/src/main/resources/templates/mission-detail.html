@@ -1100,8 +1100,9 @@
                     <label th:text="#{mission.unit.ship}">Schiff (optional)</label>
                     <select name="shipId" id="add-unit-ship" disabled>
                         <option value="" selected>-</option>
-                        <option th:each="ship : ${allShips}" 
-                                th:value="${ship.id}" 
+                        <option th:each="ship : ${allShips}"
+                                th:if="${participantUserIds != null and ship.owner != null and participantUserIds.contains(ship.owner.id)}"
+                                th:value="${ship.id}"
                                 th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
                                 th:data-type-id="${ship.shipType.id}"
                                 hidden disabled>Ship</option>
@@ -1161,8 +1162,9 @@
                     <label th:text="#{mission.unit.ship}">Schiff (optional)</label>
                     <select name="shipId" id="edit-unit-ship" disabled>
                         <option value="">-</option>
-                        <option th:each="ship : ${allShips}" 
-                                th:value="${ship.id}" 
+                        <option th:each="ship : ${allShips}"
+                                th:if="${(participantUserIds != null and ship.owner != null and participantUserIds.contains(ship.owner.id)) or (assignedUnitShipIds != null and assignedUnitShipIds.contains(ship.id))}"
+                                th:value="${ship.id}"
                                 th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
                                 th:data-type-id="${ship.shipType.id}"
                                 hidden disabled>Ship</option>
