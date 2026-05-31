@@ -13,6 +13,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverItemCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
@@ -248,6 +249,7 @@ public class JobOrderPageController {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       model.addAttribute("order", order);
       model.addAttribute("currentUserId", getCurrentUserId(principal));
+      model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
       boolean canAssign = isLogistician(principal);
       model.addAttribute("isLogistician", canAssign);
@@ -929,6 +931,33 @@ public class JobOrderPageController {
       log.error("Failed to fetch orderable items", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Collects the display names of an item order's lines whose blueprint derived no procurable
+   * material (an empty {@code materials} snapshot). The persisted order keeps only resolved
+   * requirements, so an empty list is the detail-time signal that a recipe's RESOURCE ingredients
+   * were all unresolved or ITEM-only; the detail view surfaces these in a warning banner so the
+   * logistician knows the aggregated-materials view is incomplete for that line. Returns an empty
+   * list for material orders or when every line derived at least one material.
+   *
+   * @param order the loaded order (any kind)
+   * @return distinct item names lacking derived materials, in line order; never {@code null}
+   */
+  private List<String> itemsWithoutDerivedMaterials(JobOrderDto order) {
+    List<String> names = new ArrayList<>();
+    if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
+      return names;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      if (item.materials() == null || item.materials().isEmpty()) {
+        String name = item.gameItem() != null ? item.gameItem().name() : null;
+        if (name != null && !names.contains(name)) {
+          names.add(name);
+        }
+      }
+    }
+    return names;
   }
 
   private List<SquadronDto> fetchSquadrons() {

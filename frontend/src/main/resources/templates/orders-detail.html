@@ -25,7 +25,7 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
+            <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>
@@ -72,6 +72,13 @@
                 <span th:text="${order.handle}"></span>
             </div>
             <div>
+                <strong th:text="#{orders.create.kind}">Auftragsart</strong><br>
+                <span th:switch="${order.type}" style="display: inline-block; margin-top: 0.25rem;">
+                    <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                    <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                </span>
+            </div>
+            <div>
                 <strong th:text="#{orders.index.status}">Status</strong><br>
                 <!-- DEBUG: Authorities: [[${#authentication.authorities}]] -->
                 <div sec:authorize="!hasRole('LOGISTICIAN')" style="margin-top: 0.25rem;">
@@ -99,6 +106,10 @@
             <span th:text="${order.comment}" style="white-space: pre-wrap;"></span>
         </div>
 
+        <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
+             linked-inventory drill-down). ITEM orders render the ordered-items table plus the
+             internal aggregated-materials view further below instead. -->
+        <th:block th:if="${order.type != 'ITEM'}">
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -140,7 +151,93 @@
             </tbody>
         </table>
         </div>
-        
+        </th:block>
+
+        <!-- ITEM orders: (1) the ordered finished items with delivery progress and sub-assembly
+             provenance, (2) a warning banner for items whose blueprint derived no procurable
+             material, and (3) the internal aggregated-materials view (one row per material+quality,
+             unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
+        <th:block th:if="${order.type == 'ITEM'}">
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{orders.detail.item.name}">Item</th>
+                <th th:text="#{orders.detail.item.blueprint}">Bauplan</th>
+                <th th:text="#{orders.detail.item.amount}">Anzahl</th>
+                <th th:text="#{orders.detail.item.delivered}">Geliefert</th>
+                <th th:text="#{orders.detail.item.outstanding}">Ausstehend</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${order.items}">
+                <td>
+                    <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
+                    <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
+                </td>
+                <td>
+                    <span th:if="${item.blueprint != null}"
+                          th:text="${item.blueprint.scwikiKey() != null ? item.blueprint.scwikiKey() : item.blueprint.outputName()}"
+                          th:title="${item.blueprint.outputName()}"></span>
+                    <span th:if="${item.blueprint == null}" class="text-muted">-</span>
+                </td>
+                <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}"></td>
+                <td th:text="${item.deliveredAmount != null ? #numbers.formatInteger(item.deliveredAmount, 1) : '0'}"></td>
+                <td>
+                    <span th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}"
+                          th:class="${outstanding > 0} ? 'text-warning' : 'text-success'"
+                          th:text="${#numbers.formatInteger(outstanding, 1)}"></span>
+                </td>
+            </tr>
+            <tr th:if="${order.items == null or order.items.isEmpty()}">
+                <td colspan="5" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <!-- Items whose blueprint resolved to no procurable material (empty materials list). The
+             persisted order keeps only resolved requirements, so an empty list is the detail-time
+             signal that a recipe's RESOURCE ingredients were all unresolved / ITEM-only. -->
+        <div th:if="${itemsWithoutMaterials != null and !itemsWithoutMaterials.isEmpty()}" class="alert alert-warning mt-2">
+            <strong th:text="#{orders.detail.item.noMaterials.title}">Items ohne ableitbare Materialien</strong>
+            <p style="margin: 0.5rem 0 0;" th:text="#{orders.detail.item.noMaterials.body}">Für folgende Items konnten keine Materialien abgeleitet werden:</p>
+            <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem;">
+                <li th:each="name : ${itemsWithoutMaterials}" th:text="${name}"></li>
+            </ul>
+        </div>
+
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{orders.detail.aggregated.material}">Material</th>
+                <th th:text="#{orders.detail.aggregated.quality}">Qualität</th>
+                <th th:text="#{orders.detail.aggregated.amount}">Gesamtmenge</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="agg : ${order.aggregatedMaterials}">
+                <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
+                <td>
+                    <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (700+)</span>
+                    <span th:unless="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-none" th:text="#{orders.detail.quality.none}">Keine</span>
+                </td>
+                <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                </td>
+            </tr>
+            <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
+                <td colspan="3" class="text-center text-muted" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+        </th:block>
+
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 1rem;">
@@ -178,6 +275,9 @@
             </div>
         </div>
 
+        <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
+             phase; for now the material-specific handover protocol is hidden for item orders. -->
+        <th:block th:if="${order.type != 'ITEM'}">
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -229,6 +329,7 @@
                 </table>
             </div>
         </div>
+        </th:block>
     </div>
 </main>
 

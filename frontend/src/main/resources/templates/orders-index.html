@@ -99,6 +99,11 @@
                 th:draggable="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'true' : 'false'">
                 <td class="nowrap">
                     <span class="order-id-display" th:data-utc="${order.createdAt}" th:text="'#' + ${order.displayId}"></span>
+                    <br>
+                    <span th:switch="${order.type}">
+                        <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                        <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                    </span>
                 </td>
                 <td class="nowrap">
                     <span sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
@@ -115,7 +120,10 @@
                 </td>
                 <td th:text="${order.handle}" class="nowrap"></td>
                 <td class="p-0">
-                    <div class="table-responsive">
+                    <!-- MATERIAL orders: the material-requirement summary with per-material stock
+                         progress. ITEM orders show their ordered items with delivery progress
+                         instead, keeping the column visually parallel between the two kinds. -->
+                    <div th:if="${order.type != 'ITEM'}" class="table-responsive">
                     <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
                         <colgroup>
                             <col class="w-full">
@@ -143,6 +151,32 @@
                                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                 </td>
                                 <td th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+                    <div th:if="${order.type == 'ITEM'}" class="table-responsive">
+                    <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
+                        <colgroup>
+                            <col class="w-full">
+                            <col class="w-1">
+                            <col class="w-1">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th th:text="#{orders.detail.item.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Item</th>
+                                <th th:text="#{orders.detail.item.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Anzahl</th>
+                                <th th:text="#{orders.material.progress}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Fortschritt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${order.items}">
+                                <td th:text="${item.gameItem != null ? item.gameItem.name() : '-'}" th:title="${item.gameItem != null ? item.gameItem.name() : '-'}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
+                                <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td th:text="${#numbers.formatDecimal((item.amount != null and item.amount > 0) ? ((item.deliveredAmount != null ? item.deliveredAmount : 0) * 100.0 / item.amount) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
+                            </tr>
+                            <tr th:if="${order.items == null or order.items.isEmpty()}">
+                                <td colspan="3" class="text-muted" style="border-bottom: none;" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
                             </tr>
                         </tbody>
                     </table>
