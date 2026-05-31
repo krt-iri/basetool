@@ -29,7 +29,7 @@ Request; "Date" is the production deploy timestamp.
 | R6 - Manufacturer Wiki reconciliation | TBD | TBD | TBD | TBD | TBD | needs manufacturer-sync-enabled; enriches scwiki_uuid/code on UEX rows; NO migration |
 | R7 - UEX item prices | TBD | TBD | TBD | TBD | TBD | needs item-price-sync-enabled; V115 game_item_price (~24k rows); display-only |
 | R8 - Soak + V116 cleanup | TBD | TBD | TBD | TBD | TBD | flips is_manual_entry -> source_systems=MANUAL (was V115, shifted by R7) |
-| R9 - V117 destructive cleanup | TBD | TBD | TBD | TBD | TBD | drops is_manual_entry + ship_type.description (was V116, shifted by R7) |
+| R9 - V122 destructive cleanup | TBD | TBD | TBD | TBD | TBD | drops is_manual_entry + ship_type.description (was V116/V117, shifted by R7 + features merged to main) |
 
 ---
 
@@ -977,8 +977,8 @@ in. This is the only R5-R7 phase that **carries a migration**.
 
 - **V-NUMBER DRIFT.** The plan §7 table pencilled `game_item_price` in as V114, but V113 went to
   R3's `external_sync_report` and V114 to R4's blueprint tables, so R7 takes the next free number,
-  **V115**. The R8 `is_manual_entry` cleanup and the R9 destructive drop therefore shift to
-  **V116 / V117**.
+  **V115**. The R8 `is_manual_entry` cleanup is **V116**; the R9 destructive drop, after V117–V121 were
+  claimed by other features merged to `main`, finally lands at **V122**.
 - `UexItemPriceSyncService` (UEX scheduler, fifth step after the item catalogue) walks
   `/items_prices_all` (~24 000 rows — the largest UEX payload, covered by the 16 MB WebClient
   buffer) and upserts one `game_item_price` per (item, terminal) pair: `id_item → game_item` via
@@ -1102,7 +1102,8 @@ small **data migration** that prepares the destructive R9 cleanup.
   exists) first. **No schema change**, no entity change beyond a doc fix.
 - **V-NUMBER DRIFT.** Plan §7 pencilled this as V115, but R7 took V115 for `game_item_price`, so the
   backfill is **V116** and the R9 destructive drop (`material.is_manual_entry` +
-  `ship_type.description`) shifts to **V117**.
+  `ship_type.description`) shifts to **V122** (V117–V121 went to features merged to `main` while the
+  R9 PR was open).
 - **Soak (operational, no code).** With R1-R7 deployed, turn every sync flag on and run the full
   cadence (UEX and Wiki both 24 h) for ~two weeks, watching the signals in §8.6 before committing to
   the R9 destructive drop. The flags stay operator-controlled — R8 ships **no** default-on change.
@@ -1181,13 +1182,13 @@ The point of R8 is to prove the whole sync is healthy before the irreversible R9
   count is healthy, a growing one points at a catalogue gap.
 - **Log volume.** Establish a baseline for the new services so a future regression (e.g. an error
   loop) is visible against it.
-- **Exit criterion.** After ~two weeks with the signals above clean, proceed to **R9** (the V117
+- **Exit criterion.** After ~two weeks with the signals above clean, proceed to **R9** (the V122
   destructive drop of `material.is_manual_entry` + `ship_type.description`), tracked in its own
   roadmap doc.
 
 ---
 
-## 9. R9 - V117 destructive cleanup
+## 9. R9 - V122 destructive cleanup
 
 ### 9.1 Scope summary
 
@@ -1201,8 +1202,10 @@ authoritative source; this section is the deploy-time summary.
   `admin/mission-data.html` via `ShipTypeDto`. So R9 is staged: migrate the readers to the
   replacements (`source_systems = 'MANUAL'` and `description_en` / `description_de`) first, soak,
   then drop.
-- **V-NUMBER:** V115 went to R7 (`game_item_price`), V116 to R8 (`is_manual_entry` backfill), so the
-  destructive drop is **V117**.
+- **V-NUMBER:** V115 went to R7 (`game_item_price`), V116 to R8 (`is_manual_entry` backfill); V117–V121
+  were then claimed by features merged to `main` while this PR was open (job-order comment, min-quality
+  nullable, mission party-lead, blueprint requirement-groups/modifier-segments), so the destructive drop
+  landed at **V122**.
 
 ### 9.2 Pre-deployment checks (R9)
 
@@ -1210,7 +1213,7 @@ authoritative source; this section is the deploy-time summary.
       (§8.6 exit criterion met).
 - [ ] Roadmap Steps 1–2 (reader migrations) shipped and soaked; `git grep -i
       "isManualEntry\|ship_type.*description"` is clean in the `main` source set.
-- [ ] `./gradlew spotlessApply check` green from a clean clone of the R9 (V117) branch.
+- [ ] `./gradlew spotlessApply check` green from a clean clone of the R9 (V122) branch.
 - [ ] Full DB backup taken immediately before merge — the drop is irreversible.
 
 ### 9.3 Deployment steps (production, R9)
@@ -1218,10 +1221,10 @@ authoritative source; this section is the deploy-time summary.
 Follow `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` Step 4. In brief:
 
 1. **Backup** (`pg_dump … basetool-pre-r9-…dump`).
-2. **Merge the R9 (V117) PR** — it removes `Material.isManualEntry` + `ShipType.description` and
-   runs `ALTER TABLE … DROP COLUMN`. Watch for V117:
+2. **Merge the R9 (V122) PR** — it removes `Material.isManualEntry` + `ShipType.description` and
+   runs `ALTER TABLE … DROP COLUMN`. Watch for V122:
    ```
-   Migrating schema "public" to version "117 - drop legacy material and ship_type columns"
+   Migrating schema "public" to version "122 - drop legacy material and ship_type columns"
    ```
 3. **Confirm `ddl-auto=validate` boots green** (the entity fields were removed in the same PR).
 
