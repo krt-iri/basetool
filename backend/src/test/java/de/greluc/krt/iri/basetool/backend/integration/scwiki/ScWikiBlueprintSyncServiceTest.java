@@ -29,7 +29,6 @@ import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 /** Unit tests for {@link ScWikiBlueprintSyncService} — the R4 blueprint recipe-graph sync. */
 @ExtendWith(MockitoExtension.class)
@@ -50,7 +50,7 @@ class ScWikiBlueprintSyncServiceTest {
   @Mock private MaterialExternalAliasService aliasService;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private SyncReportService syncReportService;
-  @Mock private EntityManager entityManager;
+  @Mock private ObjectProvider<ScWikiBlueprintSyncService> self;
 
   private ScWikiProperties properties;
   private ScWikiBlueprintSyncService service;
@@ -68,7 +68,8 @@ class ScWikiBlueprintSyncServiceTest {
             aliasService,
             gameItemRepository,
             syncReportService,
-            entityManager);
+            self);
+    lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 

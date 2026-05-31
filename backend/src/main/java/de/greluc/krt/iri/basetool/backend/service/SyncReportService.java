@@ -103,8 +103,14 @@ public class SyncReportService {
    * be the whole population). Skips the delete entirely on an empty keep set so the {@code NOT IN
    * ()} clause is never generated.
    *
+   * <p>Annotated {@code @Transactional} so the {@code @Modifying} delete always runs inside a
+   * transaction: it joins the caller's transaction when one is active and opens its own when a
+   * caller (e.g. the SC Wiki item / blueprint sync, whose per-row writes are isolated in their own
+   * {@code REQUIRES_NEW} transactions) invokes it without one.
+   *
    * @param source the catalogue whose old runs should be pruned
    */
+  @Transactional
   public void pruneRuns(SyncSourceSystem source) {
     List<UUID> keptRunIds = repository.findRecentRunIds(source, PageRequest.of(0, RUNS_TO_KEEP));
     if (keptRunIds.isEmpty()) {

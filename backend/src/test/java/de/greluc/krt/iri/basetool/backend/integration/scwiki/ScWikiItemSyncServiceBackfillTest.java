@@ -23,7 +23,6 @@ import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +34,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit tests for {@link ScWikiItemSyncService} Mode B — the R5 full Wiki item backfill
@@ -60,7 +61,7 @@ class ScWikiItemSyncServiceBackfillTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
-  @Mock private EntityManager entityManager;
+  @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
   private ScWikiProperties properties;
   private ScWikiItemSyncService service;
@@ -78,25 +79,9 @@ class ScWikiItemSyncServiceBackfillTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            entityManager);
+            self);
+    lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
-  }
-
-  @Test
-  void flushAndClearIfBatchFull_flushesAndClearsAtTheBatchBoundary() {
-    service.flushAndClearIfBatchFull(ScWikiItemSyncService.FLUSH_BATCH_SIZE);
-
-    verify(entityManager).flush();
-    verify(entityManager).clear();
-  }
-
-  @Test
-  void flushAndClearIfBatchFull_doesNothingBetweenBoundaries() {
-    service.flushAndClearIfBatchFull(0);
-    service.flushAndClearIfBatchFull(ScWikiItemSyncService.FLUSH_BATCH_SIZE - 1);
-    service.flushAndClearIfBatchFull(ScWikiItemSyncService.FLUSH_BATCH_SIZE + 1);
-
-    org.mockito.Mockito.verifyNoInteractions(entityManager);
   }
 
   // ---- mode selection -------------------------------------------------------------------------
@@ -326,6 +311,36 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  // ---- per-item transaction isolation ----------------------------------------------------------
+
+  @Test
+  void backfill_isolatesPerItem_oneDeadlockDoesNotAbortThePass() {
+    // Same per-item isolation as the closure mode: a lock failure on one row must not abort the
+    // pass — every other row in the page still persists in its own REQUIRES_NEW transaction.
+    UUID deadlocked = UUID.randomUUID();
+    UUID healthy = UUID.randomUUID();
+    lenient()
+        .when(scWikiClient.fetchAllPages(eq(WEAPONS), any(), any(), any(), any()))
+        .thenReturn(List.of(itemDto(deadlocked, "Bad Rifle"), itemDto(healthy, "Good Rifle")));
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class)))
+        .thenAnswer(
+            inv -> {
+              GameItem candidate = inv.getArgument(0);
+              if (deadlocked.equals(candidate.getExternalUuid())) {
+                throw new ObjectOptimisticLockingFailureException(GameItem.class, deadlocked);
+              }
+              return candidate;
+            });
+
+    service.syncItems();
+
+    assertEquals(
+        GameItemKind.WEAPON,
+        captureSaves().get(healthy).getKind(),
+        "the healthy row persists despite the sibling row deadlocking");
   }
 
   // ---- helpers ---------------------------------------------------------------------------------

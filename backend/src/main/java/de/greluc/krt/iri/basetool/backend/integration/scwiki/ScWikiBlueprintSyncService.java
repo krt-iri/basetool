@@ -27,7 +27,6 @@ import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
-import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -35,8 +34,10 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -54,8 +55,9 @@ import org.springframework.util.StringUtils;
  * /api/blueprints/{uuid}} (verified against the live API + OpenAPI). So this sync walks the list to
  * enumerate the ~1559 blueprint UUIDs, then fetches each blueprint's detail (paced via {@link
  * ScWikiClient#paceForRateLimit()}) to capture the stats — the same per-UUID closure pattern as
- * {@link ScWikiItemSyncService}. The persistence context is flushed + cleared every {@link
- * #FLUSH_BATCH_SIZE} blueprints so the run never accumulates the whole graph in one context.
+ * {@link ScWikiItemSyncService}. Each blueprint is upserted in its own {@code REQUIRES_NEW}
+ * transaction (via a self proxy) so the per-recipe lock window stays in the millisecond range and a
+ * deadlock rolls back only that recipe instead of aborting the whole run.
  *
  * <p>Ingredient resolution: a {@code RESOURCE} line resolves to a {@code material} via {@code
  * scwiki_uuid} → alias table → exact name; an {@code ITEM} line resolves to a {@code game_item} via
@@ -79,15 +81,7 @@ import org.springframework.util.StringUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScWikiBlueprintSyncService {
-
-  /**
-   * Flush/clear the persistence context every this-many blueprints so a full run (~1559 recipes,
-   * each with its group / modifier / ingredient graph) never accumulates in one context — mirrors
-   * the {@link ScWikiItemSyncService} M2 hardening.
-   */
-  static final int FLUSH_BATCH_SIZE = 500;
 
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
@@ -96,15 +90,23 @@ public class ScWikiBlueprintSyncService {
   private final MaterialExternalAliasService aliasService;
   private final GameItemRepository gameItemRepository;
   private final SyncReportService syncReportService;
-  private final EntityManager entityManager;
+
+  /**
+   * Self-reference, resolved lazily so the per-blueprint DB writes can be invoked through the
+   * Spring proxy. Calling a {@code @Transactional(REQUIRES_NEW)} method via {@code this} is
+   * self-invocation and silently skips the new transaction (the CLAUDE.md self-invocation trap);
+   * routing through this provider's proxy makes every per-blueprint write its own short transaction
+   * so a deadlock on one recipe rolls back only that recipe.
+   */
+  private final ObjectProvider<ScWikiBlueprintSyncService> self;
 
   /**
    * Runs the full blueprint sync. No-op (with an INFO line) when the feature flag is off. An empty
    * Wiki list response short-circuits before the orphan sweep so a transient outage never wipes the
    * recipe graph. Each blueprint's detail (carrying {@code requirement_groups}) is fetched per UUID
-   * and the persistence context is flushed + cleared every {@link #FLUSH_BATCH_SIZE} rows.
+   * outside any transaction, then persisted in its own {@code REQUIRES_NEW} transaction via {@link
+   * #upsertBlueprintWithinTransaction(UUID, ScWikiBlueprintDto, UUID, Instant)}.
    */
-  @Transactional
   public void syncBlueprints() {
     if (!Boolean.TRUE.equals(properties.getBlueprintSyncEnabled())) {
       log.info(
@@ -138,7 +140,9 @@ public class ScWikiBlueprintSyncService {
       try {
         seen.add(listDto.uuid());
         // requirement_groups (the stat modifiers) and summary_properties are detail-only, so fetch
-        // each blueprint's detail. Pace between calls exactly like the closure item sync.
+        // each blueprint's detail. Pace + fetch OUTSIDE any transaction so no blueprint row lock is
+        // held across the HTTP round-trip; the DB write runs in its own REQUIRES_NEW transaction
+        // (via the self proxy) so a deadlock rolls back only this recipe and the loop continues.
         scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
@@ -149,44 +153,16 @@ public class ScWikiBlueprintSyncService {
           detailMisses++;
         }
         ScWikiBlueprintDto dto = detail != null ? detail : listDto;
-
-        Blueprint bp =
-            blueprintRepository.findByScwikiUuid(listDto.uuid()).orElseGet(Blueprint::new);
-        bp.setScwikiUuid(listDto.uuid());
-        bp.setScwikiKey(dto.key());
-        bp.setOutputName(dto.outputName());
-        bp.setCategoryUuid(dto.categoryUuid());
-        bp.setCraftTimeSeconds(dto.craftTimeSeconds());
-        bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
-        bp.setIngredientCount(dto.ingredientCount());
-        bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
-        bp.setGameVersionSeen(dto.gameVersion());
-        bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
-        applyDismantle(bp, dto);
-
-        if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
-          unresolvedLines += applyRequirementGraph(bp, dto, runId);
-        } else {
-          // Fallback: no detail (transient miss) — use the flat list ingredients and leave any
-          // previously captured group / summary data untouched so a miss never wipes good stats.
-          unresolvedLines += applyIngredients(bp, dto, runId);
-        }
-        applyDismantleReturns(bp, dto, runId);
-        bp.setScwikiSyncedAt(now);
-        bp.setScwikiDeletedAt(null);
-        blueprintRepository.save(bp);
+        unresolvedLines +=
+            self.getObject().upsertBlueprintWithinTransaction(listDto.uuid(), dto, runId, now);
         processed++;
-        if (processed % FLUSH_BATCH_SIZE == 0) {
-          entityManager.flush();
-          entityManager.clear();
-        }
       } catch (Exception e) {
         log.error("Failed to process SC Wiki blueprint dto: {}", listDto, e);
       }
     }
 
     if (!seen.isEmpty()) {
-      int marked = blueprintRepository.markScwikiDeleted(seen, now);
+      int marked = self.getObject().markBlueprintOrphansWithinTransaction(seen, now);
       if (marked > 0) {
         log.info("Marked {} blueprint row(s) scwiki_deleted (no longer in Wiki feed)", marked);
       }
@@ -198,6 +174,72 @@ public class ScWikiBlueprintSyncService {
         processed,
         unresolvedLines,
         detailMisses);
+  }
+
+  /**
+   * Persists one blueprint's recipe graph in its own {@code REQUIRES_NEW} transaction so a deadlock
+   * or lock-timeout on this recipe rolls back only this recipe — not the whole sync — and the
+   * caller's loop continues. Invoked through the {@link #self} proxy so Spring opens the new
+   * transaction (a direct {@code this} call would be self-invocation and run in the caller's — here
+   * absent — transaction). The Wiki detail fetch happens in the caller, outside this transaction,
+   * so the per-recipe lock window is milliseconds.
+   *
+   * <p>Matches the blueprint by {@code scwiki_uuid} (creating it when absent), copies the scalar
+   * columns, resolves the output item, then rebuilds the owned graph: the requirement-group graph
+   * from the detail when present, otherwise the flat ingredient list (the fallback leaves
+   * previously captured group / summary data untouched). Orphan removal deletes the previous
+   * generation on commit.
+   *
+   * @param scwikiUuid the Wiki blueprint UUID (the upsert key)
+   * @param dto the inbound blueprint payload (detail when available, else the list row)
+   * @param runId the current run id for unresolved-ingredient events
+   * @param now the shared {@code scwiki_synced_at} timestamp
+   * @return the number of ingredient lines that could not be resolved to a material / game item
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int upsertBlueprintWithinTransaction(
+      UUID scwikiUuid, ScWikiBlueprintDto dto, UUID runId, Instant now) {
+    Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
+    bp.setScwikiUuid(scwikiUuid);
+    bp.setScwikiKey(dto.key());
+    bp.setOutputName(dto.outputName());
+    bp.setCategoryUuid(dto.categoryUuid());
+    bp.setCraftTimeSeconds(dto.craftTimeSeconds());
+    bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
+    bp.setIngredientCount(dto.ingredientCount());
+    bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
+    bp.setGameVersionSeen(dto.gameVersion());
+    bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
+    applyDismantle(bp, dto);
+
+    int unresolved;
+    if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
+      unresolved = applyRequirementGraph(bp, dto, runId);
+    } else {
+      // Fallback: no detail (transient miss) — use the flat list ingredients and leave any
+      // previously captured group / summary data untouched so a miss never wipes good stats.
+      unresolved = applyIngredients(bp, dto, runId);
+    }
+    applyDismantleReturns(bp, dto, runId);
+    bp.setScwikiSyncedAt(now);
+    bp.setScwikiDeletedAt(null);
+    blueprintRepository.save(bp);
+    return unresolved;
+  }
+
+  /**
+   * Runs the blueprint orphan sweep in its own {@code REQUIRES_NEW} transaction (the preceding loop
+   * is non-transactional, and the {@code @Modifying} bulk soft-delete needs an active transaction).
+   * Invoked through the {@link #self} proxy. Soft-deletes every blueprint whose {@code scwiki_uuid}
+   * was not seen in the Wiki feed this run.
+   *
+   * @param seenScwikiUuids the blueprint UUIDs processed this run
+   * @param now the soft-delete timestamp
+   * @return the number of rows marked {@code scwiki_deleted}
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int markBlueprintOrphansWithinTransaction(Set<UUID> seenScwikiUuids, Instant now) {
+    return blueprintRepository.markScwikiDeleted(seenScwikiUuids, now);
   }
 
   /**
