@@ -14,7 +14,6 @@ import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
-import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,8 +25,10 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -64,19 +65,11 @@ import org.springframework.util.StringUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScWikiItemSyncService {
 
   /** Typed envelope reference for the {@code /api/items}-shaped list endpoints used by Mode B. */
   private static final ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>> ITEM_PAGE_TYPE =
       new ParameterizedTypeReference<ScWikiResponseDto<ScWikiItemDto>>() {};
-
-  /**
-   * Flush/clear the persistence context every this-many upserts during the Mode-B backfill so the
-   * ~12 700-row pool never accumulates in one context (§ M2 hardening). See {@link
-   * #flushAndClearIfBatchFull(int)}.
-   */
-  static final int FLUSH_BATCH_SIZE = 500;
 
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
@@ -84,14 +77,21 @@ public class ScWikiItemSyncService {
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
-  private final EntityManager entityManager;
+
+  /**
+   * Self-reference, resolved lazily so the per-item DB writes can be invoked through the Spring
+   * proxy. Calling a {@code @Transactional(REQUIRES_NEW)} method via {@code this} is
+   * self-invocation and silently skips the new transaction (the CLAUDE.md self-invocation trap);
+   * routing the call through this provider's proxy makes every per-item write its own short
+   * transaction so a deadlock on one row rolls back only that row.
+   */
+  private final ObjectProvider<ScWikiItemSyncService> self;
 
   /**
    * Entry point invoked by {@link ScWikiScheduler}. No-op (with an INFO line) when {@code
    * item-sync-enabled} is off; otherwise dispatches to the full backfill (Mode B) when {@code
    * sync-all-items} is on, or to the closure fill (Mode A) when it is off.
    */
-  @Transactional
   public void syncItems() {
     if (!Boolean.TRUE.equals(properties.getItemSyncEnabled())) {
       log.info(
@@ -128,39 +128,23 @@ public class ScWikiItemSyncService {
     int missing = 0;
 
     for (UUID uuid : targets) {
+      // Pace + fetch OUTSIDE any transaction so no game_item write lock is ever held across the
+      // HTTP round-trip. The per-item DB write runs in its own REQUIRES_NEW transaction (via the
+      // self proxy), so a deadlock rolls back only that item and the loop continues with the rest.
       scWikiClient.paceForRateLimit();
       try {
         ScWikiItemDto dto =
             scWikiClient.fetchOne(
                 properties.getItemsEndpoint() + "/" + uuid, ScWikiItemDto.class, "item");
-        if (dto == null) {
-          syncReportService.logScwikiEvent(
-              runId,
-              SyncEventType.WIKI_MISSING,
-              "game_item",
-              uuid,
-              null,
-              "GET /api/items/{uuid} returned no item — Wiki does not know this asset.");
-          missing++;
-          continue;
-        }
-        GameItem item = gameItemRepository.findByExternalUuid(uuid).orElse(null);
-        boolean isNew = item == null;
-        if (isNew) {
-          item = new GameItem();
-          item.setExternalUuid(uuid);
-          item.setName(StringUtils.hasText(dto.name()) ? dto.name() : uuid.toString());
-          item.setKind(GameItemKind.GENERIC);
-          item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+        ClosureOutcome outcome =
+            self.getObject().fillClosureItemWithinTransaction(runId, uuid, dto, now);
+        if (outcome == ClosureOutcome.FILLED) {
+          filled++;
+        } else if (outcome == ClosureOutcome.CREATED) {
           created++;
         } else {
-          filled++;
+          missing++;
         }
-        applyWikiFields(item, dto, now);
-        if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
-          item.setSourceSystems(GameItemSourceSystem.BOTH);
-        }
-        gameItemRepository.save(item);
       } catch (Exception e) {
         log.error("Failed to fill SC Wiki item {}", uuid, e);
       }
@@ -172,6 +156,69 @@ public class ScWikiItemSyncService {
         filled,
         created,
         missing);
+  }
+
+  /**
+   * Persists one closure-mode item in its own {@code REQUIRES_NEW} transaction so a deadlock or
+   * lock-timeout while writing this row rolls back only this item — not the whole sweep — and the
+   * caller's loop continues with the next UUID. Invoked through the {@link #self} proxy so Spring's
+   * transaction interceptor actually opens the new transaction (a direct {@code this} call would be
+   * self-invocation and run in the caller's — here absent — transaction).
+   *
+   * <p>A {@code null} {@code dto} (the Wiki returned no item) logs {@link
+   * SyncEventType#WIKI_MISSING} and leaves the row untouched. Otherwise the row is matched by
+   * {@code external_uuid} (created {@code WIKI_ONLY} when absent), its Wiki columns filled and
+   * {@code source_systems} flipped {@code UEX_ONLY → BOTH}; the UEX-canonical {@code name} / {@code
+   * kind} are never overwritten.
+   *
+   * @param runId the current run id for the {@code WIKI_MISSING} event
+   * @param uuid the in-game asset UUID being filled
+   * @param dto the Wiki item payload, or {@code null} if the Wiki did not return the item
+   * @param now the shared {@code scwiki_synced_at} timestamp
+   * @return {@link ClosureOutcome#FILLED} for an existing row, {@link ClosureOutcome#CREATED} for a
+   *     new {@code WIKI_ONLY} row, or {@link ClosureOutcome#MISSING} when the Wiki returned nothing
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public ClosureOutcome fillClosureItemWithinTransaction(
+      UUID runId, UUID uuid, ScWikiItemDto dto, Instant now) {
+    if (dto == null) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.WIKI_MISSING,
+          "game_item",
+          uuid,
+          null,
+          "GET /api/items/{uuid} returned no item — Wiki does not know this asset.");
+      return ClosureOutcome.MISSING;
+    }
+    GameItem item = gameItemRepository.findByExternalUuid(uuid).orElse(null);
+    boolean isNew = item == null;
+    if (isNew) {
+      item = new GameItem();
+      item.setExternalUuid(uuid);
+      item.setName(StringUtils.hasText(dto.name()) ? dto.name() : uuid.toString());
+      item.setKind(GameItemKind.GENERIC);
+      item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    }
+    applyWikiFields(item, dto, now);
+    if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
+      item.setSourceSystems(GameItemSourceSystem.BOTH);
+    }
+    gameItemRepository.save(item);
+    return isNew ? ClosureOutcome.CREATED : ClosureOutcome.FILLED;
+  }
+
+  /**
+   * Outcome of a single closure-mode item upsert, used by {@link #syncItemsClosure()} to tally the
+   * run summary without re-reading the row.
+   */
+  public enum ClosureOutcome {
+    /** An existing {@code game_item} row had its Wiki columns filled. */
+    FILLED,
+    /** A new {@code WIKI_ONLY} row was created for a blueprint-referenced item. */
+    CREATED,
+    /** The Wiki returned no item for the UUID; a {@code WIKI_MISSING} event was logged. */
+    MISSING
   }
 
   /**
@@ -198,7 +245,7 @@ public class ScWikiItemSyncService {
             new KindPass(properties.getItemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
 
     if (allPassesSucceeded && !ctx.seen.isEmpty()) {
-      int marked = gameItemRepository.markScwikiDeletedExcept(ctx.seen, ctx.now);
+      int marked = self.getObject().markBackfillOrphansWithinTransaction(ctx.seen, ctx.now);
       if (marked > 0) {
         log.info(
             "Marked {} game_item row(s) scwiki_deleted (no longer in any Wiki kind feed).", marked);
@@ -219,6 +266,22 @@ public class ScWikiItemSyncService {
         ctx.linked,
         ctx.skipped,
         ctx.failedPasses);
+  }
+
+  /**
+   * Runs the Mode-B cross-kind orphan sweep in its own {@code REQUIRES_NEW} transaction. The
+   * preceding pass loop is non-transactional (so no row lock is held across the page fetches), but
+   * the {@code @Modifying} bulk soft-delete needs an active transaction — this method provides one.
+   * Invoked through the {@link #self} proxy. Soft-deletes every Wiki-written {@code game_item}
+   * whose {@code external_uuid} was not seen in any kind feed this run.
+   *
+   * @param seenExternalUuids the external UUIDs every kind pass touched this run
+   * @param now the soft-delete timestamp
+   * @return the number of rows marked {@code scwiki_deleted}
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int markBackfillOrphansWithinTransaction(Set<UUID> seenExternalUuids, Instant now) {
+    return gameItemRepository.markScwikiDeletedExcept(seenExternalUuids, now);
   }
 
   /**
@@ -309,9 +372,21 @@ public class ScWikiItemSyncService {
         continue; // no UUID, or already claimed by an earlier (more-specific) pass
       }
       try {
-        upsertItem(dto, pass.kind(), ctx);
-        ctx.processed++;
-        flushAndClearIfBatchFull(ctx.processed);
+        // Resolve the manufacturer from the in-memory cache OUTSIDE the write transaction, then
+        // persist the row in its own REQUIRES_NEW transaction (via the self proxy) so a deadlock
+        // rolls back only this row and the pass keeps going.
+        Manufacturer resolvedManufacturer = ctx.resolveManufacturer(dto.manufacturer());
+        BackfillOutcome outcome =
+            self.getObject()
+                .upsertBackfillItemWithinTransaction(
+                    dto, pass.kind(), ctx.runId, ctx.now, resolvedManufacturer);
+        if (outcome == BackfillOutcome.CREATED) {
+          ctx.created++;
+        } else if (outcome == BackfillOutcome.LINKED) {
+          ctx.linked++;
+        } else if (outcome == BackfillOutcome.SKIPPED) {
+          ctx.skipped++;
+        }
       } catch (Exception e) {
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
@@ -320,80 +395,87 @@ public class ScWikiItemSyncService {
   }
 
   /**
-   * Flushes and clears the persistence context every {@link #FLUSH_BATCH_SIZE} upserts so the full
-   * backfill (~12 700 {@code game_item} rows) never accumulates the whole pool in one context.
-   * Without this, Hibernate's auto-flush re-dirty-checks every managed entity before each {@code
-   * findByExternalUuid} query — O(n²) over the run — and the heap holds every row for the
-   * transaction's lifetime. {@code flush()} writes all pending inserts/updates first (so no dirty
-   * state is lost), then {@code clear()} detaches them.
+   * Upserts a single Wiki item under the given kind in its own {@code REQUIRES_NEW} transaction so
+   * a deadlock or lock-timeout on this row rolls back only this row — not the whole backfill — and
+   * the pass loop continues. Invoked through the {@link #self} proxy (a direct {@code this} call
+   * would be self-invocation and skip the new transaction). The pass loop pages the Wiki and
+   * resolves the manufacturer beforehand, outside this transaction, so the per-row lock window is
+   * milliseconds.
    *
-   * <p>Safe against the detach traps in CLAUDE.md: the cross-kind {@code seen} set holds UUIDs (not
-   * entities) so it is unaffected, and the orphan sweep runs on those business keys after the loop;
-   * the {@link BackfillContext} manufacturer cache survives as detached references, which is fine
-   * because they are only read for their id to set the {@code manufacturer_id} FK on new rows.
-   *
-   * @param processedSoFar count of items upserted so far this run
-   */
-  void flushAndClearIfBatchFull(int processedSoFar) {
-    if (processedSoFar > 0 && processedSoFar % FLUSH_BATCH_SIZE == 0) {
-      entityManager.flush();
-      entityManager.clear();
-    }
-  }
-
-  /**
-   * Upserts a single Wiki item under the given kind. A brand-new row is created {@code WIKI_ONLY}
-   * (its name screened by {@link #shouldSkipNewItem(ScWikiItemDto)}; manufacturer resolved against
-   * existing rows only) and logs {@link SyncEventType#CREATED_WIKI_ONLY}. An existing row has its
-   * Wiki columns filled, its kind merged via {@link GameItemKind#mergeMoreSpecific} and its {@code
+   * <p>A brand-new row is created {@code WIKI_ONLY} (its name screened by {@link
+   * #shouldSkipNewItem(ScWikiItemDto)}; manufacturer supplied by the caller from the pre-loaded
+   * cache) and logs {@link SyncEventType#CREATED_WIKI_ONLY}. An existing row has its Wiki columns
+   * filled, its kind merged via {@link GameItemKind#mergeMoreSpecific} and its {@code
    * source_systems} flipped {@code UEX_ONLY → BOTH}; the UEX-canonical {@code name} and (on
    * existing rows) {@code manufacturer} are never touched.
    *
    * @param dto the Wiki item payload
    * @param passKind the kind derived from the source endpoint
-   * @param ctx the shared backfill state
+   * @param runId the current run id for the sync-report events
+   * @param now the shared {@code scwiki_synced_at} timestamp
+   * @param resolvedManufacturer the manufacturer resolved from the cache (applied only to new
+   *     rows), or {@code null}
+   * @return the {@link BackfillOutcome} describing what happened to the row
    */
-  private void upsertItem(ScWikiItemDto dto, GameItemKind passKind, BackfillContext ctx) {
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public BackfillOutcome upsertBackfillItemWithinTransaction(
+      ScWikiItemDto dto,
+      GameItemKind passKind,
+      UUID runId,
+      Instant now,
+      Manufacturer resolvedManufacturer) {
     GameItem item = gameItemRepository.findByExternalUuid(dto.uuid()).orElse(null);
     if (item == null) {
       if (shouldSkipNewItem(dto)) {
         syncReportService.logScwikiEvent(
-            ctx.runId,
+            runId,
             SyncEventType.SKIP_JUNK,
             "game_item",
             dto.uuid(),
             dto.name(),
             "Wiki item failed the new-row guard (blank/markup name or NOITEM_Vehicle); not"
                 + " created.");
-        ctx.skipped++;
-        return;
+        return BackfillOutcome.SKIPPED;
       }
       item = new GameItem();
       item.setExternalUuid(dto.uuid());
       item.setName(dto.name().trim());
       item.setKind(passKind);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
-      item.setManufacturer(ctx.resolveManufacturer(dto.manufacturer()));
-      applyWikiFields(item, dto, ctx.now);
+      item.setManufacturer(resolvedManufacturer);
+      applyWikiFields(item, dto, now);
       gameItemRepository.save(item);
       syncReportService.logScwikiEvent(
-          ctx.runId,
+          runId,
           SyncEventType.CREATED_WIKI_ONLY,
           "game_item",
           dto.uuid(),
           item.getName(),
           "New " + passKind + " row from the full Wiki item backfill.");
-      ctx.created++;
-      return;
+      return BackfillOutcome.CREATED;
     }
 
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), passKind));
-    applyWikiFields(item, dto, ctx.now);
+    applyWikiFields(item, dto, now);
+    BackfillOutcome outcome = BackfillOutcome.UPDATED;
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
-      ctx.linked++;
+      outcome = BackfillOutcome.LINKED;
     }
     gameItemRepository.save(item);
+    return outcome;
+  }
+
+  /** Outcome of a single Mode-B backfill upsert, used by {@link #runKindPass} to tally counters. */
+  public enum BackfillOutcome {
+    /** A new {@code WIKI_ONLY} row was created. */
+    CREATED,
+    /** An existing {@code UEX_ONLY} row was linked to the Wiki ({@code UEX_ONLY → BOTH}). */
+    LINKED,
+    /** An existing {@code BOTH} / {@code WIKI_ONLY} row had its Wiki columns refreshed. */
+    UPDATED,
+    /** The Wiki row failed the junk-name guard and no row was created. */
+    SKIPPED
   }
 
   /**
@@ -513,7 +595,6 @@ public class ScWikiItemSyncService {
     private int linked;
     private int skipped;
     private int failedPasses;
-    private int processed;
 
     /**
      * Captures the run id and timestamp and indexes the manufacturer table by Wiki UUID and by

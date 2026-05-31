@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -16,7 +17,7 @@ import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
-import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,8 +26,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Unit tests for {@link ScWikiItemSyncService} — the R4 closure-mode item fill. */
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +43,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private SyncReportService syncReportService;
-  @Mock private EntityManager entityManager;
+  @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
   private ScWikiProperties properties;
   private ScWikiItemSyncService service;
@@ -54,7 +60,8 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            entityManager);
+            self);
+    lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
@@ -207,5 +214,104 @@ class ScWikiItemSyncServiceClosureTest {
     service.syncItems();
 
     verify(scWikiClient, never()).fetchOne(any(), any(), any());
+  }
+
+  @Test
+  void syncItems_closure_isolatesPerItem_oneDeadlockDoesNotAbortTheRest() {
+    // Regression for the production deadlock cascade: the closure loop used to run in ONE
+    // transaction, so a deadlock on any row aborted the tx and every later item failed with
+    // "current transaction is aborted" (25P02). With per-item REQUIRES_NEW isolation, only the
+    // deadlocked item rolls back and the rest still persist.
+    UUID deadlocked = UUID.randomUUID();
+    UUID firstGood = UUID.randomUUID();
+    UUID secondGood = UUID.randomUUID();
+    when(gameItemRepository.findAllExternalUuids())
+        .thenReturn(List.of(deadlocked, firstGood, secondGood));
+    when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
+    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(
+            inv -> {
+              String uri = inv.getArgument(0);
+              return itemDto(UUID.fromString(uri.substring(uri.lastIndexOf('/') + 1)));
+            });
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class)))
+        .thenAnswer(
+            inv -> {
+              GameItem candidate = inv.getArgument(0);
+              if (deadlocked.equals(candidate.getExternalUuid())) {
+                throw new CannotAcquireLockException(
+                    "deadlock detected while updating tuple in relation \"game_item\"");
+              }
+              return candidate;
+            });
+
+    service.syncItems();
+
+    // Every item is attempted (the loop never aborts) and the two healthy rows still persist.
+    verify(gameItemRepository, times(3)).save(any(GameItem.class));
+    verify(gameItemRepository).save(argThat(g -> firstGood.equals(g.getExternalUuid())));
+    verify(gameItemRepository).save(argThat(g -> secondGood.equals(g.getExternalUuid())));
+  }
+
+  @Test
+  void syncItems_closure_fetchesBeforeOpeningTheWriteTransaction() {
+    UUID uuid = UUID.randomUUID();
+    when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
+    when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
+    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any())).thenReturn(itemDto(uuid));
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    // The Wiki fetch completes before the per-item write transaction opens, so no game_item lock is
+    // ever held across the HTTP round-trip.
+    InOrder ordered = inOrder(scWikiClient, gameItemRepository);
+    ordered.verify(scWikiClient).fetchOne(eq("/api/items/" + uuid), eq(ScWikiItemDto.class), any());
+    ordered.verify(gameItemRepository).save(any(GameItem.class));
+  }
+
+  @Test
+  void fillClosureItemWithinTransaction_opensItsOwnTransaction() throws NoSuchMethodException {
+    Transactional tx =
+        ScWikiItemSyncService.class
+            .getMethod(
+                "fillClosureItemWithinTransaction",
+                UUID.class,
+                UUID.class,
+                ScWikiItemDto.class,
+                Instant.class)
+            .getAnnotation(Transactional.class);
+
+    assertNotNull(tx, "the per-item DB write must be transactional");
+    assertEquals(
+        Propagation.REQUIRES_NEW,
+        tx.propagation(),
+        "the per-item write must run in its own transaction so a deadlock isolates to one item");
+  }
+
+  private static ScWikiItemDto itemDto(UUID uuid) {
+    return new ScWikiItemDto(
+        uuid,
+        "slug-" + uuid,
+        "Item " + uuid,
+        "class_name",
+        "classif",
+        "classifLabel",
+        "Cargo",
+        "typeLabel",
+        "subType",
+        "subTypeLabel",
+        "1",
+        "A",
+        "common",
+        1.0,
+        null,
+        null,
+        Map.of("en_EN", "desc"),
+        Boolean.TRUE,
+        Boolean.FALSE,
+        "4.8.0-LIVE");
   }
 }
