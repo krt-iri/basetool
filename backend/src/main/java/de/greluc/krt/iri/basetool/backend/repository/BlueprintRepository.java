@@ -115,19 +115,29 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @param pageable page request (whitelisted sort)
    * @return a page of orderable game items
    */
+  // GameItem is the query ROOT (not Blueprint) so the caller's whitelisted Pageable sort on
+  // `name` resolves against gi.name — selecting b.outputItem with a Blueprint root made Spring
+  // Data append `order by b.name`, which Blueprint has no attribute for (UnknownPathException).
+  // The EXISTS subquery also dedups naturally, so no DISTINCT is needed. {@code q} must be
+  // non-null (the caller passes "" for "no filter"): a NULL bind into LOWER(CONCAT(...)) makes
+  // PostgreSQL infer bytea and fail with {@code function lower(bytea) does not exist}; an empty
+  // string matches every row via the {@code %%} pattern.
   @Query(
       value =
-          "SELECT DISTINCT b.outputItem FROM Blueprint b JOIN b.ingredients i WHERE"
-              + " b.scwikiDeletedAt IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
+          "SELECT gi FROM de.greluc.krt.iri.basetool.backend.model.GameItem gi WHERE EXISTS ("
+              + "SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi"
+              + " AND b.scwikiDeletedAt IS NULL AND i.kind ="
               + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE"
-              + " AND i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
-              + " LOWER(CONCAT('%', :q, '%')))",
+              + " AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE"
+              + " LOWER(CONCAT('%', :q, '%'))",
       countQuery =
-          "SELECT COUNT(DISTINCT b.outputItem) FROM Blueprint b JOIN b.ingredients i WHERE"
-              + " b.scwikiDeletedAt IS NULL AND b.outputItem IS NOT NULL AND i.kind ="
+          "SELECT COUNT(gi) FROM de.greluc.krt.iri.basetool.backend.model.GameItem gi WHERE"
+              + " EXISTS ("
+              + "SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi"
+              + " AND b.scwikiDeletedAt IS NULL AND i.kind ="
               + " de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE"
-              + " AND i.material IS NOT NULL AND (:q IS NULL OR LOWER(b.outputItem.name) LIKE"
-              + " LOWER(CONCAT('%', :q, '%')))")
+              + " AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE"
+              + " LOWER(CONCAT('%', :q, '%'))")
   Page<de.greluc.krt.iri.basetool.backend.model.GameItem> findOrderableItems(
       @Param("q") String q, Pageable pageable);
 }
