@@ -1,8 +1,14 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemLineDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
@@ -16,6 +22,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderHandoverForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.Cookie;
@@ -340,12 +347,138 @@ public class JobOrderPageController {
         form.setSource(source);
       }
     }
+    if (!model.containsAttribute("jobOrderItemForm")) {
+      JobOrderItemForm itemForm = new JobOrderItemForm();
+      itemForm.setSource(source);
+      model.addAttribute("jobOrderItemForm", itemForm);
+    }
     model.addAttribute("materials", fetchMaterials());
+    model.addAttribute("orderableItems", fetchOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     List<OrgUnitMembershipOptionDto> orgOptions = fetchActiveOrgUnitOptions();
     model.addAttribute("ownerOptions", orgOptions);
     model.addAttribute("ownerOptionsHasSpecialCommand", containsSpecialCommand(orgOptions));
     return "orders-create";
+  }
+
+  /**
+   * Persists a new item order. Builds the backend item-order payload from the dynamically-bound
+   * item editor (lines that lack an item, blueprint, or positive amount are dropped) and posts it
+   * to the backend. Mirrors {@link #createOrder} for redirect / flash behaviour.
+   *
+   * @param form the bound item-order form
+   * @param redirectAttributes flash carrier for toasts / re-render
+   * @param principal the caller, or {@code null} for anonymous
+   * @return redirect target
+   */
+  @PostMapping("/items")
+  public String createItemOrder(
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal OidcUser principal) {
+    try {
+      List<CreateJobOrderItemLineDto> lines =
+          form.getItems().stream()
+              .filter(
+                  l ->
+                      l.getGameItemId() != null
+                          && l.getBlueprintId() != null
+                          && l.getAmount() != null
+                          && l.getAmount() > 0)
+              .map(
+                  l ->
+                      new CreateJobOrderItemLineDto(
+                          l.getGameItemId(),
+                          l.getBlueprintId(),
+                          l.getAmount(),
+                          l.getMaterials().stream()
+                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                              .map(
+                                  m ->
+                                      new CreateJobOrderItemMaterialDto(
+                                          m.getMaterialId(), m.getQuality()))
+                              .collect(Collectors.toList()),
+                          l.getClientLineId(),
+                          l.getParentClientLineId()))
+              .collect(Collectors.toList());
+
+      if (lines.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
+        redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+        return "redirect:/orders/create"
+            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      }
+
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
+
+      if (principal == null) {
+        return "redirect:/orders/create"
+            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      }
+      return "redirect:/orders";
+    } catch (Exception e) {
+      log.error("Failed to create item order", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
+      redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+      return "redirect:/orders/create"
+          + (form.getSource() != null ? "?source=" + form.getSource() : "");
+    }
+  }
+
+  /**
+   * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
+   * given orderable item. Relays to the backend item-catalog endpoint.
+   *
+   * @param gameItemId the orderable item
+   * @return the blueprint references producing it
+   */
+  @GetMapping("/item-blueprints/{gameItemId}")
+  @ResponseBody
+  public List<BlueprintReferenceDto> itemBlueprints(@PathVariable UUID gameItemId) {
+    try {
+      List<BlueprintReferenceDto> result =
+          backendApiClient.get(
+              "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
+              new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {},
+              true);
+      return result != null ? result : List.of();
+    } catch (Exception e) {
+      log.error("Failed to fetch blueprints for item {}", gameItemId, e);
+      return List.of();
+    }
+  }
+
+  /**
+   * JSON proxy for the create form's material-derivation preview: returns the resolved materials,
+   * sub-assembly suggestions and unresolved-ingredient names for a blueprint at the given amount.
+   *
+   * @param blueprintId the chosen blueprint
+   * @param amount the whole-unit amount to scale by (defaults to 1)
+   * @return the derivation preview, or {@code null} on failure
+   */
+  @GetMapping("/item-derivation/{blueprintId}")
+  @ResponseBody
+  public ItemDerivationDto itemDerivation(
+      @PathVariable UUID blueprintId,
+      @RequestParam(required = false, defaultValue = "1") int amount) {
+    try {
+      return backendApiClient.get(
+          "/api/v1/orders/item-catalog/blueprints/" + blueprintId + "/derivation?amount=" + amount,
+          ItemDerivationDto.class,
+          true);
+    } catch (Exception e) {
+      log.error("Failed to derive materials for blueprint {}", blueprintId, e);
+      return null;
+    }
   }
 
   /**
@@ -772,6 +905,28 @@ public class JobOrderPageController {
       }
     } catch (Exception e) {
       log.error("Failed to fetch job-order materials", e);
+    }
+    return new ArrayList<>();
+  }
+
+  /**
+   * Fetches the orderable items (blueprint outputs with a resolvable material) for the item-order
+   * create picker, sorted by name. Cached as static reference data.
+   *
+   * @return the orderable item references, or an empty list on failure
+   */
+  private List<GameItemReferenceDto> fetchOrderableItems() {
+    try {
+      PageResponse<GameItemReferenceDto> page =
+          backendApiClient.getCached(
+              "/api/v1/orders/item-catalog?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
+              true);
+      if (page != null && page.content() != null) {
+        return new ArrayList<>(page.content());
+      }
+    } catch (Exception e) {
+      log.error("Failed to fetch orderable items", e);
     }
     return new ArrayList<>();
   }
