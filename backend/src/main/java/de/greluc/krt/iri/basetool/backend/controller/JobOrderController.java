@@ -10,11 +10,14 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
@@ -70,6 +73,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderItemService jobOrderItemService;
+  private final JobOrderItemHandoverService jobOrderItemHandoverService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
   private final UserService userService;
@@ -93,6 +97,26 @@ public class JobOrderController {
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
+  }
+
+  /**
+   * Records an item handover for an item order: increments each ordered line's delivered count and
+   * auto-completes the order once every line is fully delivered. Same authorisation as the material
+   * handover (LOGISTICIAN+).
+   *
+   * @param id job-order id
+   * @param dto item-handover payload (per-line delivered quantities)
+   * @return the persisted item-handover DTO
+   */
+  @PostMapping("/{id}/item-handovers")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Create an item handover",
+      description = "Logs a handover of produced items for this item order.")
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  public JobOrderItemHandoverDto createItemHandover(
+      @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
+    return jobOrderItemHandoverService.createItemHandover(id, dto);
   }
 
   /**
@@ -334,6 +358,7 @@ public class JobOrderController {
         dto.materials(),
         dto.items(),
         dto.aggregatedMaterials(),
+        java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         dto.createdAt(),

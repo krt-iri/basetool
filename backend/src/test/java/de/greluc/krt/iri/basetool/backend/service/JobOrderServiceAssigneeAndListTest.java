@@ -91,6 +91,7 @@ class JobOrderServiceAssigneeAndListTest {
                   List.of(),
                   List.of(),
                   List.of(),
+                  List.of(),
                   null,
                   o.getVersion());
             });

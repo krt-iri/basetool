@@ -73,6 +73,8 @@ public class JobOrderService {
   private final AuthHelperService authHelperService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
+  private final de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
+      jobOrderItemHandoverMapper;
   private final de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
   /**
@@ -737,6 +739,10 @@ public class JobOrderService {
     List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
     List<AggregatedMaterialDto> aggregatedMaterials =
         isItem ? jobOrderItemService.aggregateMaterials(jobOrder) : List.of();
+    List<de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
+        isItem
+            ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
+            : List.of();
 
     return new JobOrderDto(
         baseDto.id(),
@@ -753,6 +759,7 @@ public class JobOrderService {
         aggregatedMaterials,
         baseDto.assignees(),
         baseDto.handovers(),
+        itemHandovers,
         baseDto.createdAt(),
         baseDto.version());
   }
