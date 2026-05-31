@@ -510,11 +510,11 @@
             </button>
             <div class="col-content" id="col-organisation-content">
                 <div class="hud-box">
-                    <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Führungspositionen</h3>
+                    <h3 th:text="#{admin.mission_data.lead_types}" style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: var(--font-body);">Führungspositionen</h3>
                     <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
                         <div th:each="leadType : ${missionLeadTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
                             <div>
-                                <strong th:text="${leadType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Role</strong>
+                                <strong th:text="${leadType.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Role</strong>
                             </div>
                             <div class="flex-gap-sm">
                                 <span th:each="p : ${participantsByLeadType[#strings.toString(leadType.id)]}"
@@ -524,11 +524,11 @@
                         </div>
                     </div>
 
-                    <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: 'Lato', sans-serif;">Frequenzübersicht</h3>
+                    <h3 th:text="#{admin.mission_data.frequency_types}" style="color: var(--color-primary); border-bottom: 1px solid var(--color-gray-3); padding-bottom: 0.5rem; margin-bottom: 1rem; font-family: var(--font-body);">Frequenzübersicht</h3>
                     <div class="flex-col-gap">
                         <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
                             <div>
-                                <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: 'Lato', sans-serif;">Freq</strong>
+                                <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Freq</strong>
                             </div>
                             <div class="flex-gap-sm"
                                  th:with="f=${frequencyByTypeId[freqType.id]}"
@@ -558,7 +558,7 @@
                 <h2>
                     <span th:text="#{mission.participants}">Teilnehmer</span>
                     <span class="participants-count"
-                          style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-left: 0.5rem;"
+                          style="color: var(--color-primary); font-family: var(--font-body); font-weight: 700; margin-left: 0.5rem;"
                           th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|"
                           th:title="#{mission.participants.count.tooltip}">0/0</span>
                 </h2>
@@ -654,7 +654,7 @@
                         <div class="flex-gap-sm">
                             <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" data-trigger="mission-toggle-unit" th:title="#{general.toggle}">
                                 <span class="unit-toggle-icon" style="display:inline-block; width:1em; color:var(--color-primary); font-weight:bold;">-</span>
-                                <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: 'Lato', sans-serif;">Unit Name</strong>
+                                <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: var(--font-body);">Unit Name</strong>
                                 <span th:if="${unit.shipType != null}" th:text="' - ' + ${unit.shipType.name}" style="color: var(--color-gray-1); margin-left: 0.25rem;"> - ShipType</span>
                                 <span th:if="${unit.ship != null and unit.ship.owner != null}" th:text="${' (' + unit.ship.owner.effectiveName + ')'}" style="color: var(--color-gray-2); font-size: 0.9rem;">(Owner)</span>
                                 <span th:if="${unit.highValueUnit}" style="color: var(--color-accent-light); margin-left: 0.5rem;">[HVU]</span>
@@ -799,7 +799,7 @@
             </button>
             <div class="col-content" id="col-finance-content">
                 <div class="hud-box">
-                    <h3 style="color: var(--color-dept-mining); font-family: 'Lato', sans-serif; font-weight: 700;" th:if="${financeSum != null}">
+                    <h3 style="color: var(--color-dept-profit); font-family: var(--font-body); font-weight: 700;" th:if="${financeSum != null}">
                         <span th:text="#{mission.finance.total}">Gesamtsumme:</span>
                         <span th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span> aUEC
                     </h3>
@@ -850,7 +850,7 @@
                                     </td>
                                     <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td>
-                                        <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-mining); text-decoration: underline;">Raffinerieauftrag</a>
+                                        <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-profit); text-decoration: underline;">Raffinerieauftrag</a>
                                     </td>
                                     <td sec:authorize="isAuthenticated()">
                                         <div class="flex-gap-xs">
