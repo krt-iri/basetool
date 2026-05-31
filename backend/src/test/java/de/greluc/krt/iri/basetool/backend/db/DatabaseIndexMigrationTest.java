@@ -39,6 +39,7 @@ class DatabaseIndexMigrationTest {
    *   <li>V48 (mission owner/manager indexes added with the ownership rewrite)
    *   <li>V65 (personal inventory composite owner+name index)
    *   <li>V92 (backfill FK indexes that escaped V34's blanket sweep)
+   *   <li>V122 (second FK backfill: handover / unit / yield lookup indexes)
    * </ul>
    *
    * The test is intentionally not exhaustive: it acts as an early-warning canary that Flyway
@@ -70,6 +71,13 @@ class DatabaseIndexMigrationTest {
     // in-memory check in MissionService.addParticipant catches the common case; this index is
     // the DB-level backstop against the TOCTOU race.
     assertIndexExists(jdbc, "mission_participant", "uq_mission_participant_user");
+    // V122: FK index on job_order_handover.job_order_id (powers the handover view) and the
+    // ON DELETE CASCADE child index on job_order_handover_item — representative of the second
+    // FK backfill sweep.
+    assertIndexExists(jdbc, "job_order_handover", "idx_job_order_handover_job_order_id");
+    assertIndexExists(jdbc, "job_order_handover_item", "idx_job_order_handover_item_handover_id");
+    // V122: composite (terminal_id, material_id) lookup index on refinery_yield.
+    assertIndexExists(jdbc, "refinery_yield", "idx_refinery_yield_terminal_material");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
