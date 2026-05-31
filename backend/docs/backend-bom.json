@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:43d061b8-d591-4c54-8bbb-2cca47aeba9c",
+  "serialNumber" : "urn:uuid:07c2dd39-3243-4d8c-b357-9634ec51fdb8",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-05-27T19:45:46Z",
+    "timestamp" : "2026-05-31T18:47:53Z",
     "tools" : {
       "components" : [
         {
@@ -12639,62 +12639,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar",
-      "group" : "org.springdoc",
-      "name" : "springdoc-openapi-starter-webmvc-ui",
-      "version" : "3.0.3",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "fc3102ffe8ff4d63d54dd031cd87df8a"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "7445824e3ce2baaf413ef2c8d2e95eafc894ab75"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "cdb30a903b5f98eb751f59614f38f807418f1efba639f6ede0b06de35449b8d2"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "97f5e7802a5fba281bb6075818156cde52706b6725dffe0008e9a252f40181069188cff6feb099b232cfb5c8d07383624d4d6ee14cbf9547631bc0fec449ebd1"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "389ad02f5cb4163323df599f49a5be4ad0447e6b6d88d63f585d3c4cf4b5bd6de863dcf601e9f782ffbef9c4208ad604"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "ed3242fcf62e4096e9aee26076972ec68d6e1c25b093f7b1ebc7e05309e471233a2063ab95fb22c9581959d6a3c9bebf"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "890a5f61abf8fac78e15e7e38dbc6b63afd3fec9888eb7f2593a6fe1cfdf7c09"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "c3fa6165d44890919fbbc8fff5e07ea0d8fc1ee1a9e539cabea4840f63c4ba1a5923616ebf11e460f5010dc6c7fc48d2e9c9ceff38bcf4d360b0a8cb6f5d0338"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@4.0.6?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -18343,146 +18287,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar",
-      "group" : "org.webjars",
-      "name" : "swagger-ui",
-      "version" : "5.32.2",
-      "description" : "WebJar for Swagger UI",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "c0a4b73b7e478088b3f3aef172cc83a3"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "7ab64d00ba57cf2bbca5b64588f5fd540422351c"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "1db1386611b1f3d71cc8acc6a1898c3b514060ad01055bae904e24969d591ed0"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "9c64c727467584d8b747a2a1734aab0af80183d88b9607a367c73b86353b33a5b415def0843cf0a298aa59f5312f7e082af45fcbdbcfb260e01c296c18184854"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "8f6d0c532c84051e8d6f20d351c741cd35355018f9fe86b6e5f5276bf8068f976406fabb2ce043bb19ceed7cf8cefe2d"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "c065cfc1fa1812b57edda97f17f0f588f1bf28aeee27a7477e48dbb30f43eb27504851a974c5492536977c0a4d03c3cc"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "9af70b43efbec17b4a9eab1358ea0f4dc4e660e46a5d8c4a5ae5f588aaf053b1"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "08df588c1fc0aafb4cf6dc340cb06b7b0edfd962c0a4f7953e14c65e3a09dfd78a0bf565aa316bde1070cc05602bd845faa4c0a17b3da2aa7c1aa3c21ef693c8"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0",
-            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/swagger-api/swagger-ui/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/swagger-api/swagger-ui"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar",
-      "group" : "org.webjars",
-      "name" : "webjars-locator-lite",
-      "version" : "1.1.3",
-      "description" : "WebJars Locator Lite",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "649d9b39a79b284f9646d37b9b3f5b79"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "217ce590453251b39b72c4a9af3986998f6fdbd9"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "7b67c4e69437a9c32b9c901bfaa056c7e2f1db62401757f02387c1f014bd00c4"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "a00d4762bbacfe734c7424a4577b4e9064137ded47e0feb8a5731a08af0bd3c8dbe4d44ec1a9f755c205ca6f7207db98ebad5760757b08329dc9fc92c5c2914e"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "55d8db2140ae4a35b9cbcaa9359e027bc4e859ad0d17d4516fa2d6d06d74a5bc9f6e541727fe89280a931eae902e7b36"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "9c27c3668f0831faed3cc935536d075f7d8d320602c61992882de2f9f105ca154c319f2cb5d83a308815aaf02ed3ebdd"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "76bc0f7fdb9cfe5dd75a0cc19b188c8e163d2c2e6ccb34051a1791b49a43d291"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "f01068cc8f90e2148b7e13bfd977cc87f5070ae8fb19bff94026a9ccacfe8a9daa06af2fcef5540d7631d96e9f38b1c2d0a1417ea60a148ebcf032c8e5652017"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "build-system",
-          "url" : "https://github.com/webjars/webjars-locator-lite/actions"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/webjars/webjars-locator-lite/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/webjars/webjars-locator-lite"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.xmlresolver/xmlresolver@5.3.3?type=jar",
       "group" : "org.xmlresolver",
       "name" : "xmlresolver",
@@ -19139,7 +18943,6 @@
       "ref" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
@@ -19163,7 +18966,7 @@
         "pkg:maven/org.projectlombok/lombok@1.18.46?type=jar",
         "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
         "pkg:maven/org.slf4j/slf4j-simple@2.0.17?type=jar",
-        "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar",
+        "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-devtools@4.0.6?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.0.6?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.0.6?type=jar",
@@ -20166,14 +19969,6 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar",
-        "pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar",
-        "pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@4.0.6?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot-actuator@4.0.6?type=jar",
@@ -20813,16 +20608,6 @@
         "pkg:maven/org.apache.commons/commons-compress@1.28.0?type=jar",
         "pkg:maven/org.rnorth.duct-tape/duct-tape@1.0.8?type=jar",
         "pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.webjars/swagger-ui@5.32.2?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.webjars/webjars-locator-lite@1.1.3?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
       ]
     },
     {

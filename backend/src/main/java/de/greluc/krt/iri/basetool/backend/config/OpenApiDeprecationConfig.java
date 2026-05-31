@@ -12,9 +12,9 @@ import org.springframework.web.method.HandlerMethod;
  * metadata into the generated OpenAPI document.
  *
  * <p>The {@link de.greluc.krt.iri.basetool.backend.interceptor.DeprecationInterceptor} already
- * emits the runtime headers; this customizer keeps the static spec in sync so SwaggerUI shows a
- * "deprecated" badge on the operation and adds a {@code **DEPRECATED**} block to the description
- * with the sunset date and the recommended replacement path.
+ * emits the runtime headers; this customizer keeps the static spec in sync so the generated {@code
+ * openapi.json} marks the operation {@code deprecated} and adds a {@code **DEPRECATED**} block to
+ * the description with the sunset date and the recommended replacement path.
  */
 @Configuration
 public class OpenApiDeprecationConfig {

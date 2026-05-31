@@ -11,20 +11,18 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Top-level OpenAPI document for the backend module.
  *
- * <p>Sets the spec version, declares the {@code bearer-jwt} security scheme so SwaggerUI offers an
- * "Authorize" button that accepts the same Keycloak JWT every authenticated endpoint requires, and
- * marks {@code bearer-jwt} as the default security requirement so endpoints without an explicit
- * override inherit it.
+ * <p>Sets the spec version, declares the {@code bearer-jwt} security scheme so generated clients
+ * know every authenticated endpoint expects a Keycloak JWT, and marks {@code bearer-jwt} as the
+ * default security requirement so endpoints without an explicit override inherit it. The project
+ * ships only the OpenAPI document ({@code openapi.json}) — Swagger UI is not bundled.
  */
 @Configuration
 public class OpenApiConfig {
 
   /**
-   * Returns the {@link OpenAPI} root document used by SpringDoc to generate {@code openapi.json}
-   * and SwaggerUI.
+   * Returns the {@link OpenAPI} root document used by SpringDoc to generate {@code openapi.json}.
    *
    * @return the {@link OpenAPI} root document used by SpringDoc to generate {@code openapi.json}
-   *     and SwaggerUI
    */
   @Bean
   public OpenAPI krtOpenApi() {

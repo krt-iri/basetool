@@ -160,17 +160,22 @@ public class SecurityConfig {
         .headers(
             headers -> {
               headers.contentSecurityPolicy(
-                  // Audit finding M-9: added {@code form-action 'self'} and {@code
-                  // upgrade-insecure-requests}. The backend serves Swagger UI in addition to the
-                  // JSON API, so form-action restricts where a (theoretical) injected form on the
-                  // Swagger HTML could POST, and upgrade-insecure-requests prevents the rare
-                  // mixed-content download link from falling back to HTTP.
+                  // The backend is a pure JSON resource server — it serves no HTML, scripts,
+                  // styles, images or fonts of its own (enforced by the ArchUnit "no HTML" rules
+                  // and the removal of Swagger UI). The earlier policy relaxed {@code style-src}
+                  // with {@code 'unsafe-inline'} and allowed {@code data:} img/font sources purely
+                  // so the bundled Swagger UI rendered; with that gone the policy locks down to
+                  // {@code default-src 'none'}, which makes every fetch directive
+                  // (script/style/img/font/connect/object) inherit {@code 'none'} — nothing can be
+                  // loaded into a (would-be) document context. {@code frame-ancestors 'none'}
+                  // mirrors X-Frame-Options DENY; {@code base-uri 'none'} and {@code form-action
+                  // 'none'} are defence-in-depth against an injected {@code <base>}/{@code <form>}.
+                  // {@code upgrade-insecure-requests} is dropped: there are no sub-resources left
+                  // to upgrade.
                   csp ->
                       csp.policyDirectives(
-                          "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors"
-                              + " 'none'; form-action 'self'; upgrade-insecure-requests;"
-                              + " connect-src 'self'; img-src 'self' data:; font-src 'self' data:;"
-                              + " style-src 'self' 'unsafe-inline'; script-src 'self'"));
+                          "default-src 'none'; frame-ancestors 'none'; base-uri 'none';"
+                              + " form-action 'none'"));
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
@@ -209,8 +214,12 @@ public class SecurityConfig {
             })
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
-                        "/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                auth.requestMatchers("/error", "/v3/api-docs/**")
+                    // Swagger UI has been removed from the project (springdoc -api starter, no
+                    // -ui). Only the raw OpenAPI document is served at /v3/api-docs, and only in
+                    // non-prod profiles: the prod profile sets springdoc.api-docs.enabled=false so
+                    // this matcher resolves to a 404 there. The committed openapi.json remains the
+                    // single source of API documentation.
                     .permitAll()
                     // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
                     // docker-compose `depends_on: condition: service_healthy`. Other actuator
