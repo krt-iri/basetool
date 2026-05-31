@@ -706,7 +706,7 @@
                 const msg = MSG_HANDOVER_REPORT_VALIDATION_AMOUNT
                     .replace('{0}', materialName)
                     .replace('{1}', available);
-                showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, msg, 'error');
+                showFrontendErrorToast(msg);
                 return false;
             }
         }
@@ -835,7 +835,7 @@
                         document.getElementById('material-delete-confirm-modal').style.display = 'flex';
                         window.materialRowToDelete = row;
                     } else {
-                        showToast('Fehler', 'Es muss mindestens ein Material im Auftrag verbleiben.', 'error');
+                        showFrontendErrorToast('Es muss mindestens ein Material im Auftrag verbleiben.');
                     }
                 }
             });
@@ -870,8 +870,6 @@
     const MSG_STATUS_SUCCESS = '[(#{orders.status.update.success})]';
     const MSG_STATUS_ERROR   = '[(#{orders.status.update.error})]';
     const MSG_STATUS_CONFLICT = '[(#{orders.status.update.conflict})]';
-    const MSG_STATUS_SUCCESS_TITLE = '[(#{toast.title.success})]';
-    const MSG_STATUS_ERROR_TITLE   = '[(#{toast.title.error})]';
 
     let _pendingStatus = null;
     let _previousStatus = null;
@@ -921,29 +919,27 @@
             body: JSON.stringify({ status: status, version: version })
         }).then(res => {
             if (res.status === 409) {
-                showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_CONFLICT, 'error');
+                showFrontendErrorToast(MSG_STATUS_CONFLICT);
                 setTimeout(() => window.location.reload(), 1500);
                 return;
             }
             if (!res.ok) {
-                showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_ERROR, 'error');
+                showFrontendErrorToast(MSG_STATUS_ERROR);
                 return;
             }
             return res.json().then(data => {
                 if (selectElement && data && data.version !== undefined) {
                     selectElement.dataset.version = data.version;
                 }
-                showToast(MSG_STATUS_SUCCESS_TITLE, MSG_STATUS_SUCCESS, 'success');
+                showFrontendSuccessToast(MSG_STATUS_SUCCESS);
                 setTimeout(() => window.location.reload(), 1000);
             });
         }).catch(() => {
-            showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_ERROR, 'error');
+            showFrontendErrorToast(MSG_STATUS_ERROR);
         });
     }
 
     const MSG_HANDOVER_REPORT_ERROR = '[(#{orders.handover.report.error})]';
-    const MSG_HANDOVER_REPORT_ERROR_TITLE = '[(#{orders.handover.report.error.title})]';
-    const MSG_HANDOVER_REPORT_VALIDATION_TITLE = '[(#{orders.handover.report.validation.title})]';
     const MSG_HANDOVER_REPORT_VALIDATION_DATE = '[(#{orders.handover.report.validation.date})]';
     const MSG_HANDOVER_REPORT_VALIDATION_TIME = '[(#{orders.handover.report.validation.time})]';
     const MSG_HANDOVER_REPORT_VALIDATION_HANDLE = '[(#{orders.handover.report.validation.handle})]';
@@ -983,7 +979,7 @@
                 headers: downloadHeaders
             });
             if (!response.ok) {
-                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
                 return;
             }
             const blob = await response.blob();
@@ -997,7 +993,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
         }
     }
 
@@ -1083,19 +1079,19 @@
             return sel && sel.value && inp && inp.value;
         });
         if (!datePart) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
             return;
         }
         if (!timePart) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_TIME, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_TIME);
             return;
         }
         if (!recipientHandle) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_HANDLE);
             return;
         }
         if (!hasValidItem) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
             return;
         }
         if (!validateHandoverAmounts()) {
@@ -1124,12 +1120,12 @@
             const localDateStr = datePart + 'T' + timePart;
             const localDate = new Date(localDateStr);
             if (isNaN(localDate.getTime())) {
-                showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
                 return;
             }
             handoverTimeIso = localDateStr;
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
             return;
         }
         const payload = {
@@ -1147,7 +1143,7 @@
                 body: JSON.stringify(payload)
             });
             if (!response.ok) {
-                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
                 return;
             }
             const blob = await response.blob();
@@ -1167,7 +1163,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
         }
     }
 
