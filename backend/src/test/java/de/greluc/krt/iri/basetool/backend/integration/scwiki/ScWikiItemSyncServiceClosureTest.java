@@ -31,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -242,6 +243,42 @@ class ScWikiItemSyncServiceClosureTest {
               if (deadlocked.equals(candidate.getExternalUuid())) {
                 throw new CannotAcquireLockException(
                     "deadlock detected while updating tuple in relation \"game_item\"");
+              }
+              return candidate;
+            });
+
+    service.syncItems();
+
+    // Every item is attempted (the loop never aborts) and the two healthy rows still persist.
+    verify(gameItemRepository, times(3)).save(any(GameItem.class));
+    verify(gameItemRepository).save(argThat(g -> firstGood.equals(g.getExternalUuid())));
+    verify(gameItemRepository).save(argThat(g -> secondGood.equals(g.getExternalUuid())));
+  }
+
+  @Test
+  void syncItems_closure_defersOnOptimisticLock_oneCollisionDoesNotAbortTheRest() {
+    // A concurrent sync (e.g. the parallel UEX game_item sync) can bump a row's @Version between
+    // this REQUIRES_NEW transaction's read and commit. That collision is expected and benign: the
+    // colliding item is deferred (WARN, not ERROR) and the rest of the batch still persists.
+    UUID collided = UUID.randomUUID();
+    UUID firstGood = UUID.randomUUID();
+    UUID secondGood = UUID.randomUUID();
+    when(gameItemRepository.findAllExternalUuids())
+        .thenReturn(List.of(collided, firstGood, secondGood));
+    when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
+    when(scWikiClient.fetchOne(any(), eq(ScWikiItemDto.class), any()))
+        .thenAnswer(
+            inv -> {
+              String uri = inv.getArgument(0);
+              return itemDto(UUID.fromString(uri.substring(uri.lastIndexOf('/') + 1)));
+            });
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class)))
+        .thenAnswer(
+            inv -> {
+              GameItem candidate = inv.getArgument(0);
+              if (collided.equals(candidate.getExternalUuid())) {
+                throw new ObjectOptimisticLockingFailureException(GameItem.class, collided);
               }
               return candidate;
             });
