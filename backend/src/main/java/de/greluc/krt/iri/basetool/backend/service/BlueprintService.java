@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintDto;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -38,7 +39,11 @@ public class BlueprintService {
    * @return a page of blueprint DTOs
    */
   public Page<BlueprintDto> getBlueprints(@Nullable String search, @NotNull Pageable pageable) {
-    String query = (search == null || search.isBlank()) ? null : search.trim();
-    return blueprintRepository.findActiveFiltered(query, pageable).map(blueprintMapper::toDto);
+    boolean hasSearch = search != null && !search.isBlank();
+    Page<Blueprint> page =
+        hasSearch
+            ? blueprintRepository.searchActive(search.trim(), pageable)
+            : blueprintRepository.findByScwikiDeletedAtIsNull(pageable);
+    return page.map(blueprintMapper::toDto);
   }
 }
