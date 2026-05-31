@@ -172,15 +172,16 @@ class OperationServiceTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
       when(operationRepository.searchOperations(
-              "alpha", requestedStatus, false, squadronId, Set.of(), pageable))
+              "alpha", null, null, requestedStatus, false, squadronId, Set.of(), pageable))
           .thenReturn(new PageImpl<>(List.of(new Operation())));
 
       Page<Operation> result =
-          operationService.searchOperations("alpha", requestedStatus, pageable);
+          operationService.searchOperations("alpha", null, null, requestedStatus, pageable);
 
       assertEquals(1, result.getTotalElements());
       verify(operationRepository, times(1))
-          .searchOperations("alpha", requestedStatus, false, squadronId, Set.of(), pageable);
+          .searchOperations(
+              "alpha", null, null, requestedStatus, false, squadronId, Set.of(), pageable);
     }
 
     @Test
@@ -193,10 +194,10 @@ class OperationServiceTest {
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(
-              any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
+              any(), any(), any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
-      operationService.searchOperations(null, null, pageable);
+      operationService.searchOperations(null, null, null, null, pageable);
 
       List<String> forwarded = statusCaptor.getValue();
       assertTrue(forwarded.contains("PLANNED"));
@@ -214,10 +215,10 @@ class OperationServiceTest {
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(
-              any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
+              any(), any(), any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
-      operationService.searchOperations(null, List.of(), pageable);
+      operationService.searchOperations(null, null, null, List.of(), pageable);
 
       assertEquals(4, statusCaptor.getValue().size());
     }
@@ -231,13 +232,34 @@ class OperationServiceTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
-              any(), any(), any(Boolean.class), any(), any(), any()))
+              any(), any(), any(), any(), any(Boolean.class), any(), any(), any()))
           .thenReturn(new PageImpl<>(List.of()));
 
-      operationService.searchOperations(null, List.of("PLANNED"), pageable);
+      operationService.searchOperations(null, null, null, List.of("PLANNED"), pageable);
 
       verify(operationRepository, times(1))
-          .searchOperations(null, List.of("PLANNED"), true, null, Set.of(), pageable);
+          .searchOperations(null, null, null, List.of("PLANNED"), true, null, Set.of(), pageable);
+    }
+
+    @Test
+    void forwardsTimeRangeBoundsToRepositoryVerbatim() {
+      // The start/end bounds filter on the operation's derived mission span (earliest planned
+      // start / latest planned end). The service does no interpretation of its own — it forwards
+      // both instants straight to the repository, whose CAST(... AS timestamp) IS NULL guard
+      // disables a null bound.
+      PageRequest pageable = PageRequest.of(0, 20);
+      Instant start = Instant.parse("2026-06-01T00:00:00Z");
+      Instant end = Instant.parse("2026-06-30T23:59:00Z");
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
+      when(operationRepository.searchOperations(
+              any(), any(), any(), any(), any(Boolean.class), any(), any(), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      operationService.searchOperations(null, start, end, List.of("PLANNED"), pageable);
+
+      verify(operationRepository, times(1))
+          .searchOperations(null, start, end, List.of("PLANNED"), true, null, Set.of(), pageable);
     }
   }
 

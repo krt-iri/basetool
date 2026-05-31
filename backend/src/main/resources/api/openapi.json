@@ -25020,7 +25020,7 @@
       "get" : {
         "tags" : [ "Operations" ],
         "summary" : "Search operations (paginated)",
-        "description" : "Returns operations matching the supplied filters (free-text query + status list). Operations have no `plannedStartTime` of their own - that field lives on the underlying missions - so the missions' date-range filter has no equivalent here. Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. `id` is appended automatically as a stable tiebreaker.",
+        "description" : "Returns operations matching the supplied filters (free-text query + status list + time range). Operations have no `plannedStartTime` of their own - that field lives on the underlying missions - so `start` filters on the earliest linked mission's planned start and `end` on the latest linked mission's planned end. Whitelisted sort fields: id, name, status, description, createdAt, updatedAt. `id` is appended automatically as a stable tiebreaker.",
         "operationId" : "searchOperations",
         "parameters" : [ {
           "name" : "query",
@@ -25028,6 +25028,22 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "name" : "start",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "end",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }, {
           "name" : "status",

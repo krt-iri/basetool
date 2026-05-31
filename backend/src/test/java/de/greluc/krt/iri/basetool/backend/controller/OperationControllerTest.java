@@ -16,6 +16,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.OperationFinanceService;
 import de.greluc.krt.iri.basetool.backend.service.OperationService;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -194,17 +195,19 @@ class OperationControllerTest {
         new OperationDto(
             UUID.randomUUID(), "Op", "d", OperationStatus.PLANNED, null, 0L, null, null, null);
 
-    when(operationService.searchOperations(eq("alpha"), eq(statuses), any(Pageable.class)))
-        .thenAnswer(invocation -> new PageImpl<>(List.of(entity), invocation.getArgument(2), 1));
+    when(operationService.searchOperations(
+            eq("alpha"), any(), any(), eq(statuses), any(Pageable.class)))
+        .thenAnswer(invocation -> new PageImpl<>(List.of(entity), invocation.getArgument(4), 1));
     when(operationMapper.toDto(entity)).thenReturn(dto);
 
     PageResponse<OperationDto> resp =
-        operationController.searchOperations("alpha", statuses, 0, 10, "createdAt,desc");
+        operationController.searchOperations(
+            "alpha", null, null, statuses, 0, 10, "createdAt,desc");
 
     assertEquals(1, resp.totalElements());
     assertEquals(dto, resp.content().getFirst());
     verify(operationService, times(1))
-        .searchOperations(eq("alpha"), eq(statuses), any(Pageable.class));
+        .searchOperations(eq("alpha"), any(), any(), eq(statuses), any(Pageable.class));
   }
 
   @Test
@@ -214,25 +217,42 @@ class OperationControllerTest {
     // before the service is ever called.
     assertThrows(
         IllegalArgumentException.class,
-        () -> operationController.searchOperations(null, null, 0, 10, "password,asc"));
+        () -> operationController.searchOperations(null, null, null, null, 0, 10, "password,asc"));
 
-    verify(operationService, never()).searchOperations(any(), any(), any(Pageable.class));
+    verify(operationService, never())
+        .searchOperations(any(), any(), any(), any(), any(Pageable.class));
   }
 
   @Test
   void searchOperations_appendsIdAsStableTiebreaker() {
     // Two operations created at the same Instant would otherwise swap order between pages —
     // PaginationUtil must append `id` as a secondary sort because it's in the whitelist.
-    when(operationService.searchOperations(any(), any(), any(Pageable.class)))
+    when(operationService.searchOperations(any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    operationController.searchOperations(null, null, 0, 10, "createdAt,desc");
+    operationController.searchOperations(null, null, null, null, 0, 10, "createdAt,desc");
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-    verify(operationService).searchOperations(any(), any(), captor.capture());
+    verify(operationService).searchOperations(any(), any(), any(), any(), captor.capture());
     Sort sort = captor.getValue().getSort();
     assertNotNull(sort.getOrderFor("createdAt"));
     assertNotNull(
         sort.getOrderFor("id"), "PaginationUtil must append `id` as a stable secondary sort");
+  }
+
+  @Test
+  void searchOperations_forwardsTimeRangeBoundsToService() {
+    // The start/end query params bind as ISO-8601 instants and must reach the service untouched —
+    // they drive the operation's derived mission-span filter (earliest planned start / latest
+    // planned end).
+    Instant start = Instant.parse("2026-06-01T00:00:00Z");
+    Instant end = Instant.parse("2026-06-30T23:59:00Z");
+    when(operationService.searchOperations(any(), eq(start), eq(end), any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    operationController.searchOperations(null, start, end, null, 0, 10, "createdAt,desc");
+
+    verify(operationService, times(1))
+        .searchOperations(any(), eq(start), eq(end), any(), any(Pageable.class));
   }
 }
