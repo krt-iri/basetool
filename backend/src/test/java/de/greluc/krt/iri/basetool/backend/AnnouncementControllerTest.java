@@ -2,9 +2,9 @@ package de.greluc.krt.iri.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.controller.AnnouncementController;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 class AnnouncementControllerTest {
 
@@ -12,7 +12,7 @@ class AnnouncementControllerTest {
   void testJsonParsing_ContentOnly() throws Exception {
     String json = "{\"content\": \"test content\"}";
 
-    ObjectMapper mapper = new ObjectMapper();
+    JsonMapper mapper = JsonMapper.builder().build();
 
     try {
       AnnouncementController.AnnouncementRequest request =

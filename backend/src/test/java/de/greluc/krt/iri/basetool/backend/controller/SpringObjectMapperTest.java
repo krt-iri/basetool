@@ -1,15 +1,20 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderDto;
 import java.time.OffsetDateTime;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 public class SpringObjectMapperTest {
 
-  private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+  // Mirror JacksonConfig: the app disables FAIL_ON_NULL_FOR_PRIMITIVES (Jackson 2 leniency) so an
+  // absent nested primitive such as LocationDto.hidden defaults to false instead of failing.
+  private JsonMapper mapper =
+      JsonMapper.builder()
+          .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false)
+          .build();
 
   @Test
   public void testDeserialize() throws Exception {

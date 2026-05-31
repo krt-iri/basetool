@@ -6,7 +6,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.model.*;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryOrderStoreDto;
@@ -30,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,7 +64,7 @@ class RefineryOrderTest {
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -81,8 +81,6 @@ class RefineryOrderTest {
   void setUp() {
     iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-
-    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
     user1 = new User();
     user1.setId(UUID.randomUUID());
@@ -187,8 +185,8 @@ class RefineryOrderTest {
             .getResponse()
             .getContentAsString();
 
-    com.fasterxml.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
-    UUID savedId = UUID.fromString(jsonResponse.get("id").asText());
+    tools.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
+    UUID savedId = UUID.fromString(jsonResponse.get("id").asString());
     RefineryOrder saved = refineryOrderRepository.findById(savedId).orElseThrow();
     assertNotNull(saved.getId());
     assertEquals(user1.getId(), saved.getOwner().getId());
@@ -469,8 +467,8 @@ class RefineryOrderTest {
             .getResponse()
             .getContentAsString();
 
-    com.fasterxml.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
-    UUID savedId = UUID.fromString(jsonResponse.get("id").asText());
+    tools.jackson.databind.JsonNode jsonResponse = objectMapper.readTree(response);
+    UUID savedId = UUID.fromString(jsonResponse.get("id").asString());
     RefineryOrder saved = refineryOrderRepository.findById(savedId).orElseThrow();
     assertNotNull(saved.getId());
     assertNull(saved.getMission());

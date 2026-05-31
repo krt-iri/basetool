@@ -2,8 +2,6 @@ package de.greluc.krt.iri.basetool.frontend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.frontend.service.MissionPresenceService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -29,6 +27,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketExtension;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Tests for {@link MissionPresenceWebSocketHandler}.
@@ -46,7 +47,7 @@ class MissionPresenceWebSocketHandlerTest {
   @BeforeEach
   void setUp() {
     service = new MissionPresenceService();
-    objectMapper = new ObjectMapper();
+    objectMapper = JsonMapper.builder().build();
     handler = new MissionPresenceWebSocketHandler(service, objectMapper);
   }
 
@@ -86,11 +87,11 @@ class MissionPresenceWebSocketHandlerTest {
     assertThat(service.get(missionId, "details", "user-1").displayName()).isEqualTo("Alice");
 
     JsonNode broadcast = lastBroadcast(session);
-    assertThat(broadcast.get("type").asText()).isEqualTo("presence");
+    assertThat(broadcast.get("type").asString()).isEqualTo("presence");
     JsonNode editors = broadcast.get("sections").get("details");
     assertThat(editors).isNotNull();
-    assertThat(editors.get(0).get("userId").asText()).isEqualTo("user-1");
-    assertThat(editors.get(0).get("displayName").asText()).isEqualTo("Alice");
+    assertThat(editors.get(0).get("userId").asString()).isEqualTo("user-1");
+    assertThat(editors.get(0).get("displayName").asString()).isEqualTo("Alice");
   }
 
   @Test
@@ -107,7 +108,7 @@ class MissionPresenceWebSocketHandlerTest {
     assertThat(service.get(missionId, "details", "user-1")).isNull();
     JsonNode broadcast = lastBroadcast(session);
     // After the blur the snapshot has no sections at all (the entry was the only one).
-    assertThat(broadcast.get("type").asText()).isEqualTo("presence");
+    assertThat(broadcast.get("type").asString()).isEqualTo("presence");
     assertThat(broadcast.get("sections").size()).isZero();
   }
 
@@ -165,7 +166,7 @@ class MissionPresenceWebSocketHandlerTest {
     // Bob's session received an updated snapshot (no Alice in `details`).
     JsonNode broadcast = lastBroadcast(bobSession);
     assertThat(broadcast.get("sections").has("details")).isFalse();
-    assertThat(broadcast.get("sections").get("schedule").get(0).get("userId").asText())
+    assertThat(broadcast.get("sections").get("schedule").get(0).get("userId").asString())
         .isEqualTo("user-2");
   }
 

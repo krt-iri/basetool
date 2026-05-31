@@ -1,8 +1,5 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
@@ -33,6 +30,10 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Handles the import of a third-party ship-export JSON into a user's hangar.
@@ -274,7 +275,9 @@ public class HangarImportService {
     JsonNode root;
     try {
       root = objectMapper.readTree(file.getInputStream());
-    } catch (IOException e) {
+    } catch (IOException | JacksonException e) {
+      // IOException covers the multipart stream; JacksonException (unchecked in Jackson 3) covers a
+      // malformed JSON body — both must surface as a 400, not bubble up as a 500.
       log.warn("Hangar import: failed to parse JSON — {}", e.getMessage());
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
