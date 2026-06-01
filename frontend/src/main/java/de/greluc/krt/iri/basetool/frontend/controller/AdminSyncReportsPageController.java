@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SyncReportDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Spring MVC controller backing the {@code /admin/sync-reports} pages (SC_WIKI_SYNC_PLAN.md §8.8):
@@ -67,6 +70,63 @@ public class AdminSyncReportsPageController {
   @GetMapping("/admin/sync-reports/uex")
   public String uex(@RequestParam(required = false, defaultValue = "0") int page, Model model) {
     return render("UEX", "UEX", "/admin/sync-reports/uex", page, model);
+  }
+
+  /**
+   * Deletes sync-report events older than {@code days} days, optionally scoped to the active source
+   * tab, then redirects back to that tab with a flash result. A blank {@code source} purges the
+   * combined view (both catalogues); {@code "SCWIKI"} / {@code "UEX"} confine the purge to one
+   * source. The deleted-row count is relayed via the {@code deletedCount} flash attribute so the
+   * page can show a success banner; a backend failure or invalid input lands as an {@code error}
+   * flash attribute instead.
+   *
+   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank for the combined
+   *     view
+   * @param days minimum age in days a report must exceed to be deleted
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect back to the matching sync-reports tab
+   */
+  @PostMapping("/admin/sync-reports/delete-old")
+  public String deleteOld(
+      @RequestParam(required = false) String source,
+      @RequestParam int days,
+      RedirectAttributes redirectAttributes) {
+    String redirect = redirectPathFor(source);
+    if (days < 1) {
+      redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
+      return "redirect:" + redirect;
+    }
+    String uri = "/api/v1/sync-reports?olderThanDays=" + days;
+    if (source != null && !source.isBlank()) {
+      uri += "&source=" + source;
+    }
+    try {
+      SyncReportPurgeResultDto result =
+          backendApiClient.delete(uri, SyncReportPurgeResultDto.class);
+      redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
+    } catch (Exception e) {
+      log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
+      redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
+    }
+    return "redirect:" + redirect;
+  }
+
+  /**
+   * Maps the active source tab to the page path the delete action should redirect back to, so the
+   * user lands on the same tab they triggered the purge from.
+   *
+   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank / {@code null}
+   * @return the matching sync-reports page path
+   */
+  private static String redirectPathFor(String source) {
+    if (source == null || source.isBlank()) {
+      return "/admin/sync-reports";
+    }
+    return switch (source.trim().toUpperCase(java.util.Locale.ROOT)) {
+      case "SCWIKI" -> "/admin/sync-reports/scwiki";
+      case "UEX" -> "/admin/sync-reports/uex";
+      default -> "/admin/sync-reports";
+    };
   }
 
   /**

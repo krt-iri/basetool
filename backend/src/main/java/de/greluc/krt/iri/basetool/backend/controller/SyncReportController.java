@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.SyncReportDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -79,6 +81,34 @@ public class SyncReportController {
         events.getTotalElements(),
         events.getTotalPages(),
         List.of());
+  }
+
+  /**
+   * Deletes sync-report events older than {@code olderThanDays} days, optionally scoped to one
+   * source. Backs the admin "delete reports older than X days" maintenance action. An absent /
+   * unrecognised {@code source} purges both catalogues; a recognised one confines the purge to it.
+   *
+   * <p>Method-level {@code @Transactional} (read-write) overrides the class-level {@code readOnly =
+   * true} so the {@code @Modifying} delete runs in a writable transaction.
+   *
+   * @param source optional catalogue filter ({@code "UEX"} / {@code "SCWIKI"}, case-insensitive)
+   * @param olderThanDays minimum age in days a report must exceed to be deleted (must be at least
+   *     1)
+   * @return the number of rows deleted
+   */
+  @Operation(
+      summary = "Delete old sync-report events",
+      description =
+          "Admin-only. Deletes sync-report events older than the given number of days, optionally "
+              + "confined to one source system (UEX / SCWIKI). Returns the number of rows deleted.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "Old sync-report rows deleted")})
+  @DeleteMapping
+  @Transactional
+  public SyncReportPurgeResultDto deleteOldEvents(
+      @RequestParam(required = false) String source, @RequestParam int olderThanDays) {
+    SyncSourceSystem sourceFilter = parseSource(source);
+    int deleted = syncReportService.deleteOlderThan(sourceFilter, olderThanDays);
+    return new SyncReportPurgeResultDto(deleted);
   }
 
   /**
