@@ -12,10 +12,19 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   Optional<MissionParticipant> findByMissionIdAndUserId(UUID missionId, UUID userId);
 
   /**
-   * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
-   * SquadronId}.
+   * Returns {@code true} iff at least one participant is affiliated with the org unit (Staffel or
+   * Spezialkommando) of the given id, traversing the {@code orgUnits} many-to-many. Replaces the
+   * former {@code existsBySquadronId} after the participant affiliation moved from the single
+   * {@code squadron_id} FK to the {@code mission_participant_org_unit} join.
+   *
+   * @param orgUnitId the org-unit id to check for any participant affiliation.
+   * @return {@code true} iff at least one participant references the org unit.
    */
-  boolean existsBySquadronId(UUID squadronId);
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id ="
+          + " :orgUnitId")
+  boolean existsByOrgUnitId(
+      @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code

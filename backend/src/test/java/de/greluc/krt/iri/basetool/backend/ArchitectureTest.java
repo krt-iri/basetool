@@ -88,15 +88,15 @@ class ArchitectureTest {
    * <ul>
    *   <li>{@code User.squadron} — the global user→squadron link on {@code app_user}. Migration to
    *       per-membership ownership is the destructive-cleanup release.
-   *   <li>{@code MissionParticipant.squadron} — the per-mission-participant squadron snapshot taken
-   *       at mission-join time on {@code mission_participant}; used by the payout calculator
-   *       (MULTI_SQUADRON_PLAN.md Phase 6) so payouts honour the participant's squadron membership
-   *       at participation time, not at payout time. Stays until the org-unit-aware participant
-   *       snapshot lands.
    * </ul>
+   *
+   * <p>{@code MissionParticipant} no longer references {@code squadron_id}: the per-participant
+   * affiliation snapshot moved to the {@code mission_participant_org_unit} join table (FK to {@code
+   * org_unit}, supporting Staffel + Spezialkommando), so the entity is no longer in this set. The
+   * legacy {@code mission_participant.squadron_id} column is dropped in the destructive-cleanup
+   * release.
    */
-  private static final Set<String> SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS =
-      Set.of(USER_FQN, "de.greluc.krt.iri.basetool.backend.model.MissionParticipant");
+  private static final Set<String> SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS = Set.of(USER_FQN);
 
   /**
    * DTOs that are response-only — they may be returned from {@code @GetMapping} methods or used as
@@ -1486,7 +1486,7 @@ class ArchitectureTest {
         .should(
             new ArchCondition<JavaClass>(
                 "not declare any @JoinColumn(name = \"squadron_id\") field outside the"
-                    + " grandfathered legacy entities (User, MissionParticipant)") {
+                    + " grandfathered legacy entities (User)") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 if (SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS.contains(javaClass.getFullName())) {
