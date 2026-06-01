@@ -9,15 +9,14 @@ import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.iri.basetool.frontend.controller.MaterialsPageController.TerminalCol;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -176,13 +175,106 @@ class MaterialsPageControllerTest {
   }
 
   @Test
-  void getMatrixOverview_ShouldTagTerminalsWithPlanetCssClass() {
-    // Arrange — three terminals: Hurston (canonical), unknown planet (hash fallback),
-    // no planet at all (Lagrange-style, must land in planet-unknown and sort to the tail).
+  void getMatrixOverview_ShouldPopulateFilterLists() {
+    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
+    when(backendApiClient.getCached(
+            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(matrixPage());
+
+    // Act — the shell endpoint only derives the filter source lists; the grid loads separately.
+    String viewName = controller.getMatrixOverview(model);
+
+    // Assert
+    assertEquals("materials-overview", viewName);
+    Collection<String> systems = (Collection<String>) model.getAttribute("starSystems");
+    Collection<String> materials = (Collection<String>) model.getAttribute("materialNames");
+    assertNotNull(systems);
+    assertTrue(systems.contains("Stanton"));
+    assertNotNull(materials);
+    assertTrue(materials.contains("Aluminum"));
+  }
+
+  @Test
+  void getMatrixData_ShouldTagTerminalsWithPlanetCssClass() {
+    // Arrange — three terminals: Hurston (canonical), unknown planet (hash fallback),
+    // no planet at all (Lagrange-style, must land in planet-unknown and sort to the tail).
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+
+    when(backendApiClient.getCached(
+            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(matrixPage());
+
+    // Act
+    MatrixGridDto grid = controller.getMatrixData();
+
+    // Assert
+    assertNotNull(grid);
+    Map<String, String> classByTerminal = new java.util.HashMap<>();
+    for (MatrixGridDto.Column col : grid.terminals()) {
+      classByTerminal.put(col.name(), col.planetCssClass());
+    }
+    assertEquals("planet-hurston", classByTerminal.get("HUR-L1"));
+    assertTrue(
+        classByTerminal.get("FAKE-1").startsWith("planet-hash-"),
+        "expected hash fallback for unknown planet, got: " + classByTerminal.get("FAKE-1"));
+    assertEquals(PlanetColorResolver.UNKNOWN_CLASS, classByTerminal.get("JP-Lagrange"));
+
+    // Sort assertion: terminals with a planet come before planet-less ones inside the same
+    // star system. HUR-L1 and FAKE-1 may swap depending on planet-name alphabetical order, but
+    // JP-Lagrange must be last.
+    assertEquals("JP-Lagrange", grid.terminals().get(grid.terminals().size() - 1).name());
+  }
+
+  @Test
+  void getMatrixData_ShouldReturnEmptyGridOnError() {
+    // Arrange
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+
+    when(backendApiClient.getCached(
+            startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+
+    // Act
+    MatrixGridDto grid = controller.getMatrixData();
+
+    // Assert — failures degrade to an empty grid so the client shows its no-results state.
+    assertNotNull(grid);
+    assertTrue(grid.terminals().isEmpty());
+    assertTrue(grid.groups().isEmpty());
+  }
+
+  @Test
+  void getMatrixOverview_ShouldHandleBackendError() {
+    // Arrange
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+
+    when(backendApiClient.getCached(
+            startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+
+    // Act
+    String viewName = controller.getMatrixOverview(model);
+
+    // Assert
+    assertEquals("materials-overview", viewName);
+    assertEquals("error.materials.matrix.load", model.getAttribute("error"));
+  }
+
+  /**
+   * Three single-material matrix rows across three Stanton terminals — Hurston (canonical planet),
+   * an unknown planet (hash-fallback tint), and a planet-less Lagrange jump point (sorts last).
+   *
+   * @return a one-page matrix response carrying the three rows
+   */
+  private static PageResponse<MaterialMatrixItemDto> matrixPage() {
     UUID matId = UUID.randomUUID();
     MaterialMatrixItemDto onHurston =
         new MaterialMatrixItemDto(
@@ -247,60 +339,7 @@ class MaterialsPageControllerTest {
             true,
             false,
             false);
-
-    PageResponse<MaterialMatrixItemDto> pageResponse =
-        new PageResponse<>(
-            List.of(onHurston, onUnknownPlanet, noPlanet),
-            0,
-            100000,
-            3,
-            1,
-            Collections.emptyList());
-
-    when(backendApiClient.get(
-            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
-        .thenReturn(pageResponse);
-
-    // Act
-    String viewName = controller.getMatrixOverview(null, null, false, false, false, model);
-
-    // Assert
-    assertEquals("materials-overview", viewName);
-    Collection<TerminalCol> terminals = (Collection<TerminalCol>) model.getAttribute("terminals");
-    assertNotNull(terminals);
-    Map<String, String> classByTerminal = new java.util.HashMap<>();
-    List<TerminalCol> ordered = new ArrayList<>(terminals);
-    for (TerminalCol term : ordered) {
-      classByTerminal.put(term.name(), term.planetCssClass());
-    }
-    assertEquals("planet-hurston", classByTerminal.get("HUR-L1"));
-    assertTrue(
-        classByTerminal.get("FAKE-1").startsWith("planet-hash-"),
-        "expected hash fallback for unknown planet, got: " + classByTerminal.get("FAKE-1"));
-    assertEquals(PlanetColorResolver.UNKNOWN_CLASS, classByTerminal.get("JP-Lagrange"));
-
-    // Sort assertion: terminals with a planet come before planet-less ones inside the same
-    // star system. HUR-L1 and FAKE-1 may swap depending on planet-name alphabetical order, but
-    // JP-Lagrange must be last.
-    assertEquals("JP-Lagrange", ordered.get(ordered.size() - 1).name());
-  }
-
-  @Test
-  void getMatrixOverview_ShouldHandleBackendError() {
-    // Arrange
-    BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
-    Model model = new ConcurrentModel();
-
-    when(backendApiClient.get(
-            startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
-        .thenThrow(new RuntimeException("backend down"));
-
-    // Act
-    String viewName = controller.getMatrixOverview(null, null, false, false, false, model);
-
-    // Assert
-    assertEquals("materials-overview", viewName);
-    assertEquals("error.materials.matrix.load", model.getAttribute("error"));
+    return new PageResponse<>(
+        List.of(onHurston, onUnknownPlanet, noPlanet), 0, 100000, 3, 1, Collections.emptyList());
   }
 }
