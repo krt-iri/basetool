@@ -36,7 +36,17 @@
 
     function endpoints() { return window.krtBlueprintsEndpoints || {}; }
 
-    function esc(v) { return window.escapeHtml ? window.escapeHtml(v) : (v == null ? '' : String(v)); }
+    // Escape HTML meta-characters on EVERY path (the fallback must sanitize too, so the
+    // value is never reinterpreted as HTML when written via innerHTML — CodeQL js/xss-through-dom).
+    function esc(v) {
+        if (window.escapeHtml) return window.escapeHtml(v);
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     function init() {
         searchInput = $('krt-bp-search-input');
