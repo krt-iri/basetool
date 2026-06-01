@@ -420,6 +420,30 @@ class MaterialClaimServiceTest {
 
       verify(materialClaimRepository).deleteAll(List.of(orphan));
     }
+
+    @Test
+    void withdrawOrphanedClaims_itemOrder_usesItemDerivedBuckets() {
+      // Phase 7 (#347): the orphan computation is kind-agnostic — for an ITEM order the surviving
+      // buckets come from the item-derived materials, not from a JobOrderMaterial list.
+      JobOrder order = new JobOrder();
+      order.setId(ORDER_ID);
+      order.setType(JobOrderType.ITEM);
+      order.setResponsibleOrgUnit(responsibleSk);
+      order.setStatus(JobOrderStatus.OPEN);
+      JobOrderItem item = new JobOrderItem();
+      // Only the GOOD bucket survives on the (edited) item order.
+      item.setMaterials(
+          new HashSet<>(Set.of(itemMaterial(material, QualityRequirement.GOOD, 10.0))));
+      order.setItems(new HashSet<>(Set.of(item)));
+      MaterialClaim live = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      MaterialClaim orphan = claim(order, QualityRequirement.NONE, squadronB, 2.0);
+      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
+          .thenReturn(List.of(live, orphan));
+
+      service.withdrawOrphanedClaimsWithinTransaction(order);
+
+      verify(materialClaimRepository).deleteAll(List.of(orphan));
+    }
   }
 
   // ---------------------------------------------------------------

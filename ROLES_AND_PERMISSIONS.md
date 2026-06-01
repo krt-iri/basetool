@@ -17,7 +17,7 @@
 > `SpecialCommandSecurityService.canManageMembers`-Gate), nichts mehr.
 > Officer behalten ihre squadron-internen Funktionen — Mission-Management,
 > Hangar-Schreibrechte (inklusive `resetAllFittedStatus`),
-> Refinery-Management und den cross-staffel-faehigen Job-Order-Workspace.
+> Refinery-Management und den (bedingt staffel-gescopten) Job-Order-Workflow.
 > Die `USER_MANAGE`-Authority bleibt aus historischen Gruenden Teil des
 > Officer-Rollensatzes in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java),
@@ -72,6 +72,8 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 | **Warenaufträge (Job Orders): Lesen / Erstellen** (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Warenaufträge (Job Orders): Bearbeiten** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Warenaufträge (Job Orders): Löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Job Orders: Verantwortliche Einheit umschreiben** (`hasRole('LOGISTICIAN')`; Admin frei, Staffel-Logistiker nur Eskalation Staffel→SK) | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Material-Eintragungen auf SK-Aufträgen: Eintragen / Ändern / Zurückziehen** (`hasRole('LOGISTICIAN')` + eigene Staffel via `canEditOrgUnit` / verantwortliches SK / Admin) | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Missionen: Erstellen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Missionen: Verwalten (Alle)** (`hasRole('MISSION_MANAGER')`) | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Missionen: Verwalten (Eigene/Delegiert)** (`canManageMission`) | ❌ | ✅ | ✅ | ✅ | ✅ |
@@ -94,4 +96,4 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 3. **Default Role:** Wird bei der Anmeldung keine bekannte Rolle aus Keycloak übermittelt oder dem User noch keine spezifische Rolle zugewiesen, erhält der Benutzer standardmäßig die Rolle **Guest**.
 4. **Logistiker-Flag:** Die Rolle `LOGISTICIAN` kann über das `is_logistician`-Flag in der `users`-Tabelle manuell vergeben werden, unabhängig von Keycloak-Rollen. Seit dem Phase-4-Lockdown des Multi-Squadron-Umbaus ausschließlich durch **Admins** (Officer haben keinen Zugriff mehr auf die Flag-Endpunkte; siehe `@PreAuthorize("hasRole('ADMIN')")` auf `UserController#patchLogistician`).
 5. **Missions-Manager-Flag:** Die Rolle `MISSION_MANAGER` kann über das `is_mission_manager`-Flag in der `users`-Tabelle manuell durch **Admins** vergeben werden, analog zur Logistiker-Rolle. Officer haben seit Phase 4 keinen Zugriff mehr (`UserController#patchMissionManager` ist `hasRole('ADMIN')`).
-6. **Multi-Squadron-Sichtbarkeit:** Lesepfade werden ueber [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) gefiltert. Nicht-Admins sehen ausschliesslich Daten ihrer eigenen Staffel; oeffentliche Missionen (`is_internal = false`) sind zusaetzlich cross-staffel sichtbar. Admins koennen ueber den Sidebar-Switcher (`PUT /api/v1/me/active-squadron`) den aktiven Kontext umschalten oder die "Alle Staffeln"-Sicht anwaehlen. Job-Orders sind per Design ein cross-staffel-Arbeitsbereich und werden in beiden Spalten (`creating_squadron_id` und `requesting_squadron_id`) gekennzeichnet, damit Auftraggeber und Ausfuehrender getrennt nachvollziehbar bleiben.
+6. **Multi-Squadron-Sichtbarkeit:** Lesepfade werden ueber [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) gefiltert. Nicht-Admins sehen ausschliesslich Daten ihrer eigenen Staffel; oeffentliche Missionen (`is_internal = false`) sind zusaetzlich cross-staffel sichtbar. Admins koennen ueber den Sidebar-Switcher (`PUT /api/v1/me/active-squadron`) den aktiven Kontext umschalten oder die "Alle Staffeln"-Sicht anwaehlen. Job-Orders sind seit dem Auftrags-Umbau (#340) **bedingt staffel-gescopt**: Ein von einem Spezialkommando bearbeiteter Auftrag (`responsible_org_unit_id` = SK) ist fuer alle Staffeln sichtbar (gemeinsame Warteschlange, auf die sich Staffeln per Material-Eintragung melden koennen), ein von einer Staffel bearbeiteter Auftrag nur fuer diese Staffel und Admins. Der Auftraggeber (`requesting_org_unit_id`) gewaehrt keine Sichtbarkeit. Die alte `creating_squadron_id`-Spalte entfaellt.

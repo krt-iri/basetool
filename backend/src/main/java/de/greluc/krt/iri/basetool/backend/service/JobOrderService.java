@@ -977,8 +977,17 @@ public class JobOrderService {
       }
     }
 
+    OrgUnit previous = jobOrder.getResponsibleOrgUnit();
     jobOrder.setResponsibleOrgUnit(target);
     jobOrder = jobOrderRepository.save(jobOrder);
+    // Audit (Phase 7, #347): identifiers + kinds only — no PII. MDC is attached per request.
+    log.info(
+        "Job order {} responsible org unit reassigned: {} ({}) → {} ({})",
+        jobOrder.getId(),
+        previous != null ? previous.getId() : null,
+        previous != null ? previous.getKind() : null,
+        target.getId(),
+        target.getKind());
 
     // Reconciliation (Phase 4 / #344, decision #10): an SK→Squadron de-escalation makes the order
     // private, so its public material claims are withdrawn. SK→SK keeps them (still public);

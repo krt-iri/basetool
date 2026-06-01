@@ -205,7 +205,17 @@ public class MaterialClaimService {
         .flatMap(userRepository::findById)
         .ifPresent(claim::setClaimedByUser);
 
-    return toClaimDto(materialClaimRepository.save(claim));
+    MaterialClaim saved = materialClaimRepository.save(claim);
+    // Audit (Phase 7, #347): identifiers + amount only — never names/emails. The request-scoped MDC
+    // (correlationId / userId / orgUnitId) is attached by CorrelationIdFilter.
+    log.info(
+        "Material claim upserted: order={} material={} quality={} claimingOrgUnit={} amount={}",
+        order.getId(),
+        dto.materialId(),
+        dto.qualityRequirement(),
+        dto.claimingOrgUnitId(),
+        amount);
+    return toClaimDto(saved);
   }
 
   /**
@@ -232,6 +242,13 @@ public class MaterialClaimService {
     }
     assertCanManage(order, claim.getClaimingOrgUnit().getId());
     materialClaimRepository.delete(claim);
+    log.info(
+        "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
+        jobOrderId,
+        claimId,
+        claim.getMaterial().getId(),
+        claim.getQualityRequirement(),
+        claim.getClaimingOrgUnit().getId());
   }
 
   /**
@@ -249,14 +266,26 @@ public class MaterialClaimService {
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId());
     if (!claims.isEmpty()) {
       materialClaimRepository.deleteAll(claims);
+      log.info(
+          "Withdrew all {} material claim(s) on order {} (SK→squadron de-escalation)",
+          claims.size(),
+          order.getId());
     }
   }
 
   /**
    * Reconciliation hook (decision #6): withdraws claims whose bucket no longer exists on the order,
-   * used after an order edit removes a material line (or, finalized in Phase 7, an item-derived
-   * bucket). Runs inside the edit transaction; deletes through the repository so the order's
-   * {@code @Version} is never touched.
+   * used after an order edit removes a bucket. The bucket computation ({@link #requiredByBucket})
+   * is kind-agnostic, so this withdraws orphans for both a {@code MATERIAL} order whose material
+   * line was removed (the live path, wired into {@code JobOrderService.updateJobOrder}) and an
+   * {@code ITEM} order whose derived buckets changed. ITEM orders are immutable after creation
+   * today (no edit endpoint — the detail UI gates editing to {@code type != 'ITEM'}), so the ITEM
+   * branch is dormant but ready for a future item-edit path; it is covered by unit tests against an
+   * ITEM-typed order so it cannot rot.
+   *
+   * <p>Runs inside the edit transaction and deletes through the repository so the order's
+   * {@code @Version} is never touched — claims are an independent aggregate, which is what keeps
+   * the bulk withdrawal free of the optimistic-locking traps in CLAUDE.md.
    *
    * @param order the managed order whose buckets define which claims survive.
    */
@@ -272,6 +301,10 @@ public class MaterialClaimService {
             .toList();
     if (!orphaned.isEmpty()) {
       materialClaimRepository.deleteAll(orphaned);
+      log.info(
+          "Withdrew {} orphaned material claim(s) on order {} after a bucket was removed",
+          orphaned.size(),
+          order.getId());
     }
   }
 

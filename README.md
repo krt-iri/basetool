@@ -47,7 +47,7 @@ single-sign-on via Keycloak and a clear role and permission model.
 - **Keycloak** — OAuth2 / OIDC identity provider, custom IRIDIUM theme.
 - **Redis** — Spring Session store; sessions survive frontend restarts.
 
-The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) carry an `owning_org_unit_id` FK that resolves to either kind. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `SPEZIALKOMMANDO_PLAN.md` for the full data model and the staged migration roadmap (V97–V105 implemented; the staged rollout ships in three deployable releases, see `SPEZIALKOMMANDO_PLAN.md` §10).
+The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; the strict staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` FK that resolves to either kind. **Job Orders are scoped differently** (see the Job-Order rework, parent issue #340): they carry a `responsible_org_unit_id` (the *processing* unit — a profit-eligible Squadron or SK, governs visibility) and a `requesting_org_unit_id` (the customer), and are conditionally scoped — an SK-responsible order is public to all squadrons (a shared queue that squadrons sign up for partial material *claims* against), a squadron-responsible order is private to that squadron + admins. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule. See `CLAUDE.md` ("Aggregate scope kinds") for the full per-aggregate scope model.
 
 ---
 
@@ -203,12 +203,14 @@ What changed at the data layer:
 * The five staffel-scoped aggregate roots —
   `mission` / `operation` / `ship` / `inventory_item` /
   `refinery_order` — gain an `owning_squadron_id` column.
-* `job_order` is intentionally cross-squadron and gains two columns:
-  `creating_squadron_id` (who authored the order; immutable) and
-  `requesting_squadron_id` (on whose behalf; editable). The legacy
-  `squadron` VARCHAR is still written as a safety net and will only be
-  dropped in a follow-up release per the two-phase drop rule in
-  [`backend/.../db/migration/README.md`](backend/src/main/resources/db/migration/README.md).
+* `job_order` started cross-squadron with `creating_squadron_id` +
+  `requesting_squadron_id`. **This was later reworked** (parent issue
+  #340): `creating` was dropped in favour of a `responsible_org_unit_id`
+  (the *processing* unit, which governs visibility), `requesting`
+  became `requesting_org_unit_id`, the order became conditionally scoped
+  (SK-responsible = public, squadron-responsible = private), and
+  squadrons can now sign up for partial material **claims**
+  (`material_claim`) on the public SK queue. See `CLAUDE.md`.
 
 What changed at the authorization layer:
 
@@ -241,8 +243,9 @@ strict `hasRole('ADMIN')` everywhere — Stammdaten / Member-Management /
 Announcements / UEX / System-Settings / Promotion-System. Officers
 keep every squadron-internal capability: mission management, hangar
 write (incl. `resetAllFittedStatus`), refinery, logistician via role
-hierarchy, and the cross-squadron Job Order workspace. The full
-matrix lives in
+hierarchy, and the Job Order workflow (now conditionally scoped —
+SK-responsible orders are a shared queue, squadron-responsible orders
+are private; see the Job-Order rework, #340). The full matrix lives in
 [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
 
 Mission visibility for guests / cross-squadron callers stays generous:

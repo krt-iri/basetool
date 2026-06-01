@@ -8,12 +8,15 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateClaimDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialClaimRepository;
@@ -168,6 +171,77 @@ class MaterialClaimIntegrationTest {
     assertThat(dto.materials()).hasSize(1);
     assertThat(dto.materials().get(0).openAmount()).isNull();
     assertThat(dto.materials().get(0).claims()).isEmpty();
+  }
+
+  @Test
+  void updateJobOrder_droppingABucket_withdrawsOrphanClaimsWithoutConflict() {
+    // Phase 7 (#347) end-to-end: editing an SK order to remove a material bucket auto-withdraws
+    // that
+    // bucket's claim (orphan reconciliation) while the surviving bucket's claim stays — and the
+    // delete never collides with the order's @Version (claims are an independent aggregate).
+    record Setup(UUID orderId, UUID matA, UUID matB, UUID sqA, UUID sqB) {}
+    Setup s =
+        transactionTemplate.execute(
+            st -> {
+              String tag = UUID.randomUUID().toString().substring(0, 8);
+              SpecialCommand sk = new SpecialCommand();
+              sk.setName("Orph-SK-" + tag);
+              sk.setShorthand("O" + tag.substring(0, 3));
+              sk.setProfitEligible(true);
+              sk = specialCommandRepository.save(sk);
+              Squadron sqA = new Squadron();
+              sqA.setName("Orph-A-" + tag);
+              sqA.setShorthand("A" + tag.substring(0, 3));
+              sqA = squadronRepository.save(sqA);
+              Squadron sqB = new Squadron();
+              sqB.setName("Orph-B-" + tag);
+              sqB.setShorthand("B" + tag.substring(0, 3));
+              sqB = squadronRepository.save(sqB);
+              Material matA = new Material();
+              matA.setName("OrphMatA-" + tag);
+              matA.setType(MaterialType.RAW);
+              matA = materialRepository.save(matA);
+              Material matB = new Material();
+              matB.setName("OrphMatB-" + tag);
+              matB.setType(MaterialType.RAW);
+              matB = materialRepository.save(matB);
+              JobOrder order =
+                  JobOrder.builder()
+                      .responsibleOrgUnit(sk)
+                      .requestingOrgUnit(sqA)
+                      .handle("orph")
+                      .status(JobOrderStatus.OPEN)
+                      .build();
+              order.addMaterial(
+                  JobOrderMaterial.builder().material(matA).minQuality(700).amount(10.0).build());
+              order.addMaterial(
+                  JobOrderMaterial.builder().material(matB).minQuality(700).amount(8.0).build());
+              order = jobOrderRepository.save(order);
+              return new Setup(order.getId(), matA.getId(), matB.getId(), sqA.getId(), sqB.getId());
+            });
+
+    materialClaimService.upsertClaim(
+        s.orderId(), new CreateClaimDto(s.matA(), QualityRequirement.GOOD, s.sqA(), 5.0));
+    materialClaimService.upsertClaim(
+        s.orderId(), new CreateClaimDto(s.matB(), QualityRequirement.GOOD, s.sqB(), 4.0));
+    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(s.orderId()))
+        .hasSize(2);
+
+    // Edit the order to keep only material A (drops material B's bucket).
+    CreateJobOrderDto update =
+        new CreateJobOrderDto(
+            null,
+            null,
+            "orph",
+            null,
+            List.of(new CreateJobOrderMaterialDto(s.matA(), 700, 10.0)),
+            null);
+    jobOrderService.updateJobOrder(s.orderId(), update);
+
+    List<MaterialClaim> remaining =
+        materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(s.orderId());
+    assertThat(remaining).hasSize(1);
+    assertThat(remaining.get(0).getMaterial().getId()).isEqualTo(s.matA());
   }
 
   private ClaimBucketDto onlyBucket(UUID orderId) {
