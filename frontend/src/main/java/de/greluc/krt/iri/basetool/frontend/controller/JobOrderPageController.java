@@ -1,6 +1,8 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ClaimDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateClaimDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemMaterialDto;
@@ -617,6 +619,68 @@ public class JobOrderPageController {
       return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to update status for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX create-or-update of a material claim ("Eintragung") on a public SK order (Phase 6, #346).
+   * Relays the payload to the backend's claim upsert and propagates its status code so the
+   * order-detail JS can show a clean toast — 400 (not an open SK order / unknown bucket /
+   * overclaim), 403 (may not act for the claiming squadron), 409 (concurrent claim modification) —
+   * instead of a stack trace. The coarse {@code hasRole('LOGISTICIAN')} gate here is the same one
+   * the backend carries; the fine per-squadron / responsible-SK matrix is enforced backend-side.
+   *
+   * @param id the order id.
+   * @param dto the claim payload (material, quality bucket, claiming squadron, amount).
+   * @return the persisted claim on success, or the propagated backend error status.
+   */
+  @PostMapping("/{id}/claims")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<ClaimDto> upsertClaim(
+      @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
+    try {
+      ClaimDto result =
+          backendApiClient.post("/api/v1/orders/" + id + "/claims", dto, ClaimDto.class);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.CREATED)
+          .body(result);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to upsert claim on order {}: {}", id, bse.getMessage());
+      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to upsert claim on order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX withdrawal of a material claim (Phase 6, #346). Relays to the backend's claim delete and
+   * propagates the status code (404 unknown claim, 400 terminal/non-SK order, 403 forbidden) for a
+   * clean toast.
+   *
+   * @param id the order id.
+   * @param claimId the claim to withdraw.
+   * @return 204 on success, or the propagated backend error status.
+   */
+  @PostMapping("/{id}/claims/{claimId}/withdraw")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Void> withdrawClaim(
+      @PathVariable UUID id, @PathVariable UUID claimId) {
+    try {
+      backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
+      return org.springframework.http.ResponseEntity.noContent().build();
+    } catch (BackendServiceException bse) {
+      log.error("Failed to withdraw claim {} on order {}: {}", claimId, id, bse.getMessage());
+      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to withdraw claim {} on order {}", claimId, id, e);
       return org.springframework.http.ResponseEntity.status(
               org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
           .build();

@@ -147,7 +147,7 @@
                     <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
-                <td th:if="${showClaims}" data-trigger="" onclick="event.stopPropagation();">
+                <td th:if="${showClaims}" data-claim-control>
                     <span th:if="${mat.claims == null or mat.claims.isEmpty()}" class="text-muted">&#8212;</span>
                     <span th:each="c : ${mat.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
                           th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
@@ -156,11 +156,33 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
+                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-claim-control data-trigger="claim-edit"
+                                style="background:none;border:none;color:var(--color-primary);cursor:pointer;padding:0 0.2rem;min-height:auto;"
+                                th:title="#{orders.claim.edit}"
+                                th:data-material-id="${mat.material.id}"
+                                th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
+                                th:data-material-name="${mat.material.name}"
+                                th:data-quantity-type="${mat.material.quantityType}"
+                                th:data-open="${mat.openAmount}"
+                                th:data-claim-id="${c.id}"
+                                th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
+                                th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
+                                th:data-amount="${c.amount}">&#9998;</button>
                     </span>
                 </td>
-                <td th:if="${showClaims}" th:switch="${mat.material.quantityType}">
-                    <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                <td th:if="${showClaims}" data-claim-control>
+                    <span th:switch="${mat.material.quantityType}">
+                        <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                        <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                    </span>
+                    <button th:if="${isLogistician}" type="button" class="btn btn-secondary btn-claim-add" data-claim-control data-trigger="claim-add"
+                            style="margin-left:0.5rem;padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                            th:data-material-id="${mat.material.id}"
+                            th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
+                            th:data-material-name="${mat.material.name}"
+                            th:data-quantity-type="${mat.material.quantityType}"
+                            th:data-open="${mat.openAmount}"
+                            th:text="#{orders.claim.add}">Eintragen</button>
                 </td>
                 <td>
                     <span th:if="${mat.currentStock >= mat.amount}" class="text-success" th:text="'✓ ' + #{orders.detail.status.fulfilled}">✓ Erfüllt</span>
@@ -262,11 +284,33 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
+                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-trigger="claim-edit"
+                                style="background:none;border:none;color:var(--color-primary);cursor:pointer;padding:0 0.2rem;min-height:auto;"
+                                th:title="#{orders.claim.edit}"
+                                th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
+                                th:data-quality="${agg.qualityRequirement}"
+                                th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                                th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                                th:data-open="${agg.openAmount}"
+                                th:data-claim-id="${c.id}"
+                                th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
+                                th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
+                                th:data-amount="${c.amount}">&#9998;</button>
                     </span>
                 </td>
-                <td th:if="${showClaims}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
-                    <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                    <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                <td th:if="${showClaims}">
+                    <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                        <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                        <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                    </span>
+                    <button th:if="${isLogistician}" type="button" class="btn btn-secondary btn-claim-add" data-trigger="claim-add"
+                            style="margin-left:0.5rem;padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                            th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
+                            th:data-quality="${agg.qualityRequirement}"
+                            th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                            th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                            th:data-open="${agg.openAmount}"
+                            th:text="#{orders.claim.add}">Eintragen</button>
                 </td>
             </tr>
             <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
@@ -532,6 +576,38 @@
         <div style="display: flex; gap: 1rem; justify-content: center;">
             <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="material-delete-confirm-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
             <button type="button" class="btn btn-outline-danger" data-trigger="od-confirm-remove-material" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
+        </div>
+    </div>
+</div>
+
+<!-- Claim ("Eintragung") create/edit modal (Phase 6, #346) — only rendered for logisticians+; the
+     backend still enforces the per-squadron / responsible-SK / admin matrix on the relayed call. -->
+<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="claim-modal" class="modal" style="display: none; z-index: 1060;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative;">
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="claim-modal">&times;</button>
+        <h3 id="claim-modal-title" style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: 'Ethnocentric', sans-serif; text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
+        <p id="claim-modal-bucket" class="text-muted" style="margin-bottom: 1.5rem;"></p>
+        <input type="hidden" id="claim-order-id" th:value="${order.id}">
+        <input type="hidden" id="claim-material-id">
+        <input type="hidden" id="claim-quality">
+        <input type="hidden" id="claim-id">
+        <input type="hidden" id="claim-max">
+        <div class="form-group mb-2">
+            <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>
+            <select id="claim-squadron" style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white; min-height: 44px;">
+                <option value="" th:text="#{orders.claim.squadron.choose}">Bitte wählen…</option>
+                <option th:each="s : ${squadrons}" th:value="${s.id}" th:text="${s.name}"></option>
+            </select>
+        </div>
+        <div class="form-group mb-2">
+            <label for="claim-amount" class="form-label" th:text="#{orders.claim.amount}">Menge</label>
+            <input type="number" id="claim-amount" step="0.001" min="0.001" style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white; min-height: 44px;">
+            <small id="claim-open-hint" class="text-muted"></small>
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; margin-top: 1.5rem;">
+            <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger" style="display: none; min-height: 44px;" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="claim-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+            <button type="button" id="claim-submit-btn" class="btn" style="min-height: 44px; background-color: var(--color-primary); color: #000; font-weight: 700;" data-trigger="claim-submit" th:text="#{orders.claim.submit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -908,6 +984,115 @@
     const MSG_STATUS_SUCCESS = '[(#{orders.status.update.success})]';
     const MSG_STATUS_ERROR   = '[(#{orders.status.update.error})]';
     const MSG_STATUS_CONFLICT = '[(#{orders.status.update.conflict})]';
+
+    // Material claim ("Eintragung") interaction (Phase 6, #346).
+    const MSG_CLAIM_TITLE_ADD = '[(#{orders.claim.modal.title.add})]';
+    const MSG_CLAIM_TITLE_EDIT = '[(#{orders.claim.modal.title.edit})]';
+    const MSG_CLAIM_MAX_HINT = '[(#{orders.claim.max})]';
+    const MSG_QUALITY_GOOD = '[(#{orders.detail.quality.good})]';
+    const MSG_QUALITY_NONE = '[(#{orders.detail.quality.none})]';
+    const MSG_CLAIM_SUCCESS = '[(#{orders.claim.success})]';
+    const MSG_CLAIM_WITHDRAW_SUCCESS = '[(#{orders.claim.withdraw.success})]';
+    const MSG_CLAIM_ERROR = '[(#{orders.claim.error})]';
+    const MSG_CLAIM_CONFLICT = '[(#{orders.claim.conflict})]';
+    const MSG_CLAIM_FORBIDDEN = '[(#{orders.claim.forbidden})]';
+    const MSG_CLAIM_VALIDATION_SQUADRON = '[(#{orders.claim.validation.squadron})]';
+    const MSG_CLAIM_VALIDATION_AMOUNT = '[(#{orders.claim.validation.amount})]';
+    const MSG_CLAIM_VALIDATION_OVERCLAIM = '[(#{orders.claim.validation.overclaim})]';
+
+    function _claimCsrf() {
+        return {
+            token: document.querySelector('meta[name="_csrf"]')?.content || '',
+            header: document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'
+        };
+    }
+
+    function _openClaimModal(opts) {
+        document.getElementById('claim-material-id').value = opts.materialId || '';
+        document.getElementById('claim-quality').value = opts.quality || '';
+        document.getElementById('claim-id').value = opts.claimId || '';
+        const sel = document.getElementById('claim-squadron');
+        const amountInput = document.getElementById('claim-amount');
+        const open = parseFloat(opts.open || '0') || 0;
+        const qualityLabel = opts.quality === 'GOOD' ? MSG_QUALITY_GOOD : MSG_QUALITY_NONE;
+        document.getElementById('claim-modal-bucket').textContent =
+            (opts.materialName || '') + ' — ' + qualityLabel;
+        if (opts.edit) {
+            document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_EDIT;
+            sel.value = opts.squadronId || '';
+            sel.disabled = true;
+            amountInput.value = opts.amount || '';
+            const maxEdit = open + (parseFloat(opts.amount || '0') || 0);
+            document.getElementById('claim-max').value = maxEdit;
+            document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + maxEdit;
+            document.getElementById('claim-withdraw-btn').style.display = '';
+        } else {
+            document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_ADD;
+            sel.value = '';
+            sel.disabled = false;
+            amountInput.value = '';
+            document.getElementById('claim-max').value = open;
+            document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + open;
+            document.getElementById('claim-withdraw-btn').style.display = 'none';
+        }
+        document.getElementById('claim-modal').style.display = 'flex';
+    }
+
+    function openClaimCreate(el) {
+        _openClaimModal({
+            materialId: el.dataset.materialId, quality: el.dataset.quality,
+            materialName: el.dataset.materialName, quantityType: el.dataset.quantityType,
+            open: el.dataset.open, edit: false
+        });
+    }
+
+    function openClaimEdit(el) {
+        _openClaimModal({
+            materialId: el.dataset.materialId, quality: el.dataset.quality,
+            materialName: el.dataset.materialName, quantityType: el.dataset.quantityType,
+            open: el.dataset.open, claimId: el.dataset.claimId,
+            squadronId: el.dataset.squadronId, amount: el.dataset.amount, edit: true
+        });
+    }
+
+    function submitClaim() {
+        const orderId = document.getElementById('claim-order-id').value;
+        const materialId = document.getElementById('claim-material-id').value;
+        const quality = document.getElementById('claim-quality').value;
+        const squadronId = document.getElementById('claim-squadron').value;
+        const amount = parseFloat(document.getElementById('claim-amount').value);
+        const max = parseFloat(document.getElementById('claim-max').value);
+        if (!squadronId) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_SQUADRON); return; }
+        if (!(amount > 0)) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_AMOUNT); return; }
+        if (amount > max + 1e-9) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_OVERCLAIM); return; }
+        const csrf = _claimCsrf();
+        fetch('/orders/' + orderId + '/claims', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
+            body: JSON.stringify({ materialId: materialId, qualityRequirement: quality, claimingOrgUnitId: squadronId, amount: amount })
+        }).then(res => {
+            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
+            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
+            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
+            showFrontendSuccessToast(MSG_CLAIM_SUCCESS); setTimeout(() => window.location.reload(), 800);
+        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+    }
+
+    function withdrawClaimAction() {
+        const orderId = document.getElementById('claim-order-id').value;
+        const claimId = document.getElementById('claim-id').value;
+        if (!claimId) { return; }
+        const csrf = _claimCsrf();
+        fetch('/orders/' + orderId + '/claims/' + claimId + '/withdraw', {
+            method: 'POST',
+            headers: { [csrf.header]: csrf.token }
+        }).then(res => {
+            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
+            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
+            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
+            showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS); setTimeout(() => window.location.reload(), 800);
+        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+    }
 
     let _pendingStatus = null;
     let _previousStatus = null;
@@ -1343,7 +1528,18 @@
     // in this script and the inline script higher up.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'od-update-status', function (el) { updateStatus(el); });
-        window.krtEvents.on('click', 'od-toggle-inventory', function (el) { toggleInventory(el); });
+        window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
+            // Skip the row inventory-toggle when the click originated on a claim control (the claim
+            // buttons live inside the clickable material row), so the modal opens without also
+            // expanding the inventory drill-down.
+            if (ev && ev.target && typeof ev.target.closest === 'function'
+                && ev.target.closest('[data-claim-control]')) { return; }
+            toggleInventory(el);
+        });
+        window.krtEvents.on('click', 'claim-add', function (el) { openClaimCreate(el); });
+        window.krtEvents.on('click', 'claim-edit', function (el) { openClaimEdit(el); });
+        window.krtEvents.on('click', 'claim-submit', function () { submitClaim(); });
+        window.krtEvents.on('click', 'claim-withdraw', function () { withdrawClaimAction(); });
         window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
         window.krtEvents.on('click', 'od-download-report', function (el) { downloadHandoverReport(el); });
         window.krtEvents.on('click', 'od-download-item-report', function (el) { downloadItemHandoverReport(el); });
