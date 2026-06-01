@@ -64,6 +64,25 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   private static final int COMPOSE_UP_ATTEMPTS = 2;
 
+  /** Max time to wait for one {@code docker compose pull} attempt of the external images. */
+  private static final Duration PULL_TIMEOUT = Duration.ofMinutes(5);
+
+  /**
+   * How many times to attempt the registry pull of the external (non-built) images before giving
+   * up. The pull is split out from {@code up --build} because a registry blip (e.g. a {@code
+   * quay.io} 502 while fetching the Keycloak image) is transient and cheap to retry on its own,
+   * whereas re-running the whole {@code up --build} just to re-pull would rebuild the images first.
+   * Several attempts with a growing back-off ride out a multi-minute registry outage.
+   */
+  private static final int PULL_ATTEMPTS = 4;
+
+  /**
+   * Base back-off slept between pull / up retries, multiplied by the attempt number so successive
+   * waits grow (15s, 30s, 45s, …) and give a transient registry or Maven Central outage time to
+   * clear instead of hammering it back-to-back.
+   */
+  private static final Duration RETRY_BACKOFF = Duration.ofSeconds(15);
+
   /** Max time to wait for {@code docker compose down}. */
   private static final Duration DOWN_TIMEOUT = Duration.ofMinutes(3);
 
@@ -86,6 +105,15 @@ public final class E2eStackExtension implements BeforeAllCallback {
           "redis-dev",
           "backend-dev",
           "frontend-dev");
+
+  /**
+   * The external services whose images are pulled from a registry ({@code db-backend-dev}, {@code
+   * db-keycloak-dev}, {@code keycloak-dev}, {@code redis-dev}). {@code backend-dev} / {@code
+   * frontend-dev} are deliberately excluded: they are built from local Dockerfiles and tagged with
+   * {@link #IMAGE_TAG}, so {@code docker compose pull} of them would fail against the registry.
+   */
+  private static final List<String> PULLED_SERVICES =
+      List.of("db-backend-dev", "db-keycloak-dev", "keycloak-dev", "redis-dev");
 
   /** Guards one-time start across multiple test classes sharing this extension. */
   private static volatile boolean started = false;
@@ -133,6 +161,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
       Path root = repoRoot();
       stageRealm(root);
       ensureKeystore(root);
+      prePullImages(root);
       composeUp(root);
       // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
       // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
@@ -264,10 +293,54 @@ public final class E2eStackExtension implements BeforeAllCallback {
               "[E2E] compose up failed (attempt %d of %d); tearing down and retrying.%n%s%n",
               attempt, COMPOSE_UP_ATTEMPTS, up.getMessage());
           composeDown(root);
+          sleepBackoff(attempt);
         }
       }
     }
     throw lastFailure;
+  }
+
+  /**
+   * Pulls the external (non-built) service images up front, retrying up to {@link #PULL_ATTEMPTS}
+   * times with a growing back-off. Splitting the registry pull out of {@code up --build --wait}
+   * means a transient registry fault (e.g. a {@code quay.io} 502 on the Keycloak image) is retried
+   * cheaply on its own; once the images are cached in the local daemon the subsequent {@code up
+   * --build} reuses them instead of pulling again under the same flaky window.
+   *
+   * @param root the repository root the compose files live in
+   * @throws Exception if every pull attempt exits non-zero or times out
+   */
+  private void prePullImages(Path root) throws Exception {
+    Exception lastFailure = null;
+    for (int attempt = 1; attempt <= PULL_ATTEMPTS; attempt++) {
+      try {
+        runProcess(root, "compose-pull", composeCommand("pull"), throwawayEnv(), PULL_TIMEOUT);
+        return;
+      } catch (Exception pull) {
+        lastFailure = pull;
+        if (attempt < PULL_ATTEMPTS) {
+          System.out.printf(
+              "[E2E] image pull failed (attempt %d of %d); retrying.%n%s%n",
+              attempt, PULL_ATTEMPTS, pull.getMessage());
+          sleepBackoff(attempt);
+        }
+      }
+    }
+    throw lastFailure;
+  }
+
+  /**
+   * Sleeps a back-off proportional to the just-failed attempt number ({@link #RETRY_BACKOFF} times
+   * {@code attempt}) so successive retries wait progressively longer, riding out a multi-minute
+   * registry or Maven Central outage rather than hammering it back-to-back.
+   *
+   * @param attempt the 1-based number of the attempt that just failed
+   * @throws InterruptedException if the thread is interrupted while sleeping
+   */
+  private static void sleepBackoff(int attempt) throws InterruptedException {
+    Duration wait = RETRY_BACKOFF.multipliedBy(attempt);
+    System.out.printf("[E2E] waiting %ds before next attempt.%n", wait.toSeconds());
+    Thread.sleep(wait.toMillis());
   }
 
   /**
@@ -311,7 +384,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Assembles a {@code docker compose -f ... --profile dev <verb> ...} command line for the given
-   * verb and trailing arguments. {@code up} variants get the explicit service list appended.
+   * verb and trailing arguments.
+   *
+   * <p>{@code up} / {@code logs} get the full service list appended; {@code pull} gets only the
+   * external, registry-sourced services ({@link #PULLED_SERVICES}).
    *
    * @param verbAndArgs the compose verb followed by its flags (e.g. {@code "up","-d","--build"})
    * @return the full argument vector to hand to {@link ProcessBuilder}
@@ -325,9 +401,13 @@ public final class E2eStackExtension implements BeforeAllCallback {
     cmd.add("--profile");
     cmd.add("dev");
     cmd.addAll(List.of(verbAndArgs));
-    // Scope `up` and `logs` to the explicit service list (npm is intentionally excluded).
+    // Scope `up` and `logs` to the explicit service list (npm is intentionally excluded); scope
+    // `pull` to only the external, registry-sourced images (the built services have no pullable
+    // tag).
     if ("up".equals(verbAndArgs[0]) || "logs".equals(verbAndArgs[0])) {
       cmd.addAll(SERVICES);
+    } else if ("pull".equals(verbAndArgs[0])) {
+      cmd.addAll(PULLED_SERVICES);
     }
     return cmd;
   }
