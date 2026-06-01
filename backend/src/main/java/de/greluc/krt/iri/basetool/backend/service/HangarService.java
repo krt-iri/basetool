@@ -65,15 +65,19 @@ public class HangarService {
   }
 
   /**
-   * Adds a ship to a user's hangar. The ship's owning squadron is derived from the user's home
-   * squadron at the time of the call - subsequent user-squadron moves do NOT cascade to existing
-   * ships (a ship physically belongs to whichever squadron it was added in).
+   * Adds a ship to a user's hangar. The ship's owning org unit is derived from the user's
+   * membership (honouring the optional picker output) at the time of the call - subsequent org-unit
+   * moves do NOT cascade to existing ships (a ship physically belongs to whichever org unit it was
+   * added in). A user with no org-unit membership and no explicit picker output produces an
+   * ownerless personal ship ({@code owningOrgUnit == null}), visible only to that user (see {@link
+   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable}).
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location)
    * @return the persisted ship
    * @throws NotFoundException when the user id does not resolve
-   * @throws BadRequestException when the ship type or location id is missing/invalid
+   * @throws BadRequestException when the ship type or location id is missing/invalid, or the picker
+   *     output references an org unit the user does not belong to
    */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
@@ -85,7 +89,7 @@ public class HangarService {
     ship.setFitted(dto.fitted());
     ship.setOwner(user);
     ship.setOwningOrgUnit(
-        ownerScopeService.resolveOrgUnitForPickerOutput(user, dto.owningOrgUnitId()));
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId()));
     ship.setShipType(
         shipTypeRepository
             .findById(dto.shipTypeId())

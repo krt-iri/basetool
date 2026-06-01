@@ -234,13 +234,15 @@ public class HangarImportService {
         for (int i = 0; i < toCreate; i++) {
           Ship ship = new Ship();
           ship.setOwner(user);
-          // Stamp owning org-unit through the shared picker resolver — same contract as
-          // HangarService.addShip's create path. V99 makes `ship.owning_org_unit_id` NOT NULL,
-          // so the import path must populate it explicitly. The import flow has no picker UI;
-          // passing {@code null} for the picker output triggers the resolver's "auto-stamp the
-          // single membership" branch — multi-membership importers surface as a clean 400 from
-          // the resolver until a per-import picker is added (post-SK §5.5 stamping wave).
-          ship.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(user, null));
+          // Stamp owning org-unit through the shared nullable picker resolver — same contract as
+          // HangarService.addShip's create path. The import flow has no picker UI; passing
+          // {@code null} for the picker output triggers the resolver's "auto-stamp the single
+          // membership" branch for a single-membership importer, yields an ownerless personal ship
+          // ({@code owningOrgUnit == null}) for a membershipless importer (V132 made the column
+          // nullable for exactly this), and surfaces a multi-membership importer as a clean 400
+          // until a per-import picker is added (post-SK §5.5 stamping wave).
+          ship.setOwningOrgUnit(
+              ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null));
           ship.setShipType(shipType);
           ship.setInsurance(insurance);
           ship.setFitted(false);

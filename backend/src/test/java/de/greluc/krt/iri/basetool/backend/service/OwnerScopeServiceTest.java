@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +22,7 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -30,6 +32,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
@@ -68,6 +71,7 @@ class OwnerScopeServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
+  @Mock private ShipRepository shipRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   @Mock
@@ -543,6 +547,122 @@ class OwnerScopeServiceTest {
   }
 
   /**
+   * Null-owner gate behaviour for the three ownerless-personal-aggregate roots (ship, refinery
+   * order, inventory item). A row with {@code owningOrgUnit == null} is reachable only by its own
+   * owning user or by an admin in all-scopes mode — never by a foreign user or a pinned admin. See
+   * {@code OwnerScopeService.canAccessOwnerlessPersonalRow}.
+   */
+  @Nested
+  class OwnerlessPersonalAggregateGateTests {
+
+    private Ship ownerlessShip(User owner) {
+      Ship ship = new Ship();
+      ship.setId(UUID.randomUUID());
+      ship.setOwner(owner);
+      ship.setOwningOrgUnit(null);
+      return ship;
+    }
+
+    private RefineryOrder ownerlessRefineryOrder(User owner) {
+      RefineryOrder order = new RefineryOrder();
+      order.setId(UUID.randomUUID());
+      order.setOwner(owner);
+      order.setOwningOrgUnit(null);
+      return order;
+    }
+
+    private InventoryItem ownerlessInventoryItem(User owner) {
+      InventoryItem item = new InventoryItem();
+      item.setId(UUID.randomUUID());
+      item.setUser(owner);
+      item.setOwningOrgUnit(null);
+      return item;
+    }
+
+    @Test
+    void owner_seesAndEditsOwnOwnerlessShip() {
+      Ship ship = ownerlessShip(memberUserInA);
+      when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canSeeShip(ship.getId()));
+      assertTrue(service.canEditShip(ship.getId()));
+    }
+
+    @Test
+    void adminInAllScopesMode_seesOwnerlessShip() {
+      Ship ship = ownerlessShip(memberUserInA);
+      when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(service.canSeeShip(ship.getId()));
+      assertTrue(service.canEditShip(ship.getId()));
+    }
+
+    @Test
+    void adminPinnedToSquadron_doesNotSeeOwnerlessShip() {
+      // A pinned admin is scoped like any member; an ownerless row has no scope to match, and the
+      // pinned admin is not the owner, so access is denied (it would still be reachable by clearing
+      // the pin → all-scopes mode).
+      Ship ship = ownerlessShip(memberUserInA);
+      when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+      when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+      assertFalse(service.canSeeShip(ship.getId()));
+      assertFalse(service.canEditShip(ship.getId()));
+    }
+
+    @Test
+    void owner_seesAndEditsOwnOwnerlessRefineryOrder() {
+      RefineryOrder order = ownerlessRefineryOrder(memberUserInA);
+      when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canSeeRefineryOrder(order.getId()));
+      assertTrue(service.canEditRefineryOrder(order.getId()));
+    }
+
+    @Test
+    void foreignUser_cannotSeeOwnerlessRefineryOrder() {
+      RefineryOrder order = ownerlessRefineryOrder(memberUserInA);
+      when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+      assertFalse(service.canSeeRefineryOrder(order.getId()));
+      assertFalse(service.canEditRefineryOrder(order.getId()));
+    }
+
+    @Test
+    void owner_seesAndEditsOwnOwnerlessInventoryItem() {
+      InventoryItem item = ownerlessInventoryItem(memberUserInA);
+      when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canSeeInventoryItem(item.getId()));
+      assertTrue(service.canEditInventoryItem(item.getId()));
+    }
+
+    @Test
+    void foreignUser_cannotSeeOwnerlessInventoryItem() {
+      InventoryItem item = ownerlessInventoryItem(memberUserInA);
+      when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+      assertFalse(service.canSeeInventoryItem(item.getId()));
+      assertFalse(service.canEditInventoryItem(item.getId()));
+    }
+  }
+
+  /**
    * Verifies the request-scoped memoisation on {@link OwnerScopeService#currentSquadronId()} and
    * {@link OwnerScopeService#currentSquadron()}. Without this, every controller call chain on a
    * non-admin request would re-hit the {@code org_unit_membership} lookup and {@code
@@ -834,6 +954,62 @@ class OwnerScopeServiceTest {
         assertThrows(
             BadRequestException.class, () -> service.resolveOrgUnitForPickerOutput(user, null));
     assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
+  }
+
+  // --- resolveOrgUnitForPickerOutputNullable (ownerless-personal-aggregate variant: a
+  // membershipless user with no explicit picker output resolves to null instead of a 400; every
+  // other matrix branch is delegated to the same shared tail as the strict resolver) ---
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_noMembership_nullPicker_returnsNull() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
+
+    assertNull(service.resolveOrgUnitForPickerOutputNullable(user, null));
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_noMembership_withPicker_throwsBadRequest() {
+    // A membershipless user cannot claim ownership of an org unit they do not belong to — a
+    // non-null picker output is still a foreign-org-unit forgery, even though the null-picker case
+    // is now allowed (ownerless).
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.resolveOrgUnitForPickerOutputNullable(user, UUID.randomUUID()));
+    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_singleMembership_nullPicker_autoStamps() {
+    Squadron homeStaffel = new Squadron();
+    UUID homeStaffelId = UUID.randomUUID();
+    homeStaffel.setId(homeStaffelId);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
+    when(squadronRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
+
+    assertSame(homeStaffel, service.resolveOrgUnitForPickerOutputNullable(user, null));
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_foreignChoice_throwsBadRequest() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    UUID homeStaffelId = UUID.randomUUID();
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> service.resolveOrgUnitForPickerOutputNullable(user, UUID.randomUUID()));
   }
 
   @Nested

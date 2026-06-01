@@ -1171,7 +1171,7 @@ class InventoryItemServiceTest {
 
     Squadron resolved = new Squadron();
     resolved.setId(pickedOrgUnitId);
-    when(ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(resolved);
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
@@ -1208,7 +1208,7 @@ class InventoryItemServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
-    when(ownerScopeService.resolveOrgUnitForPickerOutput(user, foreignOrgUnitId))
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, foreignOrgUnitId))
         .thenThrow(new BadRequestException("not a membership"));
 
     assertThrows(

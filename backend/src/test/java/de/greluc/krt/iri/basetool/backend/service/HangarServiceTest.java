@@ -192,7 +192,8 @@ class HangarServiceTest {
         .thenReturn(java.util.Optional.of(user));
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
-    org.mockito.Mockito.when(ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
+    org.mockito.Mockito.when(
+            ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(resolved);
     org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
         .thenAnswer(i -> i.getArguments()[0]);
@@ -205,6 +206,40 @@ class HangarServiceTest {
     org.junit.jupiter.api.Assertions.assertSame(
         resolved,
         saved.getOwningOrgUnit(),
-        "picker output must flow through OwnerScopeService.resolveOrgUnitForPickerOutput");
+        "picker output must flow through OwnerScopeService.resolveOrgUnitForPickerOutputNullable");
+  }
+
+  @Test
+  void addShip_membershiplessUser_savesOwnerlessShip() {
+    // A user with no org-unit membership (and no picker output) gets a null owning org unit from
+    // the resolver — V132 made the column nullable so the ship persists as an ownerless personal
+    // ship instead of failing the create with a 400.
+    UUID userId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+    de.greluc.krt.iri.basetool.backend.model.User user =
+        new de.greluc.krt.iri.basetool.backend.model.User();
+    user.setId(userId);
+    de.greluc.krt.iri.basetool.backend.model.ShipType shipType =
+        new de.greluc.krt.iri.basetool.backend.model.ShipType();
+    shipType.setId(shipTypeId);
+
+    org.mockito.Mockito.when(userRepository.findById(userId))
+        .thenReturn(java.util.Optional.of(user));
+    org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
+        .thenReturn(java.util.Optional.of(shipType));
+    org.mockito.Mockito.when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null))
+        .thenReturn(null);
+    org.mockito.Mockito.when(shipRepository.save(any(Ship.class)))
+        .thenAnswer(i -> i.getArguments()[0]);
+
+    ShipRequestDto request =
+        new ShipRequestDto("Ownerless Ship", shipTypeId, "LTI", null, false, null, null);
+
+    Ship saved = hangarService.addShip(userId, request);
+
+    org.junit.jupiter.api.Assertions.assertNull(
+        saved.getOwningOrgUnit(), "a membershipless user's ship must be ownerless (null org unit)");
+    org.junit.jupiter.api.Assertions.assertSame(
+        user, saved.getOwner(), "the ship is still attributable through its per-user owner");
   }
 }

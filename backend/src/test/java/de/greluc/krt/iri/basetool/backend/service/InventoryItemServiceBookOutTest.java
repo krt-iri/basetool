@@ -651,7 +651,7 @@ class InventoryItemServiceBookOutTest {
     org.mockito.Mockito.when(userRepository.findById(targetUserId))
         .thenReturn(java.util.Optional.of(targetUser));
     org.mockito.Mockito.when(
-            ownerScopeService.resolveOrgUnitForPickerOutput(targetUser, pickedOrgUnitId))
+            ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
         .thenReturn(picked);
     org.mockito.ArgumentCaptor<de.greluc.krt.iri.basetool.backend.model.InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(
@@ -679,7 +679,7 @@ class InventoryItemServiceBookOutTest {
     org.junit.jupiter.api.Assertions.assertSame(
         picked,
         newRow.getOwningOrgUnit(),
-        "picker output must flow through resolveOrgUnitForPickerOutput on the new row");
+        "picker output must flow through resolveOrgUnitForPickerOutputNullable on the new row");
   }
 
   private static InventoryItemDto sentinelDto(Double amount) {

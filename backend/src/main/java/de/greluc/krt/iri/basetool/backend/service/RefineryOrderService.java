@@ -171,10 +171,11 @@ public class RefineryOrderService {
    * @param order transient entity with shallow id-only references
    * @param owningOrgUnitId optional R5.d picker output: the {@link
    *     de.greluc.krt.iri.basetool.backend.model.OrgUnit} on whose stock the new order should land.
-   *     When {@code null}, the service stamps the order owner's home Staffel (legacy behaviour).
-   *     When non-null, must point at an org unit the order owner is a member of — {@link
-   *     OwnerScopeService#resolveSquadronForPickerOutput} performs the validation and rejects
-   *     unknown / foreign / Spezialkommando selections with {@link
+   *     When {@code null}, the service auto-stamps the owner's single org-unit membership, or — if
+   *     the owner has no membership at all — leaves the order ownerless ({@code owningOrgUnit ==
+   *     null}, visible only to the owner). When non-null, must point at an org unit the order owner
+   *     is a member of — {@link OwnerScopeService#resolveOrgUnitForPickerOutputNullable} performs
+   *     the validation and rejects unknown / foreign selections with {@link
    *     de.greluc.krt.iri.basetool.backend.exception.BadRequestException}.
    * @return the persisted order
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
@@ -195,7 +196,8 @@ public class RefineryOrderService {
                         "error.user.not_found"));
 
     order.setOwner(user);
-    order.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(user, owningOrgUnitId));
+    order.setOwningOrgUnit(
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId));
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
@@ -587,15 +589,17 @@ public class RefineryOrderService {
       } else {
         InventoryItem item = new InventoryItem();
         item.setUser(assignee);
-        // R6.b: route the stamp through OwnerScopeService, which reads the assignee's
-        // Staffel membership from org_unit_membership (post-R9 D3 / V101). The store form has
-        // no owner picker (refinery STORE is admin-driven and predates the R5.d picker wave),
-        // so {@code owningOrgUnitId} is passed as {@code null} — the resolver auto-stamps when
-        // the assignee has exactly one org-unit membership (today's 100% case) and surfaces a
-        // clean 400 ("owningOrgUnitId is required") for multi-membership assignees. The latter
-        // case currently can't be resolved from the UI; widening the store form with a
-        // per-output picker is tracked as a follow-up to the SK §5.5 stamping wave.
-        item.setOwningOrgUnit(ownerScopeService.resolveOrgUnitForPickerOutput(assignee, null));
+        // R6.b: route the stamp through OwnerScopeService, which reads the assignee's membership
+        // from org_unit_membership. The store form has no owner picker (refinery STORE is
+        // admin-driven and predates the R5.d picker wave), so {@code owningOrgUnitId} is passed as
+        // {@code null} — the resolver auto-stamps when the assignee has exactly one org-unit
+        // membership (today's 100% case), yields an ownerless personal item ({@code owningOrgUnit
+        // == null}, V132) when the assignee has none, and surfaces a clean 400 ("owningOrgUnitId is
+        // required") for multi-membership assignees. The multi-membership case currently can't be
+        // resolved from the UI; widening the store form with a per-output picker is tracked as a
+        // follow-up to the SK §5.5 stamping wave.
+        item.setOwningOrgUnit(
+            ownerScopeService.resolveOrgUnitForPickerOutputNullable(assignee, null));
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);

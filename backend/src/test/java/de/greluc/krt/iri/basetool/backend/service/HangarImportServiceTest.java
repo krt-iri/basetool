@@ -70,7 +70,7 @@ class HangarImportServiceTest {
         new de.greluc.krt.iri.basetool.backend.model.Squadron();
     stubSquadron.setId(UUID.randomUUID());
     org.mockito.Mockito.lenient()
-        .when(ownerScopeService.resolveOrgUnitForPickerOutput(any(), any()))
+        .when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))
         .thenReturn(stubSquadron);
   }
 

@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -406,20 +407,89 @@ public class OwnerScopeService {
    * @throws BadRequestException per the matrix above.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
-    Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
-    // User.squadron column was dropped in R9 Step 5 / V101.
-    List<OrgUnitMembership> allMemberships =
-        orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
-    for (OrgUnitMembership m : allMemberships) {
-      memberOrgUnitIds.add(m.getId().getOrgUnitId());
-    }
-
+    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
     if (memberOrgUnitIds.isEmpty()) {
       throw new BadRequestException(
           "User has no org-unit membership — cannot stamp an aggregate owner");
     }
+    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId);
+  }
 
+  /**
+   * Nullable-owner variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the three
+   * <em>ownerless-personal-aggregate</em> roots (ship, refinery order, inventory item). Behaves
+   * identically to the strict resolver, with one carve-out: a {@code targetUser} who belongs to no
+   * org unit <em>and</em> supplied no explicit picker output resolves to {@code null} instead of a
+   * 400. That {@code null} is a legal owner for these three aggregates — V132 dropped the {@code
+   * NOT NULL} on their {@code owning_org_unit_id} column precisely so a membershipless user can
+   * still add a ship, raise a refinery order, or record inventory. The row is then attributable
+   * through its own per-user owner column ({@code ship.owner} / {@code refinery_order.owner} /
+   * {@code inventory_item.user}) and is scoped to that user only — see {@link #canSeeShip(UUID)},
+   * {@link #canSeeRefineryOrder(UUID)}, {@link #canSeeInventoryItem(UUID)}.
+   *
+   * <p>The carve-out is deliberately narrow: a membershipless user who nonetheless supplies a
+   * non-null {@code owningOrgUnitId} is still rejected — they cannot claim ownership of an org unit
+   * they do not belong to. Every other branch of the SPEZIALKOMMANDO_PLAN.md §5.5.1 matrix (1 /
+   * &gt;1 memberships; valid / foreign / multi-membership-null choice) is unchanged from the strict
+   * resolver.
+   *
+   * @param targetUser the user whose memberships gate the picker output; never {@code null}.
+   * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} when the picker was not
+   *     used.
+   * @return the resolved {@link OrgUnit}, or {@code null} when {@code targetUser} has no membership
+   *     and supplied no explicit choice (the ownerless-personal-aggregate case).
+   * @throws BadRequestException for every non-ownerless rejection branch of the §5.5.1 matrix,
+   *     including a membershipless user who supplied a non-null (therefore foreign) choice.
+   */
+  @Nullable
+  public OrgUnit resolveOrgUnitForPickerOutputNullable(
+      @NotNull User targetUser, UUID owningOrgUnitId) {
+    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
+    if (memberOrgUnitIds.isEmpty()) {
+      if (owningOrgUnitId == null) {
+        return null;
+      }
+      throw new BadRequestException(
+          "Selected owner org unit is not a membership of the target user");
+    }
+    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId);
+  }
+
+  /**
+   * Collects the distinct org-unit ids {@code targetUser} belongs to from the single authoritative
+   * {@code org_unit_membership} source (Staffel and SK rows alike). Insertion order is preserved
+   * via {@link LinkedHashSet} so the single-membership auto-stamp in {@link #resolveStampedOrgUnit}
+   * is deterministic.
+   *
+   * @param targetUser the user whose memberships to read; never {@code null}.
+   * @return the (possibly empty) set of org-unit ids the user is a member of.
+   */
+  @NotNull
+  private Set<UUID> collectMemberOrgUnitIds(@NotNull User targetUser) {
+    Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
+    for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId())) {
+      memberOrgUnitIds.add(m.getId().getOrgUnitId());
+    }
+    return memberOrgUnitIds;
+  }
+
+  /**
+   * Applies the §5.5.1 picker-output matrix for a user known to have at least one membership, then
+   * resolves the chosen id to its concrete {@link OrgUnit} subtype (Staffel via {@link
+   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}). Shared tail of
+   * {@link #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
+   * #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership branch differs
+   * between the two callers and is handled by each before delegating here.
+   *
+   * @param memberOrgUnitIds the caller's non-empty membership set.
+   * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
+   *     path.
+   * @return the resolved {@link OrgUnit}; never {@code null}.
+   * @throws BadRequestException on a foreign choice, a &gt;1-membership {@code null} choice, or a
+   *     resolved id that no longer exists in either repository.
+   */
+  @NotNull
+  private OrgUnit resolveStampedOrgUnit(@NotNull Set<UUID> memberOrgUnitIds, UUID owningOrgUnitId) {
     UUID stampedOrgUnitId;
     if (owningOrgUnitId == null) {
       if (memberOrgUnitIds.size() == 1) {
@@ -707,9 +777,44 @@ public class OwnerScopeService {
   }
 
   /**
+   * Read/write access check for an <em>ownerless personal aggregate</em> row — a ship, refinery
+   * order, or inventory item whose {@code owningOrgUnit} is {@code null} because the creating user
+   * belongs to no org unit (see {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)}). Such a
+   * row has no org-unit scope to match, so it is reachable only by:
+   *
+   * <ul>
+   *   <li>an admin in all-scopes mode (no active pin) — mirrors the {@code isAdminAllScope}
+   *       short-circuit in the list queries, so a row an admin sees in the list stays openable;
+   *   <li>its own owning user — identified by comparing the row's per-user owner against the JWT
+   *       {@code sub}, which is the {@code app_user} primary key, so {@link
+   *       AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}.
+   * </ul>
+   *
+   * <p>An admin <em>with</em> an active pin is treated like any scoped caller and does NOT see
+   * ownerless rows — consistent with {@link #canSeeSquadron(UUID)} returning {@code false} for a
+   * pinned admin against a non-matching scope, and with the list queries excluding null-owner rows
+   * once {@code activeOrgUnitId} is set.
+   *
+   * @param owner the row's per-user owner ({@code ship.owner} / {@code refinery_order.owner} /
+   *     {@code inventory_item.user}); may be {@code null} defensively, which denies all non-admin
+   *     access.
+   * @return {@code true} iff the current caller may see/edit the ownerless personal row.
+   */
+  private boolean canAccessOwnerlessPersonalRow(@Nullable User owner) {
+    if (authHelper.isAdmin() && readActiveSquadronFromHeader().isEmpty()) {
+      return true;
+    }
+    return owner != null
+        && owner.getId() != null
+        && authHelper.currentUserId().map(uid -> uid.equals(owner.getId())).orElse(false);
+  }
+
+  /**
    * {@code true} iff the current principal may read inventory item {@code itemId} directly (the
    * Lager-direct path — NOT the Job-Order-Kontext path, which is ungated by design). Strict
-   * owning-squadron check. Non-existent ids return {@code false}.
+   * owning-squadron check for org-owned items; for an ownerless personal item ({@code owningOrgUnit
+   * == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in
+   * all-scopes mode). Non-existent ids return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the item.
@@ -717,15 +822,21 @@ public class OwnerScopeService {
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningOrgUnit() == null || canSeeSquadron(i.getOwningOrgUnit().getId()))
+        .map(
+            i ->
+                i.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(i.getUser())
+                    : canSeeSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
   /**
    * {@code true} iff the current principal may edit inventory item {@code itemId} directly. Strict
-   * owning-squadron check — Job-Order-Kontext handover writes are gated separately by {@code
-   * JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard. Non-existent ids
-   * return {@code false}.
+   * owning-squadron check for org-owned items — Job-Order-Kontext handover writes are gated
+   * separately by {@code JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id}
+   * guard. For an ownerless personal item ({@code owningOrgUnit == null}) it defers to {@link
+   * #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes mode).
+   * Non-existent ids return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the item.
@@ -733,13 +844,19 @@ public class OwnerScopeService {
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> i.getOwningOrgUnit() == null || canEditSquadron(i.getOwningOrgUnit().getId()))
+        .map(
+            i ->
+                i.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(i.getUser())
+                    : canEditSquadron(i.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
   /**
    * {@code true} iff the current principal may read refinery order {@code orderId}. Strict
-   * owning-squadron check (refinery is a strict-staffel aggregate without a public escape).
+   * owning-squadron check for org-owned orders (refinery is a strict-staffel aggregate without a
+   * public escape); for an ownerless personal order ({@code owningOrgUnit == null}) it defers to
+   * {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes mode).
    * Non-existent ids return {@code false}.
    *
    * @param orderId refinery order to inspect; never {@code null}.
@@ -748,13 +865,19 @@ public class OwnerScopeService {
   public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
+        .map(
+            o ->
+                o.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(o.getOwner())
+                    : canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
   /**
    * {@code true} iff the current principal may edit refinery order {@code orderId}. Strict
-   * owning-squadron check. Non-existent ids return {@code false}.
+   * owning-squadron check for org-owned orders; for an ownerless personal order ({@code
+   * owningOrgUnit == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only,
+   * plus admins in all-scopes mode). Non-existent ids return {@code false}.
    *
    * @param orderId refinery order to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the order.
@@ -762,7 +885,11 @@ public class OwnerScopeService {
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository
         .findById(orderId)
-        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
+        .map(
+            o ->
+                o.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(o.getOwner())
+                    : canEditSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
@@ -796,7 +923,9 @@ public class OwnerScopeService {
 
   /**
    * {@code true} iff the current principal may read ship {@code shipId}. Strict owning-squadron
-   * check (Hangar = strict eigene Staffel). Non-existent ids return {@code false}.
+   * check for org-owned ships (Hangar = strict eigene Staffel); for an ownerless personal ship
+   * ({@code owningOrgUnit == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)}
+   * (owner-only, plus admins in all-scopes mode). Non-existent ids return {@code false}.
    *
    * @param shipId ship to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the ship.
@@ -804,13 +933,19 @@ public class OwnerScopeService {
   public boolean canSeeShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningOrgUnit() == null || canSeeSquadron(s.getOwningOrgUnit().getId()))
+        .map(
+            s ->
+                s.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(s.getOwner())
+                    : canSeeSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
   /**
    * {@code true} iff the current principal may edit ship {@code shipId}. Strict owning-squadron
-   * check. Non-existent ids return {@code false}.
+   * check for org-owned ships; for an ownerless personal ship ({@code owningOrgUnit == null}) it
+   * defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes
+   * mode). Non-existent ids return {@code false}.
    *
    * @param shipId ship to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the ship.
@@ -818,7 +953,11 @@ public class OwnerScopeService {
   public boolean canEditShip(@NotNull UUID shipId) {
     return shipRepository
         .findById(shipId)
-        .map(s -> s.getOwningOrgUnit() == null || canEditSquadron(s.getOwningOrgUnit().getId()))
+        .map(
+            s ->
+                s.getOwningOrgUnit() == null
+                    ? canAccessOwnerlessPersonalRow(s.getOwner())
+                    : canEditSquadron(s.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 
