@@ -151,13 +151,15 @@ class LogisticianRoleTest {
   }
 
   /**
-   * #344 — an SK <b>lead</b> ({@code is_lead = true}) is automatically a logistician of its SK: the
-   * converter grants both the flat {@code ROLE_LOGISTICIAN} and the contextual {@code
-   * LOGISTICIAN@skId}, even when {@code is_logistician = false} on that membership. This mirrors
-   * how an Officer outranks the logistician of their own squadron and an admin outranks every role.
+   * #344 — an SK <b>lead</b> ({@code is_lead = true}) is automatically both a logistician and a
+   * mission manager of its SK: the converter grants the flat {@code ROLE_LOGISTICIAN} / {@code
+   * ROLE_MISSION_MANAGER} and the contextual {@code LOGISTICIAN@skId} / {@code
+   * MISSION_MANAGER@skId}, even when both membership flags are {@code false}. This mirrors how an
+   * Officer is logistician + mission manager of their own squadron and an admin outranks every
+   * role.
    */
   @Test
-  void converterPromotesSkLead_asSkLogistician() {
+  void converterPromotesSkLead_asSkLogisticianAndMissionManager() {
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -179,6 +181,9 @@ class LogisticianRoleTest {
         authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
         "An SK lead must get the flat ROLE_LOGISTICIAN.");
     assertTrue(
+        authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER")),
+        "An SK lead must get the flat ROLE_MISSION_MANAGER.");
+    assertTrue(
         authorities.stream()
             .anyMatch(
                 a ->
@@ -186,6 +191,14 @@ class LogisticianRoleTest {
                         && "LOGISTICIAN".equals(c.roleName())
                         && skId.equals(c.orgUnitId())),
         "An SK lead must get the contextual LOGISTICIAN authority on that SK.");
+    assertTrue(
+        authorities.stream()
+            .anyMatch(
+                a ->
+                    a instanceof OrgUnitContextualAuthority c
+                        && "MISSION_MANAGER".equals(c.roleName())
+                        && skId.equals(c.orgUnitId())),
+        "An SK lead must get the contextual MISSION_MANAGER authority on that SK.");
   }
 
   @Test
