@@ -34210,6 +34210,16 @@
           "totalQuantity" : {
             "type" : "number",
             "format" : "double"
+          },
+          "claims" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClaimDto"
+            }
+          },
+          "openAmount" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },
@@ -34225,6 +34235,34 @@
           },
           "scwikiKey" : {
             "type" : "string"
+          }
+        }
+      },
+      "ClaimDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "claimingOrgUnit" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claimedByUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "claimedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -34530,6 +34568,16 @@
             "format" : "double"
           },
           "currentStock" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claims" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClaimDto"
+            }
+          },
+          "openAmount" : {
             "type" : "number",
             "format" : "double"
           },
@@ -36096,34 +36144,6 @@
           }
         },
         "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
-      },
-      "ClaimDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "claimingOrgUnit" : {
-            "$ref" : "#/components/schemas/SquadronReferenceDto"
-          },
-          "amount" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "claimedByUserId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "claimedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
       },
       "JobOrderItemHandoverCreateDto" : {
         "type" : "object",

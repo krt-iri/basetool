@@ -711,6 +711,19 @@ public class JobOrderService {
   private JobOrderDto mapToDtoWithStock(JobOrder jobOrder) {
     JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
 
+    // Phase 5 (#345): on a public SK order, every material/aggregated bucket carries the
+    // per-squadron
+    // claims + open-remaining; private (squadron) orders carry none (claims empty, openAmount
+    // null),
+    // so the detail UI renders no claim columns for them.
+    Map<String, de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto> claimByBucket =
+        isSpecialCommandResponsible(jobOrder)
+            ? materialClaimService.getClaimBucketsForOrder(jobOrder).stream()
+                .collect(
+                    Collectors.toMap(
+                        b -> bucketKey(b.material().id(), b.qualityRequirement().name()), b -> b))
+            : Map.of();
+
     List<de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto> updatedMaterials =
         baseDto.materials().stream()
             .map(
@@ -727,12 +740,22 @@ public class JobOrderService {
                       stock,
                       matDto.amount(),
                       matDto.minQuality());
+                  // MATERIAL bucket quality mirrors aggregateMaterials(): a 700-floor is GOOD,
+                  // "Keine" (null minQuality) is NONE.
+                  String qualityName =
+                      matDto.minQuality() != null
+                          ? de.greluc.krt.iri.basetool.backend.model.QualityRequirement.GOOD.name()
+                          : de.greluc.krt.iri.basetool.backend.model.QualityRequirement.NONE.name();
+                  de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto bucket =
+                      claimByBucket.get(bucketKey(matDto.material().id(), qualityName));
                   return new de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto(
                       matDto.id(),
                       matDto.material(),
                       matDto.minQuality(),
                       matDto.amount(),
                       stock != null ? stock : 0.0,
+                      bucket != null ? bucket.claims() : List.of(),
+                      bucket != null ? bucket.openRemaining() : null,
                       matDto.version());
                 })
             .toList();
@@ -740,7 +763,7 @@ public class JobOrderService {
     boolean isItem = jobOrder.getType() == JobOrderType.ITEM;
     List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
     List<AggregatedMaterialDto> aggregatedMaterials =
-        isItem ? jobOrderItemService.aggregateMaterials(jobOrder) : List.of();
+        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket) : List.of();
     List<de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
         isItem
             ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
@@ -764,6 +787,63 @@ public class JobOrderService {
         itemHandovers,
         baseDto.createdAt(),
         baseDto.version());
+  }
+
+  /**
+   * Rebuilds the item order's aggregated-material rows with their per-bucket claims +
+   * open-remaining (Phase 5, #345). The base rows come from {@link
+   * JobOrderItemService#aggregateMaterials} with neutral claim fields; this overlays the SK claim
+   * view. For a non-SK order {@code claimByBucket} is empty, so every row keeps its empty claims /
+   * {@code null} open-amount.
+   *
+   * @param jobOrder the item order.
+   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders.
+   * @return the aggregated rows, claim-enriched.
+   */
+  private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
+      JobOrder jobOrder,
+      Map<String, de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto> claimByBucket) {
+    return jobOrderItemService.aggregateMaterials(jobOrder).stream()
+        .map(
+            agg -> {
+              de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto bucket =
+                  claimByBucket.get(
+                      bucketKey(agg.material().id(), agg.qualityRequirement().name()));
+              if (bucket == null) {
+                return agg;
+              }
+              return new AggregatedMaterialDto(
+                  agg.material(),
+                  agg.qualityRequirement(),
+                  agg.totalQuantity(),
+                  bucket.claims(),
+                  bucket.openRemaining());
+            })
+        .toList();
+  }
+
+  /**
+   * {@code true} iff the order is responsible to a Spezialkommando — the only orders that carry
+   * material claims (Phase 5, #345).
+   *
+   * @param jobOrder the order.
+   * @return whether the order is a public SK order.
+   */
+  private static boolean isSpecialCommandResponsible(JobOrder jobOrder) {
+    return jobOrder.getResponsibleOrgUnit() != null
+        && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
+  }
+
+  /**
+   * Builds the composite key identifying a material bucket ({@code materialId|QUALITY}) used to
+   * join claim buckets onto the material / aggregated rows.
+   *
+   * @param materialId the material id.
+   * @param qualityName the {@code GOOD}/{@code NONE} quality name.
+   * @return the composite bucket key.
+   */
+  private static String bucketKey(UUID materialId, String qualityName) {
+    return materialId + "|" + qualityName;
   }
 
   /**

@@ -14,6 +14,7 @@ import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateClaimDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
@@ -138,6 +139,35 @@ class MaterialClaimIntegrationTest {
     jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
 
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId())).isEmpty();
+  }
+
+  @Test
+  void getJobOrderById_skOrder_embedsClaimsAndOpenAmountOnMaterialRows() {
+    // Phase 5 (#345): the order-detail DTO of a public SK order carries the per-bucket claims +
+    // open-remaining on each material row.
+    Fixture f = seed();
+    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 6.0));
+
+    JobOrderDto dto = jobOrderService.getJobOrderById(f.orderId());
+
+    assertThat(dto.materials()).hasSize(1);
+    assertThat(dto.materials().get(0).openAmount()).isEqualTo(4.0);
+    assertThat(dto.materials().get(0).claims()).hasSize(1);
+    assertThat(dto.materials().get(0).claims().get(0).amount()).isEqualTo(6.0);
+  }
+
+  @Test
+  void getJobOrderById_privateOrder_leavesClaimFieldsEmpty() {
+    // After de-escalation the order is private (squadron-responsible): no claim columns, so the DTO
+    // carries an empty claim list and a null open-amount.
+    Fixture f = seed();
+    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
+
+    JobOrderDto dto = jobOrderService.getJobOrderById(f.orderId());
+
+    assertThat(dto.materials()).hasSize(1);
+    assertThat(dto.materials().get(0).openAmount()).isNull();
+    assertThat(dto.materials().get(0).claims()).isEmpty();
   }
 
   private ClaimBucketDto onlyBucket(UUID orderId) {

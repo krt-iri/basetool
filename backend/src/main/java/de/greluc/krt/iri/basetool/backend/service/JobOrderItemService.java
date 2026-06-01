@@ -204,10 +204,15 @@ public class JobOrderItemService {
         .map(
             e -> {
               Material material = materials.get(e.getKey().materialId());
+              // Claim fields stay neutral here (no claims / null open) — JobOrderService enriches
+              // them for SK orders in mapToDtoWithStock (Phase 5, #345); non-SK orders keep the
+              // null open-amount so the UI renders no claim columns.
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
                   e.getKey().quality(),
-                  roundForQuantityType(e.getValue(), material));
+                  roundForQuantityType(e.getValue(), material),
+                  java.util.List.of(),
+                  null);
             })
         .sorted(
             Comparator.<AggregatedMaterialDto, Integer>comparing(

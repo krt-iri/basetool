@@ -10,13 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ClaimDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.Collections;
@@ -147,8 +150,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(topItem, subItem),
             List.of(
-                new AggregatedMaterialDto(acryliPlex, "GOOD", 7.5),
-                new AggregatedMaterialDto(agricium, "NONE", 12.0)),
+                new AggregatedMaterialDto(acryliPlex, "GOOD", 7.5, List.of(), null),
+                new AggregatedMaterialDto(agricium, "NONE", 12.0, List.of(), null)),
             List.of(),
             List.of(),
             List.of(),
@@ -250,7 +253,9 @@ class JobOrderItemDetailRenderTest {
             "ITEM",
             List.of(),
             List.of(line),
-            List.of(new AggregatedMaterialDto(material("Agricium", "SCU"), "NONE", 12.0)),
+            List.of(
+                new AggregatedMaterialDto(
+                    material("Agricium", "SCU"), "NONE", 12.0, List.of(), null)),
             List.of(),
             List.of(),
             List.of(handover),
@@ -285,5 +290,114 @@ class JobOrderItemDetailRenderTest {
     assertThat(html).as("item-handover history row").contains("data-testid=\"item-handover-row\"");
     assertThat(html).as("PDF download trigger").contains("od-download-item-report");
     assertThat(html).as("recipient handle in history").contains("Recipient");
+  }
+
+  @Test
+  void materialOrder_skResponsible_RendersClaimColumns() throws Exception {
+    // Given: a public SK MATERIAL order (openAmount populated) with one squadron claim of 6 against
+    // a required 10 → 4 open. The backend signals SK-ness by populating openAmount.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    ClaimDto claim =
+        new ClaimDto(
+            UUID.randomUUID(),
+            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Flight", "ALF"),
+            6.0,
+            null,
+            Instant.now(),
+            1L);
+    JobOrderMaterialDto mat =
+        new JobOrderMaterialDto(
+            UUID.randomUUID(),
+            material("Agricium", "SCU"),
+            null,
+            10.0,
+            0.0,
+            List.of(claim),
+            4.0,
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            9,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            List.of(mat),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("claims column header (de)").contains("Eingetragen");
+    assertThat(html).as("open column header (de)").contains("Offen");
+    assertThat(html).as("claim chip rendered").contains("claim-chip");
+    assertThat(html).as("claiming squadron shorthand").contains("ALF");
+  }
+
+  @Test
+  void materialOrder_privateSquadron_HidesClaimColumns() throws Exception {
+    // Given: a private squadron MATERIAL order — the backend leaves openAmount null and claims
+    // empty, so the detail page renders no claim columns.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderMaterialDto mat =
+        new JobOrderMaterialDto(
+            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 0.0, List.of(), null, 1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            10,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            List.of(mat),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("no claims column on a private order").doesNotContain("Eingetragen");
+    assertThat(html).as("no claim chips on a private order").doesNotContain("claim-chip");
   }
 }

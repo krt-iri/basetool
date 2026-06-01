@@ -248,7 +248,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderMapper.toDto(mat))
           .thenReturn(
               new de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto(
-                  mat.getId(), null, 100, 1.0, 0.0, 0L));
+                  mat.getId(), null, 100, 1.0, 0.0, List.of(), null, 0L));
 
       List<JobOrderReferenceDto> result = service.findAllActiveReference();
 

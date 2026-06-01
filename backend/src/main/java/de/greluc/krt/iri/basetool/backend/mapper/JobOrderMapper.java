@@ -47,10 +47,13 @@ public interface JobOrderMapper {
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**
-   * Maps a {@link JobOrderMaterial} child to its DTO. {@code currentStock} is owned by the service
-   * layer (it queries the inventory at request time) and stays unmapped here.
+   * Maps a {@link JobOrderMaterial} child to its DTO. {@code currentStock} (inventory queried at
+   * request time) and the claim fields {@code claims}/{@code openAmount} (populated by the service
+   * for SK orders, Phase 5 #345) are all owned by the service layer and stay unmapped here.
    */
   @Mapping(target = "currentStock", ignore = true)
+  @Mapping(target = "claims", ignore = true)
+  @Mapping(target = "openAmount", ignore = true)
   JobOrderMaterialDto toDto(JobOrderMaterial material);
 
   /**

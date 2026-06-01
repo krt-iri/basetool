@@ -91,13 +91,24 @@ public class MaterialClaimService {
    * @throws NotFoundException when the order does not exist.
    */
   public List<ClaimBucketDto> getClaimBuckets(@NotNull UUID jobOrderId) {
-    JobOrder order = loadOrder(jobOrderId);
+    return getClaimBucketsForOrder(loadOrder(jobOrderId));
+  }
+
+  /**
+   * Order-taking variant of {@link #getClaimBuckets(UUID)} for callers that already hold a managed
+   * {@link JobOrder} (e.g. {@code JobOrderService.mapToDtoWithStock} enriching the detail DTO with
+   * claims, Phase 5 / #345) — avoids the redundant {@code findById} reload.
+   *
+   * @param order the managed order whose buckets + claims to project.
+   * @return the per-bucket claim view, never {@code null}.
+   */
+  public List<ClaimBucketDto> getClaimBucketsForOrder(@NotNull JobOrder order) {
     Map<Bucket, Double> required = requiredByBucket(order);
     Map<UUID, Material> materials = materialsByBucket(order);
 
     Map<Bucket, List<MaterialClaim>> claimsByBucket = new LinkedHashMap<>();
     for (MaterialClaim claim :
-        materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(jobOrderId)) {
+        materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId())) {
       claimsByBucket
           .computeIfAbsent(
               new Bucket(claim.getMaterial().getId(), claim.getQualityRequirement()),

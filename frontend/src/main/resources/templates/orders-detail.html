@@ -111,13 +111,18 @@
         <th:block th:if="${order.type != 'ITEM'}">
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
-        <table class="data-table">
+        <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
+             populating openAmount (null on private squadron orders). -->
+        <table class="data-table"
+               th:with="showClaims=${order.materials != null and !order.materials.isEmpty() and order.materials[0].openAmount != null}">
             <thead>
             <tr>
                 <th th:text="#{orders.material.name}">Material</th>
                 <th th:text="#{orders.material.minQuality}">Min. Qualität</th>
                 <th th:text="#{orders.detail.amount}">Benötigt</th>
                 <th th:text="#{orders.detail.stock}">Im Lager</th>
+                <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
+                <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
                 <th th:text="#{orders.detail.status}">Status</th>
             </tr>
             </thead>
@@ -141,6 +146,21 @@
                 <td th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                </td>
+                <td th:if="${showClaims}" data-trigger="" onclick="event.stopPropagation();">
+                    <span th:if="${mat.claims == null or mat.claims.isEmpty()}" class="text-muted">&#8212;</span>
+                    <span th:each="c : ${mat.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
+                          th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
+                        <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
+                        <span th:switch="${mat.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                        </span>
+                    </span>
+                </td>
+                <td th:if="${showClaims}" th:switch="${mat.material.quantityType}">
+                    <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
                 <td>
                     <span th:if="${mat.currentStock >= mat.amount}" class="text-success" th:text="'✓ ' + #{orders.detail.status.fulfilled}">✓ Erfüllt</span>
@@ -209,12 +229,17 @@
 
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
-        <table class="data-table">
+        <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
+             openAmount; null on private squadron orders). -->
+        <table class="data-table"
+               th:with="showClaims=${order.aggregatedMaterials != null and !order.aggregatedMaterials.isEmpty() and order.aggregatedMaterials[0].openAmount != null}">
             <thead>
             <tr>
                 <th th:text="#{orders.detail.aggregated.material}">Material</th>
                 <th th:text="#{orders.detail.aggregated.quality}">Qualität</th>
                 <th th:text="#{orders.detail.aggregated.amount}">Gesamtmenge</th>
+                <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
+                <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
             </tr>
             </thead>
             <tbody>
@@ -227,6 +252,21 @@
                 <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                </td>
+                <td th:if="${showClaims}">
+                    <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
+                    <span th:each="c : ${agg.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
+                          th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
+                        <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
+                        <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                            <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                        </span>
+                    </span>
+                </td>
+                <td th:if="${showClaims}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                    <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
             </tr>
             <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">

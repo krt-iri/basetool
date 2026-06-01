@@ -139,7 +139,8 @@ class JobOrderServiceTest {
     jobOrder.addMaterial(jom);
 
     JobOrderMaterialDto jomDto =
-        new JobOrderMaterialDto(jom.getId(), materialDto, 100, 50.0, null, 1L);
+        new JobOrderMaterialDto(
+            jom.getId(), materialDto, 100, 50.0, null, java.util.List.of(), null, 1L);
     baseJobOrderDto =
         new JobOrderDto(
             orderId,
@@ -639,6 +640,10 @@ class JobOrderServiceTest {
     when(authHelperService.isAdmin()).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    // The order is now responsible to an SK, so mapToDtoWithStock enriches it with the claim view
+    // (Phase 5, #345).
+    when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
+        .thenReturn(java.util.List.of());
 
     jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
 
