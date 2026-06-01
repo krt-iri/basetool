@@ -36,7 +36,15 @@
 
     <!-- Multi-select add bar -->
     <div class="hud-box krt-personal-inventory mt-2">
-        <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
+        <div class="krt-bp-addbar-head">
+            <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
+            <div class="krt-bp-import-trigger">
+                <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
+                <button type="button" id="krt-bp-import-open" class="btn btn-secondary"
+                        data-trigger="bp-import-pick"
+                        th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
+            </div>
+        </div>
 
         <div class="form-group krt-pi-typeahead krt-bp-search">
             <label for="krt-bp-search-input" th:text="#{personalInventory.blueprints.add.search}">Blueprints suchen</label>
@@ -153,6 +161,28 @@
     </div>
 </div>
 
+<!-- SCMDB import preview modal (KRT-styled, no native dialogs). Body filled by JS. -->
+<div id="krt-bp-import-modal" class="modal" style="display:none;">
+    <div class="modal-content hud-box krt-bp-import-content">
+        <span class="close" data-trigger="bp-import-close">&times;</span>
+        <h2 th:text="#{personalInventory.blueprints.import.title}">Import-Vorschau</h2>
+        <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>
+        <div class="krt-bp-import-toolbar">
+            <button type="button" class="btn btn-secondary" data-trigger="bp-import-selectall"
+                    th:text="#{personalInventory.blueprints.import.selectAll}">Alle auswählen</button>
+            <button type="button" class="btn btn-secondary" data-trigger="bp-import-selectnone"
+                    th:text="#{personalInventory.blueprints.import.selectNone}">Auswahl aufheben</button>
+        </div>
+        <div id="krt-bp-import-body" class="krt-bp-import-body"></div>
+        <div class="krt-pi-modal-actions">
+            <button type="button" id="krt-bp-import-apply" class="btn" data-trigger="bp-import-apply"
+                    th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
+            <button type="button" class="btn btn-secondary" data-trigger="bp-import-close"
+                    th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
@@ -169,14 +199,37 @@
         addedLabel:   /*[[#{personalInventory.blueprints.toast.addedLabel}]]*/ 'hinzugefuegt',
         errorToast:   /*[[#{personalInventory.blueprints.error.add}]]*/    'Hinzufuegen fehlgeschlagen.'
     };
+    window.krtBlueprintsImportI18n = {
+        groupMatched:    /*[[#{personalInventory.blueprints.import.group.matched}]]*/    'Automatisch zugeordnet',
+        groupSuggested:  /*[[#{personalInventory.blueprints.import.group.suggested}]]*/  'Vorschlaege (bestaetigen)',
+        groupUnmatched:  /*[[#{personalInventory.blueprints.import.group.unmatched}]]*/  'Nicht zugeordnet',
+        groupOwned:      /*[[#{personalInventory.blueprints.import.group.alreadyOwned}]]*/ 'Bereits vorhanden',
+        colInclude:      /*[[#{personalInventory.blueprints.import.col.include}]]*/   'Importieren',
+        colExternal:     /*[[#{personalInventory.blueprints.import.col.external}]]*/  'SCMDB-Name',
+        colProduct:      /*[[#{personalInventory.blueprints.import.col.product}]]*/   'Produkt',
+        searchPlaceholder: /*[[#{personalInventory.blueprints.import.searchPlaceholder}]]*/ 'Produkt suchen...',
+        notePlaceholder: /*[[#{personalInventory.blueprints.field.note}]]*/ 'Notiz',
+        noResults:       /*[[#{personalInventory.blueprints.noResults}]]*/   'Keine Treffer',
+        summary:         /*[[#{personalInventory.blueprints.import.summary}]]*/ 'Eintraege',
+        nothing:         /*[[#{personalInventory.blueprints.import.nothing}]]*/ 'Nichts zu importieren.',
+        applied:         /*[[#{personalInventory.blueprints.import.applied}]]*/ 'Import abgeschlossen.',
+        aliasesLabel:    /*[[#{personalInventory.blueprints.import.aliasesLabel}]]*/ 'Aliase gelernt',
+        error:           /*[[#{personalInventory.blueprints.import.error}]]*/   'Import fehlgeschlagen.',
+        ownedLabel:      /*[[#{personalInventory.blueprints.add.owned}]]*/   'Bereits vorhanden',
+        addedLabel:      /*[[#{personalInventory.blueprints.toast.addedLabel}]]*/ 'hinzugefuegt',
+        skippedLabel:    /*[[#{personalInventory.blueprints.toast.skipped}]]*/ 'uebersprungen'
+    };
     window.krtBlueprintsEndpoints = {
         search:      /*[[@{/personal-inventory/blueprints/search}]]*/      '/personal-inventory/blueprints/search',
         addSelected: /*[[@{/personal-inventory/blueprints/add-selected}]]*/ '/personal-inventory/blueprints/add-selected',
         updateNote:  /*[[@{/personal-inventory/blueprints/__ID__/update-note}]]*/ '/personal-inventory/blueprints/__ID__/update-note',
-        remove:      /*[[@{/personal-inventory/blueprints/__ID__/delete}]]*/ '/personal-inventory/blueprints/__ID__/delete'
+        remove:      /*[[@{/personal-inventory/blueprints/__ID__/delete}]]*/ '/personal-inventory/blueprints/__ID__/delete',
+        importPreview: /*[[@{/personal-inventory/blueprints/import/preview}]]*/ '/personal-inventory/blueprints/import/preview',
+        importApply:   /*[[@{/personal-inventory/blueprints/import/apply}]]*/   '/personal-inventory/blueprints/import/apply'
     };
     /*]]>*/
 </script>
 <script th:src="@{/js/personal-inventory-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/personal-inventory-blueprints-import.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
