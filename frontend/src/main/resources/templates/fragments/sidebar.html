@@ -50,7 +50,13 @@
                     </div>
                 </details>
                 <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
-                <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory}">Persönliches Inventar</a>
+                <details class="sidebar-group">
+                    <summary th:text="#{nav.personal_inventory}">Persönliches Inventar</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory.items}">Items</a>
+                        <a th:href="@{/personal-inventory/blueprints}" th:text="#{nav.personal_inventory.blueprints}">Blueprints</a>
+                    </div>
+                </details>
                 <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
                     <div class="sidebar-sublinks">
@@ -78,6 +84,7 @@
                         <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                         <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}" sec:authorize="hasRole('ADMIN')">Pers. Inventar (Admin)</a>
+                        <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}" sec:authorize="hasRole('ADMIN')">Pers. Blueprints (Admin)</a>
                     </div>
                 </details>
                 <a th:href="@{/logout}" th:text="#{nav.logout}">Logout</a>
