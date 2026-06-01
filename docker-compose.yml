@@ -419,7 +419,7 @@ services:
     # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
     # and break reproducibility). Consider appending @sha256:<digest> as well.
-    image: jc21/nginx-proxy-manager:2.14.0@sha256:2aa69b382a384b676c0d4f1d6f2eac40ecd478fcf7af1cfb3f9f1d3cd0c81e12
+    image: jc21/nginx-proxy-manager:2.15.0@sha256:83b8d6a2d5ddfdd1f9f8ee240499953dec5f7bbf3b4dafc5f4ac394f1edca930
     restart: unless-stopped
     logging: *default-logging
     ports:
