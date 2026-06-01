@@ -354,9 +354,8 @@
 /* In-page tab bar mirroring the sidebar Items | Blueprints group. */
 .krt-pi-tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     margin: 1rem 0 0;
-    border-bottom: 1px solid var(--color-gray-3, #282828);
     flex-wrap: wrap;
 }
 
@@ -364,25 +363,33 @@
     min-height: 44px;
     display: inline-flex;
     align-items: center;
-    padding: 0.5rem 1.1rem;
+    padding: 0.5rem 1.4rem;
     font-family: Ethnocentric, Lato, sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: var(--fs-xs);
     color: var(--color-gray-1, #D2D2D2);
     text-decoration: none;
-    border: 1px solid transparent;
-    border-bottom: none;
-    background: transparent;
+    border: 1px solid var(--color-gray-3, #282828);
+    border-radius: 4px;
+    background: var(--color-surface-input, #1c1c1c);
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .krt-pi-tab:hover,
-.krt-pi-tab:focus { color: var(--color-primary, #E77E23); }
-
-.krt-pi-tab-active {
+.krt-pi-tab:focus {
     color: var(--color-primary, #E77E23);
     border-color: var(--color-primary, #E77E23);
-    background: rgb(231 126 35 / 8%);
+    background: rgb(231 126 35 / 12%);
+}
+
+.krt-pi-tab-active,
+.krt-pi-tab-active:hover,
+.krt-pi-tab-active:focus {
+    color: #000;
+    border-color: var(--color-primary, #E77E23);
+    background: var(--color-primary, #E77E23);
+    font-weight: 700;
 }
 
 .krt-bp-section-title {
