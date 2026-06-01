@@ -8,7 +8,7 @@ plugins {
   // Same `apply false` pattern as pitest: declared here so SpotlessExtension is
   // on the root build script's classpath for the strongly-typed configuration
   // below. Each subproject applies the plugin itself.
-  id("com.diffplug.spotless") version "8.4.0" apply false
+  id("com.diffplug.spotless") version "8.6.0" apply false
 }
 
 allprojects {
@@ -88,13 +88,14 @@ subprojects {
     //
     //   tomcat 11.0.21    -> 11.0.22       (CVE-2026-41284, -41293, -42498,
     //                                       -43512, -43513, -43515)
-    //   netty 4.2.12      -> 4.2.13.Final  (CVE-2026-42577, -42579, -42581,
+    //   netty 4.2.12      -> 4.2.14.Final  (CVE-2026-42577, -42579, -42581,
     //                                       -42582, -42583, -42584, -42585,
-    //                                       -42586, -42587, -44248)
+    //                                       -42586, -42587, -44248; .14 is the
+    //                                       latest 4.2.x patch — 5.0.0 is Alpha)
     //   postgresql 42.7.10 -> 42.7.11      (CVE-2026-42198 - SCRAM-SHA-256
     //                                       client-side DoS in pgjdbc)
     extra["tomcat.version"] = "11.0.22"
-    extra["netty.version"] = "4.2.13.Final"
+    extra["netty.version"] = "4.2.14.Final"
     extra["postgresql.version"] = "42.7.11"
   }
 
@@ -203,7 +204,7 @@ subprojects {
 
   // Checkstyle (Gradle core plugin). Uses the Google Java Style config
   // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
-  // 13.4.2 release tag) which enforces 2-space indents, 100-char lines,
+  // 13.5.0 release tag) which enforces 2-space indents, 100-char lines,
   // Google-style imports, naming conventions, Javadoc on public API, etc.
   //
   // Phase 4 (this configuration): the gate is now STRICT.
@@ -216,7 +217,7 @@ subprojects {
   // BDD-style assertions) that Google's style flags as noise.
   plugins.withId("checkstyle") {
     extensions.configure<CheckstyleExtension>("checkstyle") {
-      toolVersion = "13.4.2"
+      toolVersion = "13.5.0"
       configFile = rootProject.file("config/checkstyle/google_checks.xml")
       isIgnoreFailures = false
       maxWarnings = 0

@@ -1411,7 +1411,7 @@ public class MissionController {
         missionService.setPartyLead(id, finalUserId, finalGuestName, request.version()));
   }
 
-  // =====================================================================================
+  // -------------------------------------------------------------------------------------
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
 
   // These endpoints are additive replacements for the legacy MissionDto-returning
@@ -1423,7 +1423,7 @@ public class MissionController {
   // Behaviour and service-level concurrency semantics are IDENTICAL to the legacy
   // endpoints; only the response shape is slim. See ApiDeprecation annotations on
   // the legacy endpoints for the sunset date.
-  // =====================================================================================
+  // -------------------------------------------------------------------------------------
 
   /**
    * Locates a unit inside a mission aggregate by id, or throws {@link NotFoundException}. Used by
