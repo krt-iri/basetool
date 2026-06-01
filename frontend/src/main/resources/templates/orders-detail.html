@@ -53,19 +53,18 @@
                 <span th:text="${order.priority != null ? order.priority : '-'}"></span>
             </div>
             <div>
-                <strong th:text="#{orders.detail.squadron}">Auftraggeber-Staffel</strong><br>
-                <span th:if="${order.requestingSquadron != null}" class="squadron-badge"
-                      th:title="${order.requestingSquadron.name()}"
-                      th:text="${order.requestingSquadron.shorthand()}">IRI</span>
-                <span th:if="${order.requestingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
+                <strong th:text="#{orders.detail.responsible}">Bearbeitende Einheit</strong><br>
+                <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
+                      th:title="${order.responsibleOrgUnit.name()}"
+                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
             </div>
             <div>
-                <strong th:text="#{orders.detail.creating_squadron}">Erstellt durch</strong><br>
-                <span th:if="${order.creatingSquadron != null}"
-                      th:class="${order.requestingSquadron != null and order.creatingSquadron.id() == order.requestingSquadron.id()} ? 'squadron-badge squadron-badge-muted' : 'squadron-badge squadron-badge-foreign'"
-                      th:title="${order.creatingSquadron.name()}"
-                      th:text="${order.creatingSquadron.shorthand()}">IRI</span>
-                <span th:if="${order.creatingSquadron == null}" class="squadron-badge squadron-badge-muted">—</span>
+                <strong th:text="#{orders.detail.requesting}">Auftraggeber</strong><br>
+                <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
+                      th:title="${order.requestingOrgUnit.name()}"
+                      th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
             </div>
             <div>
                 <strong th:text="#{orders.detail.handle}">Handle</strong><br>
@@ -394,39 +393,38 @@
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
-                <label for="requestingOrgUnitId" th:text="#{orders.detail.squadron}" class="form-label">Auftraggeber-Staffel</label>
+                <label for="requestingOrgUnitId" th:text="#{orders.detail.requesting}" class="form-label">Auftraggeber</label>
                 <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required class="w-full">
-                    <option value="" disabled selected th:text="#{orders.create.selectSquadron}">-- Staffel wählen --</option>
-                    <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
-                        <option th:each="o : ${ownerOptions}"
+                    <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                    <optgroup th:if="${requestingHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
+                        <option th:each="o : ${requestingOptions}"
                                 th:if="${o.kind() == 'SQUADRON'}"
                                 th:value="${o.orgUnitId()}"
                                 th:text="${o.orgUnitName()}">Staffel</option>
                     </optgroup>
-                    <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
-                        <option th:each="o : ${ownerOptions}"
+                    <optgroup th:if="${requestingHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
+                        <option th:each="o : ${requestingOptions}"
                                 th:if="${o.kind() == 'SPECIAL_COMMAND'}"
                                 th:value="${o.orgUnitId()}"
                                 th:text="${o.orgUnitName()}">Spezialkommando</option>
                     </optgroup>
-                    <th:block th:unless="${ownerOptionsHasSpecialCommand}">
-                        <option th:each="o : ${ownerOptions}"
+                    <th:block th:unless="${requestingHasSpecialCommand}">
+                        <option th:each="o : ${requestingOptions}"
                                 th:value="${o.orgUnitId()}"
                                 th:text="${o.orgUnitName()}">Org Unit</option>
                     </th:block>
                 </select>
             </div>
 
-            <!-- creatingSquadron is immutable per MULTI_SQUADRON_PLAN.md section 8 - the order's
-                 author squadron stays as it was when the row was first persisted. Render as a
-                 read-only chip so the editor sees the value without being able to edit it. -->
-            <div class="form-group mb-1" th:if="${order.creatingSquadron != null}">
-                <label th:text="#{orders.detail.creating_squadron}" class="form-label">Erstellt durch</label>
+            <!-- The responsible (processing) org unit is changed via the dedicated reassignment flow,
+                 not the regular edit form. Shown read-only here so the editor sees who processes it. -->
+            <div class="form-group mb-1" th:if="${order.responsibleOrgUnit != null}">
+                <label th:text="#{orders.detail.responsible}" class="form-label">Bearbeitende Einheit</label>
                 <span class="squadron-badge squadron-badge-muted"
-                      th:title="${order.creatingSquadron.name()}"
-                      th:text="${order.creatingSquadron.shorthand()}">IRI</span>
+                      th:title="${order.responsibleOrgUnit.name()}"
+                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
                 <span style="display: inline-block; margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.85rem;"
-                      th:text="#{orders.detail.creating_squadron.readonly_hint}">(immutable)</span>
+                      th:text="#{orders.detail.responsible.readonly_hint}">(nur über Umschreiben)</span>
             </div>
 
             <div class="form-group mb-1">
@@ -1180,7 +1178,7 @@
     // AJAX-rendered per-material item table. When the inventory item's owningSquadron differs
     // from the order's requestingSquadron the row gets the orange-yellow border-left marker so
     // the handover-prep view shows at a glance which items come from a foreign squadron.
-    const ORDER_REQUESTING_SQUADRON_ID = /*[[${order.requestingSquadron != null ? order.requestingSquadron.id() : null}]]*/ null;
+    const ORDER_REQUESTING_SQUADRON_ID = /*[[${order.requestingOrgUnit != null ? order.requestingOrgUnit.id() : null}]]*/ null;
 
     async function toggleInventory(row) {
         const orderId = row.getAttribute('data-order-id');

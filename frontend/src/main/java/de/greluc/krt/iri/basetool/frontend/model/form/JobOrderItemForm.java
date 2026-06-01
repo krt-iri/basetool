@@ -14,7 +14,13 @@ import lombok.Data;
 @Data
 public class JobOrderItemForm {
 
-  /** Org unit the order is executed for (picker output); {@code null} falls back server-side. */
+  /**
+   * The profit-eligible org unit that will process the order (responsible picker output); ignored
+   * for guests, who are routed to the intake SK.
+   */
+  private UUID responsibleOrgUnitId;
+
+  /** The customer org unit the order is placed for (requesting picker output). */
   private UUID requestingOrgUnitId;
 
   /** Optional contact handle. */

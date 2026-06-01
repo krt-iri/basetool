@@ -20,6 +20,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryCr
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
@@ -39,6 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -262,15 +264,12 @@ public class JobOrderPageController {
         model.addAttribute("users", fetchUsers());
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("squadrons", fetchSquadrons());
-        List<OrgUnitMembershipOptionDto> detailOrgOptions = fetchActiveOrgUnitOptions();
-        model.addAttribute("ownerOptions", detailOrgOptions);
-        model.addAttribute(
-            "ownerOptionsHasSpecialCommand", containsSpecialCommand(detailOrgOptions));
+        addOwnerPickerOptions(model);
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
           form.setRequestingOrgUnitId(
-              order.requestingSquadron() != null ? order.requestingSquadron().id() : null);
+              order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
           form.setHandle(order.handle());
           form.setComment(order.comment());
           form.setVersion(order.version());
@@ -320,7 +319,7 @@ public class JobOrderPageController {
         // (see orders-detail.html, openHandoverModal) so that the user's
         // browser timezone (not the server/container) is used.
         handoverForm.setRecipientSquadron(
-            order.requestingSquadron() != null ? order.requestingSquadron().shorthand() : null);
+            order.requestingOrgUnit() != null ? order.requestingOrgUnit().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
 
@@ -369,9 +368,7 @@ public class JobOrderPageController {
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("orderableItems", fetchOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
-    List<OrgUnitMembershipOptionDto> orgOptions = fetchActiveOrgUnitOptions();
-    model.addAttribute("ownerOptions", orgOptions);
-    model.addAttribute("ownerOptionsHasSpecialCommand", containsSpecialCommand(orgOptions));
+    addOwnerPickerOptions(model);
     return "orders-create";
   }
 
@@ -425,7 +422,7 @@ public class JobOrderPageController {
 
       CreateJobOrderItemRequestDto dto =
           new CreateJobOrderItemRequestDto(
-              null,
+              form.getResponsibleOrgUnitId(),
               form.getRequestingOrgUnitId(),
               form.getHandle(),
               form.getComment(),
@@ -546,7 +543,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null,
+              form.getResponsibleOrgUnitId(),
               form.getRequestingOrgUnitId(),
               form.getHandle(),
               form.getComment(),
@@ -1102,6 +1099,71 @@ public class JobOrderPageController {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
       return List.of();
     }
+  }
+
+  /**
+   * Populates the create/edit form model with the two owner-picker option lists: {@code
+   * responsibleOptions} (only profit-eligible squadrons + SKs may process orders) and {@code
+   * requestingOptions} (any active squadron or SK may be the customer), each with a boolean flag
+   * telling the template whether to render the SK optgroup.
+   *
+   * @param model the Thymeleaf model to populate.
+   */
+  private void addOwnerPickerOptions(Model model) {
+    List<OrgUnitMembershipOptionDto> responsibleOptions = fetchResponsibleOptions();
+    List<OrgUnitMembershipOptionDto> requestingOptions = fetchActiveOrgUnitOptions();
+    model.addAttribute("responsibleOptions", responsibleOptions);
+    model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
+    model.addAttribute("requestingOptions", requestingOptions);
+    model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
+  }
+
+  /**
+   * Builds the responsible-picker options: only profit-eligible org units (squadrons and SKs) may
+   * be selected as the processing unit of an order. The template's optgroups keep squadrons and SKs
+   * visually separated; within each the list is sorted by name.
+   *
+   * @return profit-eligible org-unit options; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchResponsibleOptions() {
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>();
+    for (SquadronDto s : fetchSquadrons()) {
+      if (Boolean.TRUE.equals(s.isProfitEligible())) {
+        options.add(new OrgUnitMembershipOptionDto(s.id(), s.name(), s.shorthand(), "SQUADRON"));
+      }
+    }
+    for (SpecialCommandDto sk : fetchSpecialCommands()) {
+      if (Boolean.TRUE.equals(sk.isProfitEligible())) {
+        options.add(
+            new OrgUnitMembershipOptionDto(sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND"));
+      }
+    }
+    options.sort(
+        Comparator.comparing(
+            o -> o.orgUnitName() == null ? "" : o.orgUnitName(), String.CASE_INSENSITIVE_ORDER));
+    return options;
+  }
+
+  /**
+   * Fetches all active Spezialkommandos (with the profit-eligibility flag) for the responsible
+   * picker. Falls back to an empty list on backend hiccup so the form still renders.
+   *
+   * @return SK DTOs; never {@code null}.
+   */
+  private List<SpecialCommandDto> fetchSpecialCommands() {
+    try {
+      PageResponse<SpecialCommandDto> p =
+          backendApiClient.getCached(
+              "/api/v1/special-commands?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<>() {},
+              true);
+      if (p != null && p.content() != null) {
+        return new ArrayList<>(p.content());
+      }
+    } catch (Exception e) {
+      log.error("Failed to fetch special commands", e);
+    }
+    return new ArrayList<>();
   }
 
   private UUID getCurrentUserId(OidcUser principal) {

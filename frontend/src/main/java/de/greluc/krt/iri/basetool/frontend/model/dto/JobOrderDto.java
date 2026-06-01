@@ -13,8 +13,8 @@ import java.util.UUID;
 public record JobOrderDto(
     UUID id,
     Integer displayId,
-    SquadronReferenceDto creatingSquadron,
-    SquadronReferenceDto requestingSquadron,
+    SquadronReferenceDto responsibleOrgUnit,
+    SquadronReferenceDto requestingOrgUnit,
     String handle,
     String comment,
     Integer priority,
