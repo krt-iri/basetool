@@ -226,4 +226,60 @@ class PersonalBlueprintServiceTest {
 
     assertThrows(EntityNotFoundException.class, () -> service.delete(SUB, id));
   }
+
+  // --------------------------------------------------------------- admin variants --
+
+  @Test
+  void listForUser_delegatesToOwnerLookupWithTargetSub() {
+    when(repository.findAllByOwnerSub(eq("target"), any())).thenReturn(new PageImpl<>(List.of()));
+
+    service.listForUser("target", null, PageRequest.of(0, 10));
+
+    verify(repository).findAllByOwnerSub(eq("target"), any());
+  }
+
+  @Test
+  void updateForUser_appliesByIdAlone_whenVersionMatches() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder().id(id).ownerSub("other-user").productKey("k").build();
+    entity.setVersion(5L);
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toResponse(entity)).thenReturn(sampleResponse());
+
+    service.updateForUser(id, new PersonalBlueprintUpdateRequest(null, "edited", 5L));
+
+    assertEquals("edited", entity.getNote());
+    verify(repository).save(entity);
+  }
+
+  @Test
+  void updateForUser_throwsNotFound_whenIdUnknown() {
+    UUID id = UUID.randomUUID();
+    when(repository.findById(id)).thenReturn(Optional.empty());
+
+    assertThrows(
+        EntityNotFoundException.class,
+        () -> service.updateForUser(id, new PersonalBlueprintUpdateRequest(null, null, 1L)));
+  }
+
+  @Test
+  void deleteForUser_removesById() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub("other-user").build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+
+    service.deleteForUser(id);
+
+    verify(repository).delete(entity);
+  }
+
+  @Test
+  void deleteForUser_throwsNotFound_whenIdUnknown() {
+    UUID id = UUID.randomUUID();
+    when(repository.findById(id)).thenReturn(Optional.empty());
+
+    assertThrows(EntityNotFoundException.class, () -> service.deleteForUser(id));
+  }
 }

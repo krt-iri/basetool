@@ -84,6 +84,7 @@
                         <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                         <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}" sec:authorize="hasRole('ADMIN')">Pers. Inventar (Admin)</a>
+                        <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}" sec:authorize="hasRole('ADMIN')">Pers. Blueprints (Admin)</a>
                     </div>
                 </details>
                 <a th:href="@{/logout}" th:text="#{nav.logout}">Logout</a>

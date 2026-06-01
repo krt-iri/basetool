@@ -165,14 +165,9 @@ public class PersonalBlueprintService {
   public PersonalBlueprintResponse update(
       @NotNull String ownerSub, @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
-    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
-      throw new ObjectOptimisticLockingFailureException(PersonalBlueprint.class, entity.getId());
-    }
-    entity.setAcquiredAt(request.acquiredAt());
-    entity.setNote(request.note());
-    PersonalBlueprint saved = repository.save(entity);
-    log.info("Updated personal blueprint id={} ownerSub={}", saved.getId(), ownerSub);
-    return mapper.toResponse(saved);
+    PersonalBlueprintResponse response = applyUpdate(entity, request);
+    log.info("Updated personal blueprint id={} ownerSub={}", id, ownerSub);
+    return response;
   }
 
   /**
@@ -187,6 +182,117 @@ public class PersonalBlueprintService {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
     repository.delete(entity);
     log.info("Deleted personal blueprint id={} ownerSub={}", id, ownerSub);
+  }
+
+  // ---------------------------------------------------------------------------------
+  // Admin-scoped variants (#327, Phase 7). The ADMIN role is enforced at the controller
+  // boundary; these methods take the target sub / id directly. List / add / batch reuse
+  // the owner-scoped methods with the target sub; update / delete resolve by id alone
+  // (admins are trusted to know the id) and log the owner sub for the audit trail.
+  // ---------------------------------------------------------------------------------
+
+  /**
+   * Admin-scoped list of a target user's owned blueprints. Delegates to {@link #listOwn}; the ADMIN
+   * gate lives on the controller.
+   *
+   * @param targetSub Keycloak {@code sub} of the user being inspected
+   * @param query optional case-insensitive product-name filter
+   * @param pageable page request
+   * @return paged response DTOs
+   */
+  public Page<PersonalBlueprintResponse> listForUser(
+      @NotNull String targetSub, @Nullable String query, @NotNull Pageable pageable) {
+    return listOwn(targetSub, query, pageable);
+  }
+
+  /**
+   * Admin-scoped single add on behalf of a target user. Delegates to {@link #add}.
+   *
+   * @param targetSub Keycloak {@code sub} of the user to add the blueprint for
+   * @param request the add payload
+   * @return the persisted DTO
+   */
+  @Transactional
+  public PersonalBlueprintResponse addForUser(
+      @NotNull String targetSub, @NotNull PersonalBlueprintCreateRequest request) {
+    PersonalBlueprintResponse response = add(targetSub, request);
+    log.info("Admin added blueprint productKey='{}' ownerSub={}", request.productKey(), targetSub);
+    return response;
+  }
+
+  /**
+   * Admin-scoped multi-select add on behalf of a target user. Delegates to {@link #addBatch}.
+   *
+   * @param targetSub Keycloak {@code sub} of the user to add the blueprints for
+   * @param productKeys the product keys to add
+   * @return a summary of added vs. skipped keys
+   */
+  @Transactional
+  public PersonalBlueprintBatchResult addBatchForUser(
+      @NotNull String targetSub, @NotNull List<String> productKeys) {
+    PersonalBlueprintBatchResult result = addBatch(targetSub, productKeys);
+    log.info("Admin batch add for ownerSub={}: {}", targetSub, result);
+    return result;
+  }
+
+  /**
+   * Admin-scoped update by id alone (admins are trusted to know the id). The optimistic-lock check
+   * still applies.
+   *
+   * @param id entry primary key
+   * @param request the update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the entry id is unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  public PersonalBlueprintResponse updateForUser(
+      @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
+    PersonalBlueprint entity =
+        repository
+            .findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("PersonalBlueprint not found: " + id));
+    PersonalBlueprintResponse response = applyUpdate(entity, request);
+    log.info("Admin updated blueprint id={} ownerSub={}", id, entity.getOwnerSub());
+    return response;
+  }
+
+  /**
+   * Admin-scoped delete by id alone. Logs the owner sub at INFO so the audit trail shows whose data
+   * an admin call removed.
+   *
+   * @param id entry primary key
+   * @throws EntityNotFoundException when the entry id is unknown
+   */
+  @Transactional
+  public void deleteForUser(@NotNull UUID id) {
+    PersonalBlueprint entity =
+        repository
+            .findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("PersonalBlueprint not found: " + id));
+    repository.delete(entity);
+    log.info("Admin deleted blueprint id={} ownerSub={}", id, entity.getOwnerSub());
+  }
+
+  /**
+   * Applies an optimistic-lock-checked update of the mutable fields ({@code acquiredAt}, {@code
+   * note}) to an already-loaded managed entity. Shared by the owner-scoped {@link #update} and the
+   * admin {@link #updateForUser}.
+   *
+   * @param entity the managed blueprint entity
+   * @param request the update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @NotNull
+  private PersonalBlueprintResponse applyUpdate(
+      @NotNull PersonalBlueprint entity, @NotNull PersonalBlueprintUpdateRequest request) {
+    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
+      throw new ObjectOptimisticLockingFailureException(PersonalBlueprint.class, entity.getId());
+    }
+    entity.setAcquiredAt(request.acquiredAt());
+    entity.setNote(request.note());
+    return mapper.toResponse(repository.save(entity));
   }
 
   /**

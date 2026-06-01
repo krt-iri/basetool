@@ -1,0 +1,130 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportApplyRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportPreviewDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResolutionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResultDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.service.BlueprintImportService;
+import de.greluc.krt.iri.basetool.backend.service.PersonalBlueprintService;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
+
+/** Unit tests for {@link AdminPersonalBlueprintController}: delegation with the target sub / id. */
+@ExtendWith(MockitoExtension.class)
+class AdminPersonalBlueprintControllerTest {
+
+  private static final String TARGET = "target-user-sub";
+
+  @Mock private PersonalBlueprintService service;
+  @Mock private BlueprintImportService importService;
+  @InjectMocks private AdminPersonalBlueprintController controller;
+
+  private static PersonalBlueprintResponse sample() {
+    Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    return new PersonalBlueprintResponse(
+        UUID.randomUUID(), "k", "Name", null, null, null, 0L, now, now);
+  }
+
+  @Test
+  void listForUser_usesTargetSubAndWrapsPage() {
+    when(service.listForUser(eq(TARGET), any(), any()))
+        .thenReturn(new PageImpl<>(List.of(sample()), PageRequest.of(0, 10), 1));
+
+    PageResponse<PersonalBlueprintResponse> result =
+        controller.listForUser(TARGET, 0, 10, null, null);
+
+    assertEquals(1, result.totalElements());
+    verify(service).listForUser(eq(TARGET), any(), any());
+  }
+
+  @Test
+  void addForUser_relaysToServiceWithTargetSub() {
+    PersonalBlueprintCreateRequest req = new PersonalBlueprintCreateRequest("k", null, null);
+    when(service.addForUser(TARGET, req)).thenReturn(sample());
+
+    controller.addForUser(TARGET, req);
+
+    verify(service).addForUser(TARGET, req);
+  }
+
+  @Test
+  void addBatchForUser_relaysKeysWithTargetSub() {
+    PersonalBlueprintBatchCreateRequest req =
+        new PersonalBlueprintBatchCreateRequest(List.of("a", "b"));
+    when(service.addBatchForUser(TARGET, List.of("a", "b")))
+        .thenReturn(new PersonalBlueprintBatchResult(2, 0, 0));
+
+    PersonalBlueprintBatchResult result = controller.addBatchForUser(TARGET, req);
+
+    assertEquals(2, result.added());
+    verify(service).addBatchForUser(TARGET, List.of("a", "b"));
+  }
+
+  @Test
+  void updateForUser_relaysByIdAlone() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprintUpdateRequest req = new PersonalBlueprintUpdateRequest(null, "n", 1L);
+    when(service.updateForUser(id, req)).thenReturn(sample());
+
+    controller.updateForUser(id, req);
+
+    verify(service).updateForUser(id, req);
+  }
+
+  @Test
+  void deleteForUser_relaysByIdAlone() {
+    UUID id = UUID.randomUUID();
+
+    controller.deleteForUser(id);
+
+    verify(service).deleteForUser(id);
+  }
+
+  @Test
+  void previewImportForUser_relaysFileWithTargetSub() {
+    MultipartFile file =
+        new MockMultipartFile("file", "scmdb.json", "application/json", "{}".getBytes());
+    BlueprintImportPreviewDto preview = new BlueprintImportPreviewDto(0, 0, 0, 0, 0, 0, List.of());
+    when(importService.previewImport(TARGET, file)).thenReturn(preview);
+
+    controller.previewImportForUser(TARGET, file);
+
+    verify(importService).previewImport(TARGET, file);
+  }
+
+  @Test
+  void applyImportForUser_relaysResolutionsWithTargetSub() {
+    BlueprintImportResolutionDto res =
+        new BlueprintImportResolutionDto("Arclight Pistol", "arclight pistol", null, null);
+    BlueprintImportApplyRequest req = new BlueprintImportApplyRequest(List.of(res));
+    when(importService.applyImport(TARGET, List.of(res)))
+        .thenReturn(new BlueprintImportResultDto(1, 0, 0, 0));
+
+    BlueprintImportResultDto result = controller.applyImportForUser(TARGET, req);
+
+    assertEquals(1, result.added());
+    verify(importService).applyImport(TARGET, List.of(res));
+  }
+}
