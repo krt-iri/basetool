@@ -30,6 +30,19 @@
             margin-bottom: 1rem;
             align-items: flex-end;
         }
+        /*
+         * The item-line row is a flex container with align-items:flex-end and a
+         * label-less "Entfernen" button next to label-bearing .form-group columns.
+         * The global `.form-group { margin-bottom: 1.25rem }` (styles.css) overrides
+         * the `.mb-0` utility on these columns (equal specificity, but `.form-group`
+         * is declared later), so the columns' margin box extends 1.25rem below their
+         * input. flex-end then aligns the margin boxes, dropping the zero-margin button
+         * 1.25rem below the inputs. Zero the margin here (specificity 0/2/0 beats the
+         * global 0/1/0) so the button's bottom edge lines up with the Anzahl field.
+         */
+        .item-line .form-group {
+            margin-bottom: 0;
+        }
         details.scmdb-import summary::-webkit-details-marker {
             display: none;
         }
