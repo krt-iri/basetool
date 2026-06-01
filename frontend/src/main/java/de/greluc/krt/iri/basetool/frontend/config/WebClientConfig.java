@@ -50,6 +50,16 @@ import reactor.netty.http.client.HttpClient;
 @RequiredArgsConstructor
 public class WebClientConfig {
 
+  /**
+   * Max bytes a single backend response may buffer in memory before the reactive codec aborts with
+   * {@code DataBufferLimitException}. Sized for the heaviest read path — the materials trade matrix
+   * ({@code /api/v1/materials/matrix?size=100000}) returns one verbose row per material×terminal
+   * price and grows with the UEX catalog; at 16 MB a large universe tipped the buffer and the
+   * overview page failed outright. 64 MB leaves generous headroom (still well inside the frontend's
+   * ~576 MB heap, even with the 10-minute matrix cache holding one such response).
+   */
+  private static final int MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
+
   private final AppBackendProperties backendProperties;
   private final AppHttpProperties httpProperties;
   private final WebClientLoggingFilter webClientLoggingFilter;
@@ -233,9 +243,9 @@ public class WebClientConfig {
   }
 
   /**
-   * Authenticated WebClient against the backend: 16 MB max in-memory codec, Resilience4j chain
-   * (timeout, retry, circuit breaker, bulkhead), correlation-id propagation, OAuth2 bearer relay,
-   * defaults to {@code Accept: application/json}.
+   * Authenticated WebClient against the backend: {@value #MAX_IN_MEMORY_BYTES}-byte max in-memory
+   * codec, Resilience4j chain (timeout, retry, circuit breaker, bulkhead), correlation-id
+   * propagation, OAuth2 bearer relay, defaults to {@code Accept: application/json}.
    */
   @Bean
   public WebClient webClient(
@@ -251,7 +261,7 @@ public class WebClientConfig {
 
     ExchangeStrategies strategies =
         ExchangeStrategies.builder()
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_BYTES))
             .build();
 
     return WebClient.builder()
@@ -281,7 +291,7 @@ public class WebClientConfig {
       BulkheadRegistry bulkheadRegistry) {
     ExchangeStrategies strategies =
         ExchangeStrategies.builder()
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_BYTES))
             .build();
 
     return WebClient.builder()
