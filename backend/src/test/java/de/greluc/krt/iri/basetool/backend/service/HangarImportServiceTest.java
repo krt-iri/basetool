@@ -1399,6 +1399,242 @@ class HangarImportServiceTest {
   }
 
   // -------------------------------------------------------------------------
+  // StarJump FleetViewer ("Hangar Link"): object root with a canvasItems array.
+  // SHIP items are imported (matched on defaultText via the same pipeline);
+  // decorative TEXTGROUP items are dropped at the parse step.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpFormat_isAutoDetectedAndShipsImported() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType perseus = shipTypeWithName("Perseus");
+    ShipType galaxy = shipTypeWithName("Galaxy");
+
+    String starjumpJson =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "version": 1,
+          "canvasItems": [
+            { "id":"a", "itemType":"SHIP", "shipSlug":"perseus", "variantSlug":"",
+              "defaultText":"Perseus" },
+            { "id":"b", "itemType":"TEXTGROUP", "text":"Perseus" },
+            { "id":"c", "itemType":"SHIP", "shipSlug":"galaxy", "variantSlug":"",
+              "defaultText":"Galaxy" },
+            { "id":"d", "itemType":"TEXTGROUP", "text":"Galaxy" }
+          ]
+        }
+        """;
+    MockMultipartFile file = multipartFile(starjumpJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, galaxy));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: the two SHIP items import; the two TEXTGROUP items never reach the matcher.
+    assertThat(result.importedCount()).isEqualTo(2);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    verify(shipRepository, times(2)).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // StarJump slug fallback: when the FleetViewer defaultText resolves against
+  // no ShipType name, the kebab-case shipSlug is matched against ShipType.uexSlug.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpSlugFallback_resolvesViaUexSlugWhenNameMisses() {
+    // Given: the display name matches nothing, but the slug equals the ship's UEX slug.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType zeus = shipTypeWithSlugs("Zeus MK II MR", "zeus-mkii-mr", null);
+
+    String starjumpJson =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "canvasItems": [
+            { "itemType":"SHIP", "shipSlug":"zeus-mkii-mr", "variantSlug":"",
+              "defaultText":"Totally Unrelated Display Label" }
+          ]
+        }
+        """;
+    MockMultipartFile file = multipartFile(starjumpJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(zeus));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, zeus.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(zeus);
+  }
+
+  @Test
+  void importShips_starjumpSlugFallback_resolvesViaScwikiSlugWhenNameAndUexMiss() {
+    // Given: name and uexSlug both miss; the SC Wiki slug carries the match.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType ship = shipTypeWithSlugs("Canonical Name", null, "orig-100i");
+
+    String starjumpJson =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "canvasItems": [
+            { "itemType":"SHIP", "shipSlug":"orig-100i", "defaultText":"Unmatched Label" }
+          ]
+        }
+        """;
+    MockMultipartFile file = multipartFile(starjumpJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(ship));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ship.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(ship);
+  }
+
+  // -------------------------------------------------------------------------
+  // StarJump precedence: a name hit must win over a slug hit on a different
+  // ShipType, so the slug fallback never overrides a confident name match.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpNameMatchWinsOverSlugMatch() {
+    // Given: defaultText "Perseus" matches ShipType A exactly; the slug "decoy-slug"
+    // would match ShipType B's UEX slug — but the name stage fires first.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType perseus = shipTypeWithName("Perseus");
+    ShipType decoy = shipTypeWithSlugs("Decoy Ship", "decoy-slug", null);
+
+    String starjumpJson =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "canvasItems": [
+            { "itemType":"SHIP", "shipSlug":"decoy-slug", "defaultText":"Perseus" }
+          ]
+        }
+        """;
+    MockMultipartFile file = multipartFile(starjumpJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, decoy));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(perseus);
+  }
+
+  // -------------------------------------------------------------------------
+  // StarJump unmatched: a SHIP whose display name and slug both miss is surfaced
+  // in skippedShips under its defaultText.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpUnmatchedShip_isSkippedUnderDefaultText() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    String starjumpJson =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "canvasItems": [
+            { "itemType":"SHIP", "shipSlug":"alien-xyz", "defaultText":"Alien Mystery Ship" }
+          ]
+        }
+        """;
+    MockMultipartFile file = multipartFile(starjumpJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of());
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("Alien Mystery Ship");
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // StarJump detection by the type discriminator alone: an object carrying
+  // "type":"starjumpFleetviewer" but no (or empty) canvasItems is recognised as
+  // FleetViewer and imports as a clean no-op rather than failing the array check.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpEmptyCanvas_returnsAllZero() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    MockMultipartFile file =
+        multipartFile(
+            """
+            { "type": "starjumpFleetviewer", "version": 1, "canvasItems": [] }
+            """);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of());
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(0);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    assertThat(result.duplicateCount()).isEqualTo(0);
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
 
@@ -1406,6 +1642,13 @@ class HangarImportServiceTest {
     ShipType type = new ShipType();
     type.setId(UUID.randomUUID());
     type.setName(name);
+    return type;
+  }
+
+  private static ShipType shipTypeWithSlugs(String name, String uexSlug, String scwikiSlug) {
+    ShipType type = shipTypeWithName(name);
+    type.setUexSlug(uexSlug);
+    type.setScwikiSlug(scwikiSlug);
     return type;
   }
 

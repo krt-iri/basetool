@@ -8,6 +8,8 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShiplistEntryDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.StarjumpCanvasItemDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.StarjumpFleetviewerDto;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
@@ -38,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Handles the import of a third-party ship-export JSON into a user's hangar.
  *
- * <p>Two upload formats are accepted and auto-detected from the first JSON element:
+ * <p>Three upload formats are accepted and auto-detected from the payload shape:
  *
  * <ul>
  *   <li><strong>CCU Game Fleetview</strong> — a flat array of {@code {"name", "shipname", "type"}}
@@ -51,10 +53,21 @@ import tools.jackson.databind.ObjectMapper;
  *       (we know it is not lifetime, but we do not know the actual month count). Entries with
  *       {@code entity_type} other than {@code "ship"} are skipped defensively so that HangarXPLOR
  *       module/package rows never become ships.
+ *   <li><strong>StarJump FleetViewer</strong> ("Hangar Link", from {@code
+ *       https://fleetviewer.link}) — a JSON <em>object</em> (not an array) with a {@code
+ *       "type":"starjumpFleetviewer"} discriminator and a {@code canvasItems} array. Only items
+ *       with {@code "itemType":"SHIP"} are imported; decorative {@code TEXTGROUP} labels and other
+ *       widgets are skipped. The {@code defaultText} field supplies the resolvable ship name and
+ *       the kebab-case {@code shipSlug} drives the slug-fallback match stage. No insurance data is
+ *       carried, so imported ships fall back to {@link #DEFAULT_INSURANCE}.
  * </ul>
  *
- * <p>After format-specific parsing the two payloads are unified into a single internal {@link
- * FleetImportEntry} stream, and the rest of the import is format-agnostic.
+ * <p>The two array formats are sniffed from the first array element (field names, not values: a
+ * {@code pledge_id}/{@code ship_code} key flags HangarXPLOR, a {@code shipname}/{@code type} key
+ * flags Fleetview); an object root with a {@code starjumpFleetviewer} type or a {@code canvasItems}
+ * array flags StarJump FleetViewer. After format-specific parsing all three payloads are unified
+ * into a single internal {@link FleetImportEntry} stream, and the rest of the import is
+ * format-agnostic.
  *
  * <p>Each entry is then resolved against existing {@code ShipType} rows through a four-stage
  * tolerant lookup that maximises matches against UEX's canonical naming (the actual content of the
@@ -79,9 +92,16 @@ import tools.jackson.databind.ObjectMapper;
  *   <li><strong>uex-tokens ⊆ fv-tokens, uniquely</strong> — the reverse direction, for cases where
  *       the export uses a longer marketing name than UEX's canonical short name (e.g. {@code "Ursa
  *       Rover"} → UEX {@code "Ursa"}, {@code "325a Fighter"} → UEX {@code "325a"}).
+ *   <li><strong>Slug fallback</strong> (StarJump FleetViewer only) — when all four name stages miss
+ *       (or are left ambiguous), the FleetViewer {@code shipSlug} is folded with the same
+ *       alphanumeric normalisation and matched against {@code ShipType.uexSlug} then {@code
+ *       ShipType.scwikiSlug}. FleetViewer's slug scheme diverges from UEX's just enough that this
+ *       cannot be the primary key (e.g. {@code "zeus-mkii-mr"} vs UEX {@code "zeus-mk-ii-mr"}), but
+ *       as an exact-equality last resort it recovers entries whose display name the matcher could
+ *       not resolve. Non-StarJump entries carry a {@code null} slug and skip this stage entirely.
  * </ol>
  *
- * <p>All four stages are powered by a single {@code shipTypeRepository.findAll()} call up front, so
+ * <p>All five stages are powered by a single {@code shipTypeRepository.findAll()} call up front, so
  * per-entry resolution is in-memory rather than a database round-trip — there are no N+1 queries
  * even for fleet exports with hundreds of entries.
  *
@@ -127,14 +147,15 @@ public class HangarImportService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Parses an uploaded ship-export JSON file (Fleetview or HangarXPLOR Shiplist) and imports all
-   * resolvable ships into the given user's hangar.
+   * Parses an uploaded ship-export JSON file (CCU Game Fleetview, HangarXPLOR Shiplist or StarJump
+   * FleetViewer / "Hangar Link") and imports all resolvable ships into the given user's hangar.
    *
-   * <p>The matcher walks four progressively-looser stages (exact case-insensitive, normalised,
-   * fv-tokens-subset-of-uex, uex-tokens-subset-of-fv) — each later stage runs only if the earlier
-   * ones produced no hit. Stages 3 and 4 require the candidate to be <em>unique</em>; ambiguity
-   * leaves the entry unresolved on purpose so the user must explicitly disambiguate (e.g. choose Mk
-   * I vs Mk II) instead of having the import guess.
+   * <p>The matcher walks four progressively-looser name stages (exact case-insensitive, normalised,
+   * fv-tokens-subset-of-uex, uex-tokens-subset-of-fv) and — for StarJump FleetViewer entries only —
+   * a final slug-fallback stage; each later stage runs only if the earlier ones produced no hit.
+   * Stages 3 and 4 require the candidate to be <em>unique</em>; ambiguity leaves the entry
+   * unresolved on purpose so the user must explicitly disambiguate (e.g. choose Mk I vs Mk II)
+   * instead of having the import guess.
    *
    * <p>The import then ensures that after the operation the hangar contains at least as many ships
    * of each type as the upload specifies; ships already present are never removed. For each
@@ -144,7 +165,8 @@ public class HangarImportService {
    * on them.
    *
    * @param userId user ID from the JWT {@code sub} claim
-   * @param file multipart file containing a CCU Game Fleetview or HangarXPLOR Shiplist JSON export
+   * @param file multipart file containing a CCU Game Fleetview, HangarXPLOR Shiplist or StarJump
+   *     FleetViewer JSON export
    * @return import result with statistics and the deduplicated list of unmatched ship names
    * @throws BadRequestException if the file is empty, not parseable as JSON, or in an unknown
    *     format
@@ -174,7 +196,7 @@ public class HangarImportService {
 
     for (FleetImportEntry entry : entries) {
       String trimmed = entry.name().trim();
-      ShipType match = resolveShipType(index, trimmed);
+      ShipType match = resolveShipType(index, trimmed, entry.slug());
 
       if (match == null) {
         log.debug("Hangar import: no ShipType match for '{}' (user {})", entry.name(), userId);
@@ -259,17 +281,20 @@ public class HangarImportService {
   }
 
   /**
-   * Reads the multipart body, sniffs the format from the first array element, and converts every
-   * record into the format-agnostic {@link FleetImportEntry}. The probe inspects field names rather
-   * than values: a {@code pledge_id} or {@code ship_code} key flags HangarXPLOR Shiplist; a {@code
-   * shipname} or {@code type} key flags CCU Game Fleetview. Records with a blank {@code name} field
-   * or (for Shiplist) an {@code entity_type} other than {@code "ship"} are silently dropped — they
-   * never reach the resolver.
+   * Reads the multipart body, sniffs the format from the payload shape, and converts every record
+   * into the format-agnostic {@link FleetImportEntry}. A JSON <em>object</em> root with a {@code
+   * starjumpFleetviewer} {@code type} or a {@code canvasItems} array is parsed as StarJump
+   * FleetViewer; a JSON <em>array</em> root is probed by field name: a {@code pledge_id} or {@code
+   * ship_code} key flags HangarXPLOR Shiplist; a {@code shipname} or {@code type} key flags CCU
+   * Game Fleetview. Records with a blank {@code name}/{@code defaultText}, a non-{@code "ship"}
+   * {@code entity_type} (Shiplist) or a non-{@code "SHIP"} {@code itemType} (FleetViewer) are
+   * silently dropped — they never reach the resolver.
    *
    * @param file multipart upload from the controller
    * @return parsed entries (possibly empty); never {@code null}
-   * @throws BadRequestException if the JSON is malformed, the root is not an array, or no field on
-   *     the first element matches either known format
+   * @throws BadRequestException if the JSON is malformed, the root is neither an array nor a
+   *     recognised FleetViewer object, or no field on the first array element matches a known
+   *     format
    */
   private @NotNull List<FleetImportEntry> parseEntries(@NotNull MultipartFile file) {
     JsonNode root;
@@ -281,6 +306,12 @@ public class HangarImportService {
       log.warn("Hangar import: failed to parse JSON — {}", e.getMessage());
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
+    }
+
+    // StarJump FleetViewer exports use an object root with a canvasItems array, unlike the two
+    // array-based formats — branch on it before the array contract below.
+    if (root != null && root.isObject() && isStarjumpFleetviewer(root)) {
+      return parseStarjumpEntries(root);
     }
 
     if (root == null || !root.isArray()) {
@@ -322,6 +353,76 @@ public class HangarImportService {
   }
 
   /**
+   * Recognises a StarJump FleetViewer ("Hangar Link") export from its object root. The
+   * authoritative marker is the {@code "type":"starjumpFleetviewer"} discriminator (matched
+   * case-insensitively); a top-level {@code canvasItems} array is accepted as a secondary signal so
+   * a future export that drops or renames the {@code type} field still resolves. Because the two
+   * array formats can never present as an object, the presence of {@code canvasItems} on an object
+   * root is unambiguous.
+   *
+   * @param root the parsed JSON object root
+   * @return {@code true} iff the payload should be parsed as StarJump FleetViewer
+   */
+  private static boolean isStarjumpFleetviewer(@NotNull JsonNode root) {
+    JsonNode type = root.get("type");
+    if (type != null
+        && type.isString()
+        && "starjumpfleetviewer".equals(type.asString().toLowerCase(Locale.ROOT))) {
+      return true;
+    }
+    return root.has("canvasItems");
+  }
+
+  /**
+   * Parses a StarJump FleetViewer object root into the format-agnostic entry stream. Only {@code
+   * SHIP} canvas items survive {@link #mapStarjumpEntry(StarjumpCanvasItemDto)}; decorative {@code
+   * TEXTGROUP} labels and any item without a usable name/slug are dropped. A {@code null} or absent
+   * {@code canvasItems} array yields an empty list rather than an error so an empty FleetViewer
+   * canvas imports as a no-op.
+   *
+   * @param root the parsed JSON object root (already confirmed as FleetViewer)
+   * @return parsed entries (possibly empty); never {@code null}
+   */
+  private @NotNull List<FleetImportEntry> parseStarjumpEntries(@NotNull JsonNode root) {
+    StarjumpFleetviewerDto dto = objectMapper.convertValue(root, StarjumpFleetviewerDto.class);
+    if (dto == null || dto.canvasItems() == null) {
+      return List.of();
+    }
+    return dto.canvasItems().stream()
+        .map(HangarImportService::mapStarjumpEntry)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /**
+   * Lifts a StarJump FleetViewer canvas item into the internal representation. Non-{@code "SHIP"}
+   * items (decorative {@code TEXTGROUP} labels, widgets) are dropped. The {@code defaultText}
+   * becomes the resolvable name; if it is blank the kebab-case {@code shipSlug} is used as the name
+   * fallback so a tile with only a slug can still be matched. The trimmed {@code shipSlug} is
+   * always carried separately to drive the slug-fallback match stage. FleetViewer exports no custom
+   * ship name and no insurance, so both are left {@code null} (insurance falls back to {@link
+   * #DEFAULT_INSURANCE}).
+   *
+   * @param item raw FleetViewer canvas item
+   * @return internal entry, or {@code null} if the item is not a ship or has neither name nor slug
+   */
+  private static @Nullable FleetImportEntry mapStarjumpEntry(@Nullable StarjumpCanvasItemDto item) {
+    if (item == null || item.itemType() == null || !"ship".equalsIgnoreCase(item.itemType())) {
+      return null;
+    }
+    String slug =
+        (item.shipSlug() != null && !item.shipSlug().isBlank()) ? item.shipSlug().trim() : null;
+    String name =
+        (item.defaultText() != null && !item.defaultText().isBlank())
+            ? item.defaultText().trim()
+            : slug;
+    if (name == null) {
+      return null;
+    }
+    return new FleetImportEntry(name, null, null, slug);
+  }
+
+  /**
    * Lifts a Fleetview record into the internal representation. The shipname becomes the individual
    * name when non-blank; insurance is always left {@code null} because Fleetview carries no
    * insurance information.
@@ -335,7 +436,7 @@ public class HangarImportService {
     }
     String individual =
         (dto.shipname() != null && !dto.shipname().isBlank()) ? dto.shipname().trim() : null;
-    return new FleetImportEntry(dto.name(), individual, null);
+    return new FleetImportEntry(dto.name(), individual, null, null);
   }
 
   /**
@@ -358,7 +459,7 @@ public class HangarImportService {
     }
     String individual = computeIndividualNameFromShiplist(dto.name(), dto.shipName());
     String insurance = Boolean.TRUE.equals(dto.lti()) ? LTI_INSURANCE : null;
-    return new FleetImportEntry(dto.name(), individual, insurance);
+    return new FleetImportEntry(dto.name(), individual, insurance, null);
   }
 
   /**
@@ -388,11 +489,12 @@ public class HangarImportService {
   }
 
   /**
-   * Loads every {@code ShipType} once and pre-computes all four lookup forms in a single pass:
-   * exact case-insensitive key, normalised key, and an alphanumeric token set used by the
-   * token-subset stages. The hash maps use {@code putIfAbsent} so that if two ship types collapse
-   * to the same key (very unlikely — the {@code name} column has a unique constraint and ship-type
-   * names are distinct in UEX) the first one encountered wins deterministically.
+   * Loads every {@code ShipType} once and pre-computes every lookup form in a single pass: exact
+   * case-insensitive key, normalised key, an alphanumeric token set used by the token-subset
+   * stages, and the normalised UEX / SC Wiki slug keys used by the slug-fallback stage. The hash
+   * maps use {@code putIfAbsent} so that if two ship types collapse to the same key (very unlikely
+   * — the {@code name} column has a unique constraint and slugs are effectively unique) the first
+   * one encountered wins deterministically.
    *
    * @return the populated lookup index
    */
@@ -412,12 +514,65 @@ public class HangarImportService {
       if (!tokens.isEmpty()) {
         idx.tokenized.add(new TokenView(st, tokens));
       }
+      String uexSlug = normalizeForMatching(st.getUexSlug());
+      if (!uexSlug.isEmpty()) {
+        idx.byUexSlug.putIfAbsent(uexSlug, st);
+      }
+      String scwikiSlug = normalizeForMatching(st.getScwikiSlug());
+      if (!scwikiSlug.isEmpty()) {
+        idx.byScwikiSlug.putIfAbsent(scwikiSlug, st);
+      }
     }
     return idx;
   }
 
   /**
-   * Four-stage resolution against the pre-built index. The earlier stages are deterministic
+   * Resolves an upload entry against the pre-built index: first by name through the four tolerant
+   * name stages, then — only if those all miss or stay ambiguous — by the optional slug fallback.
+   * The slug is supplied for StarJump FleetViewer entries and {@code null} for the array formats,
+   * so for those this behaves exactly like the name-only resolution.
+   *
+   * @param index lookup index produced by {@link #buildShipTypeIndex()}
+   * @param rawName trimmed entry name from the upload
+   * @param slug source-provided ship slug for the fallback stage, or {@code null}
+   * @return the matching {@code ShipType} or {@code null} if neither name nor slug produces a hit
+   */
+  private static @Nullable ShipType resolveShipType(
+      @NotNull ShipTypeIndex index, @NotNull String rawName, @Nullable String slug) {
+    ShipType byName = resolveByName(index, rawName);
+    if (byName != null) {
+      return byName;
+    }
+    return resolveBySlug(index, slug);
+  }
+
+  /**
+   * Slug-fallback stage (StarJump FleetViewer only). Folds the source slug with the same
+   * alphanumeric normalisation used for names and matches it against {@code ShipType.uexSlug}
+   * first, then {@code ShipType.scwikiSlug}. Exact-equality only — FleetViewer's slug scheme
+   * diverges from UEX's enough that fuzzy slug matching would be unsafe. A {@code null}/blank slug
+   * or an empty normalised form short-circuits to {@code null} so non-StarJump entries skip the
+   * stage cleanly.
+   *
+   * @param index lookup index produced by {@link #buildShipTypeIndex()}
+   * @param slug source-provided ship slug, or {@code null}
+   * @return the matching {@code ShipType} or {@code null} if no slug index entry matches
+   */
+  private static @Nullable ShipType resolveBySlug(
+      @NotNull ShipTypeIndex index, @Nullable String slug) {
+    String normSlug = normalizeForMatching(slug);
+    if (normSlug.isEmpty()) {
+      return null;
+    }
+    ShipType match = index.byUexSlug.get(normSlug);
+    if (match != null) {
+      return match;
+    }
+    return index.byScwikiSlug.get(normSlug);
+  }
+
+  /**
+   * Four-stage name resolution against the pre-built index. The earlier stages are deterministic
    * one-shot map lookups; the later (token-subset) stages scan the tokenised view and require the
    * candidate to be unique so an ambiguous abbreviation cannot silently map to the wrong variant.
    *
@@ -425,7 +580,7 @@ public class HangarImportService {
    * @param rawName trimmed entry name from the upload
    * @return the matching {@code ShipType} or {@code null} if no stage produces a unique hit
    */
-  private static @Nullable ShipType resolveShipType(
+  private static @Nullable ShipType resolveByName(
       @NotNull ShipTypeIndex index, @NotNull String rawName) {
     // Stage 1: exact case-insensitive
     ShipType match = index.byExactLower.get(rawName.toLowerCase(Locale.ROOT));
@@ -572,9 +727,14 @@ public class HangarImportService {
    * @param individualName custom display name for the ship, or {@code null}
    * @param insurance explicit insurance string (e.g. {@code "LTI"}), or {@code null} to let the
    *     service fall back to {@link #DEFAULT_INSURANCE}
+   * @param slug source-provided ship slug used for the slug-fallback match stage (StarJump
+   *     FleetViewer only), or {@code null} for formats that carry no slug
    */
   private record FleetImportEntry(
-      @NotNull String name, @Nullable String individualName, @Nullable String insurance) {}
+      @NotNull String name,
+      @Nullable String individualName,
+      @Nullable String insurance,
+      @Nullable String slug) {}
 
   /**
    * Pre-computed multi-key view over the {@code ship_type} table. Built once per import via {@link
@@ -584,6 +744,8 @@ public class HangarImportService {
     private final Map<String, ShipType> byExactLower = new HashMap<>();
     private final Map<String, ShipType> byNormalized = new HashMap<>();
     private final List<TokenView> tokenized = new ArrayList<>();
+    private final Map<String, ShipType> byUexSlug = new HashMap<>();
+    private final Map<String, ShipType> byScwikiSlug = new HashMap<>();
   }
 
   /**
