@@ -73,7 +73,7 @@ Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende 
 | **Warenaufträge (Job Orders): Bearbeiten** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Warenaufträge (Job Orders): Löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Job Orders: Verantwortliche Einheit umschreiben** (`hasRole('LOGISTICIAN')`; Admin frei, Staffel-Logistiker nur Eskalation Staffel→SK) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Material-Eintragungen auf SK-Aufträgen: Eintragen / Ändern / Zurückziehen** (`hasRole('LOGISTICIAN')` + eigene Staffel via `canEditOrgUnit` / verantwortliches SK / Admin) | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Material-Eintragungen auf SK-Aufträgen: Eintragen / Ändern / Zurückziehen** (`hasRole('LOGISTICIAN')` + eigene Staffel via `canEditOrgUnit` / Logistiker **oder** Lead/Offizier des bearbeitenden SK / Admin) | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Missionen: Erstellen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Missionen: Verwalten (Alle)** (`hasRole('MISSION_MANAGER')`) | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Missionen: Verwalten (Eigene/Delegiert)** (`canManageMission`) | ❌ | ✅ | ✅ | ✅ | ✅ |

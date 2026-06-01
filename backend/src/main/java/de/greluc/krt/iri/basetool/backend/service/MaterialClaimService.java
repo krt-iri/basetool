@@ -67,6 +67,7 @@ public class MaterialClaimService {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
+  private final SpecialCommandSecurityService specialCommandSecurityService;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
 
@@ -389,16 +390,19 @@ public class MaterialClaimService {
   }
 
   /**
-   * Enforces the claim permission matrix (decision #8): an admin or an authority of the responsible
-   * SK (a logistician/officer holding contextual authority on that SK) may manage any claim; a
-   * squadron's logistician/officer may manage only claims for their own squadron ({@link
-   * AuthHelperService#canEditOrgUnit}). The bare {@code hasRole('LOGISTICIAN')} controller gate has
-   * already filtered out anyone below logistician.
+   * Enforces the claim permission matrix (decision #8): an admin, or an authority of the
+   * <em>responsible</em> SK, may manage <b>any</b> claim on that order; a squadron's
+   * logistician/officer may manage only claims for their <b>own</b> squadron ({@link
+   * AuthHelperService#canEditOrgUnit}). "Authority of the responsible SK" is a member of that SK
+   * who is either its <b>logistician</b> ({@code is_logistician} → contextual {@code
+   * LOGISTICIAN@skId}) <b>or</b> its <b>lead/officer</b> ({@code is_lead}, via {@link
+   * SpecialCommandSecurityService#canManageMembers}). The bare {@code hasRole('LOGISTICIAN')}
+   * controller gate has already filtered out anyone below logistician.
    *
    * @param order the order whose responsible SK defines the elevated authority.
    * @param claimingOrgUnitId the squadron the claim is for.
-   * @throws AccessDeniedException when the caller may neither manage any claim nor act for this
-   *     squadron.
+   * @throws AccessDeniedException when the caller may neither manage any claim as an SK
+   *     logistician/lead nor act for this squadron.
    */
   private void assertCanManage(JobOrder order, UUID claimingOrgUnitId) {
     if (authHelperService.isAdmin()) {
@@ -406,12 +410,14 @@ public class MaterialClaimService {
     }
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
-        ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
+        ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN")
+            || specialCommandSecurityService.canManageMembers(
+                responsibleSkId, authHelperService.currentAuthentication().orElse(null));
     boolean managesOwnSquadron = authHelperService.canEditOrgUnit(claimingOrgUnitId);
     if (!managesResponsibleSk && !managesOwnSquadron) {
       throw new AccessDeniedException(
-          "You may only manage claims for your own squadron, or any claim as an authority of the"
-              + " responsible Spezialkommando.");
+          "You may only manage claims for your own squadron, or any claim as a logistician or lead"
+              + " of the responsible Spezialkommando.");
     }
   }
 
