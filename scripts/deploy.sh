@@ -215,12 +215,20 @@ EOF
 # --- Apply ------------------------------------------------------------------
 cd "${COMPOSE_DIR}"
 
+# Only pre-pull the images this deploy actually moves (backend + frontend from
+# GHCR). The third-party infra images (keycloak/postgres/redis/npm) are pinned
+# by digest and change only on a deliberate compose edit; pulling them here
+# would make every deploy hostage to a transient outage of a third-party
+# registry (e.g. a quay.io 502/504 on the Keycloak manifest aborting the whole
+# `pull` under `set -e`, before `up` ever runs). The `up -d` below still pulls
+# any infra image that is genuinely missing locally, so a real digest bump is
+# rolled forward — an already-present pinned image is simply reused offline.
 log "pulling images"
 docker compose \
   -f docker-compose.yml \
   -f "${PIN_FILE_CURRENT}" \
   --profile "${PROFILE}" \
-  pull --quiet
+  pull --quiet backend frontend
 
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if docker compose \
