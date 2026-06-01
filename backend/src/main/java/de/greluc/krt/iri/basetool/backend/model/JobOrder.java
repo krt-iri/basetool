@@ -55,15 +55,15 @@ public class JobOrder extends AbstractEntity<UUID> {
    * Spezialkommando (eligibility enforced at the service layer via {@code
    * OrgUnit#isProfitEligible}). Stamped at create time and editable afterwards only through the
    * dedicated reassignment endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}). This
-   * field governs visibility once Phase 3 (#343) lands the scoping (squadron → private to that
-   * squadron + admins, SK → public to all squadrons); until then Job Orders stay a cross-staffel
-   * workspace. {@code nullable} during the Phase 2/3 soak: pre-existing rows are NULL until the
-   * Phase 3 backfill tightens the column to NOT NULL — every newly-created order always stamps it.
+   * field governs visibility (Phase 3, #343): a squadron-responsible order is private to that
+   * squadron + admins, an SK-responsible order is public to all squadrons. The requester does NOT
+   * grant visibility. {@code nullable = false} reflects V130's NOT NULL tightening after the Phase
+   * 3 backfill copied each legacy order's retired {@code creating_org_unit_id} onto this column.
    * The retired {@code creating_org_unit_id} column lives on (nullable, unmapped) until the
    * destructive cleanup release per V129.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "responsible_org_unit_id")
+  @JoinColumn(name = "responsible_org_unit_id", nullable = false)
   private OrgUnit responsibleOrgUnit;
 
   /**

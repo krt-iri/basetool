@@ -74,6 +74,7 @@ public class JobOrderService {
   private final OrgUnitRepository orgUnitRepository;
   private final SystemSettingService systemSettingService;
   private final AuthHelperService authHelperService;
+  private final OwnerScopeService ownerScopeService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
   private final de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
@@ -195,8 +196,7 @@ public class JobOrderService {
    * filter; without it the call returns every status.
    *
    * <p>Delegates to {@link #getAllJobOrders(List, UUID, Pageable)} with a {@code null} squadron
-   * filter for backwards compatibility — existing callers (and admin views in "all squadrons" mode)
-   * keep their cross-staffel result set.
+   * display filter — the visibility scope (Phase 3, #343) is always applied regardless.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
@@ -207,31 +207,42 @@ public class JobOrderService {
   }
 
   /**
-   * Paged list with optional status + squadron filters. Job Orders are a cross-staffel workspace
-   * (MULTI_SQUADRON_PLAN.md section 4.4) so the squadron filter is a UI display preference, not an
-   * access-control gate — the list endpoint accepts the parameter so the frontend can default the
-   * orders-index page to "my squadron only" (matching either {@code creatingSquadron} OR {@code
-   * requestingSquadron} per section 5.3) while still allowing the user to flip back to "all
-   * squadrons".
+   * Paged list with optional status filter and an optional squadron display filter, always
+   * constrained to the caller's visibility scope (Phase 3, #343).
+   *
+   * <p>Job Orders are a <em>conditionally</em> staffel-scoped aggregate: an SK-responsible order is
+   * public to every squadron, a squadron-responsible order is private to that squadron + admins
+   * (the requester does not grant visibility). The scope is resolved from {@link
+   * OwnerScopeService#currentScopePredicate()} and pushed into the repository query so a caller can
+   * never page past their visibility — admins without a pin see everything, an admin pinned to a
+   * squadron (or any non-admin member) sees that scope's private orders plus all SK orders.
+   *
+   * <p>The {@code squadronId} parameter is a pure UI display preference layered on top of the scope
+   * (the orders-index "involving my squadron" toggle, matching responsible OR requesting side); it
+   * can only narrow the already-scoped result, never widen it.
    *
    * @param statuses optional status filter; null/empty means "all"
-   * @param squadronId optional squadron filter (matches creating OR requesting); null means "no
-   *     squadron restriction"
+   * @param squadronId optional display filter (matches responsible OR requesting); null means "no
+   *     display restriction"
    * @param pageable page request
-   * @return paged job orders as DTOs
+   * @return paged job orders as DTOs, scoped to the caller's visibility
    */
   public Page<JobOrderDto> getAllJobOrders(
       List<JobOrderStatus> statuses, UUID squadronId, Pageable pageable) {
-    if (statuses == null || statuses.isEmpty()) {
-      if (squadronId == null) {
-        return jobOrderRepository.findAll(pageable).map(this::mapToDtoWithStock);
-      }
-      return jobOrderRepository
-          .findBySquadronInvolved(squadronId, pageable)
-          .map(this::mapToDtoWithStock);
-    }
+    // Pass the full enum set when no status filter is requested so the repository's IN clause is
+    // never bound with an empty collection (mirrors searchMissions); the boolean-flag alternative
+    // would still have to bind an empty list, which JPQL renders inconsistently across dialects.
+    List<JobOrderStatus> effectiveStatuses =
+        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return jobOrderRepository
-        .findByStatusInAndSquadronInvolved(statuses, squadronId, pageable)
+        .findScopedJobOrders(
+            effectiveStatuses,
+            squadronId,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
         .map(this::mapToDtoWithStock);
   }
 

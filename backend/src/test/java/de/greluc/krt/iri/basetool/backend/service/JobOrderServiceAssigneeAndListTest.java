@@ -98,81 +98,114 @@ class JobOrderServiceAssigneeAndListTest {
   }
 
   // ---------------------------------------------------------------
-  // getAllJobOrders — status-filter routing
+  // getAllJobOrders — status-filter routing + visibility scope (Phase 3, #343)
   // ---------------------------------------------------------------
 
   @Nested
   class GetAllJobOrdersTests {
 
     private final PageRequest pageable = PageRequest.of(0, 10);
+    // The scope predicate is resolved from OwnerScopeService and pushed into the repository query;
+    // every list call must consult it. An admin-all-scope predicate keeps these routing tests
+    // focused on the status/squadron-filter forwarding rather than the scope semantics (those live
+    // in OwnerScopeServiceTest).
+    private final ScopePredicate adminAllScope = new ScopePredicate(true, null, Set.of());
+
+    // No status filter → the service passes the full enum set so the repository IN clause is never
+    // bound with an empty collection.
+    private final List<JobOrderStatus> allStatuses = List.of(JobOrderStatus.values());
+
+    @BeforeEach
+    void stubScope() {
+      lenient().when(ownerScopeService.currentScopePredicate()).thenReturn(adminAllScope);
+    }
 
     @Test
-    void nullStatusList_callsFindAll() {
+    void nullStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      when(jobOrderRepository.findAll(pageable)).thenReturn(page);
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, null, true, null, Set.of(), pageable))
+          .thenReturn(page);
 
       Page<JobOrderDto> result = service.getAllJobOrders(null, pageable);
 
       assertEquals(1, result.getTotalElements());
-      verify(jobOrderRepository, never()).findByStatusIn(any(), any());
+      verify(jobOrderRepository)
+          .findScopedJobOrders(allStatuses, null, true, null, Set.of(), pageable);
     }
 
     @Test
-    void emptyStatusList_callsFindAll() {
+    void emptyStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      when(jobOrderRepository.findAll(pageable)).thenReturn(page);
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, null, true, null, Set.of(), pageable))
+          .thenReturn(page);
 
       service.getAllJobOrders(List.of(), pageable);
 
-      verify(jobOrderRepository).findAll(pageable);
-      verify(jobOrderRepository, never()).findByStatusIn(any(), any());
+      verify(jobOrderRepository)
+          .findScopedJobOrders(allStatuses, null, true, null, Set.of(), pageable);
     }
 
     @Test
-    void populatedStatusList_routedToFindByStatusInAndSquadronInvolved() {
+    void populatedStatusList_forwardsStatusesAndScope() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      // After the dual-squadron list filter (MULTI_SQUADRON_PLAN.md §5.3) the service routes
-      // every populated-status call through findByStatusInAndSquadronInvolved with a {@code null}
-      // squadronId for the legacy two-arg entry point — the JPQL {@code :squadronId IS NULL OR
-      // ...} branch makes that equivalent to the old findByStatusIn for callers that did not
-      // opt into the squadron filter.
-      when(jobOrderRepository.findByStatusInAndSquadronInvolved(
-              List.of(JobOrderStatus.OPEN), null, pageable))
+      when(jobOrderRepository.findScopedJobOrders(
+              List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable))
           .thenReturn(page);
 
       service.getAllJobOrders(List.of(JobOrderStatus.OPEN), pageable);
 
       verify(jobOrderRepository)
-          .findByStatusInAndSquadronInvolved(List.of(JobOrderStatus.OPEN), null, pageable);
-      verify(jobOrderRepository, never()).findAll(pageable);
+          .findScopedJobOrders(List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable);
     }
 
     @Test
-    void populatedStatusListWithSquadronId_passesSquadronIdToRepository() {
+    void populatedStatusListWithSquadronId_passesSquadronDisplayFilter() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      java.util.UUID squadronId = java.util.UUID.randomUUID();
-      when(jobOrderRepository.findByStatusInAndSquadronInvolved(
-              List.of(JobOrderStatus.OPEN), squadronId, pageable))
+      UUID squadronId = UUID.randomUUID();
+      when(jobOrderRepository.findScopedJobOrders(
+              List.of(JobOrderStatus.OPEN), squadronId, true, null, Set.of(), pageable))
           .thenReturn(page);
 
       service.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, pageable);
 
       verify(jobOrderRepository)
-          .findByStatusInAndSquadronInvolved(List.of(JobOrderStatus.OPEN), squadronId, pageable);
+          .findScopedJobOrders(
+              List.of(JobOrderStatus.OPEN), squadronId, true, null, Set.of(), pageable);
     }
 
     @Test
-    void emptyStatusListWithSquadronId_callsFindBySquadronInvolved() {
+    void emptyStatusListWithSquadronId_keepsDisplayFilterAndFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
-      java.util.UUID squadronId = java.util.UUID.randomUUID();
-      when(jobOrderRepository.findBySquadronInvolved(squadronId, pageable)).thenReturn(page);
+      UUID squadronId = UUID.randomUUID();
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, squadronId, true, null, Set.of(), pageable))
+          .thenReturn(page);
 
       service.getAllJobOrders(List.of(), squadronId, pageable);
 
-      // With an empty status filter, the squadron filter alone routes through the dedicated
-      // findBySquadronInvolved query rather than degrading to findAll.
-      verify(jobOrderRepository).findBySquadronInvolved(squadronId, pageable);
-      verify(jobOrderRepository, never()).findAll(pageable);
+      verify(jobOrderRepository)
+          .findScopedJobOrders(allStatuses, squadronId, true, null, Set.of(), pageable);
+    }
+
+    @Test
+    void nonAdminScope_forwardsMemberUnionToRepository() {
+      // A non-admin member with a two-OrgUnit membership union: the predicate's memberOrgUnitIds
+      // must reach the repository verbatim so the IN-clause scoping applies.
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      UUID sqA = UUID.randomUUID();
+      UUID sqB = UUID.randomUUID();
+      Set<UUID> union = Set.of(sqA, sqB);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, null, union));
+      when(jobOrderRepository.findScopedJobOrders(allStatuses, null, false, null, union, pageable))
+          .thenReturn(page);
+
+      service.getAllJobOrders(null, pageable);
+
+      verify(jobOrderRepository)
+          .findScopedJobOrders(allStatuses, null, false, null, union, pageable);
     }
   }
 

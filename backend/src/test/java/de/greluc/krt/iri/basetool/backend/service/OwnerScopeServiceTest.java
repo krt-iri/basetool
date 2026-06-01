@@ -21,9 +21,11 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -62,6 +64,7 @@ class OwnerScopeServiceTest {
   @Mock private AuthHelperService authHelper;
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
+  @Mock private JobOrderRepository jobOrderRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
@@ -333,6 +336,116 @@ class OwnerScopeServiceTest {
       when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
 
       assertFalse(service.canEditMission(missionId));
+    }
+  }
+
+  @Nested
+  class CanSeeJobOrderTests {
+
+    @Test
+    void skResponsibleOrder_isPublicToEveryone() {
+      // An SK-responsible order is the shared central queue: visible to any caller without a
+      // squadron-scope check. No auth stubbing required — the SK short-circuit fires first.
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+
+      assertTrue(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_visibleToMemberOfThatSquadron() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      stubMemberInSquadronA();
+
+      assertTrue(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_invisibleToForeignSquadronMember() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
+      stubMemberInSquadronA();
+
+      assertFalse(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_visibleToAdminWithoutPin() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_invisibleToAdminPinnedToOtherSquadron() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertFalse(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void unknownOrder_returnsFalse() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+      assertFalse(service.canSeeJobOrder(orderId));
+    }
+  }
+
+  @Nested
+  class CanEditJobOrderTests {
+
+    @Test
+    void skResponsibleOrder_isOpenToTheRoleGate() {
+      // SK-order edits are governed by the endpoint's LOGISTICIAN+ role gate, not by squadron
+      // scope;
+      // this method therefore returns true for the SK case so any profit squadron can contribute.
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+
+      assertTrue(service.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_editableByMemberOfThatSquadron() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
+      stubMemberInSquadronA();
+
+      assertTrue(service.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void squadronResponsibleOrder_notEditableByForeignSquadronMember() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
+      stubMemberInSquadronA();
+
+      assertFalse(service.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void unknownOrder_returnsFalse() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+      assertFalse(service.canEditJobOrder(orderId));
     }
   }
 
@@ -806,6 +919,24 @@ class OwnerScopeServiceTest {
     mission.setOwningOrgUnit(owningSquadron);
     mission.setIsInternal(isInternal);
     return mission;
+  }
+
+  /** Builds a {@link JobOrder} responsible to the given org unit (Squadron or SpecialCommand). */
+  private static de.greluc.krt.iri.basetool.backend.model.JobOrder jobOrderResponsibleTo(
+      UUID id, de.greluc.krt.iri.basetool.backend.model.OrgUnit responsible) {
+    de.greluc.krt.iri.basetool.backend.model.JobOrder o =
+        new de.greluc.krt.iri.basetool.backend.model.JobOrder();
+    o.setId(id);
+    o.setResponsibleOrgUnit(responsible);
+    return o;
+  }
+
+  /** Builds a {@link SpecialCommand} with a random id, used as an SK-responsible org unit. */
+  private static SpecialCommand newSpecialCommand() {
+    SpecialCommand sc = new SpecialCommand();
+    sc.setId(UUID.randomUUID());
+    sc.setShorthand("SKX");
+    return sc;
   }
 
   private void stubMemberInSquadronA() {

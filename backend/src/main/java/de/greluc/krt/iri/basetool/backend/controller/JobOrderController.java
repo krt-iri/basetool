@@ -55,10 +55,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the job-order aggregate (the squadron's request-and-fulfill queue). Reads are
- * open to any authenticated user; mutations require LOGISTICIAN or above; delete is ADMIN-only.
- * Job-order creation is {@code permitAll()} so unauthenticated squadron members can file requests
- * via a public form.
+ * REST surface over the job-order aggregate (the request-and-fulfill queue). Detail reads and
+ * mutations are constrained to the caller's visibility scope (Phase 3, #343) via {@code
+ * @ownerScopeService.canSee/canEditJobOrder}: SK-responsible orders are public, squadron-
+ * responsible orders private to that squadron + admins. Mutations additionally require LOGISTICIAN
+ * or above; delete is ADMIN-only. Job-order creation is {@code permitAll()} so unauthenticated
+ * squadron members can file requests via a public form (routed onto the configured intake SK).
  *
  * <p>Heavy concurrency lives in the service layer: {@code updateJobOrderPriority} acquires a
  * pessimistic write lock for the reorder shift; {@code updateJobOrderStatus} atomically unlinks
@@ -96,7 +98,9 @@ public class JobOrderController {
   @Operation(
       summary = "Create a job order handover",
       description = "Logs a handover of materials for this job order.")
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN'))"
+          + " and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
@@ -116,7 +120,9 @@ public class JobOrderController {
   @Operation(
       summary = "Create an item handover",
       description = "Logs a handover of produced items for this item order.")
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN'))"
+          + " and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
@@ -147,7 +153,9 @@ public class JobOrderController {
         responseCode = "404",
         description = "Job order or item handover not found")
   })
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
+          + " and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> downloadItemHandoverReport(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID handoverId,
@@ -195,7 +203,9 @@ public class JobOrderController {
         responseCode = "404",
         description = "Job order or handover not found")
   })
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
+          + " and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> downloadHandoverReport(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID handoverId,
@@ -240,7 +250,9 @@ public class JobOrderController {
         responseCode = "403",
         description = "Forbidden")
   })
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
+          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> previewHandoverReport(
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
@@ -418,15 +430,16 @@ public class JobOrderController {
 
   /**
    * Paged job-order list. Default sort is by {@code priority,asc} (lowest priority = top of queue),
-   * filterable by one or more statuses and optionally by squadron involvement (creating OR
-   * requesting). The squadron filter is a UI display preference rather than an access-control gate
-   * — Job Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 4.4), and any
-   * authenticated caller is allowed to ask for the cross-staffel union by omitting the parameter.
+   * filterable by one or more statuses and optionally by squadron involvement (responsible OR
+   * requesting). The result is always constrained to the caller's visibility scope (Phase 3, #343):
+   * SK-responsible orders are public to all, squadron-responsible orders only to that squadron +
+   * admins. The {@code squadronId} parameter is a pure UI display preference layered on top of that
+   * scope — it can only narrow the already-scoped result, never widen it.
    *
    * @param status optional status filter (logical OR across values)
-   * @param squadronId optional squadron filter; matches orders whose creating OR requesting
-   *     squadron equals this id. {@code null} means "no squadron restriction" (cross-staffel view).
-   * @return paged job-order DTOs
+   * @param squadronId optional display filter; matches orders whose responsible OR requesting org
+   *     unit equals this id. {@code null} means "no display restriction" (full scoped view).
+   * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
   @Operation(
@@ -480,7 +493,7 @@ public class JobOrderController {
   @Operation(
       summary = "Get job order by ID",
       description = "Returns a job order and calculates the current material stock.")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     return jobOrderService.getJobOrderById(id);
@@ -498,7 +511,7 @@ public class JobOrderController {
   @Operation(
       summary = "Get inventory items for a job order material",
       description = "Returns all inventory items linked to a specific material in a job order.")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto>
       getInventoryItemsForJobOrderMaterial(@PathVariable UUID id, @PathVariable UUID matId) {
@@ -537,7 +550,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -556,7 +569,7 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order priority",
       description = "Updates priority and shifts others.")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderPriority(@PathVariable UUID id, @RequestParam Integer priority) {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
@@ -570,7 +583,7 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -591,7 +604,7 @@ public class JobOrderController {
       description =
           "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
               + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
@@ -645,7 +658,9 @@ public class JobOrderController {
         responseCode = "404",
         description = "Job order or material not found")
   })
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
+          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
@@ -675,7 +690,9 @@ public class JobOrderController {
         responseCode = "404",
         description = "Job order or inventory item not found")
   })
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
+          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public void unlinkInventoryItem(
       @PathVariable UUID jobOrderId, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);
@@ -693,7 +710,7 @@ public class JobOrderController {
    */
   @PostMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Add an assignee", description = "Adds a user to the job order.")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   public JobOrderDto addAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, userId);
@@ -710,7 +727,7 @@ public class JobOrderController {
    */
   @DeleteMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Remove an assignee", description = "Removes a user from the job order.")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   public JobOrderDto removeAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, userId);
