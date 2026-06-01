@@ -535,6 +535,94 @@ public class JobOrderService {
   }
 
   /**
+   * Full edit of an {@code ITEM} order's ordered-item lines plus its metadata. Rebuilds the item
+   * lines from scratch (mirroring {@link #createItemJobOrder}): each line's required materials are
+   * re-derived and re-snapshotted from its chosen blueprint, and sub-assembly provenance is
+   * reconstructed from the transient {@code clientLineId}/{@code parentClientLineId} hints. Editing
+   * is only permitted while the order has <strong>no item-handover</strong> yet — once any partial
+   * delivery has been recorded the lines are frozen, because reconciling delivered quantities
+   * against a changed line set is out of scope (decision from the item-edit follow-up).
+   *
+   * <p>Because the derived buckets can change, the orphaned-claim reconciliation hook runs
+   * afterwards: a claim on a material+quality bucket that the new lines no longer require is
+   * withdrawn (decision #6). Claims are an independent aggregate, so this never bumps the order's
+   * {@code @Version} (see {@code MaterialClaimService}). The responsible org unit is not touched
+   * here — it is mutated only through the reassignment endpoint, exactly like {@link
+   * #updateJobOrder}.
+   *
+   * @param id the order id.
+   * @param updateDto the new item lines + metadata (carries the expected version).
+   * @return the persisted order DTO with re-derived materials + aggregation.
+   * @throws NotFoundException when the order, a game item or a blueprint id is unknown.
+   * @throws BadRequestException when the order is not an item order, already has item-handovers, or
+   *     a chosen blueprint does not produce its line's game item.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale.
+   */
+  @Transactional
+  public JobOrderDto updateItemJobOrder(UUID id, CreateJobOrderItemRequestDto updateDto) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+
+    if (jobOrder.getType() != JobOrderType.ITEM) {
+      throw new BadRequestException(
+          "Order " + id + " is not an item order; use the material-order update endpoint.");
+    }
+    if (updateDto.version() != null
+        && jobOrder.getVersion() != null
+        && !jobOrder.getVersion().equals(updateDto.version())) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
+    }
+    if (jobOrder.getItemHandovers() != null && !jobOrder.getItemHandovers().isEmpty()) {
+      throw new BadRequestException(
+          "Item order " + id + " already has handovers and can no longer be edited.");
+    }
+
+    // The requesting (customer) org unit is freely editable; a null id leaves it unchanged. The
+    // responsible org unit stays put (reassignment endpoint owns it).
+    if (updateDto.requestingOrgUnitId() != null) {
+      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+    }
+    jobOrder.setHandle(updateDto.handle());
+    jobOrder.setComment(normalizeComment(updateDto.comment()));
+
+    // Rebuild the ordered-item lines: orphanRemoval cascades the delete of the old lines and their
+    // derived JobOrderItemMaterial rows; buildItemLine re-derives + re-snapshots from the
+    // blueprint.
+    jobOrder.getItems().clear();
+    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
+    List<JobOrderItem> built = new ArrayList<>();
+    for (CreateJobOrderItemLineDto line : updateDto.items()) {
+      JobOrderItem item = jobOrderItemService.buildItemLine(line);
+      jobOrder.addItem(item);
+      built.add(item);
+      if (line.clientLineId() != null) {
+        byClientId.put(line.clientLineId(), item);
+      }
+    }
+    for (int i = 0; i < updateDto.items().size(); i++) {
+      Integer parentClientId = updateDto.items().get(i).parentClientLineId();
+      if (parentClientId == null) {
+        continue;
+      }
+      JobOrderItem parent = byClientId.get(parentClientId);
+      if (parent != null && parent != built.get(i)) {
+        built.get(i).setParentItem(parent);
+      }
+    }
+
+    jobOrder = jobOrderRepository.save(jobOrder);
+    jobOrderRepository.flush();
+
+    // Reconciliation (Phase 4 / #344, decision #6): withdraw claims whose bucket the re-derived
+    // lines no longer require.
+    materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
+    return mapToDtoWithStock(jobOrder);
+  }
+
+  /**
    * Hard-deletes a job order. Backend rejects the delete when linked inventory items exist (must be
    * unlinked first via {@link #unlinkInventoryItem}).
    *

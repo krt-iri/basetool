@@ -62,6 +62,12 @@ class JobOrderServiceTest {
 
   @Mock private MaterialClaimService materialClaimService;
 
+  @Mock private JobOrderItemService jobOrderItemService;
+
+  @Mock
+  private de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
+      jobOrderItemHandoverMapper;
+
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;
@@ -1024,5 +1030,114 @@ class JobOrderServiceTest {
     assertEquals(dto4.id(), result.get(1).id(), "2nd: Alpha, quality 80, ArcCorp, amount 10");
     assertEquals(dto1.id(), result.get(2).id(), "3rd: Alpha, quality 80, Baijini, amount 5");
     assertEquals(dto3.id(), result.get(3).id(), "4th: Beta, quality 70, ArcCorp");
+  }
+
+  // ---------------------------------------------------------------
+  // updateItemJobOrder — item-order edit (item lines + metadata)
+  // ---------------------------------------------------------------
+
+  @org.junit.jupiter.api.Nested
+  class UpdateItemJobOrderTests {
+
+    private de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto oneLine(
+        Long version) {
+      return new de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+          null,
+          null,
+          "edited",
+          null,
+          List.of(
+              new de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+          version);
+    }
+
+    private JobOrder itemOrder() {
+      JobOrder order = new JobOrder();
+      order.setId(orderId);
+      order.setType(JobOrderType.ITEM);
+      order.setStatus(de.greluc.krt.iri.basetool.backend.model.JobOrderStatus.OPEN);
+      order.setVersion(1L);
+      return order;
+    }
+
+    @Test
+    void nonItemOrder_throwsBadRequest() {
+      JobOrder material = new JobOrder();
+      material.setId(orderId);
+      material.setType(JobOrderType.MATERIAL);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(material));
+
+      assertThrows(
+          de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(null)));
+      verify(jobOrderItemService, never()).buildItemLine(any());
+    }
+
+    @Test
+    void orderWithItemHandover_throwsBadRequest() {
+      JobOrder order = itemOrder();
+      order
+          .getItemHandovers()
+          .add(new de.greluc.krt.iri.basetool.backend.model.JobOrderItemHandover());
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+
+      assertThrows(
+          de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(null)));
+      verify(jobOrderItemService, never()).buildItemLine(any());
+    }
+
+    @Test
+    void versionMismatch_throws409() {
+      JobOrder order = itemOrder();
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+
+      assertThrows(
+          org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(99L)));
+      verify(jobOrderItemService, never()).buildItemLine(any());
+    }
+
+    @Test
+    void happyPath_rebuildsLines_wiresSubAssembly_andWithdrawsOrphanClaims() {
+      JobOrder order = itemOrder();
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+      // mapToDtoWithStock reads the item projections for an ITEM order.
+      when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
+      when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
+      // Each line builds a distinct managed JobOrderItem.
+      when(jobOrderItemService.buildItemLine(any()))
+          .thenAnswer(inv -> new de.greluc.krt.iri.basetool.backend.model.JobOrderItem());
+
+      // Two lines, the second adopted as a sub-assembly of the first (parentClientLineId = 1).
+      de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+          new de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+              null,
+              null,
+              "edited",
+              null,
+              List.of(
+                  new de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
+                  new de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
+              1L);
+
+      jobOrderService.updateItemJobOrder(orderId, dto);
+
+      // Both lines were (re-)built and attached, and the orphan-claim reconciliation ran.
+      verify(jobOrderItemService, times(2)).buildItemLine(any());
+      assertEquals(2, order.getItems().size(), "the two new lines replace the old set");
+      java.util.List<de.greluc.krt.iri.basetool.backend.model.JobOrderItem> items =
+          new java.util.ArrayList<>(order.getItems());
+      assertTrue(
+          items.stream().anyMatch(i -> i.getParentItem() != null),
+          "the adopted line keeps its sub-assembly parent");
+      verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(order);
+      assertEquals("edited", order.getHandle());
+    }
   }
 }

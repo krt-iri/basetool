@@ -26,6 +26,12 @@
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
             <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
+            <!-- Item orders are edited on the reused create form; only while no item-handover has
+                 been recorded (afterwards the lines are frozen). -->
+            <a sec:authorize="hasRole('LOGISTICIAN')"
+               th:if="${order.type == 'ITEM' and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
+               th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn"
+               th:text="#{orders.detail.edit.items}">Items bearbeiten</a>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>

@@ -590,6 +590,44 @@ public class JobOrderController {
   }
 
   /**
+   * Full edit of an item order's ordered-item lines + metadata. Only permitted while the order has
+   * no item-handover yet; the required materials are re-derived from each line's blueprint and any
+   * claim whose bucket the new lines no longer require is auto-withdrawn.
+   *
+   * @param id item-order id
+   * @param dto the new item lines + metadata (carries the expected version)
+   * @return the persisted order with re-derived materials
+   */
+  @PutMapping("/{id}/items")
+  @Operation(
+      summary = "Update an item job order",
+      description =
+          "Replaces the ordered-item lines and metadata of an item order; required materials are"
+              + " re-derived from each line's blueprint. Rejected once the order has any handover.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Item order updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Not an item order, already has handovers, or an invalid blueprint choice"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Forbidden"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Order, item or blueprint not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "Conflict – optimistic locking failure (version mismatch)")
+  })
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  public JobOrderDto updateItemJobOrder(
+      @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
+    return jobOrderService.updateItemJobOrder(id, dto);
+  }
+
+  /**
    * Reassigns the responsible (processing) org unit of an order. Admins may reassign freely to any
    * profit-eligible org unit; a squadron logistician/officer may only escalate their own squadron's
    * order to a Spezialkommando. The detailed permission rule is enforced in the service.

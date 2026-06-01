@@ -448,6 +448,166 @@ public class JobOrderPageController {
   }
 
   /**
+   * Renders the item-order edit page — the create form reused in edit mode. Loads the order, blocks
+   * non-item orders and orders that already have an item-handover (those are frozen), prefills the
+   * metadata form, and injects the existing item lines as {@code window.EDIT_ITEMS} so the create
+   * form's JS rebuilds them (item + blueprint + amount + per-material quality + sub-assembly
+   * parent).
+   *
+   * @param id the item-order id
+   * @param model Thymeleaf model
+   * @param redirectAttributes flash carrier for the block cases
+   * @return the {@code orders-create} view (in edit mode) or a redirect to the detail page
+   */
+  @GetMapping("/{id}/items/edit")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public String viewEditItemForm(
+      @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
+    JobOrderDto order;
+    try {
+      order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+    } catch (Exception e) {
+      log.error("Failed to load item order for editing", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
+      return "redirect:/orders";
+    }
+    if (order == null || !"ITEM".equals(order.type())) {
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
+      return "redirect:/orders/" + id;
+    }
+    if (order.itemHandovers() != null && !order.itemHandovers().isEmpty()) {
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.hasHandovers");
+      return "redirect:/orders/" + id;
+    }
+
+    // The shared create template renders both the (hidden) material form and the item form, so the
+    // material form's th:object bean must exist even in item-edit mode.
+    if (!model.containsAttribute("jobOrderForm")) {
+      model.addAttribute("jobOrderForm", new JobOrderForm());
+    }
+    if (!model.containsAttribute("jobOrderItemForm")) {
+      JobOrderItemForm itemForm = new JobOrderItemForm();
+      itemForm.setHandle(order.handle());
+      itemForm.setComment(order.comment());
+      itemForm.setRequestingOrgUnitId(
+          order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
+      itemForm.setVersion(order.version());
+      model.addAttribute("jobOrderItemForm", itemForm);
+    }
+    model.addAttribute("editOrderId", id);
+    model.addAttribute("editItems", buildEditItems(order));
+    model.addAttribute("materials", fetchMaterials());
+    model.addAttribute("orderableItems", fetchOrderableItems());
+    model.addAttribute("squadrons", fetchSquadrons());
+    addOwnerPickerOptions(model);
+    return "orders-create";
+  }
+
+  /**
+   * Builds the prefill payload for {@code window.EDIT_ITEMS}: one entry per ordered-item line with
+   * its game item, blueprint, amount, the index of its sub-assembly parent line (or {@code null}),
+   * and a material-id → quality map. The list index doubles as the client line id, so a child's
+   * {@code parentId} is the list index of its parent.
+   *
+   * @param order the item order being edited
+   * @return the JS-serializable prefill list (Thymeleaf inlines it as a JSON array)
+   */
+  private List<java.util.Map<String, Object>> buildEditItems(JobOrderDto order) {
+    List<de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto> items =
+        order.items() != null ? order.items() : List.of();
+    java.util.Map<UUID, Integer> idToIndex = new java.util.HashMap<>();
+    for (int i = 0; i < items.size(); i++) {
+      idToIndex.put(items.get(i).id(), i);
+    }
+    List<java.util.Map<String, Object>> result = new ArrayList<>();
+    for (de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto line : items) {
+      java.util.Map<String, String> qualities = new java.util.LinkedHashMap<>();
+      if (line.materials() != null) {
+        for (de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemMaterialDto m :
+            line.materials()) {
+          if (m.material() != null && m.material().id() != null) {
+            qualities.put(m.material().id().toString(), m.qualityRequirement());
+          }
+        }
+      }
+      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
+      entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
+      entry.put("blueprintId", line.blueprint() != null ? line.blueprint().id().toString() : null);
+      entry.put("amount", line.amount() != null ? line.amount() : 1);
+      entry.put(
+          "parentId", line.parentItemId() != null ? idToIndex.get(line.parentItemId()) : null);
+      entry.put("qualities", qualities);
+      result.add(entry);
+    }
+    return result;
+  }
+
+  /**
+   * Persists an edit to an item order's lines + metadata. Mirrors {@link #createItemOrder}'s
+   * payload build but relays to the backend item-edit endpoint ({@code PUT
+   * /api/v1/orders/{id}/items}) and redirects back to the detail page.
+   *
+   * @param id the item-order id
+   * @param form the bound item-order form (lines rebuilt client-side)
+   * @param redirectAttributes flash carrier
+   * @return redirect to the detail page
+   */
+  @PostMapping("/{id}/items/update")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public String updateItemOrder(
+      @PathVariable UUID id,
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      RedirectAttributes redirectAttributes) {
+    try {
+      List<CreateJobOrderItemLineDto> lines =
+          form.getItems().stream()
+              .filter(
+                  l ->
+                      l.getGameItemId() != null
+                          && l.getBlueprintId() != null
+                          && l.getAmount() != null
+                          && l.getAmount() > 0)
+              .map(
+                  l ->
+                      new CreateJobOrderItemLineDto(
+                          l.getGameItemId(),
+                          l.getBlueprintId(),
+                          l.getAmount(),
+                          l.getMaterials().stream()
+                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                              .map(
+                                  m ->
+                                      new CreateJobOrderItemMaterialDto(
+                                          m.getMaterialId(), m.getQuality()))
+                              .collect(Collectors.toList()),
+                          l.getClientLineId(),
+                          l.getParentClientLineId()))
+              .collect(Collectors.toList());
+
+      if (lines.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
+        return "redirect:/orders/" + id + "/items/edit";
+      }
+
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
+      return "redirect:/orders/" + id;
+    } catch (Exception e) {
+      log.error("Failed to update item order {}", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+      return "redirect:/orders/" + id + "/items/edit";
+    }
+  }
+
+  /**
    * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
    * given orderable item. Relays to the backend item-catalog endpoint.
    *

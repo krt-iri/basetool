@@ -4525,6 +4525,105 @@
         }
       }
     },
+    "/api/v1/orders/{id}/items" : {
+      "put" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Update an item job order",
+        "description" : "Replaces the ordered-item lines and metadata of an item order; required materials are re-derived from each line's blueprint. Rejected once the order has any handover.",
+        "operationId" : "updateItemJobOrder",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobOrderItemRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Item order updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operations/{id}" : {
       "get" : {
         "tags" : [ "Operations" ],
@@ -34601,6 +34700,91 @@
         },
         "required" : [ "status", "version" ]
       },
+      "CreateJobOrderItemLineDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "blueprintId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemMaterialDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "clientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "parentClientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "amount", "blueprintId", "gameItemId" ]
+      },
+      "CreateJobOrderItemMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quality" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          }
+        },
+        "required" : [ "materialId", "quality" ]
+      },
+      "CreateJobOrderItemRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "responsibleOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "requestingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "handle" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemLineDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "items" ]
+      },
       "OperationUpdateDto" : {
         "type" : "object",
         "properties" : {
@@ -36219,91 +36403,6 @@
           }
         },
         "required" : [ "amount", "inventoryItemId" ]
-      },
-      "CreateJobOrderItemLineDto" : {
-        "type" : "object",
-        "properties" : {
-          "gameItemId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "blueprintId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "amount" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
-          },
-          "materials" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/CreateJobOrderItemMaterialDto"
-            },
-            "maxItems" : 100,
-            "minItems" : 0
-          },
-          "clientLineId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "parentClientLineId" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        },
-        "required" : [ "amount", "blueprintId", "gameItemId" ]
-      },
-      "CreateJobOrderItemMaterialDto" : {
-        "type" : "object",
-        "properties" : {
-          "materialId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "quality" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
-          }
-        },
-        "required" : [ "materialId", "quality" ]
-      },
-      "CreateJobOrderItemRequestDto" : {
-        "type" : "object",
-        "properties" : {
-          "responsibleOrgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "requestingOrgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "handle" : {
-            "type" : "string",
-            "maxLength" : 200,
-            "minLength" : 0
-          },
-          "comment" : {
-            "type" : "string",
-            "maxLength" : 1000,
-            "minLength" : 0
-          },
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/CreateJobOrderItemLineDto"
-            },
-            "maxItems" : 50,
-            "minItems" : 0
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "items" ]
       },
       "OperationCreateDto" : {
         "type" : "object",
