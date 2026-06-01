@@ -1473,19 +1473,24 @@ input[type="radio"]:focus {
 .sidebar {
     position: fixed;
     top: 0;
-    left: -400px; /* Hidden by default + border/padding */
+    left: 0;
     width: 380px;
     max-width: 85vw;
     height: 100vh;
     z-index: 2000;
-    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Animate transform (compositor-only) instead of `left` to avoid a
+       full reflow + repaint of the drawer on every frame while opening. */
+    transform: translateX(calc(-100% - 20px));
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
     background-color: var(--color-bg-dark-gray);
     box-shadow: var(--shadow-drawer);
     overflow: hidden auto;
 }
 
 .sidebar.open {
-    left: 0;
+    transform: translateX(0);
 }
 
 .sidebar-content {
@@ -1504,7 +1509,6 @@ input[type="radio"]:focus {
     width: 100vw;
     height: 100vh;
     background-color: rgb(0 0 0 / 80%);
-    backdrop-filter: blur(4px);
     z-index: 1999;
     opacity: 0;
     visibility: hidden;
@@ -1795,6 +1799,76 @@ input[type="radio"]:focus {
    glance during handover preparation. */
 .inventory-row-foreign-jobOrder {
     border-left: 4px solid var(--color-secondary);
+}
+
+/* Order-kind chip — distinguishes the two job-order kinds (Material procurement
+   vs finished-Item manufacture) in the list and on the detail header. Reuses the
+   squadron-badge pill chrome with currentColor borders: Material orders take the
+   brand orange, Item orders the Forschung blue (manufacturing/derivation semantic). */
+.order-kind-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem var(--space-2);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-pill);
+    font-family: Lato, sans-serif;
+    font-size: 0.7rem;
+    font-weight: var(--fw-bold);
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.order-kind-material {
+    color: var(--color-primary);
+}
+
+.order-kind-item {
+    color: var(--color-info);
+}
+
+/* Quality chip for an item order's aggregated-materials panel — one row per
+   (material, quality). GOOD (700+) reads as the Profit green; NONE ("Keine")
+   takes the muted grey so "no quality floor" never competes for attention. */
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem var(--space-2);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-pill);
+    font-family: Lato, sans-serif;
+    font-size: 0.7rem;
+    font-weight: var(--fw-bold);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.quality-good {
+    color: var(--color-success);
+}
+
+.quality-none {
+    color: var(--color-gray-1);
+    border-color: var(--color-gray-2);
+}
+
+/* Sub-assembly provenance marker on an ordered item line that was adopted from a
+   parent item's blueprint ITEM ingredient. Square, muted, low-key — it annotates
+   provenance without pulling focus from the item name. */
+.subassembly-tag {
+    display: inline-flex;
+    align-items: center;
+    margin-left: var(--space-2);
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--color-gray-2);
+    color: var(--color-gray-1);
+    font-family: Lato, sans-serif;
+    font-size: 0.65rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
 }
 
 /* Department tag — small square chip tinted by the owning Bereichsfarbe.

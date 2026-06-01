@@ -25,7 +25,7 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole('LOGISTICIAN')" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
+            <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-secondary" th:text="#{orders.detail.delete}">Löschen</button>
             </form>
@@ -72,6 +72,13 @@
                 <span th:text="${order.handle}"></span>
             </div>
             <div>
+                <strong th:text="#{orders.create.kind}">Auftragsart</strong><br>
+                <span th:switch="${order.type}" style="display: inline-block; margin-top: 0.25rem;">
+                    <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                    <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                </span>
+            </div>
+            <div>
                 <strong th:text="#{orders.index.status}">Status</strong><br>
                 <!-- DEBUG: Authorities: [[${#authentication.authorities}]] -->
                 <div sec:authorize="!hasRole('LOGISTICIAN')" style="margin-top: 0.25rem;">
@@ -99,6 +106,10 @@
             <span th:text="${order.comment}" style="white-space: pre-wrap;"></span>
         </div>
 
+        <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
+             linked-inventory drill-down). ITEM orders render the ordered-items table plus the
+             internal aggregated-materials view further below instead. -->
+        <th:block th:if="${order.type != 'ITEM'}">
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -140,7 +151,93 @@
             </tbody>
         </table>
         </div>
-        
+        </th:block>
+
+        <!-- ITEM orders: (1) the ordered finished items with delivery progress and sub-assembly
+             provenance, (2) a warning banner for items whose blueprint derived no procurable
+             material, and (3) the internal aggregated-materials view (one row per material+quality,
+             unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
+        <th:block th:if="${order.type == 'ITEM'}">
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{orders.detail.item.name}">Item</th>
+                <th th:text="#{orders.detail.item.blueprint}">Bauplan</th>
+                <th th:text="#{orders.detail.item.amount}">Anzahl</th>
+                <th th:text="#{orders.detail.item.delivered}">Geliefert</th>
+                <th th:text="#{orders.detail.item.outstanding}">Ausstehend</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${order.items}">
+                <td>
+                    <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
+                    <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
+                </td>
+                <td>
+                    <span th:if="${item.blueprint != null}"
+                          th:text="${item.blueprint.scwikiKey() != null ? item.blueprint.scwikiKey() : item.blueprint.outputName()}"
+                          th:title="${item.blueprint.outputName()}"></span>
+                    <span th:if="${item.blueprint == null}" class="text-muted">-</span>
+                </td>
+                <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}"></td>
+                <td th:text="${item.deliveredAmount != null ? #numbers.formatInteger(item.deliveredAmount, 1) : '0'}"></td>
+                <td>
+                    <span th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}"
+                          th:class="${outstanding > 0} ? 'text-warning' : 'text-success'"
+                          th:text="${#numbers.formatInteger(outstanding, 1)}"></span>
+                </td>
+            </tr>
+            <tr th:if="${order.items == null or order.items.isEmpty()}">
+                <td colspan="5" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <!-- Items whose blueprint resolved to no procurable material (empty materials list). The
+             persisted order keeps only resolved requirements, so an empty list is the detail-time
+             signal that a recipe's RESOURCE ingredients were all unresolved / ITEM-only. -->
+        <div th:if="${itemsWithoutMaterials != null and !itemsWithoutMaterials.isEmpty()}" class="alert alert-warning mt-2">
+            <strong th:text="#{orders.detail.item.noMaterials.title}">Items ohne ableitbare Materialien</strong>
+            <p style="margin: 0.5rem 0 0;" th:text="#{orders.detail.item.noMaterials.body}">Für folgende Items konnten keine Materialien abgeleitet werden:</p>
+            <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem;">
+                <li th:each="name : ${itemsWithoutMaterials}" th:text="${name}"></li>
+            </ul>
+        </div>
+
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{orders.detail.aggregated.material}">Material</th>
+                <th th:text="#{orders.detail.aggregated.quality}">Qualität</th>
+                <th th:text="#{orders.detail.aggregated.amount}">Gesamtmenge</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="agg : ${order.aggregatedMaterials}">
+                <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
+                <td>
+                    <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (700+)</span>
+                    <span th:unless="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-none" th:text="#{orders.detail.quality.none}">Keine</span>
+                </td>
+                <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                </td>
+            </tr>
+            <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
+                <td colspan="3" class="text-center text-muted" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+        </th:block>
+
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 1rem;">
@@ -178,6 +275,9 @@
             </div>
         </div>
 
+        <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
+             phase; for now the material-specific handover protocol is hidden for item orders. -->
+        <th:block th:if="${order.type != 'ITEM'}">
         <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -229,6 +329,59 @@
                 </table>
             </div>
         </div>
+        </th:block>
+
+        <!-- ITEM orders: handover workflow. Logisticians log per-line whole-unit deliveries; the
+             backend decrements outstanding amounts and auto-completes the order once every line is
+             fully delivered. Each persisted handover offers a PDF delivery note. -->
+        <th:block th:if="${order.type == 'ITEM'}">
+        <h3 style="color: var(--color-primary); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
+
+        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${hasOutstandingItemLines}" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button type="button" class="btn" style="min-height: 44px;" th:text="#{orders.detail.itemHandover}" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal">Item-Übergabe protokollieren</button>
+        </div>
+        <p sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+
+        <div th:if="${order.itemHandovers != null and !order.itemHandovers.isEmpty()}" class="mt-2">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
+                        <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
+                        <th th:text="#{orders.detail.handover.items}">Items</th>
+                        <th sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="ho : ${order.itemHandovers}" data-testid="item-handover-row">
+                        <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
+                        <td th:text="${ho.recipientHandle}"></td>
+                        <td>
+                            <ul style="list-style-type: none; padding: 0; margin: 0;">
+                                <li th:each="entry : ${ho.entries}">
+                                    <span th:text="${entry.gameItem != null ? entry.gameItem.name() : '-'}"></span>:
+                                    <span th:text="${#numbers.formatInteger(entry.amount, 1)}"></span>
+                                </li>
+                            </ul>
+                        </td>
+                        <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    style="min-height: 44px; font-size: 0.85rem; white-space: nowrap;"
+                                    th:data-order-id="${order.id}"
+                                    th:data-handover-id="${ho.id}"
+                                    th:data-handover-time="${ho.handoverTime}"
+                                    th:title="#{orders.handover.report.download}"
+                                    th:text="#{orders.handover.report.download}"
+                                    data-trigger="od-download-item-report">Übergabeprotokoll herunterladen</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </th:block>
     </div>
 </main>
 
@@ -393,6 +546,62 @@
     </div>
 </div>
 
+<!-- Item-handover modal (ITEM orders). One row per still-outstanding ordered-item line; each row's
+     amount input is capped at that line's outstanding quantity. Submits as a normal form POST so the
+     page reloads on success and the refreshed @Version is picked up (no stale-version 409). -->
+<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
+    <div class="modal-content hud-box" style="width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
+
+        <form data-testid="item-handover-form" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
+            <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
+                <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
+                <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
+                <div class="datetime-split-inputs">
+                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                </div>
+            </div>
+
+            <div class="form-group mb-1">
+                <label for="itemRecipientHandle" th:text="#{orders.handover.handle}" class="form-label">Empfänger (Handle)</label>
+                <input type="text" id="itemRecipientHandle" th:field="*{recipientHandle}" required class="w-full">
+            </div>
+
+            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
+
+            <!-- One row per outstanding ordered-item line. Inputs are named by request-param index so
+                 Spring binds them onto itemHandoverForm.entries; the controller drops empty rows. The
+                 outstanding value is computed once on the iterating th:block (th:with runs after
+                 th:each) so the inner th:if and the cap can both read it. -->
+            <th:block th:each="item, stat : ${order.items}"
+                      th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
+                <div th:if="${outstanding > 0}" class="item-handover-line" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                    <div>
+                        <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
+                        <div class="text-muted" style="font-size: 0.8rem;">
+                            <span th:text="#{orders.detail.item.outstanding}">Ausstehend</span>:
+                            <span th:text="${#numbers.formatInteger(outstanding, 1)}">0</span>
+                        </div>
+                        <input type="hidden" th:name="|entries[${stat.index}].jobOrderItemId|" th:value="${item.id}">
+                    </div>
+                    <div>
+                        <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
+                        <input type="number" step="1" min="0" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value="" style="width: 100%; min-height: 44px; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-gray-3); color: white;">
+                    </div>
+                </div>
+            </th:block>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="submit" class="btn" style="min-height: 44px;" data-testid="item-handover-submit" th:text="#{orders.detail.save}">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     let cachedInventoryItems = [];
     let isInventoryCached = false;
@@ -497,7 +706,7 @@
                 const msg = MSG_HANDOVER_REPORT_VALIDATION_AMOUNT
                     .replace('{0}', materialName)
                     .replace('{1}', available);
-                showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, msg, 'error');
+                showFrontendErrorToast(msg);
                 return false;
             }
         }
@@ -519,6 +728,14 @@
         if (handoverForm) {
             handoverForm.addEventListener('submit', (e) => {
                 if (!validateHandoverAmounts()) {
+                    e.preventDefault();
+                }
+            });
+        }
+        const itemHandoverForm = document.querySelector('#item-handover-modal form');
+        if (itemHandoverForm) {
+            itemHandoverForm.addEventListener('submit', (e) => {
+                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) {
                     e.preventDefault();
                 }
             });
@@ -618,7 +835,7 @@
                         document.getElementById('material-delete-confirm-modal').style.display = 'flex';
                         window.materialRowToDelete = row;
                     } else {
-                        showToast('Fehler', 'Es muss mindestens ein Material im Auftrag verbleiben.', 'error');
+                        showFrontendErrorToast('Es muss mindestens ein Material im Auftrag verbleiben.');
                     }
                 }
             });
@@ -653,8 +870,6 @@
     const MSG_STATUS_SUCCESS = '[(#{orders.status.update.success})]';
     const MSG_STATUS_ERROR   = '[(#{orders.status.update.error})]';
     const MSG_STATUS_CONFLICT = '[(#{orders.status.update.conflict})]';
-    const MSG_STATUS_SUCCESS_TITLE = '[(#{toast.title.success})]';
-    const MSG_STATUS_ERROR_TITLE   = '[(#{toast.title.error})]';
 
     let _pendingStatus = null;
     let _previousStatus = null;
@@ -704,29 +919,27 @@
             body: JSON.stringify({ status: status, version: version })
         }).then(res => {
             if (res.status === 409) {
-                showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_CONFLICT, 'error');
+                showFrontendErrorToast(MSG_STATUS_CONFLICT);
                 setTimeout(() => window.location.reload(), 1500);
                 return;
             }
             if (!res.ok) {
-                showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_ERROR, 'error');
+                showFrontendErrorToast(MSG_STATUS_ERROR);
                 return;
             }
             return res.json().then(data => {
                 if (selectElement && data && data.version !== undefined) {
                     selectElement.dataset.version = data.version;
                 }
-                showToast(MSG_STATUS_SUCCESS_TITLE, MSG_STATUS_SUCCESS, 'success');
+                showFrontendSuccessToast(MSG_STATUS_SUCCESS);
                 setTimeout(() => window.location.reload(), 1000);
             });
         }).catch(() => {
-            showToast(MSG_STATUS_ERROR_TITLE, MSG_STATUS_ERROR, 'error');
+            showFrontendErrorToast(MSG_STATUS_ERROR);
         });
     }
 
     const MSG_HANDOVER_REPORT_ERROR = '[(#{orders.handover.report.error})]';
-    const MSG_HANDOVER_REPORT_ERROR_TITLE = '[(#{orders.handover.report.error.title})]';
-    const MSG_HANDOVER_REPORT_VALIDATION_TITLE = '[(#{orders.handover.report.validation.title})]';
     const MSG_HANDOVER_REPORT_VALIDATION_DATE = '[(#{orders.handover.report.validation.date})]';
     const MSG_HANDOVER_REPORT_VALIDATION_TIME = '[(#{orders.handover.report.validation.time})]';
     const MSG_HANDOVER_REPORT_VALIDATION_HANDLE = '[(#{orders.handover.report.validation.handle})]';
@@ -766,7 +979,7 @@
                 headers: downloadHeaders
             });
             if (!response.ok) {
-                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
                 return;
             }
             const blob = await response.blob();
@@ -780,8 +993,74 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
         }
+    }
+
+    // Item-order delivery-note download. Mirrors downloadHandoverReport but targets the item-handover
+    // proxy endpoint; the backend renders date/time in the user's IANA zone forwarded below.
+    async function downloadItemHandoverReport(btn) {
+        const orderId = btn.getAttribute('data-order-id');
+        const handoverId = btn.getAttribute('data-handover-id');
+        const handoverTimeRaw = btn.getAttribute('data-handover-time');
+        const orderNumberRaw = document.getElementById('order-display-id')?.getAttribute('data-order-number')
+            || document.getElementById('order-display-id')?.textContent?.trim()
+            || ('#' + orderId);
+        const orderNumber = orderNumberRaw.replace(/^#/, '');
+        let dateStr = '';
+        let timeStr = '';
+        if (handoverTimeRaw) {
+            const d = new Date(handoverTimeRaw);
+            dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            timeStr = String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
+        }
+        const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+        try {
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+            const userTimeZone = (Intl && Intl.DateTimeFormat)
+                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                : '';
+            const downloadHeaders = { [csrfHeader]: csrfToken };
+            if (userTimeZone) {
+                downloadHeaders['X-User-Time-Zone'] = userTimeZone;
+            }
+            const response = await fetch('/api/v1/orders/' + orderId + '/item-handovers/' + handoverId + '/report', {
+                method: 'GET',
+                headers: downloadHeaders
+            });
+            if (!response.ok) {
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
+                return;
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
+        }
+    }
+
+    // Block submission of an empty item handover (every amount blank/zero) so the user gets a toast
+    // instead of a server-side "no items" round-trip. The per-row max attribute enforces the upper
+    // bound natively; this only guards the lower bound across the whole form.
+    function validateItemHandoverForm() {
+        const inputs = document.querySelectorAll('#item-handover-modal input[type="number"]');
+        for (const inp of inputs) {
+            const val = parseInt(inp.value, 10);
+            if (!isNaN(val) && val > 0) {
+                return true;
+            }
+        }
+        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
+        return false;
     }
 
     async function previewHandoverReport(btn) {
@@ -800,19 +1079,19 @@
             return sel && sel.value && inp && inp.value;
         });
         if (!datePart) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
             return;
         }
         if (!timePart) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_TIME, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_TIME);
             return;
         }
         if (!recipientHandle) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_HANDLE);
             return;
         }
         if (!hasValidItem) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
             return;
         }
         if (!validateHandoverAmounts()) {
@@ -841,12 +1120,12 @@
             const localDateStr = datePart + 'T' + timePart;
             const localDate = new Date(localDateStr);
             if (isNaN(localDate.getTime())) {
-                showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
                 return;
             }
             handoverTimeIso = localDateStr;
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_VALIDATION_TITLE, MSG_HANDOVER_REPORT_VALIDATION_DATE, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
             return;
         }
         const payload = {
@@ -864,7 +1143,7 @@
                 body: JSON.stringify(payload)
             });
             if (!response.ok) {
-                showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+                showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
                 return;
             }
             const blob = await response.blob();
@@ -884,7 +1163,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e) {
-            showToast(MSG_HANDOVER_REPORT_ERROR_TITLE, MSG_HANDOVER_REPORT_ERROR, 'error');
+            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
         }
     }
 
@@ -1029,6 +1308,7 @@
         window.krtEvents.on('click', 'od-toggle-inventory', function (el) { toggleInventory(el); });
         window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
         window.krtEvents.on('click', 'od-download-report', function (el) { downloadHandoverReport(el); });
+        window.krtEvents.on('click', 'od-download-item-report', function (el) { downloadItemHandoverReport(el); });
         window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
         window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
         window.krtEvents.on('click', 'od-confirm-remove-material', function () {

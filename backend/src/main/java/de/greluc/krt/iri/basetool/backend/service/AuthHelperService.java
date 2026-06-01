@@ -154,6 +154,20 @@ public class AuthHelperService {
     return scope().canEditSquadron(squadronId);
   }
 
+  /**
+   * Plan-compliant convenience accessor for the org-unit write-side check — delegates to {@link
+   * de.greluc.krt.iri.basetool.backend.service.OwnerScopeService#canEditOrgUnit(UUID)}. Unlike
+   * {@link #canEditSquadron(UUID)}, the id may reference either a Staffel or a Spezialkommando;
+   * used by the guest org-unit-labeling gate when a participant is tagged with org units of either
+   * kind.
+   *
+   * @param orgUnitId the org-unit id (Staffel or Spezialkommando) to check write access for.
+   * @return {@code true} iff the current caller may edit/label the given org unit.
+   */
+  public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
+    return scope().canEditOrgUnit(orgUnitId);
+  }
+
   private de.greluc.krt.iri.basetool.backend.service.OwnerScopeService scope() {
     return applicationContext.getBean(
         de.greluc.krt.iri.basetool.backend.service.OwnerScopeService.class);

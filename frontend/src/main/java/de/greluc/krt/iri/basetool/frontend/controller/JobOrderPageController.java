@@ -1,12 +1,22 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemLineDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverItemCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
@@ -16,6 +26,8 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderHandoverForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderItemForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.Cookie;
@@ -241,6 +253,7 @@ public class JobOrderPageController {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       model.addAttribute("order", order);
       model.addAttribute("currentUserId", getCurrentUserId(principal));
+      model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
       boolean canAssign = isLogistician(principal);
       model.addAttribute("isLogistician", canAssign);
@@ -310,6 +323,14 @@ public class JobOrderPageController {
             order.requestingSquadron() != null ? order.requestingSquadron().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
+
+      // Item orders carry their own handover form (per-line whole-unit delivery). Empty by default;
+      // the modal renders one row per still-outstanding ordered-item line, bound by request-param
+      // name. The flag gates the "log handover" button so it hides once every line is delivered.
+      if (!model.containsAttribute("itemHandoverForm")) {
+        model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
+      }
+      model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);
@@ -340,12 +361,138 @@ public class JobOrderPageController {
         form.setSource(source);
       }
     }
+    if (!model.containsAttribute("jobOrderItemForm")) {
+      JobOrderItemForm itemForm = new JobOrderItemForm();
+      itemForm.setSource(source);
+      model.addAttribute("jobOrderItemForm", itemForm);
+    }
     model.addAttribute("materials", fetchMaterials());
+    model.addAttribute("orderableItems", fetchOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     List<OrgUnitMembershipOptionDto> orgOptions = fetchActiveOrgUnitOptions();
     model.addAttribute("ownerOptions", orgOptions);
     model.addAttribute("ownerOptionsHasSpecialCommand", containsSpecialCommand(orgOptions));
     return "orders-create";
+  }
+
+  /**
+   * Persists a new item order. Builds the backend item-order payload from the dynamically-bound
+   * item editor (lines that lack an item, blueprint, or positive amount are dropped) and posts it
+   * to the backend. Mirrors {@link #createOrder} for redirect / flash behaviour.
+   *
+   * @param form the bound item-order form
+   * @param redirectAttributes flash carrier for toasts / re-render
+   * @param principal the caller, or {@code null} for anonymous
+   * @return redirect target
+   */
+  @PostMapping("/items")
+  public String createItemOrder(
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal OidcUser principal) {
+    try {
+      List<CreateJobOrderItemLineDto> lines =
+          form.getItems().stream()
+              .filter(
+                  l ->
+                      l.getGameItemId() != null
+                          && l.getBlueprintId() != null
+                          && l.getAmount() != null
+                          && l.getAmount() > 0)
+              .map(
+                  l ->
+                      new CreateJobOrderItemLineDto(
+                          l.getGameItemId(),
+                          l.getBlueprintId(),
+                          l.getAmount(),
+                          l.getMaterials().stream()
+                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                              .map(
+                                  m ->
+                                      new CreateJobOrderItemMaterialDto(
+                                          m.getMaterialId(), m.getQuality()))
+                              .collect(Collectors.toList()),
+                          l.getClientLineId(),
+                          l.getParentClientLineId()))
+              .collect(Collectors.toList());
+
+      if (lines.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
+        redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+        return "redirect:/orders/create"
+            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      }
+
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
+
+      if (principal == null) {
+        return "redirect:/orders/create"
+            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      }
+      return "redirect:/orders";
+    } catch (Exception e) {
+      log.error("Failed to create item order", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
+      redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+      return "redirect:/orders/create"
+          + (form.getSource() != null ? "?source=" + form.getSource() : "");
+    }
+  }
+
+  /**
+   * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
+   * given orderable item. Relays to the backend item-catalog endpoint.
+   *
+   * @param gameItemId the orderable item
+   * @return the blueprint references producing it
+   */
+  @GetMapping("/item-blueprints/{gameItemId}")
+  @ResponseBody
+  public List<BlueprintReferenceDto> itemBlueprints(@PathVariable UUID gameItemId) {
+    try {
+      List<BlueprintReferenceDto> result =
+          backendApiClient.get(
+              "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
+              new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {},
+              true);
+      return result != null ? result : List.of();
+    } catch (Exception e) {
+      log.error("Failed to fetch blueprints for item {}", gameItemId, e);
+      return List.of();
+    }
+  }
+
+  /**
+   * JSON proxy for the create form's material-derivation preview: returns the resolved materials,
+   * sub-assembly suggestions and unresolved-ingredient names for a blueprint at the given amount.
+   *
+   * @param blueprintId the chosen blueprint
+   * @param amount the whole-unit amount to scale by (defaults to 1)
+   * @return the derivation preview, or {@code null} on failure
+   */
+  @GetMapping("/item-derivation/{blueprintId}")
+  @ResponseBody
+  public ItemDerivationDto itemDerivation(
+      @PathVariable UUID blueprintId,
+      @RequestParam(required = false, defaultValue = "1") int amount) {
+    try {
+      return backendApiClient.get(
+          "/api/v1/orders/item-catalog/blueprints/" + blueprintId + "/derivation?amount=" + amount,
+          ItemDerivationDto.class,
+          true);
+    } catch (Exception e) {
+      log.error("Failed to derive materials for blueprint {}", blueprintId, e);
+      return null;
+    }
   }
 
   /**
@@ -652,6 +799,79 @@ public class JobOrderPageController {
   }
 
   /**
+   * Records an item handover for an item order: relays the per-line delivered whole-unit quantities
+   * to the Phase 3 backend endpoint, which decrements outstanding amounts and auto-completes the
+   * order once every line is fully delivered. Rows with a null or non-positive amount are dropped;
+   * an empty result short-circuits with an error toast. On success the page redirects (a full
+   * reload), so the refreshed {@code @Version} is picked up and no stale-version 409 can follow.
+   *
+   * @param id the item order's id
+   * @param form the bound item-handover form (per-line amounts + recipient + time)
+   * @param redirectAttributes flash channel for the success/error toast
+   * @return redirect to the order detail page
+   */
+  @PostMapping("/{id}/item-handovers")
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  public String createItemHandover(
+      @PathVariable UUID id,
+      @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
+      RedirectAttributes redirectAttributes) {
+    try {
+      List<JobOrderItemHandoverEntryCreateDto> entries =
+          form.getEntries().stream()
+              .filter(
+                  e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
+              .map(
+                  e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
+              .collect(Collectors.toList());
+
+      if (entries.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
+        return "redirect:/orders/" + id;
+      }
+
+      // handoverTime arrives as a client-produced UTC ISO-Instant (see orders-detail.html); parse
+      // as Instant to preserve the absolute point in time, falling back to local-datetime parsing
+      // and finally now() so a malformed value never blocks the handover. Mirrors createHandover.
+      Instant handoverTime = Instant.now();
+      String rawHandoverTime = form.getHandoverTime();
+      if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
+        try {
+          handoverTime = Instant.parse(rawHandoverTime);
+        } catch (Exception eiso) {
+          try {
+            handoverTime =
+                LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant();
+          } catch (Exception elocal) {
+            log.warn("Could not parse item handoverTime {}, using now()", rawHandoverTime);
+          }
+        }
+      }
+
+      JobOrderItemHandoverCreateDto dto =
+          new JobOrderItemHandoverCreateDto(handoverTime, form.getRecipientHandle(), entries);
+      backendApiClient.post(
+          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/item-handovers", id, bse);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+    } catch (Exception e) {
+      log.error(
+          "Failed to create item handover for jobOrder={} via POST"
+              + " /api/v1/orders/{}/item-handovers",
+          id,
+          id,
+          e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
+    }
+    return "redirect:/orders/" + id;
+  }
+
+  /**
    * Removes a material requirement from the order without deleting any associated inventory items
    * (the items keep their job-order link cleared by the backend).
    *
@@ -774,6 +994,78 @@ public class JobOrderPageController {
       log.error("Failed to fetch job-order materials", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Fetches the orderable items (blueprint outputs with a resolvable material) for the item-order
+   * create picker, sorted by name. Cached as static reference data.
+   *
+   * @return the orderable item references, or an empty list on failure
+   */
+  private List<GameItemReferenceDto> fetchOrderableItems() {
+    try {
+      PageResponse<GameItemReferenceDto> page =
+          backendApiClient.getCached(
+              "/api/v1/orders/item-catalog?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
+              true);
+      if (page != null && page.content() != null) {
+        return new ArrayList<>(page.content());
+      }
+    } catch (Exception e) {
+      log.error("Failed to fetch orderable items", e);
+    }
+    return new ArrayList<>();
+  }
+
+  /**
+   * Collects the display names of an item order's lines whose blueprint derived no procurable
+   * material (an empty {@code materials} snapshot). The persisted order keeps only resolved
+   * requirements, so an empty list is the detail-time signal that a recipe's RESOURCE ingredients
+   * were all unresolved or ITEM-only; the detail view surfaces these in a warning banner so the
+   * logistician knows the aggregated-materials view is incomplete for that line. Returns an empty
+   * list for material orders or when every line derived at least one material.
+   *
+   * @param order the loaded order (any kind)
+   * @return distinct item names lacking derived materials, in line order; never {@code null}
+   */
+  private List<String> itemsWithoutDerivedMaterials(JobOrderDto order) {
+    List<String> names = new ArrayList<>();
+    if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
+      return names;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      if (item.materials() == null || item.materials().isEmpty()) {
+        String name = item.gameItem() != null ? item.gameItem().name() : null;
+        if (name != null && !names.contains(name)) {
+          names.add(name);
+        }
+      }
+    }
+    return names;
+  }
+
+  /**
+   * Reports whether an item order still has at least one ordered-item line with outstanding
+   * (ordered minus delivered) whole units. Gates the item-handover button: once every line is fully
+   * delivered the order is COMPLETED and the button is hidden. Always {@code false} for material
+   * orders or an order with no item lines.
+   *
+   * @param order the loaded order (any kind)
+   * @return {@code true} if any item line has a positive outstanding quantity
+   */
+  private boolean hasOutstandingItemLines(JobOrderDto order) {
+    if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
+      return false;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      int ordered = item.amount() != null ? item.amount() : 0;
+      int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
+      if (ordered - delivered > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private List<SquadronDto> fetchSquadrons() {

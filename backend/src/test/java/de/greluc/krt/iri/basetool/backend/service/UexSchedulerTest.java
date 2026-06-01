@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -35,6 +36,10 @@ class UexSchedulerTest {
   @Mock private UexCategoryRefService uexCategoryRefService;
   @Mock private UexItemSyncService uexItemSyncService;
   @Mock private UexItemPriceSyncService uexItemPriceSyncService;
+
+  // A real coordinator (spied so it can be told the gate is busy) — its default behaviour runs the
+  // sweep synchronously, so the existing ordering/verify tests below exercise the real steps.
+  @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
   @InjectMocks private UexScheduler scheduler;
 
@@ -158,5 +163,26 @@ class UexSchedulerTest {
     // per-service try/catch would be a behaviour change and break this
     // expectation — the test then makes that change visible.
     verify(uexRefinerySyncService, never()).syncRefiningMethods();
+  }
+
+  @Test
+  void scheduleTask_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
+    // Given the shared gate denies entry (a UEX or SC Wiki sync is already in flight)
+    doReturn(false).when(syncCoordinator).runExclusively(eq("UEX"), any());
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then no sync step runs — the tick is dropped, never started concurrently
+    verifyNoInteractions(
+        uexUniverseSyncService,
+        uexStarSystemService,
+        uexCommodityService,
+        uexManufacturerService,
+        uexVehicleService,
+        uexCategoryRefService,
+        uexItemSyncService,
+        uexItemPriceSyncService,
+        uexRefinerySyncService);
   }
 }

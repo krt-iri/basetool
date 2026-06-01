@@ -10,6 +10,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
@@ -134,7 +135,11 @@ class JobOrderServiceTest {
             null,
             1,
             JobOrderStatus.OPEN,
+            JobOrderType.MATERIAL,
             List.of(jomDto),
+            List.of(),
+            List.of(),
+            List.of(),
             List.of(),
             List.of(),
             Instant.now(),

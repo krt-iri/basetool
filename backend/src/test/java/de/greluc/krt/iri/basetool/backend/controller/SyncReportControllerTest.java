@@ -1,13 +1,17 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.backend.model.ExternalSyncReport;
+import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,5 +82,28 @@ class SyncReportControllerTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void deleteOldEvents_forbiddenForNonAdmin() throws Exception {
+    mockMvc
+        .perform(
+            delete(BASE + "?olderThanDays=30")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void deleteOldEvents_allowedForAdmin_relaysSourceAndDaysToService() throws Exception {
+    when(syncReportService.deleteOlderThan(eq(SyncSourceSystem.UEX), eq(30))).thenReturn(4);
+
+    mockMvc
+        .perform(
+            delete(BASE + "?source=UEX&olderThanDays=30")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk());
+
+    verify(syncReportService).deleteOlderThan(eq(SyncSourceSystem.UEX), eq(30));
   }
 }

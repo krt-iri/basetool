@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.integration.scwiki;
 
 import de.greluc.krt.iri.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
+import de.greluc.krt.iri.basetool.backend.service.SyncCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -12,8 +13,13 @@ import org.springframework.stereotype.Component;
  * Scheduler bean that drives the periodic SC Wiki sync.
  *
  * <p>{@code @Scheduled} fixed-delay of {@code krt.scwiki.scheduler-delay} (default 24h); Wiki data
- * changes only on game patches. {@code @Async(AsyncConfig.SCWIKI_EXECUTOR)} runs the sweep on the
- * dedicated bounded pool so a slow Wiki response cannot delay the UEX scheduler.
+ * changes only on game patches. An {@code initialDelay} of {@code
+ * krt.scwiki.scheduler-initial-delay} (default 1h) staggers the first run behind the UEX scheduler
+ * (which starts at boot) so the two daily syncs do not fire at the same time.
+ * {@code @Async(AsyncConfig.SCWIKI_EXECUTOR)} runs the sweep on the dedicated bounded pool so a
+ * slow Wiki response cannot delay the UEX scheduler. Both schedulers additionally share a {@link
+ * SyncCoordinator} gate as a safety net: if their cadences ever align, the later sync waits for the
+ * earlier one to finish rather than running concurrently.
  *
  * <p>R3 wired the first real sync (commodity merge); R4 adds the vehicle fill, the closure-mode
  * item fill and the blueprint graph. The scheduler checks the {@code krt.scwiki.scheduler-enabled}
@@ -38,6 +44,7 @@ public class ScWikiScheduler {
   private final ScWikiItemSyncService itemSyncService;
   private final ScWikiVehicleSyncService vehicleSyncService;
   private final ScWikiManufacturerSyncService manufacturerSyncService;
+  private final SyncCoordinator syncCoordinator;
 
   /**
    * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
@@ -51,12 +58,24 @@ public class ScWikiScheduler {
    * scWikiIntegrationClassesMustWireScWikiClient} ArchUnit rule is satisfied.
    */
   @Async(AsyncConfig.SCWIKI_EXECUTOR)
-  @Scheduled(fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}")
+  @Scheduled(
+      fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}",
+      initialDelayString = "${krt.scwiki.scheduler-initial-delay:3600000}")
   public void scheduleScWikiSync() {
     if (!Boolean.TRUE.equals(properties.getSchedulerEnabled())) {
       log.info("ScWikiScheduler invoked but disabled (krt.scwiki.scheduler-enabled=false) — skip.");
       return;
     }
+    syncCoordinator.runExclusively("SC Wiki", this::runAllSyncSteps);
+  }
+
+  /**
+   * Runs every SC Wiki sync step in dependency order. Invoked by {@link #scheduleScWikiSync()}
+   * through {@link SyncCoordinator#runExclusively(String, Runnable)} — and therefore only when no
+   * UEX sync is in progress; if one is, this run waits for it to finish first (bounded by the
+   * coordinator's wait cap) so the two never execute at the same time.
+   */
+  private void runAllSyncSteps() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());
     runStep("commodity", commoditySyncService::syncCommodities);
     runStep("vehicle", vehicleSyncService::syncVehicles);

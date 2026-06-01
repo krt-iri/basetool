@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
 import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.repository.ExternalSyncReportRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -124,6 +125,42 @@ public class SyncReportService {
           source,
           RUNS_TO_KEEP);
     }
+  }
+
+  /**
+   * Deletes every sync-report event older than {@code days} days, optionally scoped to one source.
+   * Backs the admin "delete reports older than X days" maintenance action. The cutoff is {@code now
+   * - days} computed at call time; rows with {@code ran_at} strictly before it are removed. When
+   * {@code source} is {@code null} the purge spans both catalogues; otherwise it is confined to
+   * that source.
+   *
+   * <p>Annotated {@code @Transactional} (read-write) so the {@code @Modifying} delete runs in its
+   * own writable transaction even though the controller class is {@code @Transactional(readOnly =
+   * true)}.
+   *
+   * @param source the catalogue to scope the purge to, or {@code null} for both
+   * @param days the minimum age in days a report must exceed to be deleted; must be at least 1
+   * @return number of rows deleted
+   * @throws IllegalArgumentException if {@code days} is less than 1
+   */
+  @Transactional
+  public int deleteOlderThan(SyncSourceSystem source, int days) {
+    if (days < 1) {
+      throw new IllegalArgumentException("days must be at least 1, was " + days);
+    }
+    Instant cutoff = Instant.now().minus(Duration.ofDays(days));
+    int deleted =
+        source == null
+            ? repository.deleteByRanAtBefore(cutoff)
+            : repository.deleteBySourceSystemAndRanAtBefore(source, cutoff);
+    if (deleted > 0) {
+      log.info(
+          "Deleted {} sync-report row(s) older than {} day(s) for source {}.",
+          deleted,
+          days,
+          source == null ? "ALL" : source);
+    }
+    return deleted;
   }
 
   /**

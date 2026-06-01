@@ -4,12 +4,17 @@ import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Inbound request payload for the Update Participant operation. {@code @Size} caps mirror the
  * create payload (audit finding H-2) so an anonymous guest editing their own entry cannot grow the
  * row past the create-time limit.
+ *
+ * <p>{@code orgUnitIds} replaces the entry's full org-unit affiliation set on update — for a guest
+ * it is the caller-submitted, authorization-filtered selection; for a registered participant the
+ * submitted list is honoured the same way so the edit modal can adjust affiliations explicitly.
  */
 public record UpdateParticipantRequest(
     UUID desiredMissionJobTypeId,
@@ -18,6 +23,6 @@ public record UpdateParticipantRequest(
     @Size(max = 100) String guestName,
     Instant startTime,
     Instant endTime,
-    UUID squadronId,
+    List<UUID> orgUnitIds,
     PayoutPreference payoutPreference,
     @NotNull Long version) {}

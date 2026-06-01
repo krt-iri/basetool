@@ -352,7 +352,7 @@ public class MissionController {
 
   /**
    * Redacts a participant DTO for guests: cleans the nested user via {@link #cleanupUserForGuest},
-   * keeps the displayed fields (squadron, job-type, comment, payout preference, times) intact
+   * keeps the displayed fields (org units, job-type, comment, payout preference, times) intact
    * because those are public per the squadron policy.
    *
    * @param dto the participant DTO
@@ -364,7 +364,7 @@ public class MissionController {
         dto.id(),
         cleanedUser,
         dto.guestName(),
-        dto.squadron(),
+        dto.orgUnits(),
         dto.desiredMissionJobType(),
         dto.plannedMissionJobType(),
         dto.comment(),
@@ -821,7 +821,7 @@ public class MissionController {
                 request.comment(),
                 request.startTime(),
                 request.endTime(),
-                request.squadronId(),
+                request.orgUnitIds(),
                 request.payoutPreference(),
                 request.guestName(),
                 request.version()));
@@ -1109,7 +1109,7 @@ public class MissionController {
                 finalGuestName,
                 request.desiredJobTypeId(),
                 request.comment(),
-                request.squadronId()));
+                request.orgUnitIds()));
     // C-1 + H-2: every caller below Officer+ gets the peer-redacted shape — anonymous callers
     // would otherwise see participant emails / real names; authenticated non-Logistician callers
     // got the same leak on the legacy public endpoint until H-2. The slim variant's redaction
@@ -1411,7 +1411,7 @@ public class MissionController {
         missionService.setPartyLead(id, finalUserId, finalGuestName, request.version()));
   }
 
-  // =====================================================================================
+  // -------------------------------------------------------------------------------------
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
 
   // These endpoints are additive replacements for the legacy MissionDto-returning
@@ -1423,7 +1423,7 @@ public class MissionController {
   // Behaviour and service-level concurrency semantics are IDENTICAL to the legacy
   // endpoints; only the response shape is slim. See ApiDeprecation annotations on
   // the legacy endpoints for the sunset date.
-  // =====================================================================================
+  // -------------------------------------------------------------------------------------
 
   /**
    * Locates a unit inside a mission aggregate by id, or throws {@link NotFoundException}. Used by
@@ -1676,7 +1676,7 @@ public class MissionController {
             request.comment(),
             request.startTime(),
             request.endTime(),
-            request.squadronId(),
+            request.orgUnitIds(),
             request.payoutPreference(),
             request.guestName(),
             request.version());
@@ -1854,7 +1854,7 @@ public class MissionController {
             finalGuestName,
             request.desiredJobTypeId(),
             request.comment(),
-            request.squadronId());
+            request.orgUnitIds());
     java.util.stream.Stream<MissionParticipantDto> participants =
         mission.getParticipants().stream().map(missionMapper::toDto);
     // C-1 (anonymous) + H-5 (authenticated non-Officer): every caller below Officer+ gets the

@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -70,4 +71,29 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
   int deleteBySourceAndRunIdNotIn(
       @Param("source") SyncSourceSystem sourceSystem,
       @Param("keptRunIds") Collection<UUID> keptRunIds);
+
+  /**
+   * Deletes every event, regardless of source, whose {@code ran_at} predates {@code cutoff}. Backs
+   * the admin "delete reports older than X days" action when no source filter is chosen (the
+   * combined view).
+   *
+   * @param cutoff the exclusive upper bound; rows strictly older than this are removed
+   * @return number of rows deleted
+   */
+  @Modifying
+  @Query("DELETE FROM ExternalSyncReport r WHERE r.ranAt < :cutoff")
+  int deleteByRanAtBefore(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Deletes every event of one source whose {@code ran_at} predates {@code cutoff}. Backs the admin
+   * "delete reports older than X days" action when a single source tab (UEX / SCWIKI) is active.
+   *
+   * @param sourceSystem the catalogue to scope the delete to
+   * @param cutoff the exclusive upper bound; rows strictly older than this are removed
+   * @return number of rows deleted
+   */
+  @Modifying
+  @Query("DELETE FROM ExternalSyncReport r WHERE r.sourceSystem = :source AND r.ranAt < :cutoff")
+  int deleteBySourceSystemAndRanAtBefore(
+      @Param("source") SyncSourceSystem sourceSystem, @Param("cutoff") Instant cutoff);
 }

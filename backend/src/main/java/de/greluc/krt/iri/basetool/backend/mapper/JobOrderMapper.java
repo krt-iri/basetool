@@ -31,15 +31,19 @@ public interface JobOrderMapper {
    * <p>After R9 Step 2 the entity exposes {@code creatingOrgUnit} / {@code requestingOrgUnit}
    * (typed {@code OrgUnit}); the DTO still publishes {@code creatingSquadron} / {@code
    * requestingSquadron} as {@code SquadronReferenceDto} for API stability. The two explicit
-   * mappings below route both fields through {@code SquadronMapper.orgUnitToReferenceDto} so SK-
-   * owned orders surface as {@code null} on the wire while Staffel-owned ones continue to project
-   * as before.
+   * mappings below route both fields through {@code SquadronMapper.orgUnitToReferenceDto}, which
+   * projects either kind — a Staffel or a Spezialkommando — into the slim reference
+   * (id/name/shorthand), so an SK creating or requesting on behalf now surfaces its SK badge
+   * instead of a blank cell.
    *
    * @param jobOrder the entity to project; {@code null} returns {@code null}.
    * @return the populated outbound DTO.
    */
   @Mapping(target = "creatingSquadron", source = "creatingOrgUnit")
   @Mapping(target = "requestingSquadron", source = "requestingOrgUnit")
+  @Mapping(target = "items", ignore = true)
+  @Mapping(target = "aggregatedMaterials", ignore = true)
+  @Mapping(target = "itemHandovers", ignore = true)
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**

@@ -262,11 +262,11 @@ public class AdminSpecialCommandsPageController {
     return "redirect:/admin/special-commands";
   }
 
-  // ============================================================================
+  // ----------------------------------------------------------------------------
   // R5.c.b — per-SK detail page with the member roster + add / remove / patch /
   // Lead-toggle modals. Calls the R5.b backend endpoints under
   // /api/v1/special-commands/{id}/members.
-  // ============================================================================
+  // ----------------------------------------------------------------------------
 
   /**
    * Renders the per-SK detail page with the member roster. Loads the SK + its members in two

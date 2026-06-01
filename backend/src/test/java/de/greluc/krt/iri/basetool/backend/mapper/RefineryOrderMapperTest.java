@@ -8,6 +8,8 @@ import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.RefineryGood;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryGoodDto;
@@ -145,6 +147,51 @@ class RefineryOrderMapperTest {
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals(900.0, dto.profit(), 0.0001);
+  }
+
+  @Test
+  void toListDto_shouldProjectStaffelOwnerIntoOwningSquadron() {
+    // Given a Staffel-owned order — the list row must carry the owner so the overview's
+    // Staffel column is not blank (regression guard: toListDto previously dropped the owner
+    // because the renamed owningOrgUnit source no longer matched the owningSquadron target).
+    Squadron squadron = new Squadron();
+    squadron.setId(UUID.randomUUID());
+    squadron.setName("IRIDIUM");
+    squadron.setShorthand("IRI");
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+    order.setOwningOrgUnit(squadron);
+
+    // When
+    var dto = mapper.toListDto(order);
+
+    // Then
+    assertNotNull(dto);
+    assertNotNull(dto.owningSquadron(), "Staffel owner must surface on the list row");
+    assertEquals(squadron.getId(), dto.owningSquadron().id());
+    assertEquals("IRI", dto.owningSquadron().shorthand());
+  }
+
+  @Test
+  void toListDto_shouldProjectSpecialCommandOwnerIntoOwningSquadron() {
+    // Given an SK-owned order (SK leader without a Staffel) — it must surface its SK badge
+    // on the list row instead of a blank cell.
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(UUID.randomUUID());
+    sk.setName("Special Command Alpha");
+    sk.setShorthand("SKA");
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+    order.setOwningOrgUnit(sk);
+
+    // When
+    var dto = mapper.toListDto(order);
+
+    // Then
+    assertNotNull(dto);
+    assertNotNull(dto.owningSquadron(), "SK owner must surface on the list row");
+    assertEquals(sk.getId(), dto.owningSquadron().id());
+    assertEquals("SKA", dto.owningSquadron().shorthand());
   }
 
   @Test

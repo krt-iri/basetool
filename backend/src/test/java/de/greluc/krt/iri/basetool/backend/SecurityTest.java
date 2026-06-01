@@ -65,6 +65,28 @@ class SecurityTest {
         .andExpect(header().exists("Content-Security-Policy"));
   }
 
+  /**
+   * Pins the hardened Content-Security-Policy for the JSON-only backend. The backend serves no HTML
+   * (Swagger UI was removed), so the policy locks down to {@code default-src 'none'}. This test
+   * fails loudly if a future change re-introduces the Swagger-era relaxations ({@code
+   * 'unsafe-inline'} on {@code style-src}, {@code data:} img/font sources) or otherwise loosens the
+   * lockdown — those would silently re-open a (would-be) XSS surface.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void contentSecurityPolicyIsLockedDownForJsonOnlyBackend() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Security-Policy",
+                    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action"
+                        + " 'none'"));
+  }
+
   @Test
   void testRateLimiting() throws Exception {
     // First request should pass

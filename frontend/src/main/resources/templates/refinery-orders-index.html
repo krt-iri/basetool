@@ -59,8 +59,7 @@
                 <th th:text="#{refineryorder.index.id}">ID</th>
                 <th th:text="#{refineryorder.index.owner}">Besitzer</th>
                 <th th:text="#{refineryorder.index.status}">Status</th>
-                <th th:text="#{refineryorder.index.startedAt}">Gestartet</th>
-                <th th:text="#{refineryorder.index.endsAt}">Ende</th>
+                <th class="nowrap" style="width: 1%;" th:text="#{refineryorder.index.endsAt}">Ende</th>
                 <th th:text="#{refineryorder.index.location}">Ort</th>
                 <th th:text="#{refineryorder.index.mission}">Einsatz</th>
                 <th th:text="#{refineryorder.index.materials}">Materialien</th>
@@ -77,10 +76,7 @@
                 <td th:text="${order.status != null ? #messages.msg('refineryorder.status.' + order.status) : '-'}"></td>
                 <td class="nowrap">
                     <!-- Server-Rendering explizit in UTC, Anzeige wird im Browser per JS in Browser-Lokalzeit (DST-korrekt) konvertiert. -->
-                    <span class="local-datetime-display" th:data-utc="${order.startedAt != null ? order.startedAt.toEpochMilli() : 'null'}" th:text="${order.startedAt != null ? #temporals.format(order.startedAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
-                </td>
-                <td class="nowrap">
-                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yy HH:mm', 'UTC') + ' UTC' : '-'}"></span>
+                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM. HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>
                 <td th:text="${order.mission != null ? order.mission.name : '-'}"></td>
@@ -105,7 +101,7 @@
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td th:attr="colspan=${isAllSquadronsMode ? 10 : 9}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
+                <td th:attr="colspan=${isAllSquadronsMode ? 9 : 8}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>
@@ -138,10 +134,9 @@
                 if (!isNaN(date)) {
                     const day = String(date.getDate()).padStart(2, '0');
                     const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const year = String(date.getFullYear()).slice(-2);
                     const hours = String(date.getHours()).padStart(2, '0');
                     const minutes = String(date.getMinutes()).padStart(2, '0');
-                    el.innerText = `${day}.${month}.${year} ${hours}:${minutes}`;
+                    el.innerText = `${day}.${month}. ${hours}:${minutes}`;
                 }
             } else {
                 el.innerText = '-';

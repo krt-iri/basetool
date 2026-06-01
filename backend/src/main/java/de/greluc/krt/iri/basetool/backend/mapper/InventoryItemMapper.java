@@ -21,8 +21,9 @@ public interface InventoryItemMapper {
    * <p>After R9 Step 2 the inventory-item entity exposes {@code owningOrgUnit} (typed {@code
    * OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for
    * API stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto} so SK-owned stock surfaces as {@code null} on the wire
-   * while Staffel-owned stock continues to project as before.
+   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
+   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned stock now
+   * surfaces its SK badge instead of a blank cell.
    *
    * @param inventoryItem the inventory-item entity to project; {@code null} returns {@code null}.
    * @return the populated inventory-item DTO.
