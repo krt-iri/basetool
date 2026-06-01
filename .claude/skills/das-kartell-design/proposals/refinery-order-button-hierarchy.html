@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vorschlag — Raffinerieauftrag (/refinery-orders/{id})</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="../krt-components.css">
+<style>
+  body { margin: 0; padding: 40px 32px 80px; background: var(--color-bg-black); background-image: url('../assets/honeycomb-bg.svg'); background-size: 46px 26.56px; }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .head { margin-bottom: 30px; }
+  .head .eyebrow { font-family: var(--font-body); font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; color: var(--color-gray-2); display: flex; align-items: center; gap: 10px; }
+  .head .eyebrow::before { content: ''; width: 30px; height: 2px; background: var(--color-primary); }
+  .head h1 { font-family: var(--font-headline); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em; font-size: 28px; margin: 14px 0 8px; }
+  .head p { color: var(--color-gray-1); font-weight: 300; max-width: 80ch; margin: 0; }
+  .cols { display: grid; grid-template-columns: 1fr; gap: 28px; }
+  @media (min-width: 1080px) { .cols { grid-template-columns: 1fr 1fr; } }
+  .side > .tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; padding: 5px 12px; margin-bottom: 14px; font-family: var(--font-body); }
+  .tag.before { color: var(--color-danger); border: 1px solid var(--color-danger); background: rgba(163,0,10,0.12); }
+  .tag.after { color: var(--color-success); border: 1px solid var(--color-success); background: rgba(35,158,51,0.12); }
+
+  .ohead { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .ohead .ttl { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .ohead h2 { margin: 0; font-family: var(--font-headline); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em; font-size: 1.15rem; }
+  .card { margin-bottom: 1rem; }
+  .fg { margin-bottom: 0.85rem; }
+  .fg label, .fg .lbl { display: block; font-family: var(--font-body); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 5px; }
+  .fg input, .fg select { width: 100%; }
+  .row2 { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .row2 > .fg { flex: 1; min-width: 130px; }
+  .sec-h { margin: 0 0 0.75rem; font-weight: 700; }
+  .mat-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0; }
+  th, td { padding: 0.6rem 0.7rem; font-size: 0.82rem; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .act { display: flex; gap: 0.4rem; justify-content: flex-end; }
+  .btn-sm2 { min-height: 36px; padding: 0.35rem 0.7rem; font-size: 0.72rem; }
+  .formacts { display: flex; gap: 0.6rem; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+
+  /* BEFORE */
+  .before-panel .fg label, .before-panel .fg .lbl { color: var(--color-primary); }
+  .before-panel .sec-h { color: var(--color-primary); font-family: var(--font-body); }
+  .before-panel th { color: var(--color-primary); }
+  .before-panel .val { color: var(--color-accent-light); font-weight: bold; }
+  /* AFTER */
+  .after-panel .fg label, .after-panel .fg .lbl { color: var(--color-gray-1); }
+  .after-panel .sec-h { color: var(--color-white); font-family: var(--font-body); }
+  .after-panel th { color: var(--color-gray-1); }
+  .after-panel .val { color: var(--color-white); font-weight: 700; }
+
+  .ann { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .ann li { display: flex; gap: 10px; color: var(--color-gray-1); font-weight: 300; font-size: 13.5px; align-items: flex-start; }
+  .ann li::before { content: ''; width: 7px; height: 7px; margin-top: 7px; flex: none; }
+  .before-notes li::before { background: var(--color-danger); }
+  .after-notes li::before { background: var(--color-success); }
+  .foot { margin-top: 34px; color: var(--color-gray-2); font-family: var(--font-mono); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="eyebrow">Vorschlag · /refinery-orders/{id}</div>
+    <h1>Raffinerieauftrag — Daten lesbar, eine CTA</h1>
+    <p>Eigene Card-Optik (kein mission-detail-Klon), aber mit Orange-Label-Override, inline-orangem „Materialien"-Titel und mehreren gleichrangigen Buttons.</p>
+  </div>
+
+  <div class="cols">
+    <!-- BEFORE -->
+    <div class="side">
+      <span class="tag before">Vorher · Ist-Zustand</span>
+      <div class="before-panel">
+        <div class="ohead">
+          <div class="ttl"><h2>Auftrag #1042</h2><span class="status-pill status-active">ACTIVE</span></div>
+          <button class="btn btn-secondary">Zurück</button>
+        </div>
+        <div class="hud-box card">
+          <div class="row2">
+            <div class="fg"><label>Status</label><select><option>ACTIVE</option></select></div>
+            <div class="fg"><label>Raffinerie</label><select><option>ARC-L1 · Refinery</option></select></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><span class="lbl">Ertrag</span><span class="val">+14.300 aUEC</span></div>
+            <div class="fg"><span class="lbl">Laufzeit</span><span class="val">3h 12m</span></div>
+          </div>
+        </div>
+        <div class="hud-box card">
+          <div class="mat-head"><h3 class="sec-h">Materialien</h3><button class="btn btn-sm">Material hinzufügen</button></div>
+          <table>
+            <thead><tr><th>Material</th><th class="num">Menge</th><th class="num">Ertrag</th><th style="text-align:right;">Aktion</th></tr></thead>
+            <tbody>
+              <tr><td>Quantanium</td><td class="num">128</td><td class="num val">+9.800</td><td><div class="act"><button class="btn btn-sm">Edit</button><button class="btn btn-danger btn-sm">Löschen</button></div></td></tr>
+              <tr><td>Laranite</td><td class="num">64</td><td class="num val">+4.500</td><td><div class="act"><button class="btn btn-sm">Edit</button><button class="btn btn-danger btn-sm">Löschen</button></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="hud-box formacts">
+          <button class="btn btn-danger" style="margin-right:auto;">Auftrag löschen</button>
+          <button class="btn">Speichern</button>
+        </div>
+      </div>
+      <ul class="ann before-notes">
+        <li>Labels orange, „Materialien"-Titel orange, Ertragswerte orange — Daten wirken wie Buttons.</li>
+        <li>„Speichern", „Hinzufügen", „Edit" alle gleich orange → das Hauptziel verschwimmt.</li>
+      </ul>
+    </div>
+
+    <!-- AFTER -->
+    <div class="side after-panel">
+      <span class="tag after">Nachher · Vorschlag</span>
+      <div>
+        <div class="ohead">
+          <div class="ttl"><h2>Auftrag #1042</h2><span class="status-pill status-active">ACTIVE</span></div>
+          <button class="btn btn-ghost">Zurück</button>
+        </div>
+        <div class="hud-box card">
+          <div class="row2">
+            <div class="fg"><label>Status</label><select><option>ACTIVE</option></select></div>
+            <div class="fg"><label>Raffinerie</label><select><option>ARC-L1 · Refinery</option></select></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><span class="lbl">Ertrag</span><span class="data-value data-value--mono">+14.300 aUEC</span></div>
+            <div class="fg"><span class="lbl">Laufzeit</span><span class="data-value data-value--mono">3h 12m</span></div>
+          </div>
+        </div>
+        <div class="hud-box card">
+          <div class="mat-head"><h3 class="sec-h">Materialien</h3><button class="btn btn-outline btn-sm2">＋ Material hinzufügen</button></div>
+          <table>
+            <thead><tr><th>Material</th><th class="num">Menge</th><th class="num">Ertrag</th><th style="text-align:right;">Aktion</th></tr></thead>
+            <tbody>
+              <tr><td>Quantanium</td><td class="num">128</td><td class="num"><span class="val">+9.800</span></td><td><div class="act"><button class="btn btn-ghost btn-sm2">Edit</button><button class="btn btn-quiet-danger btn-sm2">Löschen</button></div></td></tr>
+              <tr><td>Laranite</td><td class="num">64</td><td class="num"><span class="val">+4.500</span></td><td><div class="act"><button class="btn btn-ghost btn-sm2">Edit</button><button class="btn btn-quiet-danger btn-sm2">Löschen</button></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="hud-box formacts">
+          <button class="btn btn-quiet-danger" style="margin-right:auto;">Auftrag löschen</button>
+          <button class="btn btn-ghost">Zurück</button>
+          <button class="btn btn--cta">Speichern</button>
+        </div>
+      </div>
+      <ul class="ann after-notes">
+        <li>„Speichern" ist die einzige gefüllte CTA; „Material hinzufügen" als Outline, „Edit" Ghost, „Löschen" leise.</li>
+        <li>Labels + „Materialien"-Titel hellgrau/weiß; Ertrag &amp; Laufzeit als weiße <code>.data-value</code>-Chips.</li>
+        <li>Auftrag-Löschen tritt links zurück, bekennt sich erst beim Hover zu Rot.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="foot">Modell für /refinery-orders/{id} (analog /orders/{id}). Label-Override entfernen · Titel neutral · Datenwerte <code>.data-value</code> · eine <code>.btn--cta</code>.</p>
+</div>
+</body>
+</html>

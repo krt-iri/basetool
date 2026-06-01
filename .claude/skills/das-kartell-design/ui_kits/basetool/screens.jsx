@@ -79,7 +79,7 @@ function Dashboard({ onOpenMission }) {
 }
 
 /* ------------------------------------------------------------- MISSIONS --- */
-function MissionsScreen({ push }) {
+function MissionsScreen({ push, onOpen }) {
   const [q, setQ] = useS("");
   const [showPast, setShowPast] = useS(true);
   let rows = MISSIONS.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()));
@@ -103,7 +103,7 @@ function MissionsScreen({ push }) {
         <thead><tr><th>Mission</th><th>Department</th><th>Status</th><th>Server Join</th><th>Owner</th><th>Part.</th></tr></thead>
         <tbody>
           {rows.map((m) => (
-            <tr key={m.id}>
+            <tr key={m.id} style={{ cursor: onOpen ? "pointer" : "default" }} onClick={() => onOpen && onOpen(m.id)}>
               <td>{m.name}</td>
               <td><span className="dept-tag" style={{ color: "var(--color-dept-" + m.dept + ")" }}>{m.deptLabel}</span></td>
               <td><StatusPill status={m.status} /></td>

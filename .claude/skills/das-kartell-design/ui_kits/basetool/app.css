@@ -188,3 +188,30 @@ body {
     .app-main { padding: 1.5rem; padding-bottom: 7rem; }
     .ctx-chip .lbl { display: none; }
 }
+
+/* -------------------------------------------------- MISSION DETAIL ------- */
+.mission-cols { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1.5rem; }
+@media (min-width: 1100px) { .mission-cols { grid-template-columns: 1fr 1fr; align-items: start; } }
+.mcol { display: flex; flex-direction: column; }
+.mcol .panel-header { margin-bottom: 1rem; }
+.mcol.collapsed .col-body { display: none; }
+.mcol.collapsed .panel-header { margin-bottom: 0; }
+.panel-header .toggle-icon {
+    width: 0.6em; height: 0.6em; display: inline-block;
+    border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: rotate(45deg); transition: transform 0.25s ease;
+}
+.mcol.collapsed .panel-header .toggle-icon { transform: rotate(-45deg); }
+.col-body { display: flex; flex-direction: column; gap: 1rem; }
+.panel-toolbar { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.kv-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px dashed var(--color-surface-input); }
+.kv-row:last-child { border-bottom: none; }
+.kv-row .kv-key { color: var(--color-gray-1); font-weight: 700; }
+.kv-right { display: flex; gap: 0.5rem; align-items: center; }
+.unit-box { border: 1px solid var(--color-gray-3); padding: 0.8rem; }
+.unit-box .unit-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.unit-box .unit-name { color: var(--color-primary); font-weight: 700; }
+.detail-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.btn-sm2 { min-height: 36px; padding: 0.35rem 0.7rem; font-size: 0.72rem; }
+.mission-table th, .mission-table td { padding: 0.7rem 0.8rem; font-size: 0.85rem; }
+.mission-table td .act { display: flex; gap: 0.4rem; justify-content: flex-end; }

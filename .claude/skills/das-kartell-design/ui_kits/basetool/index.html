@@ -19,6 +19,7 @@
 <script type="text/babel" src="data.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="screen-mission-detail.jsx"></script>
 <script type="text/babel">
 const { useState } = React;
 
@@ -42,8 +43,9 @@ function App() {
 
   let screen;
   switch (route) {
-    case "home": screen = <Dashboard onOpenMission={() => setRoute("missions")} />; break;
-    case "missions": screen = <MissionsScreen push={push} />; break;
+    case "home": screen = <Dashboard onOpenMission={() => setRoute("mission-detail")} />; break;
+    case "missions": screen = <MissionsScreen push={push} onOpen={() => setRoute("mission-detail")} />; break;
+    case "mission-detail": screen = <MissionDetailScreen push={push} onBack={() => setRoute("missions")} />; break;
     case "hangar": screen = <HangarScreen push={push} />; break;
     case "materials": screen = <MaterialsScreen />; break;
     case "members": screen = <MembersScreen />; break;
