@@ -80,6 +80,7 @@ public final class EntityMappers {
         s.getDescription(),
         s.isActive(),
         s.isPromotionEnabled(),
+        s.isProfitEligible(),
         s.getVersion());
   }
 

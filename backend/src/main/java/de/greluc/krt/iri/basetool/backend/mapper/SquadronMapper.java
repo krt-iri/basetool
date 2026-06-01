@@ -19,6 +19,7 @@ public interface SquadronMapper {
    * @return the full squadron DTO.
    */
   @Mapping(target = "isPromotionEnabled", source = "promotionEnabled")
+  @Mapping(target = "isProfitEligible", source = "profitEligible")
   SquadronDto toDto(Squadron entity);
 
   /**
@@ -62,14 +63,16 @@ public interface SquadronMapper {
 
   /**
    * Builds a new {@link Squadron} entity from the inbound DTO. Timestamps are owned by the
-   * persistence provider and ignored. {@code promotionEnabled} is intentionally NOT mapped from the
-   * DTO either: the flag is only mutable through the dedicated {@code PATCH
-   * /api/v1/squadrons/{id}/promotion-enabled} endpoint (see {@code
-   * SquadronService.setPromotionEnabled}) so an accidental description edit cannot flip the
+   * persistence provider and ignored. {@code promotionEnabled} and {@code profitEligible} are
+   * intentionally NOT mapped from the DTO either: both flags are only mutable through their
+   * dedicated {@code PATCH /api/v1/squadrons/{id}/promotion-enabled} / {@code .../profit-eligible}
+   * endpoints (see {@code SquadronService.setPromotionEnabled} / {@code
+   * SquadronService.setProfitEligible}) so an accidental description edit cannot flip either
    * per-squadron toggle.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "promotionEnabled", ignore = true)
+  @Mapping(target = "profitEligible", ignore = true)
   Squadron toEntity(SquadronDto dto);
 }

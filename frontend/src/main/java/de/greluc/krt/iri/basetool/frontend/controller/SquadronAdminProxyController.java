@@ -45,4 +45,21 @@ public class SquadronAdminProxyController {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
     return ResponseEntity.noContent().build();
   }
+
+  /**
+   * Forwards a "set squadron profit-eligible flag" request to the backend. Returns 204 No Content
+   * on success so the AJAX caller does not have to parse the squadron payload — it already knows
+   * the new state from the checkbox event.
+   *
+   * @param id squadron primary key
+   * @param body request payload {@code { "eligible": true|false }}
+   * @return 204 No Content on success
+   */
+  @PatchMapping("/{id}/profit-eligible")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Void> setProfitEligible(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
+    return ResponseEntity.noContent().build();
+  }
 }

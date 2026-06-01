@@ -20748,6 +20748,103 @@
         }
       }
     },
+    "/api/v1/squadrons/{id}/profit-eligible" : {
+      "patch" : {
+        "tags" : [ "squadron-controller" ],
+        "operationId" : "setProfitEligible",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SquadronProfitEligibleToggleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SquadronDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/squadrons/{id}/members/{userId}" : {
       "patch" : {
         "tags" : [ "squadron-membership-controller" ],
@@ -20834,6 +20931,105 @@
           },
           "401" : {
             "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/special-commands/{id}/profit-eligible" : {
+      "patch" : {
+        "tags" : [ "special-command-controller" ],
+        "summary" : "Toggle Spezialkommando profit-eligibility",
+        "description" : "Sets whether the Spezialkommando may be selected as the responsible (processing) org unit of a Job Order. ADMIN-only.",
+        "operationId" : "setProfitEligible_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SpecialCommandProfitEligibleToggleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Updated.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SpecialCommandDto"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -32687,6 +32883,9 @@
           "isPromotionEnabled" : {
             "type" : "boolean"
           },
+          "isProfitEligible" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -32716,6 +32915,9 @@
             "minLength" : 0
           },
           "active" : {
+            "type" : "boolean"
+          },
+          "isProfitEligible" : {
             "type" : "boolean"
           },
           "version" : {
@@ -36101,6 +36303,14 @@
           }
         }
       },
+      "SquadronProfitEligibleToggleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "eligible" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "MembershipFlagsPatchRequest" : {
         "type" : "object",
         "properties" : {
@@ -36116,6 +36326,14 @@
           }
         },
         "required" : [ "version" ]
+      },
+      "SpecialCommandProfitEligibleToggleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "eligible" : {
+            "type" : "boolean"
+          }
+        }
       },
       "MembershipLeadToggleRequest" : {
         "type" : "object",

@@ -58,6 +58,7 @@
                 <input type="hidden" name="ageRedVersion" th:value="${ageRedVersion}">
                 <input type="hidden" name="refineryRoundingVersion" th:value="${refineryRoundingVersion}">
                 <input type="hidden" name="transferFeeVersion" th:value="${transferFeeVersion}">
+                <input type="hidden" name="intakeSpecialCommandVersion" th:value="${intakeSpecialCommandVersion}">
 
                 <div class="form-group" style="max-width: 300px;">
                     <label for="ageYellowDays" th:text="#{admin.settings.orders.yellowDays}">Tage bis gelbe Markierung</label>
@@ -89,6 +90,22 @@
                     <div class="form-group" style="max-width: 300px;">
                         <label for="transferFeePercent" th:text="#{admin.settings.operations.transferFeeRate}">Überweisungsgebühr (%)</label>
                         <input type="number" id="transferFeePercent" name="transferFeePercent" th:value="${transferFeePercent}" min="0" max="99.99" step="0.01" required>
+                    </div>
+                </div>
+
+                <div class="data-section mt-2">
+                    <h2 th:text="#{admin.settings.joborder}">Auftragsannahme</h2>
+                    <p class="mb-1 text-muted" th:text="#{admin.settings.joborder.intakeSpecialCommand.description}">Spezialkommando, dem anonym erstellte Aufträge zugewiesen werden.</p>
+
+                    <div class="form-group" style="max-width: 300px;">
+                        <label for="intakeSpecialCommandId" th:text="#{admin.settings.joborder.intakeSpecialCommand}">Eingangs-Spezialkommando</label>
+                        <select id="intakeSpecialCommandId" name="intakeSpecialCommandId">
+                            <option value="" th:text="#{admin.settings.joborder.intakeSpecialCommand.none}">— Keines —</option>
+                            <option th:each="sk : ${specialCommands}"
+                                    th:value="${sk.id}"
+                                    th:text="${sk.name}"
+                                    th:selected="${sk.id != null and sk.id.toString() == intakeSpecialCommandId}">SK</option>
+                        </select>
                     </div>
                 </div>
 
@@ -131,6 +148,89 @@
                                        th:attr="data-squadron-id=${squadron.id}"
                                        th:checked="${squadron.isPromotionEnabled}">
                                 <span class="toggle-state-text" th:text="${squadron.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
+                            </label>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <!--
+            Per-squadron profit-eligibility toggle. Each row PATCHes the backend on click via
+            /api/proxy/squadrons/{id}/profit-eligible — no full form submit. Marking a squadron
+            eligible opts it into the Job-Order responsible (processing) picker; un-marking removes
+            it again. Spezialkommandos are always eligible and are not listed here.
+        -->
+        <div class="data-section mt-2">
+            <h2 th:text="#{admin.settings.squadron.profit}">Auftragsbearbeitung pro Staffel</h2>
+            <p class="mb-1 text-muted"
+               th:text="#{admin.settings.squadron.profit.description}">Legt fest, welche Staffeln als verantwortliche (bearbeitende) Einheit eines Auftrags ausgewählt werden können. Spezialkommandos sind immer auswählbar.</p>
+
+            <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
+                 th:text="#{admin.settings.squadron.profit.empty}">Keine Staffeln gefunden.</div>
+
+            <div th:unless="${#lists.isEmpty(squadrons)}" class="table-responsive">
+            <table class="krt-table" style="max-width: 600px;">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                        <th th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
+                        <td th:text="${squadron.shorthand}">IRI</td>
+                        <td th:text="${squadron.name}">IRIDIUM</td>
+                        <td>
+                            <label class="flex-gap-sm" style="cursor:pointer;">
+                                <input type="checkbox"
+                                       class="squadron-profit-toggle"
+                                       th:attr="data-squadron-id=${squadron.id}"
+                                       th:checked="${squadron.isProfitEligible}">
+                                <span class="toggle-state-text" th:text="${squadron.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
+                            </label>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <!--
+            Per-SK profit-eligibility toggle. Same pattern as the squadron table, but PATCHes
+            /api/proxy/special-commands/{id}/profit-eligible. SKs of non-Profit Kartell departments
+            stay unchecked: they may place orders but not process them.
+        -->
+        <div class="data-section mt-2">
+            <h2 th:text="#{admin.settings.sk.profit}">Auftragsbearbeitung pro Spezialkommando</h2>
+            <p class="mb-1 text-muted"
+               th:text="#{admin.settings.sk.profit.description}">Legt fest, welche Spezialkommandos Aufträge abarbeiten dürfen. SKs anderer Bereiche können Aufträge aufgeben, aber nicht bearbeiten.</p>
+
+            <div th:if="${#lists.isEmpty(specialCommands)}" style="color: var(--color-gray-2); font-style: italic;"
+                 th:text="#{admin.settings.sk.profit.empty}">Keine Spezialkommandos gefunden.</div>
+
+            <div th:unless="${#lists.isEmpty(specialCommands)}" class="table-responsive">
+            <table class="krt-table" style="max-width: 600px;">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                        <th th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="sk : ${specialCommands}" th:attr="data-sk-id=${sk.id}">
+                        <td th:text="${sk.shorthand}">SK</td>
+                        <td th:text="${sk.name}">Spezialkommando</td>
+                        <td>
+                            <label class="flex-gap-sm" style="cursor:pointer;">
+                                <input type="checkbox"
+                                       class="sk-profit-toggle"
+                                       th:attr="data-sk-id=${sk.id}"
+                                       th:checked="${sk.isProfitEligible}">
+                                <span class="toggle-state-text" th:text="${sk.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
                             </label>
                         </td>
                     </tr>
@@ -195,6 +295,99 @@
                         labelSpan.textContent = !enabled ? MSG_ENABLED : MSG_DISABLED;
                     }
                     if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_ERROR);
+                });
+            });
+        });
+    });
+
+    /*
+     * Per-squadron profit-eligibility toggle: PATCH /api/proxy/squadrons/{id}/profit-eligible on
+     * every checkbox change. Same optimistic-UI + CSP-safe pattern as the promotion toggle above.
+     */
+    var MSG_PROFIT_ENABLED  = /*[[#{admin.settings.squadron.profit.enabled}]]*/ 'berechtigt';
+    var MSG_PROFIT_DISABLED = /*[[#{admin.settings.squadron.profit.disabled}]]*/ 'nicht berechtigt';
+    var MSG_PROFIT_ERROR    = /*[[#{admin.settings.squadron.profit.error}]]*/ 'Speichern fehlgeschlagen';
+    var MSG_PROFIT_SAVED    = /*[[#{admin.settings.squadron.profit.saved}]]*/ 'Gespeichert';
+
+    function patchProfitEligible(squadronId, eligible) {
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader()] = csrfToken();
+        return fetch('/api/proxy/squadrons/' + encodeURIComponent(squadronId) + '/profit-eligible', {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ eligible: eligible })
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.squadron-profit-toggle').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                var squadronId = checkbox.getAttribute('data-squadron-id');
+                var eligible = checkbox.checked;
+                var labelSpan = checkbox.parentElement ? checkbox.parentElement.querySelector('.toggle-state-text') : null;
+                if (labelSpan) {
+                    labelSpan.textContent = eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                }
+                patchProfitEligible(squadronId, eligible).then(function (response) {
+                    if (!response.ok) {
+                        checkbox.checked = !eligible;
+                        if (labelSpan) {
+                            labelSpan.textContent = !eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                        }
+                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PROFIT_ERROR);
+                    } else if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(MSG_PROFIT_SAVED);
+                    }
+                }).catch(function () {
+                    checkbox.checked = !eligible;
+                    if (labelSpan) {
+                        labelSpan.textContent = !eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                    }
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PROFIT_ERROR);
+                });
+            });
+        });
+    });
+
+    /*
+     * Per-SK profit-eligibility toggle: PATCH /api/proxy/special-commands/{id}/profit-eligible.
+     * Reuses the MSG_PROFIT_* labels (generic "berechtigt"/"nicht berechtigt").
+     */
+    function patchSkProfitEligible(skId, eligible) {
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader()] = csrfToken();
+        return fetch('/api/proxy/special-commands/' + encodeURIComponent(skId) + '/profit-eligible', {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ eligible: eligible })
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.sk-profit-toggle').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                var skId = checkbox.getAttribute('data-sk-id');
+                var eligible = checkbox.checked;
+                var labelSpan = checkbox.parentElement ? checkbox.parentElement.querySelector('.toggle-state-text') : null;
+                if (labelSpan) {
+                    labelSpan.textContent = eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                }
+                patchSkProfitEligible(skId, eligible).then(function (response) {
+                    if (!response.ok) {
+                        checkbox.checked = !eligible;
+                        if (labelSpan) {
+                            labelSpan.textContent = !eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                        }
+                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PROFIT_ERROR);
+                    } else if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(MSG_PROFIT_SAVED);
+                    }
+                }).catch(function () {
+                    checkbox.checked = !eligible;
+                    if (labelSpan) {
+                        labelSpan.textContent = !eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
+                    }
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PROFIT_ERROR);
                 });
             });
         });

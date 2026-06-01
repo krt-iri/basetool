@@ -49,7 +49,7 @@ class SpecialCommandControllerTest {
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
     SpecialCommand entity = new SpecialCommand();
     SpecialCommandDto dto =
-        new SpecialCommandDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, 1L);
+        new SpecialCommandDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, false, 1L);
     Page<SpecialCommand> servicePage = new PageImpl<>(List.of(entity));
     when(service.getAllSpecialCommands(any(Pageable.class), eq(false))).thenReturn(servicePage);
     when(mapper.toDto(entity)).thenReturn(dto);
@@ -106,7 +106,7 @@ class SpecialCommandControllerTest {
   void getOne_delegatesIdToService() {
     UUID id = UUID.randomUUID();
     SpecialCommand entity = new SpecialCommand();
-    SpecialCommandDto dto = new SpecialCommandDto(id, "Alpha", "ALP", null, true, 0L);
+    SpecialCommandDto dto = new SpecialCommandDto(id, "Alpha", "ALP", null, true, false, 0L);
     when(service.getSpecialCommandById(id)).thenReturn(entity);
     when(mapper.toDto(entity)).thenReturn(dto);
 
@@ -118,11 +118,12 @@ class SpecialCommandControllerTest {
 
   @Test
   void create_roundTripsDtoToEntityViaMapperAndBack() {
-    SpecialCommandDto request = new SpecialCommandDto(null, "Bravo", "BRV", "Test", true, null);
+    SpecialCommandDto request =
+        new SpecialCommandDto(null, "Bravo", "BRV", "Test", true, false, null);
     SpecialCommand entity = new SpecialCommand();
     SpecialCommand persisted = new SpecialCommand();
     SpecialCommandDto response =
-        new SpecialCommandDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, 1L);
+        new SpecialCommandDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, false, 1L);
 
     when(mapper.toEntity(request)).thenReturn(entity);
     when(service.createSpecialCommand(entity)).thenReturn(persisted);
@@ -137,9 +138,11 @@ class SpecialCommandControllerTest {
   @Test
   void update_passesIdAndDtoDirectlyToService() {
     UUID id = UUID.randomUUID();
-    SpecialCommandDto request = new SpecialCommandDto(id, "Renamed", "REN", "Test", true, 4L);
+    SpecialCommandDto request =
+        new SpecialCommandDto(id, "Renamed", "REN", "Test", true, false, 4L);
     SpecialCommand persisted = new SpecialCommand();
-    SpecialCommandDto response = new SpecialCommandDto(id, "Renamed", "REN", "Test", true, 5L);
+    SpecialCommandDto response =
+        new SpecialCommandDto(id, "Renamed", "REN", "Test", true, false, 5L);
 
     when(service.updateSpecialCommand(id, request)).thenReturn(persisted);
     when(mapper.toDto(persisted)).thenReturn(response);
@@ -149,6 +152,22 @@ class SpecialCommandControllerTest {
     assertSame(response, result);
     verify(service).updateSpecialCommand(id, request);
     verify(mapper, never()).toEntity(any(SpecialCommandDto.class));
+  }
+
+  @Test
+  void setProfitEligible_delegatesToServiceAndMapsResult() {
+    UUID id = UUID.randomUUID();
+    SpecialCommand persisted = new SpecialCommand();
+    SpecialCommandDto response = new SpecialCommandDto(id, "Alpha", "ALP", "Test", true, true, 2L);
+    when(service.setProfitEligible(id, true)).thenReturn(persisted);
+    when(mapper.toDto(persisted)).thenReturn(response);
+
+    SpecialCommandDto result =
+        controller.setProfitEligible(
+            id, new SpecialCommandController.SpecialCommandProfitEligibleToggleRequest(true));
+
+    assertSame(response, result);
+    verify(service).setProfitEligible(id, true);
   }
 
   @Test

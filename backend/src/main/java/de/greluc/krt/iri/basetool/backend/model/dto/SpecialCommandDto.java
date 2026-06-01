@@ -27,6 +27,10 @@ import java.util.UUID;
  * @param description free-form text; nullable.
  * @param active soft-delete flag; {@code true} for active rows. Populated by the server; {@code
  *     null} on requests means "no change".
+ * @param isProfitEligible per-SK Job-Order processor eligibility flag (default {@code false}); only
+ *     profit-eligible Spezialkommandos appear in the responsible (processing) picker. Read-only on
+ *     the regular update path; toggled only through {@code
+ *     /api/v1/special-commands/{id}/profit-eligible}.
  * @param version optimistic-lock counter; required on update so the persistence layer can detect
  *     concurrent edits, server-populated on create + read.
  */
@@ -36,4 +40,5 @@ public record SpecialCommandDto(
     @NotBlank @Size(max = 255) String shorthand,
     @Size(max = 65_535) String description,
     Boolean active,
+    Boolean isProfitEligible,
     Long version) {}

@@ -16,6 +16,9 @@ import java.util.UUID;
  * @param description free-form text
  * @param active soft-delete flag
  * @param isPromotionEnabled per-squadron promotion-feature flag
+ * @param isProfitEligible per-squadron Job-Order processor eligibility flag; the admin toggle lives
+ *     at {@code /api/proxy/squadrons/{id}/profit-eligible} and decides whether the squadron appears
+ *     in the Job-Order responsible (processing) picker
  * @param version optimistic-lock counter
  */
 public record SquadronDto(
@@ -25,4 +28,5 @@ public record SquadronDto(
     String description,
     Boolean active,
     Boolean isPromotionEnabled,
+    Boolean isProfitEligible,
     Long version) {}

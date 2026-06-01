@@ -181,6 +181,7 @@ class EntityMappersTest {
     s.setDescription("Test squad");
     s.setActive(true);
     s.setPromotionEnabled(false);
+    s.setProfitEligible(true);
     s.setVersion(2L);
 
     // When
@@ -196,6 +197,9 @@ class EntityMappersTest {
     // UI / sidebar visibility uses this value to decide whether the
     // promotion menu is exposed to a non-admin caller.
     assertFalse(dto.isPromotionEnabled());
+    // toDto must also mirror the per-squadron profit-eligibility flag — the
+    // admin settings page renders the responsible-picker opt-in from this value.
+    assertTrue(dto.isProfitEligible());
     assertEquals(2L, dto.version());
   }
 
@@ -203,7 +207,7 @@ class EntityMappersTest {
   void squadronToEntity_shouldCopyScalars_butIgnoreActiveAndVersion() {
     // Given
     UUID id = UUID.randomUUID();
-    SquadronDto dto = new SquadronDto(id, "Alpha", "ALP", "First squad", true, true, 5L);
+    SquadronDto dto = new SquadronDto(id, "Alpha", "ALP", "First squad", true, true, false, 5L);
 
     // When
     Squadron s = EntityMappers.toEntity(dto);
