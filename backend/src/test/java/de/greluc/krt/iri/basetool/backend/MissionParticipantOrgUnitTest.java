@@ -1,0 +1,161 @@
+package de.greluc.krt.iri.basetool.backend;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import de.greluc.krt.iri.basetool.backend.model.Mission;
+import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.MissionService;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Verifies the org-unit stamping of mission participants. Replaces the former {@code
+ * MissionParticipantSquadronTest}: a registered participant's affiliations are now derived from
+ * their {@code org_unit_membership} rows (none / one Staffel / one SK / both), with no IRIDIUM
+ * fallback, while a guest's affiliation honours the caller-submitted org units only after the H-3
+ * authorization filter (anonymous callers are stripped).
+ */
+@SpringBootTest
+@Transactional
+class MissionParticipantOrgUnitTest {
+
+  @Autowired private MissionService missionService;
+  @Autowired private MissionRepository missionRepository;
+  @Autowired private UserRepository userRepository;
+  @Autowired private SquadronRepository squadronRepository;
+  @Autowired private SpecialCommandRepository specialCommandRepository;
+  @Autowired private OrgUnitMembershipRepository membershipRepository;
+
+  private Mission mission;
+  private Squadron testStaffel;
+  private SpecialCommand testSk;
+
+  @BeforeEach
+  void setup() {
+    Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    mission = new Mission();
+    mission.setOwningOrgUnit(iridium);
+    mission.setName("Test Mission");
+    mission.setStatus("PLANNED");
+    mission = missionRepository.save(mission);
+
+    testStaffel = new Squadron();
+    testStaffel.setName("Test Staffel");
+    testStaffel.setShorthand("TST");
+    testStaffel = squadronRepository.save(testStaffel);
+
+    testSk = new SpecialCommand();
+    testSk.setName("Test Spezialkommando");
+    testSk.setShorthand("TSK");
+    testSk = specialCommandRepository.save(testSk);
+  }
+
+  private User newUser(String username) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(username);
+    return userRepository.save(user);
+  }
+
+  private void addMembership(User user, OrgUnit orgUnit, OrgUnitKind kind) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(user.getId(), orgUnit.getId()));
+    m.setUser(user);
+    m.setKind(kind);
+    m.setJoinedAt(Instant.now());
+    membershipRepository.saveAndFlush(m);
+  }
+
+  private MissionParticipant onlyParticipant(Mission updated) {
+    return updated.getParticipants().iterator().next();
+  }
+
+  @Test
+  void registeredUserWithNoMembership_getsNoOrgUnit() {
+    User user = newUser("nomember");
+
+    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+
+    assertTrue(
+        onlyParticipant(updated).getOrgUnits().isEmpty(),
+        "a user with no membership must get no org-unit affiliation (no IRIDIUM fallback)");
+  }
+
+  @Test
+  void registeredUserWithOnlyStaffel_getsThatStaffel() {
+    User user = newUser("staffelonly");
+    addMembership(user, testStaffel, OrgUnitKind.SQUADRON);
+
+    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+
+    List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
+    assertEquals(List.of(testStaffel.getId()), ids);
+  }
+
+  @Test
+  void registeredUserWithOnlySpecialCommand_getsThatSk() {
+    User user = newUser("skonly");
+    addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
+
+    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+
+    List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
+    assertEquals(List.of(testSk.getId()), ids);
+  }
+
+  @Test
+  void registeredUserWithStaffelAndSk_getsBoth() {
+    User user = newUser("both");
+    addMembership(user, testStaffel, OrgUnitKind.SQUADRON);
+    addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
+
+    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+
+    List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
+    assertTrue(ids.contains(testStaffel.getId()), "Staffel affiliation must be present");
+    assertTrue(ids.contains(testSk.getId()), "SK affiliation must be present");
+    assertEquals(2, ids.size());
+  }
+
+  @Test
+  void guest_anonymousCaller_submittedOrgUnitsAreDropped() {
+    // This @SpringBootTest runs without an authenticated SecurityContext — the H-3 gate strips any
+    // caller-submitted org units so a forged "guest of org unit X" entry never lands.
+    Mission updated =
+        missionService.addParticipant(
+            mission.getId(),
+            null,
+            "Guest",
+            null,
+            "Comment",
+            List.of(testStaffel.getId(), testSk.getId()));
+
+    MissionParticipant participant =
+        updated.getParticipants().stream()
+            .filter(p -> "Guest".equals(p.getGuestName()))
+            .findFirst()
+            .orElseThrow();
+    assertTrue(
+        participant.getOrgUnits().isEmpty(),
+        "anonymous guest must not be able to claim affiliation with any org unit (H-3)");
+  }
+}

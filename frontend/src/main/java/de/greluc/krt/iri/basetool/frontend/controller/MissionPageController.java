@@ -107,7 +107,7 @@ public class MissionPageController {
   public void addFormsToModel(Model model, OidcUser principal) {
     if (!model.containsAttribute("participantForm")) {
       ParticipantForm form =
-          new ParticipantForm(null, "", null, null, "", null, null, null, null, null);
+          new ParticipantForm(null, "", null, null, "", List.of(), null, null, null, null);
       if (principal != null) {
         try {
           UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
@@ -116,33 +116,12 @@ public class MissionPageController {
                 (me.displayName() != null && !me.displayName().isBlank())
                     ? me.displayName()
                     : me.username();
-            UUID squadronId = null;
-            if (me.roles() != null
-                && (me.roles().contains("MEMBER")
-                    || me.roles().contains("ROLE_MEMBER")
-                    || me.roles().contains("SQUADRON_MEMBER")
-                    || me.roles().contains("ROLE_SQUADRON_MEMBER")
-                    || me.roles().contains("ADMIN")
-                    || me.roles().contains("ROLE_ADMIN")
-                    || me.roles().contains("OFFICER")
-                    || me.roles().contains("ROLE_OFFICER"))) {
-              PageResponse<Map<String, Object>> squadronsPage =
-                  backendApiClient.getCached(
-                      "/api/v1/squadrons?size=1000",
-                      new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
-                      true);
-              if (squadronsPage != null && squadronsPage.content() != null) {
-                for (Map<String, Object> sq : squadronsPage.content()) {
-                  if ("Iridium".equalsIgnoreCase(String.valueOf(sq.get("name")))) {
-                    squadronId = UUID.fromString(String.valueOf(sq.get("id")));
-                    break;
-                  }
-                }
-              }
-            }
+            // Org-unit affiliations for a registered participant are derived server-side from the
+            // caller's memberships, so the form carries no org-unit prefill — the picker is
+            // guest-only and hidden once a registered user is selected.
             form =
                 new ParticipantForm(
-                    me.id(), name, squadronId, null, "", null, null, null, null, null);
+                    me.id(), name, null, null, "", List.of(), null, null, null, null);
           }
         } catch (Exception e) {
           log.warn("Could not prefill participant form", e);
@@ -492,6 +471,23 @@ public class MissionPageController {
         // Ignore
       }
 
+      // Fetch all active org units (Staffel + Spezialkommandos) for the guest org-unit picker in
+      // the participant add/edit modals. The backend endpoint requires a role, and an anonymous
+      // guest's submitted org units are dropped server-side (H-3) anyway, so the picker is only
+      // populated for authenticated callers labeling a guest.
+      if (principal != null) {
+        try {
+          List<OrgUnitMembershipOptionDto> orgUnits =
+              backendApiClient.get(
+                  "/api/v1/org-units/active", new ParameterizedTypeReference<>() {});
+          model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
+        } catch (Exception e) {
+          model.addAttribute("orgUnits", List.of());
+        }
+      } else {
+        model.addAttribute("orgUnits", List.of());
+      }
+
       // Fetch FrequencyTypes
       try {
         PageResponse<Map<String, Object>> freqTypesPage =
@@ -609,8 +605,8 @@ public class MissionPageController {
       if (form.desiredJobTypeId() != null) {
         body.put("desiredJobTypeId", form.desiredJobTypeId());
       }
-      if (form.squadronId() != null) {
-        body.put("squadronId", form.squadronId());
+      if (form.orgUnitIds() != null && !form.orgUnitIds().isEmpty()) {
+        body.put("orgUnitIds", form.orgUnitIds());
       }
       body.put("comment", form.comment());
 
@@ -896,8 +892,8 @@ public class MissionPageController {
       if (form.plannedMissionJobTypeId() != null) {
         body.put("plannedMissionJobTypeId", form.plannedMissionJobTypeId());
       }
-      if (form.squadronId() != null) {
-        body.put("squadronId", form.squadronId());
+      if (form.orgUnitIds() != null) {
+        body.put("orgUnitIds", form.orgUnitIds());
       }
       body.put("comment", form.comment());
       if (form.startTime() != null && !form.startTime().isBlank()) {

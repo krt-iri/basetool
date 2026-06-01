@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -127,9 +128,9 @@ class MissionServiceTest {
     when(userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase("TestUser", "TestUser"))
         .thenReturn(Optional.of(existingUser));
     when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
-    // Post-fix #10 fallback path: when the resolved user has no squadron, MissionService
-    // looks up IRIDIUM by its canonical UUID (not by shorthand) and stamps the participant.
-    when(squadronRepository.findById(Squadron.IRIDIUM_ID)).thenReturn(Optional.of(new Squadron()));
+    // The resolved user has no memberships, so the participant gets no org-unit affiliation —
+    // there is deliberately no IRIDIUM fallback anymore.
+    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, null, "TestUser", null, "No comment");
 
@@ -138,6 +139,9 @@ class MissionServiceTest {
     assertNotNull(participant.getUser(), "User should be mapped from guest name");
     assertEquals(userId, participant.getUser().getId());
     assertNull(participant.getGuestName(), "Guest name should be nullified since user was found");
+    assertTrue(
+        participant.getOrgUnits().isEmpty(),
+        "a user with no membership must get no org-unit affiliation (no IRIDIUM fallback)");
   }
 
   @Test

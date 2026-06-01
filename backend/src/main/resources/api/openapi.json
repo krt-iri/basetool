@@ -32868,8 +32868,11 @@
           "guestName" : {
             "type" : "string"
           },
-          "squadron" : {
-            "$ref" : "#/components/schemas/SquadronDto"
+          "orgUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgUnitReferenceDto"
+            }
           },
           "desiredMissionJobType" : {
             "$ref" : "#/components/schemas/JobTypeDto"
@@ -32926,6 +32929,25 @@
             "items" : {
               "$ref" : "#/components/schemas/MissionCrewDto"
             }
+          }
+        }
+      },
+      "OrgUnitReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
           }
         }
       },
@@ -33049,9 +33071,12 @@
             "type" : "string",
             "format" : "date-time"
           },
-          "squadronId" : {
-            "type" : "string",
-            "format" : "uuid"
+          "orgUnitIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           },
           "payoutPreference" : {
             "type" : "string",
@@ -33949,9 +33974,12 @@
             "maxLength" : 1000,
             "minLength" : 0
           },
-          "squadronId" : {
-            "type" : "string",
-            "format" : "uuid"
+          "orgUnitIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           }
         }
       },
