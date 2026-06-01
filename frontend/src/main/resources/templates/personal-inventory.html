@@ -27,6 +27,13 @@
         <p class="krt-subtitle" th:text="#{personalInventory.subtitle}">Eigene Bestaende</p>
     </div>
 
+    <nav class="krt-pi-tabs" aria-label="Personal inventory sections">
+        <a th:href="@{/personal-inventory}" class="krt-pi-tab krt-pi-tab-active"
+           th:text="#{personalInventory.tab.items}">Items</a>
+        <a th:href="@{/personal-inventory/blueprints}" class="krt-pi-tab"
+           th:text="#{personalInventory.tab.blueprints}">Blueprints</a>
+    </nav>
+
     <div class="hud-box krt-personal-inventory mt-2">
 
         <div class="krt-pi-actionbar">
