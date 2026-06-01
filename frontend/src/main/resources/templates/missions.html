@@ -60,8 +60,8 @@
             </div>
 
             <div class="search-form-actions">
-                <button type="button" id="missions-filter-reset" class="btn btn-secondary" th:text="#{general.reset}">Zurücksetzen</button>
-                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn" data-testid="missions-create-link" th:text="#{mission.create}">Create New</a>
+                <button type="button" id="missions-filter-reset" class="btn btn-ghost" th:text="#{general.reset}">Zurücksetzen</button>
+                <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn btn--cta" data-testid="missions-create-link" th:text="#{mission.create}">Create New</a>
             </div>
         </form>
 
@@ -97,7 +97,7 @@
                             <span th:if="${m.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                         </td>
                         <td>
-                            <a th:href="@{/missions/{id}(id=${m.id})}" class="btn" th:text="#{general.open}">Open</a>
+                            <a th:href="@{/missions/{id}(id=${m.id})}" class="btn btn-ghost" th:text="#{general.open}">Open</a>
                         </td>
                     </tr>
                 </tbody>

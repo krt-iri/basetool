@@ -23,12 +23,12 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.refinery}">Raffinerieaufträge</h1>
-        <a th:href="@{/refinery-orders/create(source='index')}" class="btn" data-testid="refinery-create-link" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
+        <a th:href="@{/refinery-orders/create(source='index')}" class="btn btn--cta" data-testid="refinery-create-link" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
     </div>
 
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
+            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{refineryorder.status.OPEN}">Offen</span>
@@ -49,7 +49,7 @@
                 <input type="checkbox" name="onlyMine" value="true" th:checked="${onlyMine}">
                 <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Aufträge</span>
             </label>
-            <button type="submit" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
+            <button type="submit" class="btn btn-ghost" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
 
         <div class="table-responsive">
@@ -97,7 +97,7 @@
                     <span th:if="${order.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                 </td>
                 <td class="nowrap">
-                    <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn" th:text="#{refineryorder.action.details}">Details</a>
+                    <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn btn-ghost" th:text="#{refineryorder.action.details}">Details</a>
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
