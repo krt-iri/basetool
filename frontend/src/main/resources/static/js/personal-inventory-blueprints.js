@@ -36,10 +36,10 @@
 
     function endpoints() { return window.krtBlueprintsEndpoints || {}; }
 
-    // Escape HTML meta-characters on EVERY path (the fallback must sanitize too, so the
-    // value is never reinterpreted as HTML when written via innerHTML — CodeQL js/xss-through-dom).
+    // Escape HTML meta-characters before any value is written via innerHTML. Implemented as a
+    // self-contained replace chain (not a delegate to window.escapeHtml) so it is an unconditional,
+    // statically-recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
     function esc(v) {
-        if (window.escapeHtml) return window.escapeHtml(v);
         return String(v == null ? '' : v)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
