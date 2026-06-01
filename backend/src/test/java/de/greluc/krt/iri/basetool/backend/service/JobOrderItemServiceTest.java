@@ -26,6 +26,7 @@ import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +46,7 @@ class JobOrderItemServiceTest {
 
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private GameItemRepository gameItemRepository;
+  @Mock private MaterialRepository materialRepository;
   @Mock private MaterialMapper materialMapper;
   @InjectMocks private JobOrderItemService service;
 
@@ -175,6 +177,82 @@ class JobOrderItemServiceTest {
     assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
     assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
     assertThat(preview.unresolvedIngredients()).containsExactly("Unknownium");
+  }
+
+  @Test
+  void deriveForPreviewBridgesNonCraftableItemIngredientIntoMaterials() {
+    // A wiki ITEM ingredient (Beradom, counted in pieces) with no own blueprint but an existing
+    // PIECE material of the same name must surface as a material requirement, not a sub-assembly.
+    GameItem weapon = gameItem("Palisade", GameItemKind.WEAPON);
+    GameItem beradomItem = gameItem("Beradom", GameItemKind.GENERIC);
+    Material beradomMaterial = material("Beradom", QuantityType.PIECE);
+    stubMapper(beradomMaterial);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(itemIngredient(beradomItem, 20));
+
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(blueprintRepository.findByOutputItemId(beradomItem.getId())).thenReturn(List.of());
+    when(materialRepository.findByNameIgnoreCase("Beradom"))
+        .thenReturn(Optional.of(beradomMaterial));
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 3);
+
+    assertThat(preview.subAssemblies()).isEmpty();
+    assertThat(preview.materials()).hasSize(1);
+    assertThat(preview.materials().get(0).material().name()).isEqualTo("Beradom");
+    assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(60.0); // 20 pieces * 3
+    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo(QualityRequirement.NONE);
+  }
+
+  @Test
+  void deriveForPreviewKeepsCraftableItemAsSubAssemblyAndDoesNotBridge() {
+    // A craftable ITEM ingredient (has its own blueprint) stays an adoptable sub-assembly and is
+    // never bridged to a material, even though the bridge would otherwise look one up.
+    GameItem rifle = gameItem("Rifle", GameItemKind.WEAPON);
+    GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
+    Blueprint blueprint = blueprint(rifle);
+    blueprint.addIngredient(itemIngredient(scope, 1));
+
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(blueprintRepository.findByOutputItemId(scope.getId()))
+        .thenReturn(List.of(blueprint(scope)));
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 1);
+
+    assertThat(preview.materials()).isEmpty();
+    assertThat(preview.subAssemblies()).hasSize(1);
+    assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
+  }
+
+  @Test
+  void buildItemLineSnapshotsBridgedItemIngredientAsPieceMaterial() {
+    // Persist path: the bridged Beradom requirement is snapshotted onto the order as a PIECE
+    // material alongside the regular RESOURCE materials.
+    GameItem weapon = gameItem("Palisade", GameItemKind.WEAPON);
+    Material riccite = material("Riccite", QuantityType.SCU);
+    GameItem beradomItem = gameItem("Beradom", GameItemKind.GENERIC);
+    Material beradomMaterial = material("Beradom", QuantityType.PIECE);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(riccite, 1.5, 0));
+    blueprint.addIngredient(itemIngredient(beradomItem, 20));
+
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(blueprintRepository.findByOutputItemId(beradomItem.getId())).thenReturn(List.of());
+    when(materialRepository.findByNameIgnoreCase("Beradom"))
+        .thenReturn(Optional.of(beradomMaterial));
+
+    JobOrderItem built =
+        service.buildItemLine(
+            new CreateJobOrderItemLineDto(
+                weapon.getId(), blueprint.getId(), 2, List.of(), null, null));
+
+    assertThat(built.getMaterials()).hasSize(2);
+    JobOrderItemMaterial ricciteReq = requirementFor(built, riccite);
+    assertThat(ricciteReq.getRequiredQuantity()).isEqualTo(3.0); // 1.5 SCU * 2
+    JobOrderItemMaterial beradomReq = requirementFor(built, beradomMaterial);
+    assertThat(beradomReq.getRequiredQuantity()).isEqualTo(40.0); // 20 pieces * 2, whole
+    assertThat(beradomReq.getQualityRequirement()).isEqualTo(QualityRequirement.NONE);
   }
 
   // ── helpers ──────────────────────────────────────────────────────────
