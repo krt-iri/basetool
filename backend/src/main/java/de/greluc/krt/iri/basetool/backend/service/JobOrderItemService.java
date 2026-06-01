@@ -73,6 +73,12 @@ public class JobOrderItemService {
    */
   private static final int GOOD_QUALITY_THRESHOLD = 700;
 
+  /**
+   * Scale factor for rounding SCU quantities to three decimals (the {@code 0.001} input step used
+   * across the order UI), used to strip binary floating-point artefacts from derived quantities.
+   */
+  private static final double SCU_ROUNDING_SCALE = 1000.0;
+
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
@@ -196,11 +202,13 @@ public class JobOrderItemService {
     }
     return sums.entrySet().stream()
         .map(
-            e ->
-                new AggregatedMaterialDto(
-                    materialMapper.toDto(materials.get(e.getKey().materialId())),
-                    e.getKey().quality(),
-                    e.getValue()))
+            e -> {
+              Material material = materials.get(e.getKey().materialId());
+              return new AggregatedMaterialDto(
+                  materialMapper.toDto(material),
+                  e.getKey().quality(),
+                  roundForQuantityType(e.getValue(), material));
+            })
         .sorted(
             Comparator.<AggregatedMaterialDto, Integer>comparing(
                     a ->
@@ -263,10 +271,23 @@ public class JobOrderItemService {
         : QualityRequirement.NONE;
   }
 
+  /**
+   * Rounds a derived quantity to the precision its quantity type can express, eliminating the
+   * binary floating-point artefacts that {@code perUnit * amount} introduces (e.g. {@code 0.36 * 5}
+   * yielding {@code 1.7999999999999998} instead of {@code 1.8}). {@code PIECE} materials round to a
+   * whole unit; {@code SCU} materials round to three decimals, matching the {@code 0.001} input
+   * step used throughout the UI.
+   *
+   * @param quantity the raw, possibly noisy product of per-unit quantity and ordered amount
+   * @param material the material whose quantity type selects the rounding granularity; {@code null}
+   *     is treated as SCU
+   * @return the cleaned quantity
+   */
   private static double roundForQuantityType(double quantity, Material material) {
-    return material != null && material.getQuantityType() == QuantityType.PIECE
-        ? Math.round(quantity)
-        : quantity;
+    if (material != null && material.getQuantityType() == QuantityType.PIECE) {
+      return Math.round(quantity);
+    }
+    return Math.round(quantity * SCU_ROUNDING_SCALE) / SCU_ROUNDING_SCALE;
   }
 
   /**
