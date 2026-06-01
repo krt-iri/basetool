@@ -60,6 +60,8 @@ class JobOrderServiceTest {
 
   @Mock private de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
+  @Mock private MaterialClaimService materialClaimService;
+
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;

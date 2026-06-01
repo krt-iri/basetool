@@ -682,7 +682,11 @@ class ArchitectureTest {
             "RefineryOrderService",
             "HangarService",
             "OperationService",
-            "JobOrderService");
+            "JobOrderService",
+            // Phase 4 (#344): material claims gate on the claiming squadron's scope
+            // (AuthHelperService.canEditOrgUnit) + the responsible-SK authority
+            // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
+            "MaterialClaimService");
 
     String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
     String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";

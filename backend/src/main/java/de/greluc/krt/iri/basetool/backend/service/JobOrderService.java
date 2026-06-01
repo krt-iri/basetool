@@ -75,6 +75,7 @@ public class JobOrderService {
   private final SystemSettingService systemSettingService;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
+  private final MaterialClaimService materialClaimService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
   private final de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
@@ -526,6 +527,10 @@ public class JobOrderService {
     }
 
     jobOrder = jobOrderRepository.save(jobOrder);
+
+    // Reconciliation (Phase 4 / #344, decision #6): an edit that drops a material bucket withdraws
+    // any now-orphaned claims on that bucket. No-op for non-SK orders (which carry no claims).
+    materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -894,6 +899,15 @@ public class JobOrderService {
 
     jobOrder.setResponsibleOrgUnit(target);
     jobOrder = jobOrderRepository.save(jobOrder);
+
+    // Reconciliation (Phase 4 / #344, decision #10): an SK→Squadron de-escalation makes the order
+    // private, so its public material claims are withdrawn. SK→SK keeps them (still public);
+    // Squadron→SK escalation never had any. Claims are an independent aggregate, so this delete
+    // does
+    // not touch the order's @Version.
+    if (target.getKind() == OrgUnitKind.SQUADRON) {
+      materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
+    }
     return mapToDtoWithStock(jobOrder);
   }
 
