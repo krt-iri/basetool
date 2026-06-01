@@ -990,7 +990,7 @@ class RefineryOrderServiceTest {
       de.greluc.krt.iri.basetool.backend.model.Squadron resolved =
           new de.greluc.krt.iri.basetool.backend.model.Squadron();
       resolved.setId(pickedOrgUnitId);
-      when(ownerScopeService.resolveOrgUnitForPickerOutput(user, pickedOrgUnitId))
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
           .thenReturn(resolved);
 
       Location loc = new Location();

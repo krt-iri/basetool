@@ -99,14 +99,16 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   private Set<RefineryGood> goods = new HashSet<>();
 
   /**
-   * Org-unit owner of this refinery order. After R9 Step 2 dropped the legacy {@code
-   * owningSquadron} mirror field together with the {@code syncOwnerFields()} lifecycle hook,
-   * callers stamp this field directly via {@code OwnerScopeService.resolveOrgUnitForPickerOutput};
-   * V100 drops the matching {@code owning_squadron_id} column. {@code nullable = false} reflects
-   * V99's NOT NULL tightening on the new column.
+   * Org-unit owner of this refinery order, or {@code null} for an <em>ownerless personal</em> order
+   * — one raised by a user who belongs to no Staffel/SK. Such an order is attributable solely
+   * through {@link #owner} and is visible/editable only by that owner (plus admins in all-scopes
+   * mode); it never surfaces in an org unit's order list. Callers stamp this field via {@code
+   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. V132 dropped the {@code NOT NULL}
+   * constraint V102 had added, which is why the column — and therefore this {@code @JoinColumn} —
+   * is nullable.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_org_unit_id", nullable = false)
+  @JoinColumn(name = "owning_org_unit_id", nullable = true)
   @ToString.Exclude
   private OrgUnit owningOrgUnit;
 }
