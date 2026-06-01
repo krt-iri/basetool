@@ -349,4 +349,58 @@ class HangarImportIntegrationTest {
     Ship imported = shipRepository.findByOwnerId(user1.getId()).stream().findFirst().orElseThrow();
     assertEquals("Stella Aeterna", imported.getName());
   }
+
+  // -------------------------------------------------------------------------
+  // StarJump FleetViewer ("Hangar Link"): object root with a canvasItems array,
+  // auto-detected on the canonical /import/ships endpoint. Exercises a name match
+  // (135c via defaultText), a slug fallback (zeus via uexSlug when the display
+  // name misses), and a dropped TEXTGROUP item, end-to-end against the real DB.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_starjumpFleetviewer_nameAndSlugFallback() throws Exception {
+    // Give the Zeus a UEX slug so the slug-fallback stage can resolve it.
+    typeZeus.setUexSlug("zeus-mkii-mr");
+    typeZeus = shipTypeRepository.save(typeZeus);
+
+    String json =
+        """
+        {
+          "type": "starjumpFleetviewer",
+          "version": 1,
+          "canvasItems": [
+            { "id":"1", "itemType":"SHIP", "shipSlug":"135c", "variantSlug":"",
+              "defaultText":"135c" },
+            { "id":"2", "itemType":"TEXTGROUP", "text":"135c" },
+            { "id":"3", "itemType":"SHIP", "shipSlug":"zeus-mkii-mr", "variantSlug":"",
+              "defaultText":"No Name The Matcher Knows" }
+          ]
+        }
+        """;
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "STARJUMP_FleetViewer.json",
+            "application/json",
+            json.getBytes(StandardCharsets.UTF_8));
+
+    // When
+    String response =
+        mockMvc
+            .perform(
+                multipart("/api/v1/hangar/import/ships")
+                    .file(file)
+                    .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: both SHIP items resolve (one by name, one by slug); the TEXTGROUP is ignored.
+    FleetviewImportResponseDto result =
+        objectMapper.readValue(response, FleetviewImportResponseDto.class);
+    assertEquals(2, result.importedCount());
+    assertEquals(0, result.skippedCount());
+    assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
+  }
 }
