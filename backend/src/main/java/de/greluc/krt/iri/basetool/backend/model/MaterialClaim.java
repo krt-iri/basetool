@@ -92,4 +92,33 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "claimed_by_user_id")
   private User claimedByUser;
+
+  /**
+   * Renders the claim using only safe scalar identifiers — its own id, the {@code
+   * qualityRequirement}, the {@code amount}, and the (null-safe) ids of the associated entities.
+   * Deliberately does <b>not</b> call {@code toString()} on the {@code @ManyToOne} associations:
+   * those are {@code FetchType.LAZY}, so dereferencing them in a log line could trigger a lazy load
+   * (or fail outside a session), and the audit user must never surface as a name/email. Reading
+   * only the foreign-key id off a lazy proxy does not initialise it.
+   *
+   * @return a stable, PII-free single-line representation of this claim.
+   */
+  @Override
+  public String toString() {
+    return "MaterialClaim{id="
+        + id
+        + ", jobOrderId="
+        + (jobOrder != null ? jobOrder.getId() : null)
+        + ", materialId="
+        + (material != null ? material.getId() : null)
+        + ", qualityRequirement="
+        + qualityRequirement
+        + ", claimingOrgUnitId="
+        + (claimingOrgUnit != null ? claimingOrgUnit.getId() : null)
+        + ", amount="
+        + amount
+        + ", claimedByUserId="
+        + (claimedByUser != null ? claimedByUser.getId() : null)
+        + '}';
+  }
 }
