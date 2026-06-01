@@ -191,7 +191,22 @@ function updateSelectedText(checkboxes, headerId) {
         }
     }
 
+    // Debounce wrapper around the matrix re-fetch. Each material/system checkbox toggle fires a
+    // change event, and "select all" flips dozens at once; without coalescing, every flip would
+    // kick off its own full backend round-trip + table rebuild, refreezing the page on each click.
+    // A short trailing debounce collapses a burst of toggles into a single request.
+    var filterMatrixTimer = null;
     function filterMatrix() {
+        if (filterMatrixTimer) {
+            clearTimeout(filterMatrixTimer);
+        }
+        filterMatrixTimer = setTimeout(function () {
+            filterMatrixTimer = null;
+            runFilterMatrix();
+        }, 250);
+    }
+
+    function runFilterMatrix() {
         var matCheckboxes = document.getElementsByClassName("matCheck");
         var activeMats = [];
         for (var i = 0; i < matCheckboxes.length; i++) {

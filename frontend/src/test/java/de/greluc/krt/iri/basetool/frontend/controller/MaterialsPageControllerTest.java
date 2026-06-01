@@ -257,7 +257,7 @@ class MaterialsPageControllerTest {
             1,
             Collections.emptyList());
 
-    when(backendApiClient.get(
+    when(backendApiClient.getCached(
             eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
         .thenReturn(pageResponse);
 
@@ -292,7 +292,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    when(backendApiClient.get(
+    when(backendApiClient.getCached(
             startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
         .thenThrow(new RuntimeException("backend down"));
 

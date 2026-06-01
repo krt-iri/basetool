@@ -155,6 +155,27 @@
     font-size: var(--fs-sm);
 }
 
+/*
+ * Off-screen row culling. The matrix is a dense materials x terminals grid: a few hundred
+ * material rows, each with one cell per terminal column. Rendering every row's layout and
+ * paint up front froze the browser's main thread for seconds on large universes, even though
+ * the scroll container (.table-wrapper, max-height 70vh) only shows a handful of rows at once.
+ *
+ * `content-visibility: auto` lets the browser skip layout AND paint for material rows that are
+ * outside the scroll viewport, rendering them on demand as they scroll in. This is safe for
+ * this table specifically because `table-layout: fixed` + the explicit <colgroup> widths mean
+ * a row's content never influences column sizing, so skipped rows cannot shift the grid.
+ * `contain-intrinsic-size` supplies a placeholder height (one text line + cell padding) so the
+ * scrollbar stays stable; the `auto` keyword caches each row's real height after first render.
+ * Only `.row-material` is culled - the few `.row-kind` category headers stay rendered so their
+ * collapse toggles and sticky-ish section labels always work. Browsers without the property
+ * just render the table as before (graceful degradation).
+ */
+.matrix-table tbody tr.row-material {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 41px;
+}
+
 .matrix-table td .price-sell {
     color: var(--color-success);
 }

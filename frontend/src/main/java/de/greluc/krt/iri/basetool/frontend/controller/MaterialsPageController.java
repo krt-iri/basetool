@@ -235,6 +235,12 @@ public class MaterialsPageController {
    * star-system header counts. The {@code fragment=true} branch returns just the matrix table
    * fragment for AJAX filter changes, avoiding a full page reload.
    *
+   * <p>The matrix payload is fetched via {@link BackendApiClient#getCached} (10-minute TTL): it is
+   * global price/terminal reference data, not user-scoped, so the heavy 100 000-row fetch and JSON
+   * deserialize run at most once per TTL and every in-memory filter re-render reuses the cached
+   * list instead of re-hitting the backend. The trade-off is that overview prices can lag a UEX
+   * sync by up to the TTL; the per-material detail page stays uncached for authoritative prices.
+   *
    * @param systems optional star-system filter (multi-select)
    * @param materials optional material-name filter (multi-select)
    * @param filterLoadingDock include only terminals with a loading dock
@@ -254,7 +260,7 @@ public class MaterialsPageController {
       Model model) {
     try {
       PageResponse<MaterialMatrixItemDto> page =
-          backendApiClient.get(
+          backendApiClient.getCached(
               "/api/v1/materials/matrix?size=100000",
               new ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>() {});
 
