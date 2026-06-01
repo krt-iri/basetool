@@ -156,24 +156,23 @@
 }
 
 /*
- * Off-screen row culling. The matrix is a dense materials x terminals grid: a few hundred
- * material rows, each with one cell per terminal column. Rendering every row's layout and
- * paint up front froze the browser's main thread for seconds on large universes, even though
- * the scroll container (.table-wrapper, max-height 70vh) only shows a handful of rows at once.
- *
- * `content-visibility: auto` lets the browser skip layout AND paint for material rows that are
- * outside the scroll viewport, rendering them on demand as they scroll in. This is safe for
- * this table specifically because `table-layout: fixed` + the explicit <colgroup> widths mean
- * a row's content never influences column sizing, so skipped rows cannot shift the grid.
- * `contain-intrinsic-size` supplies a placeholder height (one text line + cell padding) so the
- * scrollbar stays stable; the `auto` keyword caches each row's real height after first render.
- * Only `.row-material` is culled - the few `.row-kind` category headers stay rendered so their
- * collapse toggles and sticky-ish section labels always work. Browsers without the property
- * just render the table as before (graceful degradation).
+ * Uniform body-row height — required by the virtual scroller in /js/materials-matrix.js. It maps
+ * scroll offset to row index and sizes the top/bottom spacer rows from a single row height, so
+ * every flattened row (category header or material row) must be the same height. A price cell can
+ * stack a sell line over a buy line, so we pin the height tall enough for two lines and centre the
+ * content; single-price and header rows then match. The script measures this height at runtime, so
+ * the literal value here only has to be uniform and large enough for two lines.
  */
-.matrix-table tbody tr.row-material {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 41px;
+.matrix-table tbody td {
+    height: 42px;
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+    vertical-align: middle;
+}
+
+.matrix-table td .price-sell,
+.matrix-table td .price-buy {
+    line-height: 1.15;
 }
 
 .matrix-table td .price-sell {
@@ -182,6 +181,72 @@
 
 .matrix-table td .price-buy {
     color: var(--color-danger);
+}
+
+/*
+ * Spacer rows pad the virtual scroll height above and below the rendered window. Their single
+ * colspan cell must not inherit the fixed body-row height, the cell borders/padding, or the
+ * sticky first-column treatment from `td:first-child`; its height is set inline by the script.
+ */
+.matrix-table tbody tr.row-spacer td {
+    position: static;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* Category (kind) header row, rendered inside the virtual body. */
+.matrix-table tbody tr.row-kind {
+    background-color: var(--color-surface-input);
+    cursor: pointer;
+}
+
+.matrix-table td.mtx-kind-cell {
+    font-weight: bold;
+    color: var(--color-primary);
+    font-family: var(--font-headline);
+    padding-left: 1rem;
+    text-align: left;
+}
+
+.matrix-table td.mtx-kind-cell .toggle-icon {
+    display: inline-block;
+    width: 1.5rem;
+    text-align: center;
+}
+
+/* First (material-name) cell of a material row. */
+.matrix-table td.mtx-name-cell {
+    padding-left: 2rem;
+    text-align: left;
+}
+
+.matrix-table .mtx-warn {
+    margin-right: 0.5rem;
+    font-weight: bold;
+}
+
+/* Colgroup column widths — table-layout: fixed reads these to size the columns. */
+.matrix-table col.mtx-col-first {
+    width: 250px;
+}
+
+.matrix-table col.mtx-col-term {
+    width: 120px;
+}
+
+/* Loading placeholder and empty-result states. */
+.matrix-loading {
+    padding: 1rem;
+    color: var(--color-gray-2);
+    font-family: var(--font-body);
+}
+
+.matrix-table td.mtx-no-results {
+    text-align: center;
+    font-style: italic;
+    color: var(--color-gray-2);
 }
 
 .filters-container {

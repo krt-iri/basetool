@@ -33,21 +33,27 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
+        <!--
+          Filter widgets are server-rendered (one checkbox per material / star system) but wired up
+          and applied entirely by /js/materials-matrix.js: it binds the dropdown open/close, the
+          select-all toggles and the boolean filters, then re-filters the already-fetched grid data
+          in memory and re-renders the virtual table. No server round-trip per filter change.
+        -->
         <div class="filters-container">
             <div class="form-group">
                 <label th:text="#{filter.material}">Material filtern</label>
                 <div class="multi-select-container" id="materialFilterContainer">
-                    <div class="multi-select-header" data-trigger="mo-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.material.all}" th:data-selected="#{filter.selected}" id="materialHeader">
+                    <div class="multi-select-header mtx-multi-header" data-options-id="materialOptions" th:data-all="#{filter.material.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                         <span class="selected-text" id="materialSelectedText" th:text="#{filter.material.all}">Alle Materialien</span>
                     </div>
                     <div class="multi-select-options" id="materialOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="matAll" value="ALL" checked data-trigger="mo-toggle-all" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
+                            <input type="checkbox" id="matAll" value="ALL" checked class="mtx-select-all" data-check-class="matCheck" data-header-id="materialHeader">
                         </label>
                         <label class="multi-select-option" th:each="mat : ${materialNames}">
                             <span th:text="${mat}">Material</span>
-                            <input type="checkbox" class="matCheck" th:value="${mat}" checked data-trigger="mo-update-state" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
+                            <input type="checkbox" class="matCheck mtx-check" th:value="${mat}" checked data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
                         </label>
                     </div>
                 </div>
@@ -55,249 +61,64 @@
             <div class="form-group">
                 <label th:text="#{filter.system}">System filtern</label>
                 <div class="multi-select-container" id="systemFilterContainer">
-                    <div class="multi-select-header" data-trigger="mo-toggle-multi" data-multi-target="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
+                    <div class="multi-select-header mtx-multi-header" data-options-id="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
                         <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
                     </div>
                     <div class="multi-select-options" id="systemOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked data-trigger="mo-toggle-all" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
+                            <input type="checkbox" id="sysAll" value="ALL" checked class="mtx-select-all" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                         <label class="multi-select-option" th:each="sys : ${starSystems}">
                             <span th:text="${sys}">System</span>
-                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked data-trigger="mo-update-state" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
+                            <input type="checkbox" class="sysCheck mtx-check" th:value="${sys}" checked data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                     </div>
                 </div>
             </div>
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
-                <input type="checkbox" id="filterLoadingDock" data-trigger="mo-filter">
+                <input type="checkbox" id="filterLoadingDock" class="mtx-bool-filter">
                 <label for="filterLoadingDock" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasLoadingDock}">Hat Loading Dock</label>
             </div>
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
-                <input type="checkbox" id="filterAutoLoad" data-trigger="mo-filter">
+                <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
                 <label for="filterAutoLoad" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
             </div>
         </div>
 
-        <div class="table-wrapper" id="tableContainer" th:fragment="matrixTableFragment">
+        <!--
+          Client-rendered, virtual-scrolling grid. The server ships only this empty skeleton plus
+          the JSON config below; /js/materials-matrix.js fetches the matrix from
+          /materials/overview/data and materializes just the visible rows into <tbody>, so the DOM
+          stays small no matter how large the universe is. See the controller class Javadoc.
+        -->
+        <div id="matrixConfig"
+             th:data-data-url="@{/materials/overview/data}"
+             th:data-label-material="#{materials.matrix.material}"
+             th:data-label-unsorted="#{material.category.unsorted}"
+             th:data-label-no-results="#{materials.matrix.noResults}"
+             th:data-label-illegal="#{material.is_illegal}"
+             th:data-label-volatile-qt="#{material.is_volatile_qt}"
+             th:data-label-volatile-time="#{material.is_volatile_time}"
+             hidden></div>
+
+        <div id="matrixLoading" class="matrix-loading" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
+
+        <div id="matrixError" class="hud-box hud-box-error" style="display: none;">
+            <p th:text="#{error.materials.matrix.load}">Fehler</p>
+        </div>
+
+        <div class="table-wrapper" id="tableContainer" style="display: none;">
             <table class="matrix-table" id="matrixTable">
-                <colgroup>
-                    <col style="width: 250px; min-width: 250px; max-width: 250px;" />
-                    <col th:each="term : ${terminals}" style="width: 120px; min-width: 120px; max-width: 120px;" />
-                </colgroup>
-                <thead>
-                    <tr class="row-system">
-                        <th></th>
-                        <th th:each="group : ${systemGroups}" th:colspan="${group.count}" class="col-system" th:data-system="${group.name}" th:text="${not #strings.isEmpty(group.name) ? group.name : '-'}">
-                        </th>
-                    </tr>
-                    <tr class="row-terminal">
-                        <th th:text="#{materials.matrix.material}">Material</th>
-                        <th th:each="term : ${terminals}" class="col-terminal" th:classappend="${term.planetCssClass}" th:data-system="${term.starSystemName}" th:data-planet="${term.planetName}" th:data-loading-dock="${term.hasLoadingDock}" th:data-auto-load="${term.isAutoLoad}" th:title="${not #strings.isEmpty(term.planetName) ? (not #strings.isEmpty(term.nickname) ? term.nickname + ' — ' + term.planetName : term.name + ' — ' + term.planetName) : (not #strings.isEmpty(term.nickname) ? term.nickname : term.name)}" th:text="${not #strings.isEmpty(term.nickname) ? term.nickname : term.name}">
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <th:block th:each="entry : ${rowsByKind}">
-                        <tr class="row-kind" th:data-kind="${entry.key}" style="background-color: var(--color-surface-input); cursor: pointer;" data-trigger="mo-toggle-kind">
-                            <td th:colspan="${terminals.size() + 1}" style="font-weight: bold; color: var(--color-primary); font-family: var(--font-headline); padding-left: 1rem; text-align: left;">
-                                <span class="toggle-icon" style="display: inline-block; width: 1.5rem; text-align: center;">−</span>
-                                <span th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kind</span>
-                            </td>
-                        </tr>
-                        <tr th:each="row : ${entry.value}" class="row-material" th:data-material="${row.materialName}" th:data-kind="${entry.key}">
-                            <td style="padding-left: 2rem; text-align: left;">
-                                <span th:if="${row.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${row.isVolatileQt == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${row.isVolatileTime == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${row.materialName}"></span>
-                            </td>
-                            
-                            <td th:each="term : ${terminals}" class="col-terminal" th:classappend="${term.planetCssClass}"><th:block th:with="item=${row.prices.get(term.name)}"><th:block th:if="${item != null}"><div th:if="${item.priceSell != null and item.priceSell > 0}" class="price-sell" th:text="|+${#numbers.formatInteger(item.priceSell, 1, 'POINT')}|"></div><div th:if="${item.priceBuy != null and item.priceBuy > 0}" class="price-buy" th:text="|-${#numbers.formatInteger(item.priceBuy, 1, 'POINT')}|"></div><div th:if="${(item.priceSell == null or item.priceSell == 0) and (item.priceBuy == null or item.priceBuy == 0)}">-</div></th:block><th:block th:if="${item == null}">-</th:block></th:block></td>
-                        </tr>
-                    </th:block>
-                    <tr id="noResultsRow" style="display: none;" th:style="${rowsByKind.isEmpty() ? '' : 'display: none;'}">
-                        <td th:colspan="${terminals.size() + 1}" style="text-align: center; font-style: italic; color: var(--color-gray-2);" th:text="#{materials.matrix.noResults}">Keine Einträge gefunden.</td>
-                    </tr>
-                </tbody>
+                <colgroup id="matrixColgroup"></colgroup>
+                <thead id="matrixHead"></thead>
+                <tbody id="matrixBody"></tbody>
             </table>
         </div>
-        
+
     </div>
 </main>
 
-<script th:attr="nonce=${cspNonce}">
-function toggleMultiSelect(id) {
-        var el = document.getElementById(id);
-        var isOpened = el.classList.contains('open');
-        
-        // Close all others
-        document.querySelectorAll('.multi-select-options').forEach(function(opt) {
-            opt.classList.remove('open');
-        });
-
-        if (!isOpened) {
-            el.classList.add('open');
-        }
-    }
-
-function getTranslations(headerId) {
-        var header = document.getElementById(headerId);
-        return {
-            allText: header.getAttribute('data-all'),
-            selectedTextStr: header.getAttribute('data-selected')
-        };
-    }
-
-function toggleSelectAll(allId, checkClass, headerId) {
-        var isAllChecked = document.getElementById(allId).checked;
-        var checkboxes = document.getElementsByClassName(checkClass);
-        for (var i = 0; i < checkboxes.length; i++) {
-            checkboxes[i].checked = isAllChecked;
-        }
-        updateSelectedText(checkboxes, headerId);
-    }
-
-function updateSelectState(allId, checkClass, headerId) {
-        var checkboxes = document.getElementsByClassName(checkClass);
-        var allChecked = true;
-        for (var i = 0; i < checkboxes.length; i++) {
-            if (!checkboxes[i].checked) {
-                allChecked = false;
-                break;
-            }
-        }
-        document.getElementById(allId).checked = allChecked;
-        updateSelectedText(checkboxes, headerId);
-    }
-
-function updateSelectedText(checkboxes, headerId) {
-        var translations = getTranslations(headerId);
-        var count = 0;
-        var total = checkboxes.length;
-        var firstChecked = null;
-        for (var i = 0; i < checkboxes.length; i++) {
-            if (checkboxes[i].checked) {
-                count++;
-                if (!firstChecked) firstChecked = checkboxes[i].previousElementSibling.innerText;
-            }
-        }
-
-        var textElement = document.getElementById(headerId).querySelector('.selected-text');
-        if (count === total) {
-            textElement.innerText = translations.allText;
-        } else if (count === 1) {
-            textElement.innerText = firstChecked;
-        } else {
-            textElement.innerText = count + " " + translations.selectedTextStr;
-        }
-    }
-
-    // Debounce wrapper around the matrix re-fetch. Each material/system checkbox toggle fires a
-    // change event, and "select all" flips dozens at once; without coalescing, every flip would
-    // kick off its own full backend round-trip + table rebuild, refreezing the page on each click.
-    // A short trailing debounce collapses a burst of toggles into a single request.
-    var filterMatrixTimer = null;
-    function filterMatrix() {
-        if (filterMatrixTimer) {
-            clearTimeout(filterMatrixTimer);
-        }
-        filterMatrixTimer = setTimeout(function () {
-            filterMatrixTimer = null;
-            runFilterMatrix();
-        }, 250);
-    }
-
-    function runFilterMatrix() {
-        var matCheckboxes = document.getElementsByClassName("matCheck");
-        var activeMats = [];
-        for (var i = 0; i < matCheckboxes.length; i++) {
-            if (matCheckboxes[i].checked) activeMats.push(matCheckboxes[i].value);
-        }
-
-        var sysCheckboxes = document.getElementsByClassName("sysCheck");
-        var activeSys = [];
-        for (var i = 0; i < sysCheckboxes.length; i++) {
-            if (sysCheckboxes[i].checked) activeSys.push(sysCheckboxes[i].value);
-        }
-
-        var requireLoadingDock = document.getElementById("filterLoadingDock") ? document.getElementById("filterLoadingDock").checked : false;
-        var requireAutoLoad = document.getElementById("filterAutoLoad") ? document.getElementById("filterAutoLoad").checked : false;
-        
-        var container = document.getElementById('tableContainer');
-        container.style.opacity = '0.5';
-        container.style.pointerEvents = 'none';
-
-        var url = new URL(window.location.origin + '/materials/overview');
-        url.searchParams.append('fragment', 'true');
-        
-        activeSys.forEach(s => url.searchParams.append('systems', s));
-        activeMats.forEach(m => url.searchParams.append('materials', m));
-        
-        if (requireLoadingDock) url.searchParams.append('filterLoadingDock', 'true');
-        if (requireAutoLoad) url.searchParams.append('filterAutoLoad', 'true');
-
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => response.text())
-        .then(html => {
-            container.innerHTML = html;
-            container.style.opacity = '1.0';
-            container.style.pointerEvents = 'auto';
-        })
-        .catch(error => {
-            console.error('Error fetching filtered matrix:', error);
-            container.style.opacity = '1.0';
-            container.style.pointerEvents = 'auto';
-        });
-    }
-
-    function toggleKindGroupMatrix(rowKind) {
-        var kind = rowKind.getAttribute('data-kind');
-        var tbody = rowKind.parentElement;
-        var rows = tbody.querySelectorAll('tr.row-material[data-kind="' + kind + '"]');
-        var icon = rowKind.querySelector('.toggle-icon');
-        
-        var isHidden = false;
-        if (rows.length > 0) {
-            isHidden = rows[0].style.display === 'none';
-        }
-        
-        if (isHidden) {
-            rows.forEach(function(row) {
-                row.style.display = '';
-            });
-            if (icon) icon.textContent = '−';
-        } else {
-            rows.forEach(function(row) {
-                row.style.display = 'none';
-            });
-            if (icon) icon.textContent = '+';
-        }
-    }
-
-    // CSP-safe delegated bindings (replace nine inline on*= handlers — the multi-call onchange
-    // patterns from before are reproduced verbatim inside the registered callbacks so the
-    // ordering of toggleSelectAll/updateSelectState followed by filterMatrix is preserved).
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'mo-toggle-multi', function (el) {
-            toggleMultiSelect(el.getAttribute('data-multi-target'));
-        });
-        window.krtEvents.on('change', 'mo-toggle-all', function (el) {
-            toggleSelectAll(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
-            filterMatrix();
-        });
-        window.krtEvents.on('change', 'mo-update-state', function (el) {
-            updateSelectState(el.getAttribute('data-all-id'), el.getAttribute('data-check-class'), el.getAttribute('data-header-id'));
-            filterMatrix();
-        });
-        window.krtEvents.on('change', 'mo-filter', filterMatrix);
-        window.krtEvents.on('click', 'mo-toggle-kind', function (el) {
-            toggleKindGroupMatrix(el);
-        });
-    }
-</script>
+<script th:src="@{/js/materials-matrix.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

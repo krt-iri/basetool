@@ -4,6 +4,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.ArrayList;
@@ -26,18 +27,21 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Spring MVC controller for the materials browsing pages ({@code /materials}, {@code
  * /materials/overview} matrix, {@code /materials/{id}} detail).
  *
  * <p>The overview and detail pages stay simple — list + by-category groups, detail + price list.
- * The matrix endpoint is the heaviest read path in the frontend: pulls up to 100 000 matrix rows,
- * filters them in-memory by system / material / loading-dock / auto-load, computes a deterministic
- * terminal column ordering (by system, then by location-type group, then alphabetic), and groups
- * material rows by category. The result is a row-by-column matrix the template renders as a single
- * big HTML table — backend-side aggregation would have required a much narrower API.
+ * The matrix is the heaviest read path in the frontend. It is split in two: {@code GET
+ * /materials/overview} renders only a lightweight shell (filters + an empty grid container), and
+ * {@code GET /materials/overview/data} returns the whole matrix as one lean {@link MatrixGridDto}
+ * JSON document. The browser's virtual-scroll grid ({@code /js/materials-matrix.js}) then
+ * materializes only the currently visible rows into the DOM and does all filtering client-side, so
+ * a multi-thousand-cell universe no longer freezes the page by forcing the browser to build the
+ * entire dense table at once. The underlying 100 000-row backend fetch is cached (see {@link
+ * #getMatrixData}); the server-side reshaping into columns/rows lives in {@link #buildGrid}.
  */
 @Controller
 @RequestMapping("/materials")
@@ -139,38 +143,6 @@ public class MaterialsPageController {
     }
   }
 
-  /**
-   * Adjacent-terminal column-count for the system grouping headers of the matrix.
-   *
-   * @param name star system name shown above the spanning header
-   * @param count number of contiguous terminal columns under this header
-   */
-  public record SystemGroup(String name, int count) {}
-
-  /**
-   * One row of the matrix: a material name, a few summary flags, and a map of terminal-name →
-   * matrix item entry. Rows sort case-insensitively by material name so the on-screen order is
-   * stable across reloads.
-   *
-   * @param materialName material display name
-   * @param isIllegal flag — controls a "contraband" badge in the template
-   * @param isVolatileQt flag — material decays quickly while in storage
-   * @param isVolatileTime flag — material has a real-time decay timer
-   * @param prices map from terminal name to that terminal's price entry (for the row)
-   */
-  public record MaterialRow(
-      String materialName,
-      Boolean isIllegal,
-      Boolean isVolatileQt,
-      Boolean isVolatileTime,
-      Map<String, MaterialMatrixItemDto> prices)
-      implements Comparable<MaterialRow> {
-    @Override
-    public int compareTo(MaterialRow o) {
-      return this.materialName.compareToIgnoreCase(o.materialName);
-    }
-  }
-
   private final BackendApiClient backendApiClient;
 
   /**
@@ -227,178 +199,196 @@ public class MaterialsPageController {
   }
 
   /**
-   * Renders the matrix overview ({@code /materials/overview}).
+   * Renders the matrix-overview shell ({@code GET /materials/overview}).
    *
-   * <p>Pulls every matrix row (up to 100 000) and applies the four filter dimensions in memory.
-   * Computes the terminal column set (deduplicated via {@code TreeSet} so ordering uses {@link
-   * TerminalCol#compareTo}), the per-material row set grouped by category, and the spanning
-   * star-system header counts. The {@code fragment=true} branch returns just the matrix table
-   * fragment for AJAX filter changes, avoiding a full page reload.
+   * <p>This endpoint deliberately renders no table body. It fetches the cached matrix only to
+   * derive the distinct material-name and star-system lists that populate the two multi-select
+   * filters, then returns the page shell. The grid itself is fetched separately as JSON from {@link
+   * #getMatrixData} and drawn — and filtered — entirely client-side by the virtual-scroll script,
+   * which is what keeps a large universe from freezing the browser by never building the whole
+   * dense table in the DOM at once.
    *
-   * <p>The matrix payload is fetched via {@link BackendApiClient#getCached} (10-minute TTL): it is
-   * global price/terminal reference data, not user-scoped, so the heavy 100 000-row fetch and JSON
-   * deserialize run at most once per TTL and every in-memory filter re-render reuses the cached
-   * list instead of re-hitting the backend. The trade-off is that overview prices can lag a UEX
-   * sync by up to the TTL; the per-material detail page stays uncached for authoritative prices.
-   *
-   * @param systems optional star-system filter (multi-select)
-   * @param materials optional material-name filter (multi-select)
-   * @param filterLoadingDock include only terminals with a loading dock
-   * @param filterAutoLoad include only terminals with auto-load
-   * @param fragment when {@code true}, return the table fragment for AJAX replacement
-   * @param model Thymeleaf model populated with terminals, system groups, rows-by-category, filter
-   *     source lists
-   * @return either the full {@code materials-overview} view or its {@code matrixTableFragment}
+   * @param model Thymeleaf model populated with the {@code materialNames} and {@code starSystems}
+   *     filter source lists
+   * @return the {@code materials-overview} view name
    */
   @GetMapping("/overview")
-  public String getMatrixOverview(
-      @RequestParam(required = false) List<String> systems,
-      @RequestParam(required = false) List<String> materials,
-      @RequestParam(defaultValue = "false") boolean filterLoadingDock,
-      @RequestParam(defaultValue = "false") boolean filterAutoLoad,
-      @RequestParam(defaultValue = "false") boolean fragment,
-      Model model) {
+  public String getMatrixOverview(Model model) {
     try {
-      PageResponse<MaterialMatrixItemDto> page =
-          backendApiClient.getCached(
-              "/api/v1/materials/matrix?size=100000",
-              new ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>() {});
-
-      List<MaterialMatrixItemDto> items = new ArrayList<>();
-      if (page != null && page.content() != null) {
-        items = new ArrayList<>(page.content());
-      }
-
-      // Unique systems for filter
-      Set<String> starSystems =
+      List<MaterialMatrixItemDto> items = fetchMatrixItems();
+      model.addAttribute(
+          "starSystems",
           items.stream()
               .map(item -> item.starSystemName() != null ? item.starSystemName() : "")
               .filter(s -> !s.isEmpty())
-              .collect(Collectors.toCollection(TreeSet::new));
-      model.addAttribute("starSystems", starSystems);
-
-      // Unique materials for filter
-      Set<String> materialNames =
+              .collect(Collectors.toCollection(TreeSet::new)));
+      model.addAttribute(
+          "materialNames",
           items.stream()
               .map(MaterialMatrixItemDto::materialName)
-              .collect(Collectors.toCollection(TreeSet::new));
-      model.addAttribute("materialNames", materialNames);
-
-      Set<TerminalCol> terminals = new TreeSet<>();
-      Map<String, Map<String, MaterialMatrixItemDto>> materialPrices = new TreeMap<>();
-      Map<String, String> kindByMaterial = new HashMap<>();
-
-      Map<String, Boolean> isIllegalByMaterial = new HashMap<>();
-      Map<String, Boolean> isVolatileQtByMaterial = new HashMap<>();
-      Map<String, Boolean> isVolatileTimeByMaterial = new HashMap<>();
-
-      for (MaterialMatrixItemDto item : items) {
-        if (systems != null && !systems.isEmpty() && !systems.contains(item.starSystemName())) {
-          continue;
-        }
-        if (materials != null && !materials.isEmpty() && !materials.contains(item.materialName())) {
-          continue;
-        }
-        if (filterLoadingDock && !item.hasLoadingDock()) {
-          continue;
-        }
-        if (filterAutoLoad && !item.isAutoLoad()) {
-          continue;
-        }
-
-        String effectiveSystem = item.starSystemName() != null ? item.starSystemName() : "";
-        terminals.add(
-            new TerminalCol(
-                item.terminalName(),
-                item.terminalNickname(),
-                effectiveSystem,
-                item.planetName(),
-                PlanetColorResolver.cssClassFor(effectiveSystem, item.planetName()),
-                item.cityName(),
-                item.spaceStationName(),
-                item.outpostName(),
-                item.isJumpPoint(),
-                item.hasLoadingDock(),
-                item.isAutoLoad()));
-        kindByMaterial.put(
-            item.materialName(),
-            item.category() != null
-                    && item.category().name() != null
-                    && !item.category().name().isBlank()
-                ? item.category().name()
-                : "Unsortiert");
-        if (item.isIllegal() != null) {
-          isIllegalByMaterial.put(item.materialName(), item.isIllegal());
-        }
-        if (item.isVolatileQt() != null) {
-          isVolatileQtByMaterial.put(item.materialName(), item.isVolatileQt());
-        }
-        if (item.isVolatileTime() != null) {
-          isVolatileTimeByMaterial.put(item.materialName(), item.isVolatileTime());
-        }
-        materialPrices
-            .computeIfAbsent(item.materialName(), k -> new HashMap<>())
-            .put(item.terminalName(), item);
-      }
-
-      Map<String, List<MaterialRow>> rowsByKind = new TreeMap<>();
-      for (Map.Entry<String, Map<String, MaterialMatrixItemDto>> entry :
-          materialPrices.entrySet()) {
-        String matName = entry.getKey();
-        String kind = kindByMaterial.get(matName);
-        Boolean isIllegal = isIllegalByMaterial.getOrDefault(matName, false);
-        Boolean isVolatileQt = isVolatileQtByMaterial.getOrDefault(matName, false);
-        Boolean isVolatileTime = isVolatileTimeByMaterial.getOrDefault(matName, false);
-        rowsByKind
-            .computeIfAbsent(kind, k -> new ArrayList<>())
-            .add(
-                new MaterialRow(
-                    matName, isIllegal, isVolatileQt, isVolatileTime, entry.getValue()));
-      }
-      rowsByKind
-          .values()
-          .forEach(
-              list ->
-                  list.sort(
-                      Comparator.comparing(
-                          MaterialRow::materialName, String.CASE_INSENSITIVE_ORDER)));
-
-      List<SystemGroup> systemGroups = new ArrayList<>();
-      String currentSystem = null;
-      int currentCount = 0;
-      for (TerminalCol term : terminals) {
-        if (currentSystem == null) {
-          currentSystem = term.starSystemName();
-          currentCount = 1;
-        } else if (currentSystem.equals(term.starSystemName())) {
-          currentCount++;
-        } else {
-          systemGroups.add(new SystemGroup(currentSystem, currentCount));
-          currentSystem = term.starSystemName();
-          currentCount = 1;
-        }
-      }
-      if (currentSystem != null) {
-        systemGroups.add(new SystemGroup(currentSystem, currentCount));
-      }
-
-      model.addAttribute("terminals", terminals);
-      model.addAttribute("systemGroups", systemGroups);
-      model.addAttribute("rowsByKind", rowsByKind);
-
+              .collect(Collectors.toCollection(TreeSet::new)));
     } catch (Exception e) {
-      log.error("Error loading materials matrix", e);
+      log.error("Error loading materials matrix filters", e);
       model.addAttribute("error", "error.materials.matrix.load");
-      model.addAttribute("terminals", new TreeSet<>());
-      model.addAttribute("rowsByKind", new TreeMap<>());
       model.addAttribute("starSystems", new TreeSet<>());
       model.addAttribute("materialNames", new TreeSet<>());
     }
-
-    if (fragment) {
-      return "materials-overview :: matrixTableFragment";
-    }
     return "materials-overview";
+  }
+
+  /**
+   * Returns the entire trade matrix as one lean {@link MatrixGridDto} JSON document ({@code GET
+   * /materials/overview/data}), consumed by the client-side virtual-scroll grid.
+   *
+   * <p>The heavy 100 000-row backend fetch is served from {@link BackendApiClient#getCached}
+   * (10-minute TTL) — the matrix is global price/terminal reference data, not user-scoped, so a
+   * shared cache is safe and the fetch/deserialize runs at most once per TTL. The per-request work
+   * is the {@link #buildGrid} reshaping into columns and category-grouped rows. The response is
+   * always the full, unfiltered grid; the four filter dimensions are applied in the browser. The
+   * trade-off is that overview prices can lag a UEX sync by up to the TTL; the per-material detail
+   * page stays uncached for authoritative prices.
+   *
+   * @return the reshaped grid, or an empty grid if the backend fetch fails (the client then shows
+   *     its no-results state instead of an error page)
+   */
+  @GetMapping("/overview/data")
+  @ResponseBody
+  public MatrixGridDto getMatrixData() {
+    try {
+      return buildGrid(fetchMatrixItems());
+    } catch (Exception e) {
+      log.error("Error loading materials matrix data", e);
+      return new MatrixGridDto(List.of(), List.of(), List.of());
+    }
+  }
+
+  /**
+   * Fetches the full matrix projection from the (cached) backend endpoint, normalising a {@code
+   * null} page or {@code null} content to an empty list so callers never see {@code null}.
+   *
+   * @return the matrix rows, never {@code null}
+   */
+  @NotNull
+  private List<MaterialMatrixItemDto> fetchMatrixItems() {
+    PageResponse<MaterialMatrixItemDto> page =
+        backendApiClient.getCached(
+            "/api/v1/materials/matrix?size=100000",
+            new ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>() {});
+    if (page == null || page.content() == null) {
+      return new ArrayList<>();
+    }
+    return new ArrayList<>(page.content());
+  }
+
+  /**
+   * Reshapes the flat material/terminal/price stream into the render-ready {@link MatrixGridDto}:
+   * the deterministically ordered terminal columns (sorted via {@link TerminalCol#compareTo}), the
+   * spanning star-system header counts, and the per-category material rows, each carrying a sparse
+   * terminal-name → price-cell map. No filtering happens here — the browser filters the full grid.
+   *
+   * @param items the flat matrix rows; must not be {@code null}
+   * @return the reshaped grid, never {@code null}
+   */
+  @NotNull
+  private MatrixGridDto buildGrid(@NotNull List<MaterialMatrixItemDto> items) {
+    Set<TerminalCol> terminals = new TreeSet<>();
+    Map<String, Map<String, MatrixGridDto.Cell>> pricesByMaterial = new HashMap<>();
+    Map<String, String> kindByMaterial = new HashMap<>();
+    Map<String, boolean[]> flagsByMaterial = new HashMap<>();
+
+    for (MaterialMatrixItemDto item : items) {
+      String effectiveSystem = item.starSystemName() != null ? item.starSystemName() : "";
+      terminals.add(
+          new TerminalCol(
+              item.terminalName(),
+              item.terminalNickname(),
+              effectiveSystem,
+              item.planetName(),
+              PlanetColorResolver.cssClassFor(effectiveSystem, item.planetName()),
+              item.cityName(),
+              item.spaceStationName(),
+              item.outpostName(),
+              item.isJumpPoint(),
+              item.hasLoadingDock(),
+              item.isAutoLoad()));
+
+      String material = item.materialName();
+      kindByMaterial.put(
+          material,
+          item.category() != null
+                  && item.category().name() != null
+                  && !item.category().name().isBlank()
+              ? item.category().name()
+              : "Unsortiert");
+      boolean[] flags = flagsByMaterial.computeIfAbsent(material, k -> new boolean[3]);
+      if (Boolean.TRUE.equals(item.isIllegal())) {
+        flags[0] = true;
+      }
+      if (Boolean.TRUE.equals(item.isVolatileQt())) {
+        flags[1] = true;
+      }
+      if (Boolean.TRUE.equals(item.isVolatileTime())) {
+        flags[2] = true;
+      }
+      pricesByMaterial
+          .computeIfAbsent(material, k -> new HashMap<>())
+          .put(item.terminalName(), new MatrixGridDto.Cell(item.priceBuy(), item.priceSell()));
+    }
+
+    List<MatrixGridDto.Column> columns = new ArrayList<>(terminals.size());
+    for (TerminalCol term : terminals) {
+      columns.add(
+          new MatrixGridDto.Column(
+              term.name(),
+              term.nickname(),
+              term.starSystemName(),
+              term.planetName(),
+              term.planetCssClass(),
+              Boolean.TRUE.equals(term.hasLoadingDock()),
+              Boolean.TRUE.equals(term.isAutoLoad())));
+    }
+
+    List<MatrixGridDto.SystemGroup> systemGroups = new ArrayList<>();
+    String currentSystem = null;
+    int currentCount = 0;
+    for (TerminalCol term : terminals) {
+      if (currentSystem == null) {
+        currentSystem = term.starSystemName();
+        currentCount = 1;
+      } else if (currentSystem.equals(term.starSystemName())) {
+        currentCount++;
+      } else {
+        systemGroups.add(new MatrixGridDto.SystemGroup(currentSystem, currentCount));
+        currentSystem = term.starSystemName();
+        currentCount = 1;
+      }
+    }
+    if (currentSystem != null) {
+      systemGroups.add(new MatrixGridDto.SystemGroup(currentSystem, currentCount));
+    }
+
+    Map<String, List<MatrixGridDto.Row>> rowsByKind = new TreeMap<>();
+    for (Map.Entry<String, Map<String, MatrixGridDto.Cell>> entry : pricesByMaterial.entrySet()) {
+      String material = entry.getKey();
+      boolean[] flags = flagsByMaterial.getOrDefault(material, new boolean[3]);
+      rowsByKind
+          .computeIfAbsent(kindByMaterial.get(material), k -> new ArrayList<>())
+          .add(new MatrixGridDto.Row(material, flags[0], flags[1], flags[2], entry.getValue()));
+    }
+    rowsByKind
+        .values()
+        .forEach(
+            list ->
+                list.sort(
+                    Comparator.comparing(
+                        MatrixGridDto.Row::materialName, String.CASE_INSENSITIVE_ORDER)));
+
+    List<MatrixGridDto.Group> groups = new ArrayList<>(rowsByKind.size());
+    for (Map.Entry<String, List<MatrixGridDto.Row>> entry : rowsByKind.entrySet()) {
+      groups.add(new MatrixGridDto.Group(entry.getKey(), entry.getValue()));
+    }
+
+    return new MatrixGridDto(columns, systemGroups, groups);
   }
 
   /**
