@@ -109,6 +109,25 @@ class JobOrderItemServiceTest {
   }
 
   @Test
+  void buildItemLineRoundsScuQuantitiesAwayFromFloatingPointNoise() {
+    // 0.36 SCU * 5 evaluates to 1.7999999999999998 as a binary double; the snapshot must store 1.8.
+    GameItem weapon = gameItem("Longsword", GameItemKind.WEAPON);
+    Material iron = material("Iron", QuantityType.SCU);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(iron, 0.36, null));
+
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    JobOrderItem built =
+        service.buildItemLine(
+            new CreateJobOrderItemLineDto(
+                weapon.getId(), blueprint.getId(), 5, List.of(), null, null));
+
+    assertThat(requirementFor(built, iron).getRequiredQuantity()).isEqualTo(1.8);
+  }
+
+  @Test
   void buildItemLineRejectsBlueprintThatDoesNotProduceTheItem() {
     GameItem ordered = gameItem("Ballista", GameItemKind.WEAPON);
     GameItem other = gameItem("Other", GameItemKind.WEAPON);
@@ -154,6 +173,22 @@ class JobOrderItemServiceTest {
   }
 
   @Test
+  void aggregateMaterialsRoundsSummedScuQuantitiesAwayFromFloatingPointNoise() {
+    // 0.1 + 0.2 evaluates to 0.30000000000000004 as a binary double; the aggregate must report 0.3.
+    Material steel = material("Steel", QuantityType.SCU);
+    stubMapper(steel);
+
+    JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
+    order.addItem(itemLine(steel, 0.1, QualityRequirement.NONE));
+    order.addItem(itemLine(steel, 0.2, QualityRequirement.NONE));
+
+    List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
+
+    assertThat(aggregated).hasSize(1);
+    assertThat(aggregated.get(0).totalQuantity()).isEqualTo(0.3);
+  }
+
+  @Test
   void deriveForPreviewReturnsResolvedMaterialsSubAssembliesAndUnresolvedNames() {
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Material steel = material("Steel", QuantityType.SCU);
@@ -177,6 +212,23 @@ class JobOrderItemServiceTest {
     assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
     assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
     assertThat(preview.unresolvedIngredients()).containsExactly("Unknownium");
+  }
+
+  @Test
+  void deriveForPreviewRoundsScuQuantitiesAwayFromFloatingPointNoise() {
+    // 0.36 SCU * 5 evaluates to 1.7999999999999998 as a binary double; the preview must show 1.8.
+    GameItem weapon = gameItem("Longsword", GameItemKind.WEAPON);
+    Material iron = material("Iron", QuantityType.SCU);
+    stubMapper(iron);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(iron, 0.36, null));
+
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 5);
+
+    assertThat(preview.materials()).hasSize(1);
+    assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(1.8);
   }
 
   @Test
