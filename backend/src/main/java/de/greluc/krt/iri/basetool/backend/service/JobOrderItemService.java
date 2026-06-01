@@ -25,6 +25,7 @@ import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintIngredientKind;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -48,9 +49,17 @@ import org.springframework.transaction.annotation.Transactional;
  * requester's per-material Gut/Keine choice (defaulting from the ingredient's {@code minQuality}),
  * and snapshots the result onto the order so it stays stable even if the wiki data later changes.
  * The amount's unit follows the material's {@link QuantityType}: PIECE quantities are kept whole,
- * SCU quantities stay fractional. ITEM (sub-assembly) ingredients are intentionally NOT recursed
- * into materials here — they surface to the create UI as separate adoptable lines (see issue #304
- * decision 1), so each adopted sub-item line contributes its own RESOURCE materials.
+ * SCU quantities stay fractional.
+ *
+ * <p>ITEM ingredients are handled in two ways. A <b>craftable</b> ITEM ingredient (the referenced
+ * game item has its own orderable blueprint) is a genuine sub-assembly: it surfaces to the create
+ * UI as a separate adoptable line (issue #304 decision 1), so each adopted sub-item contributes its
+ * own materials. A <b>non-craftable</b> ITEM ingredient (no blueprint) that nonetheless exists in
+ * the shared {@code material} catalogue by name is a procurement component — e.g. a UEX-commodity
+ * gem the wiki lists as an "item" with a piece count — and is bridged to that material so it
+ * appears as a (PIECE) material requirement on the same {@code material} row that Lager and
+ * Refinery use, instead of a recipe-less sub-assembly. ITEM ingredients with neither a blueprint
+ * nor a matching material stay unresolved/adoptable as before.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,8 +73,15 @@ public class JobOrderItemService {
    */
   private static final int GOOD_QUALITY_THRESHOLD = 700;
 
+  /**
+   * Scale factor for rounding SCU quantities to three decimals (the {@code 0.001} input step used
+   * across the order UI), used to strip binary floating-point artefacts from derived quantities.
+   */
+  private static final double SCU_ROUNDING_SCALE = 1000.0;
+
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
+  private final MaterialRepository materialRepository;
   private final MaterialMapper materialMapper;
 
   /**
@@ -106,15 +122,30 @@ public class JobOrderItemService {
     Map<UUID, QualityRequirement> qualityChoices = qualityChoicesByMaterial(line.materials());
 
     for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
-      if (ingredient.getKind() != BlueprintIngredientKind.RESOURCE
-          || ingredient.getMaterial() == null) {
-        // ITEM ingredients become separate adoptable lines (decision 1); unresolved RESOURCE lines
-        // (material == null) cannot be snapshotted and surface only as a create-time warning.
-        continue;
+      Material material;
+      double rawQuantity;
+      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
+        material = ingredient.getMaterial();
+        if (material == null) {
+          // Unresolved RESOURCE line: cannot be snapshotted, surfaces only as a create-time
+          // warning.
+          continue;
+        }
+        double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
+        rawQuantity = perUnit * line.amount();
+      } else {
+        // ITEM ingredient: a craftable sub-assembly stays a separate adoptable line; a
+        // non-craftable
+        // item that maps to a known material is bridged to that material (piece count as quantity).
+        material = bridgedMaterial(ingredient);
+        if (material == null) {
+          continue;
+        }
+        int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
+        rawQuantity = (double) perUnit * line.amount();
       }
-      Material material = ingredient.getMaterial();
-      double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
-      double required = roundForQuantityType(perUnit * line.amount(), material);
+
+      double required = roundForQuantityType(rawQuantity, material);
       QualityRequirement quality =
           qualityChoices.getOrDefault(material.getId(), defaultQuality(ingredient.getMinQuality()));
 
@@ -171,11 +202,13 @@ public class JobOrderItemService {
     }
     return sums.entrySet().stream()
         .map(
-            e ->
-                new AggregatedMaterialDto(
-                    materialMapper.toDto(materials.get(e.getKey().materialId())),
-                    e.getKey().quality(),
-                    e.getValue()))
+            e -> {
+              Material material = materials.get(e.getKey().materialId());
+              return new AggregatedMaterialDto(
+                  materialMapper.toDto(material),
+                  e.getKey().quality(),
+                  roundForQuantityType(e.getValue(), material));
+            })
         .sorted(
             Comparator.<AggregatedMaterialDto, Integer>comparing(
                     a ->
@@ -238,10 +271,23 @@ public class JobOrderItemService {
         : QualityRequirement.NONE;
   }
 
+  /**
+   * Rounds a derived quantity to the precision its quantity type can express, eliminating the
+   * binary floating-point artefacts that {@code perUnit * amount} introduces (e.g. {@code 0.36 * 5}
+   * yielding {@code 1.7999999999999998} instead of {@code 1.8}). {@code PIECE} materials round to a
+   * whole unit; {@code SCU} materials round to three decimals, matching the {@code 0.001} input
+   * step used throughout the UI.
+   *
+   * @param quantity the raw, possibly noisy product of per-unit quantity and ordered amount
+   * @param material the material whose quantity type selects the rounding granularity; {@code null}
+   *     is treated as SCU
+   * @return the cleaned quantity
+   */
   private static double roundForQuantityType(double quantity, Material material) {
-    return material != null && material.getQuantityType() == QuantityType.PIECE
-        ? Math.round(quantity)
-        : quantity;
+    if (material != null && material.getQuantityType() == QuantityType.PIECE) {
+      return Math.round(quantity);
+    }
+    return Math.round(quantity * SCU_ROUNDING_SCALE) / SCU_ROUNDING_SCALE;
   }
 
   /**
@@ -320,9 +366,22 @@ public class JobOrderItemService {
           continue;
         }
         int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
+        List<BlueprintReferenceDto> subBlueprints = blueprintsForItem(subItem.getId());
+        if (subBlueprints.isEmpty()) {
+          // Non-craftable item: if it maps to a known material it is a procurement requirement
+          // (PIECE piece-count), not a sub-assembly. Bridge it onto that shared material row.
+          Material material = resolveItemMaterial(subItem, ingredient);
+          if (material != null) {
+            materials.add(
+                new DerivedMaterialDto(
+                    materialMapper.toDto(material),
+                    roundForQuantityType((double) perUnit * scaledBy, material),
+                    defaultQuality(ingredient.getMinQuality())));
+            continue;
+          }
+        }
         subAssemblies.add(
-            new SubAssemblySuggestionDto(
-                gameItemRef(subItem), perUnit * scaledBy, blueprintsForItem(subItem.getId())));
+            new SubAssemblySuggestionDto(gameItemRef(subItem), perUnit * scaledBy, subBlueprints));
       }
     }
     return new ItemDerivationDto(
@@ -345,5 +404,49 @@ public class JobOrderItemService {
     return ingredient.getWikiNameSnapshot() != null
         ? ingredient.getWikiNameSnapshot()
         : "(unresolved ingredient)";
+  }
+
+  /**
+   * Bridges a non-craftable ITEM ingredient to the shared {@code material} catalogue. Returns the
+   * matching material when the ingredient is an ITEM line whose referenced game item has <b>no</b>
+   * orderable blueprint (so it is not a real sub-assembly) yet exists as a material by name — e.g.
+   * a UEX-commodity gem the wiki lists as an "item" with a piece count. Returns {@code null} for
+   * RESOURCE lines, for craftable items (which stay adoptable sub-assemblies), and for items with
+   * no matching material (which stay unresolved). Used by the persist path; the preview path
+   * inlines the same rule to reuse its already-fetched blueprint list.
+   *
+   * @param ingredient the blueprint ingredient to examine
+   * @return the bridged material, or {@code null} when the ingredient is not a bridgeable item line
+   */
+  private Material bridgedMaterial(BlueprintIngredient ingredient) {
+    if (ingredient.getKind() != BlueprintIngredientKind.ITEM) {
+      return null;
+    }
+    GameItem subItem = ingredient.getGameItem();
+    if (subItem == null) {
+      return null;
+    }
+    if (!blueprintRepository.findByOutputItemId(subItem.getId()).isEmpty()) {
+      // Craftable: a genuine sub-assembly, handled as a separate adoptable line, not a material.
+      return null;
+    }
+    return resolveItemMaterial(subItem, ingredient);
+  }
+
+  /**
+   * Resolves an ITEM ingredient's component to a material by name, preferring the resolved game
+   * item's name and falling back to the wiki name snapshot. {@code material.name} is unique, so
+   * this yields at most one row.
+   *
+   * @param subItem the resolved game item of the ITEM ingredient
+   * @param ingredient the owning ingredient (for the wiki-name fallback)
+   * @return the matching material, or {@code null} when none exists
+   */
+  private Material resolveItemMaterial(GameItem subItem, BlueprintIngredient ingredient) {
+    String name = subItem.getName() != null ? subItem.getName() : ingredient.getWikiNameSnapshot();
+    if (name == null || name.isBlank()) {
+      return null;
+    }
+    return materialRepository.findByNameIgnoreCase(name).orElse(null);
   }
 }
