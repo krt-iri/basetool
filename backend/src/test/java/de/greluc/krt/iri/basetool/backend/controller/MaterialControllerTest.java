@@ -125,7 +125,6 @@ class MaterialControllerTest {
     Material persisted = new Material();
     persisted.setId(UUID.randomUUID());
     persisted.setName("Raw Ouratite");
-    persisted.setIsManualEntry(true);
 
     MaterialDto responseDto =
         new MaterialDto(

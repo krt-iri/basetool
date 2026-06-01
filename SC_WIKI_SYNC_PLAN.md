@@ -1620,10 +1620,10 @@ The same release pattern as the SK rollout (small slices, each independently mer
 - Monitor: log-volume baseline for the new service, DB growth on `game_item` + `blueprint_ingredient`, sync-report event mix.
 - After two weeks clean: ship **V115** (`is_manual_entry → source_systems = 'MANUAL'`) and start the soak window for **V116** drop of `material.is_manual_entry` + `ship_type.description` synthesized column.
 
-### R9 — V117 destructive cleanup *(separate track — see [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md))*
+### R9 — V125 destructive cleanup *(separate track — see [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md))*
 - Drop `material.is_manual_entry` and `ship_type.description`.
 - Out of scope of this plan; tracked in `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`, which stages the reader migrations (`is_manual_entry` → `source_systems = 'MANUAL'`; `ship_type.description` → `description_en` / `description_de`, resolving §13 #9 — both are still UI-consumed) ahead of the irreversible drop, with a soak between, gated on a clean R8 soak.
-- V-number drift: V115 / V116 went to R7 (`game_item_price`) / R8 (`is_manual_entry` backfill), so the destructive drop is **V117** (the draft §7 table called it V116).
+- V-number drift: V115 / V116 went to R7 (`game_item_price`) / R8 (`is_manual_entry` backfill), and V117–V124 were claimed by features merged to `main` while this PR was open, so the destructive drop is **V125** (the draft §7 table called it V116).
 
 ---
 

@@ -129,9 +129,6 @@ public class Material extends AbstractEntity<UUID> {
   @Column(name = "is_job_order", nullable = false)
   private Boolean isJobOrder = false;
 
-  @Column(name = "is_manual_entry", nullable = false)
-  private Boolean isManualEntry = false;
-
   /**
    * SC Wiki commodity UUID. Populated by the R3 Wiki commodity sync when a UEX commodity is matched
    * against a Wiki entry (or a stand-alone Wiki row is inserted). {@code null} on every R1 row;

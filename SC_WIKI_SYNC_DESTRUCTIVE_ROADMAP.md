@@ -6,9 +6,10 @@ scopes R9 **out** of the main rollout ("Out of scope of this plan; tracked separ
 removes two columns that user-facing code still reads. This doc is that separate track.
 
 > **Status (2026-05-29):** Steps 1–2 (the reader migrations — code-only and individually reversible)
-> are implemented in PR [#275](https://github.com/krt-iri/basetool/pull/275). Steps 3–4 (the soak and
-> the irreversible V117 column drop) remain **pending** and must **not** start until the R8 soak (PR
-> [#271](https://github.com/krt-iri/basetool/pull/271)) has run clean for ~two weeks.
+> are implemented in PR [#275](https://github.com/krt-iri/basetool/pull/275). Step 4 (the irreversible
+> V125 column drop) is implemented as a **draft** PR stacked on #275 — held as a draft until Step 3
+> (the R8 soak, PR [#271](https://github.com/krt-iri/basetool/pull/271)) has run clean for ~two weeks;
+> it **must not** merge before then.
 
 ## What R9 removes
 
@@ -79,7 +80,7 @@ Deploy Steps 1–2 and confirm in production that nothing reads `material.is_man
 migrated UI pages). Soak ~one release window. This is the safety gap the two-phase rule requires
 between "stop using the column" and "drop the column".
 
-### Step 4 — V117: drop the columns + remove the entity fields (destructive)
+### Step 4 — V125: drop the columns + remove the entity fields (destructive)
 
 ```sql
 ALTER TABLE material  DROP COLUMN is_manual_entry;
@@ -92,9 +93,11 @@ In the **same PR**, remove the Java fields so `ddl-auto=validate` stays green:
 - `ShipType.description` (field — all migrated in Step 2). Delete `buildLegacyDescription` if still
   present.
 
-**V-NUMBER:** V115 went to R7 (`game_item_price`) and V116 to R8 (`is_manual_entry` backfill), so
-this destructive drop is **V117** (the plan §7 draft called it V116 — drift, like V112–V116 before
-it).
+**V-NUMBER:** V115 went to R7 (`game_item_price`) and V116 to R8 (`is_manual_entry` backfill), and
+V117–V124 were then claimed by features merged to `main` while this PR was open (job-order comment,
+min-quality nullable, mission party-lead, blueprint requirement-groups/modifier-segments, FK-index
+round2, item job-orders, mission-participant org-units), so this destructive drop is **V125** (the
+plan §7 draft called it V116 — drift, like V112–V116 before it).
 
 **Pre-merge gates:** Steps 1–3 in production and soaked; `git grep -i "isManualEntry\|setDescription"`
 returns nothing in the `main` source set for these two fields; a full DB backup is taken
@@ -116,7 +119,7 @@ immediately before the merge. Irreversible.
       description.) The column itself stays in place until Step 4.
 - [ ] Step 3: `git grep` for both columns is clean in `main`; soak window observed; APM/logs clean
       on the migrated pages.
-- [ ] Step 4 PR: V117 applied against a `.env.test` snapshot of the prod schema; `Material` /
+- [ ] Step 4 PR: V125 applied against a `.env.test` snapshot of the prod schema; `Material` /
       `ShipType` entities no longer declare the fields; `ddl-auto=validate` boots green; backup
       confirmed.
 
