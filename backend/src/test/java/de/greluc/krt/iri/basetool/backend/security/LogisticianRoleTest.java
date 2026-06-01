@@ -9,12 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
+import de.greluc.krt.iri.basetool.backend.config.OrgUnitContextualAuthority;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.Collection;
@@ -48,6 +51,8 @@ class LogisticianRoleTest {
   @Autowired private SquadronRepository squadronRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Autowired private SpecialCommandRepository specialCommandRepository;
 
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -145,6 +150,57 @@ class LogisticianRoleTest {
         "Membership-level flag is the single source of truth — false must NOT promote.");
   }
 
+  /**
+   * #344 — an SK <b>lead</b> ({@code is_lead = true}) is automatically both a logistician and a
+   * mission manager of its SK: the converter grants the flat {@code ROLE_LOGISTICIAN} / {@code
+   * ROLE_MISSION_MANAGER} and the contextual {@code LOGISTICIAN@skId} / {@code
+   * MISSION_MANAGER@skId}, even when both membership flags are {@code false}. This mirrors how an
+   * Officer is logistician + mission manager of their own squadron and an admin outranks every
+   * role.
+   */
+  @Test
+  void converterPromotesSkLead_asSkLogisticianAndMissionManager() {
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    user.setUsername("sk_lead_user");
+    userRepository.save(user);
+    userRepository.flush();
+    UUID skId = saveSkLeadMembership(userId, user);
+
+    Jwt jwt =
+        Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("sub", userId.toString())
+            .claim("preferred_username", "sk_lead_user")
+            .build();
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertTrue(
+        authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN")),
+        "An SK lead must get the flat ROLE_LOGISTICIAN.");
+    assertTrue(
+        authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER")),
+        "An SK lead must get the flat ROLE_MISSION_MANAGER.");
+    assertTrue(
+        authorities.stream()
+            .anyMatch(
+                a ->
+                    a instanceof OrgUnitContextualAuthority c
+                        && "LOGISTICIAN".equals(c.roleName())
+                        && skId.equals(c.orgUnitId())),
+        "An SK lead must get the contextual LOGISTICIAN authority on that SK.");
+    assertTrue(
+        authorities.stream()
+            .anyMatch(
+                a ->
+                    a instanceof OrgUnitContextualAuthority c
+                        && "MISSION_MANAGER".equals(c.roleName())
+                        && skId.equals(c.orgUnitId())),
+        "An SK lead must get the contextual MISSION_MANAGER authority on that SK.");
+  }
+
   @Test
   void adminShouldAccessInventory() throws Exception {
     mockMvc
@@ -239,5 +295,30 @@ class LogisticianRoleTest {
     membership.setLogistician(isLogistician);
     orgUnitMembershipRepository.save(membership);
     orgUnitMembershipRepository.flush();
+  }
+
+  /**
+   * Persists a fresh SK and a lead membership on it ({@code is_lead = true}, {@code is_logistician
+   * = false}) for the given user, returning the SK's id. {@code is_lead} is only valid on SK
+   * memberships (DB CHECK), so the org unit must be a Spezialkommando.
+   */
+  private UUID saveSkLeadMembership(UUID userId, User user) {
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    SpecialCommand sk = new SpecialCommand();
+    sk.setName("Lead-SK-" + tag);
+    sk.setShorthand("L" + tag.substring(0, 3));
+    sk = specialCommandRepository.save(sk);
+    specialCommandRepository.flush();
+
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, sk.getId()));
+    membership.setUser(user);
+    membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    membership.setJoinedAt(java.time.Instant.now());
+    membership.setLogistician(false);
+    membership.setLead(true);
+    orgUnitMembershipRepository.save(membership);
+    orgUnitMembershipRepository.flush();
+    return sk.getId();
   }
 }

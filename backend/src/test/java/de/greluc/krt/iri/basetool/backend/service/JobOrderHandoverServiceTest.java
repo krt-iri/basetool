@@ -522,7 +522,7 @@ class JobOrderHandoverServiceTest {
     squadronB.setId(UUID.randomUUID());
     squadronB.setShorthand("BRV");
 
-    order.setCreatingOrgUnit(squadronA);
+    order.setResponsibleOrgUnit(squadronA);
     order.setRequestingOrgUnit(squadronA);
     inventoryItem.setOwningOrgUnit(squadronB);
 

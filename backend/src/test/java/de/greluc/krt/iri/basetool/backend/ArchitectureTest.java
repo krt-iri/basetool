@@ -660,26 +660,33 @@ class ArchitectureTest {
    * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted {@code
    * SquadronScopeService} shim to its successor in R2.c.
    *
-   * <p>{@code JobOrderService} and {@code JobOrderHandoverService} are intentionally excluded: Job
-   * Orders are a cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 1) so they legitimately
-   * operate without a squadron filter. They do depend on {@code AuthHelperService} for the owner
-   * stamp at create time, which keeps the test honest by still being satisfied for them via the
-   * AuthHelperService route.
+   * <p>{@code JobOrderService} is included as of Phase 3 (#343): Job Orders are no longer an
+   * unconditional cross-staffel workspace but a <em>conditionally</em> staffel-scoped aggregate
+   * (SK-responsible = public, squadron-responsible = private to that squadron + admins), so the
+   * service now wires {@code OwnerScopeService} to resolve the visibility scope. {@code
+   * JobOrderHandoverService} stays excluded — handover writes inherit their access gate from the
+   * parent order's {@code @ownerScopeService.canEditJobOrder} controller check, and the service
+   * itself only injects {@code AuthHelperService} for the audit stamp on the handover record.
    */
   @Test
   void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
-    // JobOrderService AND JobOrderHandoverService are intentionally excluded — Job Orders are a
-    // cross-staffel workspace by design (MULTI_SQUADRON_PLAN.md section 1 + 4.6), so the squadron
-    // filter does not apply. Both services do inject AuthHelperService anyway for the owner stamp
-    // (JobOrderService) and the audit stamp on the handover record (JobOrderHandoverService) —
-    // verified by their own unit tests rather than by this rule.
+    // JobOrderHandoverService is intentionally excluded — its access gate lives on the parent
+    // order's controller endpoint (@ownerScopeService.canEditJobOrder), and it injects
+    // AuthHelperService anyway for the audit stamp on the handover record, verified by its own unit
+    // tests rather than by this rule. JobOrderService IS included as of Phase 3 (#343): it wires
+    // OwnerScopeService to scope the list/detail visibility (SK-public vs squadron-private).
     Set<String> staffelScopedServiceNames =
         Set.of(
             "MissionService",
             "InventoryItemService",
             "RefineryOrderService",
             "HangarService",
-            "OperationService");
+            "OperationService",
+            "JobOrderService",
+            // Phase 4 (#344): material claims gate on the claiming squadron's scope
+            // (AuthHelperService.canEditOrgUnit) + the responsible-SK authority
+            // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
+            "MaterialClaimService");
 
     String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
     String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";

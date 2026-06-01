@@ -193,6 +193,7 @@ public class AdminMissionDataPageController {
                         parseString(m.get("description")),
                         parseBoolean(m.get("active")),
                         parseBoolean(m.get("isPromotionEnabled")),
+                        parseBoolean(m.get("isProfitEligible")),
                         parseLong(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
@@ -401,7 +402,8 @@ public class AdminMissionDataPageController {
     }
     try {
       SquadronDto body =
-          new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, true, 0L);
+          new SquadronDto(
+              null, form.name(), form.shorthand(), form.description(), true, true, false, 0L);
       backendApiClient.post("/api/v1/squadrons", body, Void.class);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -445,7 +447,14 @@ public class AdminMissionDataPageController {
     try {
       SquadronDto body =
           new SquadronDto(
-              id, form.name(), form.shorthand(), form.description(), true, true, form.version());
+              id,
+              form.name(),
+              form.shorthand(),
+              form.description(),
+              true,
+              true,
+              false,
+              form.version());
       backendApiClient.put("/api/v1/squadrons/" + id, body, Void.class);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");

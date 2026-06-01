@@ -51,25 +51,28 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Integer displayId;
 
   /**
-   * Org-unit author of this order. After R9 Step 2 dropped the legacy {@code creatingSquadron}
-   * mirror field together with the {@code syncOwnerFields()} lifecycle hook, callers stamp this
-   * field directly via {@code OwnerScopeService.resolveOrgUnitForPickerOutput}; V100 drops the
-   * matching {@code creating_squadron_id} column. {@code nullable = false} reflects V99's NOT NULL
-   * tightening. Informational only — Job Orders are a cross-squadron workspace and access is
-   * governed by the role/permission matrix, not by this field (see MULTI_SQUADRON_PLAN.md, section
-   * 1).
+   * Org unit responsible for <em>processing</em> this order — a profit-eligible squadron or
+   * Spezialkommando (eligibility enforced at the service layer via {@code
+   * OrgUnit#isProfitEligible}). Stamped at create time and editable afterwards only through the
+   * dedicated reassignment endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}). This
+   * field governs visibility (Phase 3, #343): a squadron-responsible order is private to that
+   * squadron + admins, an SK-responsible order is public to all squadrons. The requester does NOT
+   * grant visibility. {@code nullable = false} reflects V130's NOT NULL tightening after the Phase
+   * 3 backfill copied each legacy order's retired {@code creating_org_unit_id} onto this column.
+   * The retired {@code creating_org_unit_id} column lives on (nullable, unmapped) until the
+   * destructive cleanup release per V129.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "creating_org_unit_id", nullable = false)
-  private OrgUnit creatingOrgUnit;
+  @JoinColumn(name = "responsible_org_unit_id", nullable = false)
+  private OrgUnit responsibleOrgUnit;
 
   /**
-   * Org-unit recipient of this order — may differ from {@link #creatingOrgUnit} when one org unit
-   * creates orders on behalf of another. After R9 Step 2 dropped the legacy {@code
-   * requestingSquadron} mirror field together with the {@code syncOwnerFields()} lifecycle hook,
-   * callers stamp this field directly; V100 drops the matching {@code requesting_squadron_id}
-   * column. Editable by any Logistician+ regardless of their own org unit. Informational only, not
-   * access-controlling. {@code nullable = false} reflects V99's NOT NULL tightening.
+   * Org unit that placed the order and ultimately receives the material/item — the customer. Any
+   * squadron or Spezialkommando (no profit-eligibility restriction; other Kartell departments may
+   * place orders). Mandatory at create time, editable by any Logistician+ through the regular
+   * update path. Informational only; it does NOT grant visibility (a private order is visible to
+   * its responsible org unit + admins only, not to the requester — see Phase 3 / #343). {@code
+   * nullable = false} reflects V99's NOT NULL tightening, still in force.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)

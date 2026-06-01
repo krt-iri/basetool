@@ -174,4 +174,26 @@ public class SpecialCommandService {
     sc.setActive(true);
     specialCommandRepository.save(sc);
   }
+
+  /**
+   * Toggles the per-SK profit-eligibility flag deciding whether this Spezialkommando may be picked
+   * as the responsible (processing) org unit of a Job Order. SKs of non-Profit departments leave
+   * the flag {@code false}: they can still place orders (as the requesting org unit) but never
+   * appear in the responsible picker. Kept as a dedicated mutator separate from {@link
+   * #updateSpecialCommand(UUID, SpecialCommandDto)} so the flag cannot be flipped as a side-effect
+   * of a name/description edit and the access log can attribute the change to the admin who pressed
+   * the toggle. Flipping the flag never touches any Job Order.
+   *
+   * @param id Spezialkommando primary key.
+   * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the SK selectable
+   *     as a Job-Order processor, {@code false} removes it from the responsible picker.
+   * @return the persisted entity.
+   * @throws NotFoundException if no SK matches the given id.
+   */
+  @Transactional
+  public SpecialCommand setProfitEligible(@NotNull UUID id, boolean eligible) {
+    SpecialCommand sc = getSpecialCommandById(id);
+    sc.setProfitEligible(eligible);
+    return specialCommandRepository.save(sc);
+  }
 }

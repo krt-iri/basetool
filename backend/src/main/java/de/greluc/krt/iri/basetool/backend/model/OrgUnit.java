@@ -114,6 +114,21 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
   private boolean isPromotionEnabled = true;
 
   /**
+   * Per-org-unit eligibility flag deciding whether this org unit may be picked as the
+   * <em>responsible (processing)</em> org unit of a Job Order. Applies to <b>both</b> kinds: only
+   * org units that an admin has explicitly marked profit-eligible can process orders. Squadrons and
+   * Spezialkommandos belong to different Kartell departments (Combat, Research, Profit, …) and only
+   * the Profit-side units process orders — an SK of another department may still be the
+   * <em>requesting</em> (placing) org unit but must not appear in the responsible picker. The flag
+   * therefore defaults to {@code false} for every newly-created org unit (squadron or SK) and is
+   * toggled exclusively through the dedicated {@code PATCH /api/v1/squadrons/{id}/profit-eligible}
+   * / {@code PATCH /api/v1/special-commands/{id}/profit-eligible} endpoints, never as a side-effect
+   * of a regular update, mirroring the {@link #isPromotionEnabled} handling.
+   */
+  @Column(name = "is_profit_eligible", nullable = false)
+  private boolean isProfitEligible = false;
+
+  /**
    * Returns the concrete {@link OrgUnitKind} this row represents. Each concrete subclass overrides
    * this with a constant value matching its {@code @DiscriminatorValue}. The discriminator column
    * itself is read-only at the JPA layer (Hibernate manages it via the inheritance metadata), so

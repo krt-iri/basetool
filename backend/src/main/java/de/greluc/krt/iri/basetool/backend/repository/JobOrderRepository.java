@@ -31,7 +31,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers.items",
         "handovers.items.material",
         "assignees",
-        "creatingOrgUnit",
+        "responsibleOrgUnit",
         "requestingOrgUnit"
       })
   @Override
@@ -49,7 +49,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers",
         "handovers.items",
         "handovers.items.material",
-        "creatingOrgUnit",
+        "responsibleOrgUnit",
         "requestingOrgUnit"
       })
   @Query(
@@ -58,38 +58,40 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
-   */
-  @EntityGraph(
-      attributePaths = {
-        "materials",
-        "assignees",
-        "handovers",
-        "handovers.items",
-        "creatingOrgUnit",
-        "requestingOrgUnit"
-      })
-  Page<JobOrder> findByStatusIn(List<JobOrderStatus> statuses, Pageable pageable);
-
-  /**
-   * List variant that additionally filters on the dual-org-unit model (MULTI_SQUADRON_PLAN.md
-   * section 5.3): only orders whose {@code creatingOrgUnit} OR {@code requestingOrgUnit} equals
-   * {@code squadronId} are returned. Used by the UI's default "only my squadron" toggle on the job-
-   * order list view — Job Orders themselves are a cross-staffel workspace, so this filter is a
-   * display preference rather than an access-control gate (the service layer applies no implicit
-   * squadron filter on Job Orders, see section 4.4).
+   * Scoped, paged job-order list — the single entry point behind the {@code GET /api/v1/orders}
+   * list endpoint. Combines three concerns in one query so the service layer never has to fork its
+   * query builder:
    *
-   * <p>{@code squadronId} {@code null} short-circuits the squadron predicate and behaves
-   * identically to {@link #findByStatusIn(List, Pageable)} — kept as a separate method so the SpEL
-   * gate on the list endpoint stays simple and call-sites with both filters do not need to fork
-   * their query builder.
+   * <ol>
+   *   <li><b>Visibility scope (Phase 3, #343).</b> Job Orders are a <em>conditionally</em>
+   *       staffel-scoped aggregate: an order whose {@code responsibleOrgUnit} is a Spezialkommando
+   *       is public to every squadron, while a squadron-responsible order is private to that
+   *       squadron + admins. The requester does NOT grant visibility. The scope is expressed with
+   *       the standard org-unit predicate triple ({@code isAdminAllScope} / {@code activeOrgUnitId}
+   *       / {@code memberOrgUnitIds}, see {@link
+   *       de.greluc.krt.iri.basetool.backend.service.ScopePredicate}) plus the SK-public escape
+   *       {@code TYPE(o.responsibleOrgUnit) = SpecialCommand}.
+   *   <li><b>Status filter.</b> The order's status must be in {@code statuses}. The service passes
+   *       the full enum set to disable status filtering (mirroring {@code searchMissions}), so the
+   *       {@code IN} clause is never bound with an empty collection.
+   *   <li><b>Optional {@code squadronId} display filter.</b> A pure UI preference on top of the
+   *       scope gate — the orders-index "involving my squadron" toggle, matching responsible OR
+   *       requesting side. {@code null} disables it. It can only ever narrow the already-scoped
+   *       result, never widen it past the security scope above.
+   * </ol>
    *
-   * @param statuses status filter; may be empty but must be non-null per the Spring Data contract.
-   * @param squadronId squadron to constrain to via creating- OR requesting-side match; {@code null}
-   *     disables the squadron filter.
+   * @param statuses status values to keep; pass the full enum set to disable status filtering
+   *     (never empty).
+   * @param squadronId optional display filter (responsible OR requesting side); {@code null}
+   *     disables it.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
+   *     disables the scope filter entirely.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous callers.
    * @param pageable page request.
-   * @return paged job-orders matching both predicates.
+   * @return paged job-orders visible to the caller, matching the optional status + squadron
+   *     filters.
    */
   @EntityGraph(
       attributePaths = {
@@ -97,40 +99,24 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "assignees",
         "handovers",
         "handovers.items",
-        "creatingOrgUnit",
+        "responsibleOrgUnit",
         "requestingOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND (:squadronId IS NULL OR"
-          + " o.creatingOrgUnit.id = :squadronId OR o.requestingOrgUnit.id = :squadronId)")
-  Page<JobOrder> findByStatusInAndSquadronInvolved(
+      "SELECT o FROM JobOrder o WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR TYPE(o.responsibleOrgUnit) = SpecialCommand"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) AND o.status IN :statuses AND (:squadronId IS NULL OR o.responsibleOrgUnit.id ="
+          + " :squadronId OR o.requestingOrgUnit.id = :squadronId)")
+  Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("squadronId") UUID squadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
-
-  /**
-   * All-status variant of {@link #findByStatusInAndSquadronInvolved(List, UUID, Pageable)}. Returns
-   * every job-order whose {@code creatingOrgUnit} OR {@code requestingOrgUnit} equals {@code
-   * squadronId}; {@code null} squadronId returns everything (identical to {@code findAll(pageable)}
-   * but emits the squadron-aware JPQL anyway, so the service layer's branch stays predictable).
-   *
-   * @param squadronId squadron to constrain to; {@code null} disables the filter.
-   * @param pageable page request.
-   * @return paged job-orders.
-   */
-  @EntityGraph(
-      attributePaths = {
-        "materials",
-        "assignees",
-        "handovers",
-        "handovers.items",
-        "creatingOrgUnit",
-        "requestingOrgUnit"
-      })
-  @Query(
-      "SELECT o FROM JobOrder o WHERE :squadronId IS NULL OR o.creatingOrgUnit.id = :squadronId"
-          + " OR o.requestingOrgUnit.id = :squadronId")
-  Page<JobOrder> findBySquadronInvolved(@Param("squadronId") UUID squadronId, Pageable pageable);
 
   /**
    * Returns the current maximum priority across all job-orders (used to assign the next priority

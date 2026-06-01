@@ -15,8 +15,9 @@ import java.util.UUID;
  *
  * @param id job order primary key
  * @param displayId human-readable sequential id
- * @param creatingSquadron author org unit (slim reference)
- * @param requestingSquadron recipient org unit (slim reference)
+ * @param responsibleOrgUnit processing org unit (slim reference); {@code null} only on pre-rework
+ *     rows not yet backfilled (Phase 3)
+ * @param requestingOrgUnit customer org unit the order is placed for (slim reference)
  * @param handle contact handle
  * @param comment optional free-text note
  * @param priority queue priority (null when terminal)
@@ -36,8 +37,8 @@ import java.util.UUID;
 public record JobOrderDto(
     UUID id,
     Integer displayId,
-    SquadronReferenceDto creatingSquadron,
-    SquadronReferenceDto requestingSquadron,
+    SquadronReferenceDto responsibleOrgUnit,
+    SquadronReferenceDto requestingOrgUnit,
     String handle,
     String comment,
     Integer priority,

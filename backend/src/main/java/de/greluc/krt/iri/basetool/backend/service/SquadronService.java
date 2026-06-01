@@ -174,4 +174,27 @@ public class SquadronService {
     squadron.setPromotionEnabled(enabled);
     return squadronRepository.save(squadron);
   }
+
+  /**
+   * Toggles the per-squadron profit-eligibility flag deciding whether the squadron may be picked as
+   * the responsible (processing) org unit of a Job Order. Kept as a dedicated mutator separate from
+   * {@link #updateSquadron(UUID, SquadronDto)} — for the same reasons as {@link
+   * #setPromotionEnabled(UUID, boolean)} — so the flag cannot be flipped as an accidental
+   * side-effect of a name/shorthand/description edit and the access log can attribute the change to
+   * the admin who pressed the toggle. Flipping the flag never touches any Job Order; it only
+   * changes whether the squadron appears in the responsible picker from now on.
+   *
+   * @param id squadron primary key
+   * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the squadron
+   *     selectable as a Job-Order processor, {@code false} removes it from the responsible picker.
+   * @return the persisted squadron
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when no matching row.
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
+  public Squadron setProfitEligible(@NotNull UUID id, boolean eligible) {
+    Squadron squadron = getSquadronById(id);
+    squadron.setProfitEligible(eligible);
+    return squadronRepository.save(squadron);
+  }
 }

@@ -1,6 +1,8 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ClaimDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CreateClaimDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemMaterialDto;
@@ -20,6 +22,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryCr
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
@@ -39,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -262,15 +266,12 @@ public class JobOrderPageController {
         model.addAttribute("users", fetchUsers());
         model.addAttribute("materials", fetchMaterials());
         model.addAttribute("squadrons", fetchSquadrons());
-        List<OrgUnitMembershipOptionDto> detailOrgOptions = fetchActiveOrgUnitOptions();
-        model.addAttribute("ownerOptions", detailOrgOptions);
-        model.addAttribute(
-            "ownerOptionsHasSpecialCommand", containsSpecialCommand(detailOrgOptions));
+        addOwnerPickerOptions(model);
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
           form.setRequestingOrgUnitId(
-              order.requestingSquadron() != null ? order.requestingSquadron().id() : null);
+              order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
           form.setHandle(order.handle());
           form.setComment(order.comment());
           form.setVersion(order.version());
@@ -320,7 +321,7 @@ public class JobOrderPageController {
         // (see orders-detail.html, openHandoverModal) so that the user's
         // browser timezone (not the server/container) is used.
         handoverForm.setRecipientSquadron(
-            order.requestingSquadron() != null ? order.requestingSquadron().shorthand() : null);
+            order.requestingOrgUnit() != null ? order.requestingOrgUnit().shorthand() : null);
         model.addAttribute("handoverForm", handoverForm);
       }
 
@@ -369,9 +370,7 @@ public class JobOrderPageController {
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("orderableItems", fetchOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
-    List<OrgUnitMembershipOptionDto> orgOptions = fetchActiveOrgUnitOptions();
-    model.addAttribute("ownerOptions", orgOptions);
-    model.addAttribute("ownerOptionsHasSpecialCommand", containsSpecialCommand(orgOptions));
+    addOwnerPickerOptions(model);
     return "orders-create";
   }
 
@@ -425,7 +424,7 @@ public class JobOrderPageController {
 
       CreateJobOrderItemRequestDto dto =
           new CreateJobOrderItemRequestDto(
-              null,
+              form.getResponsibleOrgUnitId(),
               form.getRequestingOrgUnitId(),
               form.getHandle(),
               form.getComment(),
@@ -445,6 +444,166 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
       return "redirect:/orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
+    }
+  }
+
+  /**
+   * Renders the item-order edit page — the create form reused in edit mode. Loads the order, blocks
+   * non-item orders and orders that already have an item-handover (those are frozen), prefills the
+   * metadata form, and injects the existing item lines as {@code window.EDIT_ITEMS} so the create
+   * form's JS rebuilds them (item + blueprint + amount + per-material quality + sub-assembly
+   * parent).
+   *
+   * @param id the item-order id
+   * @param model Thymeleaf model
+   * @param redirectAttributes flash carrier for the block cases
+   * @return the {@code orders-create} view (in edit mode) or a redirect to the detail page
+   */
+  @GetMapping("/{id}/items/edit")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public String viewEditItemForm(
+      @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
+    JobOrderDto order;
+    try {
+      order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+    } catch (Exception e) {
+      log.error("Failed to load item order for editing", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
+      return "redirect:/orders";
+    }
+    if (order == null || !"ITEM".equals(order.type())) {
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
+      return "redirect:/orders/" + id;
+    }
+    if (order.itemHandovers() != null && !order.itemHandovers().isEmpty()) {
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.hasHandovers");
+      return "redirect:/orders/" + id;
+    }
+
+    // The shared create template renders both the (hidden) material form and the item form, so the
+    // material form's th:object bean must exist even in item-edit mode.
+    if (!model.containsAttribute("jobOrderForm")) {
+      model.addAttribute("jobOrderForm", new JobOrderForm());
+    }
+    if (!model.containsAttribute("jobOrderItemForm")) {
+      JobOrderItemForm itemForm = new JobOrderItemForm();
+      itemForm.setHandle(order.handle());
+      itemForm.setComment(order.comment());
+      itemForm.setRequestingOrgUnitId(
+          order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
+      itemForm.setVersion(order.version());
+      model.addAttribute("jobOrderItemForm", itemForm);
+    }
+    model.addAttribute("editOrderId", id);
+    model.addAttribute("editItems", buildEditItems(order));
+    model.addAttribute("materials", fetchMaterials());
+    model.addAttribute("orderableItems", fetchOrderableItems());
+    model.addAttribute("squadrons", fetchSquadrons());
+    addOwnerPickerOptions(model);
+    return "orders-create";
+  }
+
+  /**
+   * Builds the prefill payload for {@code window.EDIT_ITEMS}: one entry per ordered-item line with
+   * its game item, blueprint, amount, the index of its sub-assembly parent line (or {@code null}),
+   * and a material-id → quality map. The list index doubles as the client line id, so a child's
+   * {@code parentId} is the list index of its parent.
+   *
+   * @param order the item order being edited
+   * @return the JS-serializable prefill list (Thymeleaf inlines it as a JSON array)
+   */
+  private List<java.util.Map<String, Object>> buildEditItems(JobOrderDto order) {
+    List<de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto> items =
+        order.items() != null ? order.items() : List.of();
+    java.util.Map<UUID, Integer> idToIndex = new java.util.HashMap<>();
+    for (int i = 0; i < items.size(); i++) {
+      idToIndex.put(items.get(i).id(), i);
+    }
+    List<java.util.Map<String, Object>> result = new ArrayList<>();
+    for (de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto line : items) {
+      java.util.Map<String, String> qualities = new java.util.LinkedHashMap<>();
+      if (line.materials() != null) {
+        for (de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemMaterialDto m :
+            line.materials()) {
+          if (m.material() != null && m.material().id() != null) {
+            qualities.put(m.material().id().toString(), m.qualityRequirement());
+          }
+        }
+      }
+      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
+      entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
+      entry.put("blueprintId", line.blueprint() != null ? line.blueprint().id().toString() : null);
+      entry.put("amount", line.amount() != null ? line.amount() : 1);
+      entry.put(
+          "parentId", line.parentItemId() != null ? idToIndex.get(line.parentItemId()) : null);
+      entry.put("qualities", qualities);
+      result.add(entry);
+    }
+    return result;
+  }
+
+  /**
+   * Persists an edit to an item order's lines + metadata. Mirrors {@link #createItemOrder}'s
+   * payload build but relays to the backend item-edit endpoint ({@code PUT
+   * /api/v1/orders/{id}/items}) and redirects back to the detail page.
+   *
+   * @param id the item-order id
+   * @param form the bound item-order form (lines rebuilt client-side)
+   * @param redirectAttributes flash carrier
+   * @return redirect to the detail page
+   */
+  @PostMapping("/{id}/items/update")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public String updateItemOrder(
+      @PathVariable UUID id,
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      RedirectAttributes redirectAttributes) {
+    try {
+      List<CreateJobOrderItemLineDto> lines =
+          form.getItems().stream()
+              .filter(
+                  l ->
+                      l.getGameItemId() != null
+                          && l.getBlueprintId() != null
+                          && l.getAmount() != null
+                          && l.getAmount() > 0)
+              .map(
+                  l ->
+                      new CreateJobOrderItemLineDto(
+                          l.getGameItemId(),
+                          l.getBlueprintId(),
+                          l.getAmount(),
+                          l.getMaterials().stream()
+                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                              .map(
+                                  m ->
+                                      new CreateJobOrderItemMaterialDto(
+                                          m.getMaterialId(), m.getQuality()))
+                              .collect(Collectors.toList()),
+                          l.getClientLineId(),
+                          l.getParentClientLineId()))
+              .collect(Collectors.toList());
+
+      if (lines.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
+        return "redirect:/orders/" + id + "/items/edit";
+      }
+
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
+      return "redirect:/orders/" + id;
+    } catch (Exception e) {
+      log.error("Failed to update item order {}", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+      return "redirect:/orders/" + id + "/items/edit";
     }
   }
 
@@ -546,7 +705,7 @@ public class JobOrderPageController {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null,
+              form.getResponsibleOrgUnitId(),
               form.getRequestingOrgUnitId(),
               form.getHandle(),
               form.getComment(),
@@ -620,6 +779,68 @@ public class JobOrderPageController {
       return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to update status for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX create-or-update of a material claim ("Eintragung") on a public SK order (Phase 6, #346).
+   * Relays the payload to the backend's claim upsert and propagates its status code so the
+   * order-detail JS can show a clean toast — 400 (not an open SK order / unknown bucket /
+   * overclaim), 403 (may not act for the claiming squadron), 409 (concurrent claim modification) —
+   * instead of a stack trace. The coarse {@code hasRole('LOGISTICIAN')} gate here is the same one
+   * the backend carries; the fine per-squadron / responsible-SK matrix is enforced backend-side.
+   *
+   * @param id the order id.
+   * @param dto the claim payload (material, quality bucket, claiming squadron, amount).
+   * @return the persisted claim on success, or the propagated backend error status.
+   */
+  @PostMapping("/{id}/claims")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<ClaimDto> upsertClaim(
+      @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
+    try {
+      ClaimDto result =
+          backendApiClient.post("/api/v1/orders/" + id + "/claims", dto, ClaimDto.class);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.CREATED)
+          .body(result);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to upsert claim on order {}: {}", id, bse.getMessage());
+      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to upsert claim on order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX withdrawal of a material claim (Phase 6, #346). Relays to the backend's claim delete and
+   * propagates the status code (404 unknown claim, 400 terminal/non-SK order, 403 forbidden) for a
+   * clean toast.
+   *
+   * @param id the order id.
+   * @param claimId the claim to withdraw.
+   * @return 204 on success, or the propagated backend error status.
+   */
+  @PostMapping("/{id}/claims/{claimId}/withdraw")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Void> withdrawClaim(
+      @PathVariable UUID id, @PathVariable UUID claimId) {
+    try {
+      backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
+      return org.springframework.http.ResponseEntity.noContent().build();
+    } catch (BackendServiceException bse) {
+      log.error("Failed to withdraw claim {} on order {}: {}", claimId, id, bse.getMessage());
+      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to withdraw claim {} on order {}", claimId, id, e);
       return org.springframework.http.ResponseEntity.status(
               org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
           .build();
@@ -1102,6 +1323,71 @@ public class JobOrderPageController {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
       return List.of();
     }
+  }
+
+  /**
+   * Populates the create/edit form model with the two owner-picker option lists: {@code
+   * responsibleOptions} (only profit-eligible squadrons + SKs may process orders) and {@code
+   * requestingOptions} (any active squadron or SK may be the customer), each with a boolean flag
+   * telling the template whether to render the SK optgroup.
+   *
+   * @param model the Thymeleaf model to populate.
+   */
+  private void addOwnerPickerOptions(Model model) {
+    List<OrgUnitMembershipOptionDto> responsibleOptions = fetchResponsibleOptions();
+    List<OrgUnitMembershipOptionDto> requestingOptions = fetchActiveOrgUnitOptions();
+    model.addAttribute("responsibleOptions", responsibleOptions);
+    model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
+    model.addAttribute("requestingOptions", requestingOptions);
+    model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
+  }
+
+  /**
+   * Builds the responsible-picker options: only profit-eligible org units (squadrons and SKs) may
+   * be selected as the processing unit of an order. The template's optgroups keep squadrons and SKs
+   * visually separated; within each the list is sorted by name.
+   *
+   * @return profit-eligible org-unit options; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchResponsibleOptions() {
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>();
+    for (SquadronDto s : fetchSquadrons()) {
+      if (Boolean.TRUE.equals(s.isProfitEligible())) {
+        options.add(new OrgUnitMembershipOptionDto(s.id(), s.name(), s.shorthand(), "SQUADRON"));
+      }
+    }
+    for (SpecialCommandDto sk : fetchSpecialCommands()) {
+      if (Boolean.TRUE.equals(sk.isProfitEligible())) {
+        options.add(
+            new OrgUnitMembershipOptionDto(sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND"));
+      }
+    }
+    options.sort(
+        Comparator.comparing(
+            o -> o.orgUnitName() == null ? "" : o.orgUnitName(), String.CASE_INSENSITIVE_ORDER));
+    return options;
+  }
+
+  /**
+   * Fetches all active Spezialkommandos (with the profit-eligibility flag) for the responsible
+   * picker. Falls back to an empty list on backend hiccup so the form still renders.
+   *
+   * @return SK DTOs; never {@code null}.
+   */
+  private List<SpecialCommandDto> fetchSpecialCommands() {
+    try {
+      PageResponse<SpecialCommandDto> p =
+          backendApiClient.getCached(
+              "/api/v1/special-commands?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<>() {},
+              true);
+      if (p != null && p.content() != null) {
+        return new ArrayList<>(p.content());
+      }
+    } catch (Exception e) {
+      log.error("Failed to fetch special commands", e);
+    }
+    return new ArrayList<>();
   }
 
   private UUID getCurrentUserId(OidcUser principal) {

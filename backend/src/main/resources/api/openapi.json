@@ -19,6 +19,9 @@
     "name" : "Admin – Personal Blueprints",
     "description" : "Administrator endpoints for managing any user's acquired blueprints (#327)."
   }, {
+    "name" : "Material Claims",
+    "description" : "Squadron claims on a Spezialkommando order's materials"
+  }, {
     "name" : "org-unit-controller",
     "description" : "Read-only org-unit hierarchy endpoints"
   }, {
@@ -4501,6 +4504,105 @@
           },
           "409" : {
             "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/items" : {
+      "put" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Update an item job order",
+        "description" : "Replaces the ordered-item lines and metadata of an item order; required materials are re-derived from each line's blueprint. Rejected once the order has any handover.",
+        "operationId" : "updateItemJobOrder",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobOrderItemRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Item order updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -13823,6 +13925,212 @@
         }
       }
     },
+    "/api/v1/orders/{jobOrderId}/claims" : {
+      "get" : {
+        "tags" : [ "Material Claims" ],
+        "summary" : "List claim buckets for an order",
+        "description" : "Returns each required material bucket with its required / claimed / open-remaining amounts and the individual squadron claims.",
+        "operationId" : "getClaimBuckets",
+        "parameters" : [ {
+          "name" : "jobOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ClaimBucketDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Material Claims" ],
+        "summary" : "Create or update a material claim",
+        "description" : "Signs a squadron up for a partial quantity of a material bucket on a Spezialkommando order, or updates its existing claim. Rejected on non-SK or terminal orders and on overclaim.",
+        "operationId" : "upsertClaim",
+        "parameters" : [ {
+          "name" : "jobOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateClaimDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Claim created or updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ClaimDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/item-handovers" : {
       "post" : {
         "tags" : [ "Orders" ],
@@ -20748,6 +21056,103 @@
         }
       }
     },
+    "/api/v1/squadrons/{id}/profit-eligible" : {
+      "patch" : {
+        "tags" : [ "squadron-controller" ],
+        "operationId" : "setProfitEligible",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SquadronProfitEligibleToggleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SquadronDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/squadrons/{id}/members/{userId}" : {
       "patch" : {
         "tags" : [ "squadron-membership-controller" ],
@@ -20834,6 +21239,105 @@
           },
           "401" : {
             "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/special-commands/{id}/profit-eligible" : {
+      "patch" : {
+        "tags" : [ "special-command-controller" ],
+        "summary" : "Toggle Spezialkommando profit-eligibility",
+        "description" : "Sets whether the Spezialkommando may be selected as the responsible (processing) org unit of a Job Order. ADMIN-only.",
+        "operationId" : "setProfitEligible_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SpecialCommandProfitEligibleToggleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Updated.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SpecialCommandDto"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21177,6 +21681,105 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/OutpostDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/responsible-org-unit" : {
+      "patch" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Reassign responsible org unit",
+        "description" : "Changes which org unit processes the order. Admin: free to any profit-eligible org unit; squadron logistician/officer: escalate own squadron's order to an SK only.",
+        "operationId" : "reassignResponsibleOrgUnit",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReassignResponsibleOrgUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
                 }
               }
             }
@@ -32173,6 +32776,96 @@
         }
       }
     },
+    "/api/v1/orders/{jobOrderId}/claims/{claimId}" : {
+      "delete" : {
+        "tags" : [ "Material Claims" ],
+        "summary" : "Withdraw a material claim",
+        "description" : "Removes a squadron's claim from a bucket.",
+        "operationId" : "withdrawClaim",
+        "parameters" : [ {
+          "name" : "jobOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "claimId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Claim withdrawn"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{id}/frequencies/{frequencyId}" : {
       "delete" : {
         "tags" : [ "Missions" ],
@@ -32687,6 +33380,9 @@
           "isPromotionEnabled" : {
             "type" : "boolean"
           },
+          "isProfitEligible" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -32716,6 +33412,9 @@
             "minLength" : 0
           },
           "active" : {
+            "type" : "boolean"
+          },
+          "isProfitEligible" : {
             "type" : "boolean"
           },
           "version" : {
@@ -33540,7 +34239,7 @@
       "CreateJobOrderDto" : {
         "type" : "object",
         "properties" : {
-          "creatingSquadronId" : {
+          "responsibleOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
           },
@@ -33610,6 +34309,16 @@
           "totalQuantity" : {
             "type" : "number",
             "format" : "double"
+          },
+          "claims" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClaimDto"
+            }
+          },
+          "openAmount" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },
@@ -33625,6 +34334,34 @@
           },
           "scwikiKey" : {
             "type" : "string"
+          }
+        }
+      },
+      "ClaimDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "claimingOrgUnit" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claimedByUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "claimedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -33654,10 +34391,10 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "creatingSquadron" : {
+          "responsibleOrgUnit" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
-          "requestingSquadron" : {
+          "requestingOrgUnit" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "handle" : {
@@ -33933,6 +34670,16 @@
             "type" : "number",
             "format" : "double"
           },
+          "claims" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClaimDto"
+            }
+          },
+          "openAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -33952,6 +34699,91 @@
           }
         },
         "required" : [ "status", "version" ]
+      },
+      "CreateJobOrderItemLineDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "blueprintId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemMaterialDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "clientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "parentClientLineId" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "amount", "blueprintId", "gameItemId" ]
+      },
+      "CreateJobOrderItemMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quality" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          }
+        },
+        "required" : [ "materialId", "quality" ]
+      },
+      "CreateJobOrderItemRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "responsibleOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "requestingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "handle" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreateJobOrderItemLineDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "items" ]
       },
       "OperationUpdateDto" : {
         "type" : "object",
@@ -35475,6 +36307,28 @@
         },
         "required" : [ "handoverTime", "items", "jobOrderNumber", "recipientHandle" ]
       },
+      "CreateClaimDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          },
+          "claimingOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
+      },
       "JobOrderItemHandoverCreateDto" : {
         "type" : "object",
         "properties" : {
@@ -35549,91 +36403,6 @@
           }
         },
         "required" : [ "amount", "inventoryItemId" ]
-      },
-      "CreateJobOrderItemLineDto" : {
-        "type" : "object",
-        "properties" : {
-          "gameItemId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "blueprintId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "amount" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
-          },
-          "materials" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/CreateJobOrderItemMaterialDto"
-            },
-            "maxItems" : 100,
-            "minItems" : 0
-          },
-          "clientLineId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "parentClientLineId" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        },
-        "required" : [ "amount", "blueprintId", "gameItemId" ]
-      },
-      "CreateJobOrderItemMaterialDto" : {
-        "type" : "object",
-        "properties" : {
-          "materialId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "quality" : {
-            "type" : "string",
-            "enum" : [ "GOOD", "NONE" ]
-          }
-        },
-        "required" : [ "materialId", "quality" ]
-      },
-      "CreateJobOrderItemRequestDto" : {
-        "type" : "object",
-        "properties" : {
-          "creatingSquadronId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "requestingOrgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "handle" : {
-            "type" : "string",
-            "maxLength" : 200,
-            "minLength" : 0
-          },
-          "comment" : {
-            "type" : "string",
-            "maxLength" : 1000,
-            "minLength" : 0
-          },
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/CreateJobOrderItemLineDto"
-            },
-            "maxItems" : 50,
-            "minItems" : 0
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "items" ]
       },
       "OperationCreateDto" : {
         "type" : "object",
@@ -36101,6 +36870,14 @@
           }
         }
       },
+      "SquadronProfitEligibleToggleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "eligible" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "MembershipFlagsPatchRequest" : {
         "type" : "object",
         "properties" : {
@@ -36116,6 +36893,14 @@
           }
         },
         "required" : [ "version" ]
+      },
+      "SpecialCommandProfitEligibleToggleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "eligible" : {
+            "type" : "boolean"
+          }
+        }
       },
       "MembershipLeadToggleRequest" : {
         "type" : "object",
@@ -36201,6 +36986,16 @@
             "type" : "boolean"
           }
         }
+      },
+      "ReassignResponsibleOrgUnitRequest" : {
+        "type" : "object",
+        "properties" : {
+          "responsibleOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "responsibleOrgUnitId" ]
       },
       "PatchMissionScheduleRequest" : {
         "type" : "object",
@@ -37248,6 +38043,36 @@
           },
           "delivered" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "ClaimBucketDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          },
+          "requiredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claimedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "openRemaining" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claims" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClaimDto"
+            }
           }
         }
       },

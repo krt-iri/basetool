@@ -161,8 +161,13 @@ public class CustomJwtGrantedAuthoritiesConverter
       return;
     }
 
-    boolean anyLogistician = memberships.stream().anyMatch(OrgUnitMembership::isLogistician);
-    boolean anyMissionManager = memberships.stream().anyMatch(OrgUnitMembership::isMissionManager);
+    // An SK lead (is_lead = true) is automatically BOTH a logistician AND a mission manager of that
+    // SK — the lead role sits above both within its org unit, mirroring how admin outranks every
+    // role and an Officer is logistician + mission manager of their own squadron (#344). is_lead
+    // only exists on SK memberships (DB CHECK), so this never widens a Staffel membership.
+    boolean anyLogistician = memberships.stream().anyMatch(m -> m.isLogistician() || m.isLead());
+    boolean anyMissionManager =
+        memberships.stream().anyMatch(m -> m.isMissionManager() || m.isLead());
 
     if (anyLogistician) {
       authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
@@ -175,12 +180,14 @@ public class CustomJwtGrantedAuthoritiesConverter
     // here is what differentiates this from the flat OR-union above: a user with the
     // Logistician flag on Staffel A but not on SK B gets a contextual authority for A only,
     // even though the flat ROLE_LOGISTICIAN was granted by either of them. That distinction is
-    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about.
+    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about. A lead of an
+    // SK gets the SK's contextual LOGISTICIAN and MISSION_MANAGER authorities here too
+    // (lead ⊇ logistician + mission manager).
     for (OrgUnitMembership m : memberships) {
-      if (m.isLogistician()) {
+      if (m.isLogistician() || m.isLead()) {
         authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", m.getId().getOrgUnitId()));
       }
-      if (m.isMissionManager()) {
+      if (m.isMissionManager() || m.isLead()) {
         authorities.add(
             new OrgUnitContextualAuthority("MISSION_MANAGER", m.getId().getOrgUnitId()));
       }

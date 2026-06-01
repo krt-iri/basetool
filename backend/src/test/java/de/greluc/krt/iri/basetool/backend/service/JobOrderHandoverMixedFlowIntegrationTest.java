@@ -95,7 +95,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           JobOrder jobOrder =
               JobOrder.builder()
-                  .creatingOrgUnit(
+                  .responsibleOrgUnit(
                       squadronRepository
                           .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
                           .orElseThrow())

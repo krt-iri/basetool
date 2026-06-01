@@ -59,7 +59,7 @@ class PromotionFeatureFlagPageGateTest {
 
   private void stubSquadronContext(UUID squadronId, boolean promotionEnabled) {
     SquadronDto squadron =
-        new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, 0L);
+        new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(

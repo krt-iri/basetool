@@ -19,6 +19,9 @@ import java.util.UUID;
  * @param description free-form text
  * @param active soft-delete flag; {@code true} for the active reference data
  * @param isPromotionEnabled per-squadron promotion-system feature flag (default {@code true})
+ * @param isProfitEligible per-squadron Job-Order processor eligibility flag (default {@code
+ *     false}); read-only on the regular update path and toggled only through {@code
+ *     /api/v1/squadrons/{id}/profit-eligible}
  * @param version optimistic-lock counter
  */
 public record SquadronDto(
@@ -28,4 +31,5 @@ public record SquadronDto(
     String description,
     Boolean active,
     Boolean isPromotionEnabled,
+    Boolean isProfitEligible,
     Long version) {}

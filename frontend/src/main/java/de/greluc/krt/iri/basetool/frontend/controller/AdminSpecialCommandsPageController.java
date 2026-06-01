@@ -117,6 +117,7 @@ public class AdminSpecialCommandsPageController {
                         parseString(m.get("shorthand")),
                         parseString(m.get("description")),
                         parseBoolean(m.get("active")),
+                        parseBoolean(m.get("isProfitEligible")),
                         parseLong(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     commands.sort(
@@ -149,7 +150,8 @@ public class AdminSpecialCommandsPageController {
     }
     try {
       SpecialCommandDto body =
-          new SpecialCommandDto(null, form.name(), form.shorthand(), form.description(), true, 0L);
+          new SpecialCommandDto(
+              null, form.name(), form.shorthand(), form.description(), true, false, 0L);
       backendApiClient.post("/api/v1/special-commands", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -192,7 +194,7 @@ public class AdminSpecialCommandsPageController {
     try {
       SpecialCommandDto body =
           new SpecialCommandDto(
-              id, form.name(), form.shorthand(), form.description(), true, form.version());
+              id, form.name(), form.shorthand(), form.description(), true, false, form.version());
       backendApiClient.put("/api/v1/special-commands/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -454,6 +456,7 @@ public class AdminSpecialCommandsPageController {
         parseString(map.get("shorthand")),
         parseString(map.get("description")),
         parseBoolean(map.get("active")),
+        parseBoolean(map.get("isProfitEligible")),
         parseLong(map.get("version")));
   }
 

@@ -6,15 +6,13 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend's {@code CreateJobOrderDto}. Carries the picker output for the Job
- * Order create form (R5.d.c): the {@link #requestingOrgUnitId} field replaces the historical {@code
- * requestingSquadronId} so the form picker can offer Staffel + Spezialkommando alike; today SK
- * selections are rejected with 400 by the backend until the destructive cleanup release lowers NOT
- * NULL on the legacy {@code requesting_squadron_id} column. The {@code creatingSquadronId} admin
- * override stays untouched in R5.d.c — its plan-aligned rename to {@code creatingOrgUnitId} ships
- * in a follow-up.
+ * Order create form: {@link #responsibleOrgUnitId} is the profit-eligible org unit that processes
+ * the order (required for authenticated callers, ignored for guests who are routed to the intake
+ * SK), and {@link #requestingOrgUnitId} is the customer (any squadron or SK). Both accept Staffel +
+ * Spezialkommando.
  */
 public record CreateJobOrderDto(
-    @Nullable UUID creatingSquadronId,
+    @Nullable UUID responsibleOrgUnitId,
     @Nullable UUID requestingOrgUnitId,
     String handle,
     String comment,

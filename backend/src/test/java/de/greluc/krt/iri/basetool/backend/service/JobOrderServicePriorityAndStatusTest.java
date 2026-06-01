@@ -62,6 +62,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private MaterialClaimService materialClaimService;
 
   @InjectMocks private JobOrderService service;
 

@@ -65,12 +65,29 @@ class SquadronServiceTest {
 
     SquadronDto update =
         new SquadronDto(
-            s.getId(), "Updated Name", "NEW", "Updated Desc", true, true, s.getVersion());
+            s.getId(), "Updated Name", "NEW", "Updated Desc", true, true, false, s.getVersion());
 
     Squadron updated = squadronService.updateSquadron(s.getId(), update);
 
     assertEquals("NEW", updated.getShorthand());
     assertEquals("Updated Name", updated.getName());
+  }
+
+  @Test
+  void setProfitEligible_flipsFlagAndPersists() {
+    Squadron s = new Squadron();
+    s.setName("Profit Toggle");
+    s.setShorthand("PFT");
+    s = squadronService.createSquadron(s);
+    // Squadrons default to NOT profit-eligible.
+    assertFalse(s.isProfitEligible());
+
+    Squadron enabled = squadronService.setProfitEligible(s.getId(), true);
+    assertTrue(enabled.isProfitEligible(), "Toggle must flip the flag on");
+    assertEquals("PFT", enabled.getShorthand(), "Toggle must not touch the shorthand");
+
+    Squadron disabled = squadronService.setProfitEligible(s.getId(), false);
+    assertFalse(disabled.isProfitEligible(), "Toggle must flip the flag off again");
   }
 
   @Test

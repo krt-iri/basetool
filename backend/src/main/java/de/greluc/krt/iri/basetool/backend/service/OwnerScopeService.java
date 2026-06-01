@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
@@ -8,6 +9,7 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -112,6 +114,7 @@ public class OwnerScopeService {
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
   private final MissionRepository missionRepository;
+  private final JobOrderRepository jobOrderRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationRepository operationRepository;
@@ -627,6 +630,80 @@ public class OwnerScopeService {
         .findById(missionId)
         .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))
         .orElse(false);
+  }
+
+  /**
+   * {@code true} iff the current principal may read job order {@code jobOrderId} (Phase 3, #343).
+   * Job Orders are a <em>conditionally</em> staffel-scoped aggregate:
+   *
+   * <ul>
+   *   <li>responsible = Spezialkommando → <b>public</b>: visible to every (authenticated) caller,
+   *       so the central SK queue stays a shared workspace across all profit squadrons.
+   *   <li>responsible = Squadron → <b>private</b>: visible only to a member of that squadron and to
+   *       admins. The requester does NOT grant visibility (a squadron-private order is invisible to
+   *       the customer squadron unless it happens to also be the responsible one).
+   * </ul>
+   *
+   * <p>A {@code null} responsible org unit (legacy rows before the V130 backfill) is treated as
+   * visible — defensive only; the backfill + NOT NULL constraint means no such row survives in
+   * practice. Non-existent ids return {@code false}.
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may read the order.
+   */
+  public boolean canSeeJobOrder(@NotNull UUID jobOrderId) {
+    return jobOrderRepository.findById(jobOrderId).map(this::canSeeJobOrderRow).orElse(false);
+  }
+
+  /**
+   * Per-row read check shared by {@link #canSeeJobOrder(UUID)}. SK-responsible orders are public;
+   * squadron-responsible orders defer to {@link #canSeeSquadron(UUID)}.
+   *
+   * @param o the job order whose responsible org unit gates visibility.
+   * @return {@code true} iff the caller may read the row.
+   */
+  private boolean canSeeJobOrderRow(JobOrder o) {
+    OrgUnit responsible = o.getResponsibleOrgUnit();
+    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
+      return true;
+    }
+    return canSeeSquadron(responsible.getId());
+  }
+
+  /**
+   * {@code true} iff the current principal may edit job order {@code jobOrderId} (Phase 3, #343).
+   * Mirrors {@link #canSeeJobOrder(UUID)} but for writes:
+   *
+   * <ul>
+   *   <li>responsible = Spezialkommando → editable by anyone the endpoint's role gate admits
+   *       (LOGISTICIAN+). The central SK queue is a shared workspace, so write access is governed
+   *       by role rather than by squadron scope; this method does not further restrict it.
+   *   <li>responsible = Squadron → editable only by a member of that squadron and admins, exactly
+   *       like {@link #canEditSquadron(UUID)}.
+   * </ul>
+   *
+   * <p>Non-existent ids return {@code false}.
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may edit the order.
+   */
+  public boolean canEditJobOrder(@NotNull UUID jobOrderId) {
+    return jobOrderRepository.findById(jobOrderId).map(this::canEditJobOrderRow).orElse(false);
+  }
+
+  /**
+   * Per-row write check shared by {@link #canEditJobOrder(UUID)}. SK-responsible orders are open to
+   * the role gate; squadron-responsible orders defer to {@link #canEditSquadron(UUID)}.
+   *
+   * @param o the job order whose responsible org unit gates write access.
+   * @return {@code true} iff the caller may edit the row.
+   */
+  private boolean canEditJobOrderRow(JobOrder o) {
+    OrgUnit responsible = o.getResponsibleOrgUnit();
+    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
+      return true;
+    }
+    return canEditSquadron(responsible.getId());
   }
 
   /**

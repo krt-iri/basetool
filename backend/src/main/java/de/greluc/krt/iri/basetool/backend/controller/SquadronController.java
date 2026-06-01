@@ -142,10 +142,36 @@ public class SquadronController {
   }
 
   /**
+   * Per-squadron profit-eligibility toggle. Admins flip the flag to opt a squadron in or out of the
+   * Job-Order responsible (processing) picker without losing any data. ADMIN-only and isolated from
+   * the regular {@code PUT /api/v1/squadrons/{id}} update path so an accidental description edit
+   * cannot change a squadron's eligibility.
+   *
+   * @param id squadron id
+   * @param body request payload {@code { "eligible": true|false }}
+   * @return the updated squadron DTO with the new flag value
+   */
+  @PatchMapping("/{id}/profit-eligible")
+  @PreAuthorize("hasRole('ADMIN')")
+  public SquadronDto setProfitEligible(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {
+    return squadronMapper.toDto(squadronService.setProfitEligible(id, body.eligible()));
+  }
+
+  /**
    * Request body for the per-squadron promotion-feature toggle endpoint. Carries a single boolean
    * so a future expansion (e.g. effective-from date) can be added without breaking the wire format.
    *
    * @param enabled new value of {@code Squadron.isPromotionEnabled}
    */
   public record SquadronPromotionToggleRequest(boolean enabled) {}
+
+  /**
+   * Request body for the per-squadron profit-eligibility toggle endpoint. Carries a single boolean
+   * so a future expansion can be added without breaking the wire format.
+   *
+   * @param eligible new value of {@code Squadron.isProfitEligible}
+   */
+  public record SquadronProfitEligibleToggleRequest(boolean eligible) {}
 }

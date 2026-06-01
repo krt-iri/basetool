@@ -17,11 +17,15 @@ public interface SpecialCommandMapper {
 
   /**
    * Maps a {@link SpecialCommand} entity to its outbound DTO. Audit fields and the (always-false)
-   * {@code isPromotionEnabled} accessor are intentionally not surfaced on the wire.
+   * {@code isPromotionEnabled} accessor are intentionally not surfaced on the wire. The {@code
+   * isProfitEligible} flag IS surfaced — unlike promotion, it is a real per-SK value an admin
+   * toggles to mark which Spezialkommandos may process orders, so the admin-settings page renders
+   * the toggle from this value.
    *
    * @param entity the persisted entity; never {@code null} in the live call paths.
    * @return the wire-shape DTO, never {@code null}.
    */
+  @Mapping(target = "isProfitEligible", source = "profitEligible")
   SpecialCommandDto toDto(SpecialCommand entity);
 
   /**
@@ -29,12 +33,19 @@ public interface SpecialCommandMapper {
    * true)} declarations cover the server-managed fields (id is server-stamped on create; audit
    * timestamps are populated by Hibernate's {@code @CreationTimestamp} / {@code @UpdateTimestamp}).
    * {@code kind} is set automatically by the JPA discriminator on persist — every entity built
-   * through this path lands as {@code kind='SPECIAL_COMMAND'}.
+   * through this path lands as {@code kind='SPECIAL_COMMAND'}. {@code promotionEnabled} is ignored
+   * because it is permanently {@code false} on SK rows (constructor + setter override). {@code
+   * profitEligible} is ignored because, like the squadron flag, it is mutated only through the
+   * dedicated {@code PATCH /api/v1/special-commands/{id}/profit-eligible} toggle, never as a
+   * side-effect of a create/update, so an accidental edit cannot change which SKs may process
+   * orders.
    *
    * @param dto the inbound DTO; never {@code null}.
    * @return a transient {@link SpecialCommand} instance ready to be saved.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "promotionEnabled", ignore = true)
+  @Mapping(target = "profitEligible", ignore = true)
   SpecialCommand toEntity(SpecialCommandDto dto);
 }

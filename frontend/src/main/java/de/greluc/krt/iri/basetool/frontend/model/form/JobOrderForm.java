@@ -9,12 +9,16 @@ import lombok.Data;
 @Data
 public class JobOrderForm {
   /**
-   * UUID of the org unit the order is executed for. R5.d.c renamed this from the historical {@code
-   * requestingSquadronId} so the form's owner-picker can offer both Staffel and Spezialkommando
-   * entries. The Thymeleaf form binds the picker fragment to this field; the controller forwards it
-   * as {@code requestingOrgUnitId} on the backend {@code CreateJobOrderDto}. The backend rejects SK
-   * selections with 400 today because the legacy {@code requesting_squadron_id} column is still NOT
-   * NULL — the destructive cleanup release lifts that constraint and unlocks SK stamping.
+   * UUID of the profit-eligible org unit that will <em>process</em> the order (the responsible org
+   * unit). Bound by the responsible picker on the create form; forwarded as {@code
+   * responsibleOrgUnitId} on the backend {@code CreateJobOrderDto}. Ignored for guests, who are
+   * routed onto the configured intake SK.
+   */
+  private UUID responsibleOrgUnitId;
+
+  /**
+   * UUID of the customer org unit the order is placed for (the requesting org unit). Bound by the
+   * requesting picker; forwarded as {@code requestingOrgUnitId}. Any squadron or Spezialkommando.
    */
   private UUID requestingOrgUnitId;
 

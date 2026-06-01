@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingUpdateDto;
@@ -45,6 +46,13 @@ public class AdminSettingsPageController {
 
   /** Decimal scale used when converting between DB fraction and form percentage. */
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+  /**
+   * System-setting key holding the UUID of the designated intake Spezialkommando that anonymous /
+   * guest Job-Order creations are routed to. Seeded empty by Flyway V128; an admin picks the SK
+   * here.
+   */
+  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
 
   /**
    * Display default for the transfer-fee rate (percent) used when the backend lookup fails. Kept in
@@ -130,7 +138,49 @@ public class AdminSettingsPageController {
     model.addAttribute("transferFeeVersion", transferFeeVersion);
     model.addAttribute("squadrons", fetchSquadronsForPromotionToggle());
 
+    String intakeSpecialCommandId = "";
+    Long intakeSpecialCommandVersion = 0L;
+    try {
+      SystemSettingDto intakeSetting =
+          backendApiClient.get("/api/v1/settings/" + INTAKE_SK_SETTING_KEY, SystemSettingDto.class);
+      intakeSpecialCommandId = intakeSetting.value() == null ? "" : intakeSetting.value();
+      intakeSpecialCommandVersion = intakeSetting.version();
+    } catch (Exception e) {
+      log.warn("Could not fetch job-order intake special-command setting");
+    }
+    model.addAttribute("intakeSpecialCommandId", intakeSpecialCommandId);
+    model.addAttribute("intakeSpecialCommandVersion", intakeSpecialCommandVersion);
+    model.addAttribute("specialCommands", fetchSpecialCommands());
+
     return "admin-settings";
+  }
+
+  /**
+   * Loads every Spezialkommando (alphabetical) for the job-order intake-SK dropdown on the
+   * admin-settings page. A backend failure degrades to an empty list with a logged warning so the
+   * rest of the page still renders.
+   *
+   * @return Spezialkommandos sorted by name, never {@code null}.
+   */
+  private List<SpecialCommandDto> fetchSpecialCommands() {
+    try {
+      PageResponse<SpecialCommandDto> page =
+          backendApiClient.get(
+              "/api/v1/special-commands?size=1000&sort=name,asc",
+              new ParameterizedTypeReference<PageResponse<SpecialCommandDto>>() {});
+      if (page == null || page.content() == null) {
+        return List.of();
+      }
+      return page.content().stream()
+          .sorted(
+              Comparator.comparing(
+                  s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+          .toList();
+    } catch (Exception e) {
+      log.warn(
+          "Could not fetch special commands for admin-settings intake picker: {}", e.getMessage());
+      return List.of();
+    }
   }
 
   /**
@@ -180,6 +230,9 @@ public class AdminSettingsPageController {
    * @param refineryRoundingVersion optimistic-lock version for the rounding setting
    * @param transferFeePercentStr in-game banking transfer fee as a percentage (e.g. {@code 0.5})
    * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
+   * @param intakeSpecialCommandId UUID of the job-order intake Spezialkommando; blank leaves the
+   *     current value untouched (the value cannot be cleared back to blank via this form)
+   * @param intakeSpecialCommandVersion optimistic-lock version for the intake-SK setting
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/settings}
    */
@@ -193,6 +246,10 @@ public class AdminSettingsPageController {
       @RequestParam("refineryRoundingVersion") Long refineryRoundingVersion,
       @RequestParam("transferFeePercent") String transferFeePercentStr,
       @RequestParam("transferFeeVersion") Long transferFeeVersion,
+      @RequestParam(name = "intakeSpecialCommandId", required = false, defaultValue = "")
+          String intakeSpecialCommandId,
+      @RequestParam(name = "intakeSpecialCommandVersion", required = false, defaultValue = "0")
+          Long intakeSpecialCommandVersion,
       RedirectAttributes redirectAttributes) {
     try {
       int yellowDays = Integer.parseInt(ageYellowDaysStr);
@@ -228,6 +285,16 @@ public class AdminSettingsPageController {
           new SystemSettingUpdateDto(
               transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
           SystemSettingDto.class);
+
+      // Only persist the intake SK when an SK is actually selected. The backend setting is
+      // @NotBlank, so a blank submit (no SK chosen yet) is treated as "leave unchanged" rather than
+      // an attempt to clear it.
+      if (intakeSpecialCommandId != null && !intakeSpecialCommandId.isBlank()) {
+        backendApiClient.put(
+            "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
+            new SystemSettingUpdateDto(intakeSpecialCommandId.trim(), intakeSpecialCommandVersion),
+            SystemSettingDto.class);
+      }
 
       redirectAttributes.addFlashAttribute("successToast", "success.settings.update");
     } catch (NumberFormatException e) {

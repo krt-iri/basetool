@@ -88,7 +88,7 @@
 
 <main>
     <div class="greeting hud-box flex-between">
-        <h1 th:text="#{orders.create.title}">Neuer Auftrag</h1>
+        <h1 th:text="${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}">Neuer Auftrag</h1>
         <div class="flex-gap-sm" sec:authorize="isAuthenticated()">
             <a th:href="@{/orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
         </div>
@@ -104,17 +104,21 @@
         </div>
 
         <div class="form-container">
-            <div class="form-group">
+            <!-- In edit mode the order kind is fixed to ITEM (only item orders are edited via this
+                 page reuse), so the toggle is hidden but the item radio is pre-checked. -->
+            <div class="form-group" th:style="${editOrderId != null} ? 'display:none' : ''">
                 <label th:text="#{orders.create.kind}">Auftragsart</label>
                 <div class="flex-gap-sm" style="display:flex; gap:1.5rem;">
                     <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
-                        <input type="radio" name="orderModeToggle" value="material" checked
+                        <input type="radio" name="orderModeToggle" value="material"
+                               th:attr="checked=${editOrderId == null} ? 'checked' : null"
                                data-trigger="order-mode-toggle" style="width:auto;"
                                data-testid="order-mode-material" />
                         <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
                     </label>
                     <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
                         <input type="radio" name="orderModeToggle" value="item"
+                               th:attr="checked=${editOrderId != null} ? 'checked' : null"
                                data-trigger="order-mode-toggle" style="width:auto;"
                                data-testid="order-mode-item" />
                         <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
@@ -126,30 +130,9 @@
             <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
                 
-                <div class="form-group">
-                    <label for="requestingOrgUnitId" th:text="#{orders.create.squadron}">Staffel</label>
-                    <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required>
-                        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
-                            <option th:each="o : ${ownerOptions}"
-                                    th:if="${o.kind() == 'SQUADRON'}"
-                                    th:value="${o.orgUnitId()}"
-                                    th:text="${o.orgUnitName()}">Staffel</option>
-                        </optgroup>
-                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
-                            <option th:each="o : ${ownerOptions}"
-                                    th:if="${o.kind() == 'SPECIAL_COMMAND'}"
-                                    th:value="${o.orgUnitId()}"
-                                    th:text="${o.orgUnitName()}">Spezialkommando</option>
-                        </optgroup>
-                        <th:block th:unless="${ownerOptionsHasSpecialCommand}">
-                            <option th:each="o : ${ownerOptions}"
-                                    th:value="${o.orgUnitId()}"
-                                    th:text="${o.orgUnitName()}">Org Unit</option>
-                        </th:block>
-                    </select>
-                </div>
-                
+                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+
                 <div class="form-group">
                     <label for="handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
                     <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
@@ -203,24 +186,11 @@
             </div>
 
             <div id="mode-item" hidden>
-            <form th:action="@{/orders/items}" method="post" th:object="${jobOrderItemForm}">
+            <form th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
 
-                <div class="form-group">
-                    <label for="item-requestingOrgUnitId" th:text="#{orders.create.squadron}">Staffel</label>
-                    <select id="item-requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required>
-                        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
-                            <option th:each="o : ${ownerOptions}" th:if="${o.kind() == 'SQUADRON'}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Staffel</option>
-                        </optgroup>
-                        <optgroup th:if="${ownerOptionsHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
-                            <option th:each="o : ${ownerOptions}" th:if="${o.kind() == 'SPECIAL_COMMAND'}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Spezialkommando</option>
-                        </optgroup>
-                        <th:block th:unless="${ownerOptionsHasSpecialCommand}">
-                            <option th:each="o : ${ownerOptions}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}">Org Unit</option>
-                        </th:block>
-                    </select>
-                </div>
+                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
 
                 <div class="form-group">
                     <label for="item-handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
@@ -407,6 +377,8 @@
         unresolved: /*[[#{orders.create.item.unresolved}]]*/ 'Nicht aufgeloeste Zutaten:'
     };
     let itemLineIndex = 0;
+    // Edit mode (item-order edit): the existing lines, injected server-side. Null on the create page.
+    const EDIT_ITEMS = /*[[${editItems}]]*/ null;
 
     function escapeName(s) {
         if (window.escapeHtml) { return window.escapeHtml(String(s)); }
@@ -465,7 +437,9 @@
         container.appendChild(row);
         if (prefill.gameItemId) {
             row.querySelector('[data-role="item-select"]').value = prefill.gameItemId;
-            loadBlueprints(row);
+            // In edit mode, thread the stored blueprint + per-material qualities through the async
+            // load so the line restores exactly as ordered.
+            loadBlueprints(row, prefill.blueprintId, prefill.qualities);
         }
         return row;
     }
@@ -478,7 +452,7 @@
         row.querySelector('[data-role="subassemblies"]').innerHTML = '';
     }
 
-    function loadBlueprints(row) {
+    function loadBlueprints(row, preselectBpId, qualities) {
         const gameItemId = row.querySelector('[data-role="item-select"]').value;
         const wrap = row.querySelector('[data-role="blueprint-wrap"]');
         const bpSelect = row.querySelector('[data-role="blueprint-select"]');
@@ -490,12 +464,17 @@
                 list = list || [];
                 bpSelect.innerHTML = list.map(b => `<option value="${b.id}">${escapeName(b.outputName || b.scwikiKey || b.id)}</option>`).join('');
                 wrap.hidden = list.length <= 1;
-                if (list.length > 0) { bpSelect.value = list[0].id; loadDerivation(row); }
+                if (list.length > 0) {
+                    // Restore the previously-chosen blueprint in edit mode if it is still offered.
+                    const pick = (preselectBpId && list.some(b => b.id === preselectBpId)) ? preselectBpId : list[0].id;
+                    bpSelect.value = pick;
+                    loadDerivation(row, qualities);
+                }
             })
             .catch(() => { wrap.hidden = true; });
     }
 
-    function loadDerivation(row) {
+    function loadDerivation(row, qualities) {
         const blueprintId = row.querySelector('[data-role="blueprint-select"]').value;
         const amount = parseInt(row.querySelector('[data-role="amount"]').value, 10) || 1;
         if (!blueprintId) { clearDerived(row); return; }
@@ -512,8 +491,10 @@
                     const mat = m.material || {};
                     const unit = (mat.quantityType === 'PIECE') ? 'Stk' : 'SCU';
                     const qty = (mat.quantityType === 'PIECE') ? Math.round(m.requiredQuantity || 0) : Number((m.requiredQuantity || 0).toFixed(3));
-                    const goodSel = (m.defaultQuality === 'GOOD') ? ' selected' : '';
-                    const noneSel = (m.defaultQuality !== 'GOOD') ? ' selected' : '';
+                    // Edit mode: restore the stored quality for this material; else blueprint default.
+                    const storedQ = (qualities && mat.id && qualities[mat.id]) ? qualities[mat.id] : m.defaultQuality;
+                    const goodSel = (storedQ === 'GOOD') ? ' selected' : '';
+                    const noneSel = (storedQ !== 'GOOD') ? ' selected' : '';
                     html += `
                         <div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
                             <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
@@ -567,7 +548,13 @@
                 addItemLine({gameItemId: adoptBtn.dataset.gameItemId, amount: parseInt(adoptBtn.dataset.amount, 10) || 1, parentId: adoptBtn.dataset.parent});
             }
         });
-        addItemLine();
+        // Edit mode: rebuild the existing lines from the injected prefill; otherwise start with one
+        // empty line.
+        if (Array.isArray(EDIT_ITEMS) && EDIT_ITEMS.length) {
+            EDIT_ITEMS.forEach(line => addItemLine(line));
+        } else {
+            addItemLine();
+        }
     }
     document.querySelectorAll('input[name="orderModeToggle"]').forEach(r => r.addEventListener('change', toggleOrderMode));
     toggleOrderMode();
