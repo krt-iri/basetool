@@ -1,0 +1,235 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.iri.basetool.backend.mapper.PersonalBlueprintMapper;
+import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.iri.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import jakarta.persistence.EntityNotFoundException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Owner-scoped domain service for the personal-blueprint feature (#327). Every read and write is
+ * scoped by the Keycloak {@code sub} so a caller can only ever see or mutate their own owned
+ * blueprints. The service is {@code sub}-parameterised (it never reads the security context) so the
+ * Phase 7 admin surface can reuse it for a target user.
+ *
+ * <p>Optimistic locking follows the project convention: the inbound update DTO carries the last
+ * seen {@code version}; on mismatch an {@link ObjectOptimisticLockingFailureException} is raised so
+ * the global handler maps it to HTTP 409. A duplicate add raises {@link DuplicateEntityException} →
+ * 409 before the {@code (owner_sub, product_key)} unique constraint fires.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class PersonalBlueprintService {
+
+  /** Whitelist of sort properties accepted on the owned-list endpoint. */
+  public static final Set<String> SORTABLE_FIELDS =
+      Set.of("productName", "acquiredAt", "createdAt", "updatedAt");
+
+  /** Default sort property when the caller does not specify one. */
+  public static final String DEFAULT_SORT_FIELD = "updatedAt";
+
+  private final PersonalBlueprintRepository repository;
+  private final PersonalBlueprintMapper mapper;
+  private final BlueprintProductService blueprintProductService;
+  private final GameItemRepository gameItemRepository;
+
+  /**
+   * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
+   * name substring.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param query optional case-insensitive product-name filter
+   * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
+   * @return paged response DTOs
+   */
+  public Page<PersonalBlueprintResponse> listOwn(
+      @NotNull String ownerSub, @Nullable String query, @NotNull Pageable pageable) {
+    Page<PersonalBlueprint> page =
+        (query == null || query.isBlank())
+            ? repository.findAllByOwnerSub(ownerSub, pageable)
+            : repository.findAllByOwnerSubAndProductNameContainingIgnoreCase(
+                ownerSub, query.trim(), pageable);
+    return page.map(mapper::toResponse);
+  }
+
+  /**
+   * Adds a single blueprint to the caller's owned set. The product key is resolved against the
+   * active master list and the canonical name + output item are stamped onto the new row.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param request the add payload (product key + optional acquisition date / note)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException if the product key matches no active product
+   * @throws DuplicateEntityException if the caller already owns the product
+   */
+  @Transactional
+  public PersonalBlueprintResponse add(
+      @NotNull String ownerSub, @NotNull PersonalBlueprintCreateRequest request) {
+    ResolvedProduct product =
+        blueprintProductService
+            .resolveByProductKey(request.productKey())
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException(
+                        "Blueprint product not found: " + request.productKey()));
+    if (repository.existsByOwnerSubAndProductKey(ownerSub, product.productKey())) {
+      throw new DuplicateEntityException(
+          "Blueprint '" + product.productName() + "' is already owned.");
+    }
+    PersonalBlueprint saved =
+        repository.save(newOwned(ownerSub, product, request.acquiredAt(), request.note()));
+    log.info(
+        "Added personal blueprint id={} productKey='{}' ownerSub={}",
+        saved.getId(),
+        product.productKey(),
+        ownerSub);
+    return mapper.toResponse(saved);
+  }
+
+  /**
+   * Multi-select add: resolves and inserts each requested product key, skipping (not failing) keys
+   * the caller already owns, keys repeated within the request, and keys that resolve to no active
+   * product. Bulk-safe — only new entities are persisted, no detaching bulk update runs.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param productKeys the product keys to add
+   * @return a summary of how many keys were added vs. skipped and why
+   */
+  @Transactional
+  public PersonalBlueprintBatchResult addBatch(
+      @NotNull String ownerSub, @NotNull List<String> productKeys) {
+    int added = 0;
+    int alreadyOwned = 0;
+    int unresolved = 0;
+    Set<String> seenInRequest = new HashSet<>();
+    for (String rawKey : productKeys) {
+      Optional<ResolvedProduct> resolved =
+          rawKey == null ? Optional.empty() : blueprintProductService.resolveByProductKey(rawKey);
+      if (resolved.isEmpty()) {
+        unresolved++;
+        continue;
+      }
+      ResolvedProduct product = resolved.get();
+      if (!seenInRequest.add(product.productKey())
+          || repository.existsByOwnerSubAndProductKey(ownerSub, product.productKey())) {
+        alreadyOwned++;
+        continue;
+      }
+      repository.save(newOwned(ownerSub, product, null, null));
+      added++;
+    }
+    log.info(
+        "Batch add for ownerSub={}: added={} alreadyOwned={} unresolved={}",
+        ownerSub,
+        added,
+        alreadyOwned,
+        unresolved);
+    return new PersonalBlueprintBatchResult(added, alreadyOwned, unresolved);
+  }
+
+  /**
+   * Updates the mutable fields ({@code acquiredAt}, {@code note}) of an owned blueprint with an
+   * explicit optimistic-lock check.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id entry primary key
+   * @param request the update payload (carries the expected version)
+   * @return the persisted DTO
+   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  public PersonalBlueprintResponse update(
+      @NotNull String ownerSub, @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
+    PersonalBlueprint entity = loadOwn(ownerSub, id);
+    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
+      throw new ObjectOptimisticLockingFailureException(PersonalBlueprint.class, entity.getId());
+    }
+    entity.setAcquiredAt(request.acquiredAt());
+    entity.setNote(request.note());
+    PersonalBlueprint saved = repository.save(entity);
+    log.info("Updated personal blueprint id={} ownerSub={}", saved.getId(), ownerSub);
+    return mapper.toResponse(saved);
+  }
+
+  /**
+   * Deletes an owned blueprint. 404 for an unknown id or a cross-owner attempt.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id entry primary key
+   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   */
+  @Transactional
+  public void delete(@NotNull String ownerSub, @NotNull UUID id) {
+    PersonalBlueprint entity = loadOwn(ownerSub, id);
+    repository.delete(entity);
+    log.info("Deleted personal blueprint id={} ownerSub={}", id, ownerSub);
+  }
+
+  /**
+   * Builds a new, unsaved owned-blueprint entity stamped with the resolved product. The output item
+   * is attached as a lazy reference (no extra query) when the product resolved one.
+   *
+   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param product the resolved product to stamp
+   * @param acquiredAt optional acquisition time
+   * @param note optional note
+   * @return the new transient entity
+   */
+  @NotNull
+  private PersonalBlueprint newOwned(
+      String ownerSub, ResolvedProduct product, java.time.Instant acquiredAt, String note) {
+    PersonalBlueprint entity = new PersonalBlueprint();
+    entity.setOwnerSub(ownerSub);
+    entity.setProductKey(product.productKey());
+    entity.setProductName(product.productName());
+    if (product.outputItemId() != null) {
+      entity.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
+    }
+    entity.setAcquiredAt(acquiredAt);
+    entity.setNote(note);
+    return entity;
+  }
+
+  /**
+   * Owner-scoped load; 404 (via {@link EntityNotFoundException}) for an unknown id or a row owned
+   * by a different user — the two cases are deliberately indistinguishable on the wire.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id entry primary key
+   * @return the managed entity
+   */
+  @NotNull
+  private PersonalBlueprint loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
+    return repository
+        .findByIdAndOwnerSub(id, ownerSub)
+        .orElseThrow(
+            () -> {
+              log.warn("Access denied or not found: ownerSub={} requested id={}", ownerSub, id);
+              return new EntityNotFoundException("PersonalBlueprint not found: " + id);
+            });
+  }
+}
