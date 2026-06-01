@@ -42,7 +42,18 @@
     // Group thousands with '.' to preserve the server's previous `formatInteger(.., 'POINT')` look,
     // independent of UI locale; prices are whole-number aUEC.
     const NUM = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
-    const esc = window.escapeHtml || function (v) { return v == null ? '' : String(v); };
+
+    // Escape HTML meta-characters before any value is written via innerHTML. A self-contained
+    // replace chain (not a delegate to window.escapeHtml) so it is an unconditional, statically
+    // recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     const BUFFER = 8;        // extra rows rendered above and below the viewport
     const collapsed = {};    // kind -> true when its rows are hidden
