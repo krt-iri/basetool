@@ -13,9 +13,12 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -72,6 +75,8 @@ public class MissionParticipant extends AbstractEntity<UUID> {
       joinColumns = @JoinColumn(name = "mission_participant_id"),
       inverseJoinColumns = @JoinColumn(name = "org_unit_id"))
   @BatchSize(size = 50)
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
   private Set<OrgUnit> orgUnits = new LinkedHashSet<>();
 
   @ManyToOne
@@ -90,4 +95,31 @@ public class MissionParticipant extends AbstractEntity<UUID> {
 
   @Enumerated(EnumType.STRING)
   private PayoutPreference payoutPreference = PayoutPreference.PAYOUT;
+
+  /**
+   * Returns an unmodifiable view of this participant's org-unit affiliations. The Lombok getter is
+   * suppressed for {@code orgUnits} so callers cannot mutate the entity-owned set through the
+   * accessor (CWE-374); use {@link #setOrgUnits(Collection)} to replace the affiliations.
+   *
+   * @return an unmodifiable snapshot of the affiliated org units; never {@code null}, possibly
+   *     empty.
+   */
+  public Set<OrgUnit> getOrgUnits() {
+    return Collections.unmodifiableSet(orgUnits);
+  }
+
+  /**
+   * Replaces this participant's org-unit affiliations with the given org units, mutating the
+   * entity-owned {@link LinkedHashSet} in place (clear + re-add) so Hibernate's dirty-checking sees
+   * the change on the managed collection rather than a swapped reference. A {@code null} argument
+   * clears all affiliations.
+   *
+   * @param orgUnits the new affiliations, or {@code null} to clear them.
+   */
+  public void setOrgUnits(Collection<? extends OrgUnit> orgUnits) {
+    this.orgUnits.clear();
+    if (orgUnits != null) {
+      this.orgUnits.addAll(orgUnits);
+    }
+  }
 }

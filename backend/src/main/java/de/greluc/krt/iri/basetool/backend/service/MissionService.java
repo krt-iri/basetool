@@ -738,12 +738,10 @@ public class MissionService {
       // belongs to none (admins / brand-new accounts) so the roster shows no affiliation instead of
       // the old, wrong IRIDIUM fallback. The caller-submitted orgUnitIds are intentionally ignored
       // for registered participants; the picker is guest-only.
-      participant.getOrgUnits().clear();
-      participant.getOrgUnits().addAll(resolveMembershipOrgUnits(user.getId()));
+      participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
     } else {
       participant.setGuestName(effectiveGuestName);
-      participant.getOrgUnits().clear();
-      participant.getOrgUnits().addAll(resolveGuestSubmittedOrgUnits(orgUnitIds));
+      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
     }
 
     if (desiredJobTypeId != null) {
@@ -910,8 +908,7 @@ public class MissionService {
       // org_unit_membership on every update so a freshly-assigned Staffel / SK propagates into the
       // participant row. The submitted orgUnitIds are ignored for registered participants — the
       // picker is guest-only, and the affiliation is the user's actual membership set.
-      participant.getOrgUnits().clear();
-      participant.getOrgUnits().addAll(resolveMembershipOrgUnits(participant.getUser().getId()));
+      participant.setOrgUnits(resolveMembershipOrgUnits(participant.getUser().getId()));
     } else {
       // Audit finding M-3 (2026-05-20): logging the raw {@code guestName} leaks PII —
       // free-text names often contain real-life names of third parties that PiiMasker does not
@@ -922,8 +919,7 @@ public class MissionService {
       if (guestName != null) {
         participant.setGuestName(guestName);
       }
-      participant.getOrgUnits().clear();
-      participant.getOrgUnits().addAll(resolveGuestSubmittedOrgUnits(orgUnitIds));
+      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
     }
 
     if (plannedMissionJobTypeId != null) {
