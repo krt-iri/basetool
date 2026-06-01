@@ -130,6 +130,9 @@
             <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
                 
+                <div th:if="${#lists.isEmpty(responsibleOptions)}" class="hud-box hud-box-error">
+                    <p th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</p>
+                </div>
                 <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
                 <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
 
@@ -189,6 +192,9 @@
             <form th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
 
+                <div th:if="${#lists.isEmpty(responsibleOptions)}" class="hud-box hud-box-error">
+                    <p th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</p>
+                </div>
                 <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
                 <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
 

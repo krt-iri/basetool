@@ -1370,17 +1370,26 @@ public class JobOrderPageController {
 
   /**
    * Fetches all active Spezialkommandos (with the profit-eligibility flag) for the responsible
-   * picker. Falls back to an empty list on backend hiccup so the form still renders.
+   * picker. Unlike the permitAll {@code /api/v1/squadrons} catalog, the {@code
+   * /api/v1/special-commands} endpoint requires an authenticated caller, so this goes through the
+   * bearer-relaying authenticated WebClient ({@code isPublic = false}). Using the anonymous public
+   * client here silently 401s and drops every SK from the picker. Anonymous guests cannot read the
+   * catalog and are force-routed to the intake SK at create time anyway, so the call is skipped for
+   * them rather than firing a doomed 401 that logs a misleading error on every guest create-form
+   * view. Falls back to an empty list on backend hiccup so the form still renders.
    *
    * @return SK DTOs; never {@code null}.
    */
   private List<SpecialCommandDto> fetchSpecialCommands() {
+    if (!isAuthenticatedCaller()) {
+      return new ArrayList<>();
+    }
     try {
       PageResponse<SpecialCommandDto> p =
           backendApiClient.getCached(
               "/api/v1/special-commands?size=1000&sort=name,asc",
               new ParameterizedTypeReference<>() {},
-              true);
+              false);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1388,6 +1397,23 @@ public class JobOrderPageController {
       log.error("Failed to fetch special commands", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Reports whether the current request carries a real authenticated principal (not an anonymous
+   * guest), used to gate the authenticated-only Spezialkommando catalog fetch. Reads the security
+   * context directly because the picker-population helpers run without an injected principal.
+   *
+   * @return {@code true} for an authenticated, non-anonymous caller; {@code false} otherwise.
+   */
+  private boolean isAuthenticatedCaller() {
+    org.springframework.security.core.Authentication auth =
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .getAuthentication();
+    return auth != null
+        && auth.isAuthenticated()
+        && !(auth
+            instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
   }
 
   private UUID getCurrentUserId(OidcUser principal) {
