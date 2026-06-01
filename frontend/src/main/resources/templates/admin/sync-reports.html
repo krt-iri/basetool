@@ -9,6 +9,19 @@
         .event-type { font-family: var(--font-headline); font-size: 0.75rem; letter-spacing: 0.04em; }
         .event-detail { color: var(--color-gray-2); font-size: 0.85rem; }
         .pager { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+        .purge-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem; margin-top: 1rem; }
+        .purge-form .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+        .purge-form label { font-size: 0.85rem; color: var(--color-gray-2); }
+        .purge-form input[type="number"] {
+            width: 8rem; min-height: 44px; padding: 0.5rem;
+            background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box;
+        }
+        .purge-form .btn { min-height: 44px; }
+        .modal {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
+            align-items: center; justify-content: center; padding: 1rem;
+        }
     </style>
     </th:block>
 </head>
@@ -37,6 +50,10 @@
 
     <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-combat);">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <div th:if="${deletedCount != null}" class="hud-box mt-2" style="border-color: var(--color-success);">
+        <p th:text="#{admin.syncReports.delete.success(${deletedCount})}">Berichte gelöscht.</p>
     </div>
 
     <div class="hud-box mt-2">
@@ -92,6 +109,85 @@
                th:text="#{general.pagination.next}">Weiter</a>
         </div>
     </div>
+
+    <div class="hud-box mt-2">
+        <h2 class="mt-0" th:text="#{admin.syncReports.delete.title}">Alte Berichte löschen</h2>
+        <p class="event-detail" th:text="#{admin.syncReports.delete.help}">Berichte löschen, die älter als die angegebene Anzahl Tage sind.</p>
+        <form id="purge-form" th:action="@{/admin/sync-reports/delete-old}" method="post" class="purge-form">
+            <input type="hidden" name="source" th:value="${activeTab == 'ALL' ? '' : activeTab}">
+            <div class="form-group">
+                <label for="purge-days" th:text="#{admin.syncReports.delete.label}">Berichte älter als (Tage)</label>
+                <input type="number" id="purge-days" name="days" min="1" step="1" value="30" required>
+            </div>
+            <button type="button" id="purge-trigger" class="btn btn-danger"
+                    th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
+        </form>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="purge-confirm-modal" class="modal" style="display:none; z-index: 3100;">
+        <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+            <h2 th:text="#{admin.syncReports.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+            <p id="purge-confirm-message" class="mb-2"
+               th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
+            <div class="flex-center-gap">
+                <button type="button" class="btn btn-secondary" id="purge-cancel"
+                        th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-danger" id="purge-confirm"
+                        th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
+            </div>
+        </div>
+    </div>
 </main>
+<script th:attr="nonce=${cspNonce}">
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('purge-form');
+        const daysInput = document.getElementById('purge-days');
+        const modal = document.getElementById('purge-confirm-modal');
+        const trigger = document.getElementById('purge-trigger');
+        const cancelBtn = document.getElementById('purge-cancel');
+        const confirmBtn = document.getElementById('purge-confirm');
+        const messageEl = document.getElementById('purge-confirm-message');
+
+        if (!form || !daysInput || !modal || !trigger || !confirmBtn) {
+            return;
+        }
+
+        const template = messageEl ? (messageEl.getAttribute('data-template') || '') : '';
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        trigger.addEventListener('click', function () {
+            if (!daysInput.checkValidity()) {
+                daysInput.reportValidity();
+                return;
+            }
+            if (messageEl && template) {
+                messageEl.textContent = template.replace('{0}', daysInput.value);
+            }
+            modal.style.display = 'flex';
+        });
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeModal);
+        }
+        confirmBtn.addEventListener('click', function () {
+            closeModal();
+            form.requestSubmit();
+        });
+        window.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+    });
+</script>
 </body>
 </html>

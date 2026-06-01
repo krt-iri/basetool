@@ -84,6 +84,37 @@ class SyncReportServiceTest {
   }
 
   @Test
+  void deleteOlderThan_nullSource_usesCombinedDeleteAndReturnsCount() {
+    when(repository.deleteByRanAtBefore(any())).thenReturn(3);
+
+    int deleted = service.deleteOlderThan(null, 30);
+
+    assertEquals(3, deleted);
+    verify(repository).deleteByRanAtBefore(any());
+    verify(repository, never()).deleteBySourceSystemAndRanAtBefore(any(), any());
+  }
+
+  @Test
+  void deleteOlderThan_withSource_usesScopedDeleteAndReturnsCount() {
+    when(repository.deleteBySourceSystemAndRanAtBefore(eq(SyncSourceSystem.UEX), any()))
+        .thenReturn(5);
+
+    int deleted = service.deleteOlderThan(SyncSourceSystem.UEX, 7);
+
+    assertEquals(5, deleted);
+    verify(repository).deleteBySourceSystemAndRanAtBefore(eq(SyncSourceSystem.UEX), any());
+    verify(repository, never()).deleteByRanAtBefore(any());
+  }
+
+  @Test
+  void deleteOlderThan_rejectsNonPositiveDaysWithoutTouchingRepository() {
+    assertThrows(IllegalArgumentException.class, () -> service.deleteOlderThan(null, 0));
+
+    verify(repository, never()).deleteByRanAtBefore(any());
+    verify(repository, never()).deleteBySourceSystemAndRanAtBefore(any(), any());
+  }
+
+  @Test
   void findEvents_nullSource_usesCombinedQuery() {
     Page<ExternalSyncReport> empty = new PageImpl<>(List.of());
     when(repository.findAllByOrderByRanAtDesc(any(Pageable.class))).thenReturn(empty);
