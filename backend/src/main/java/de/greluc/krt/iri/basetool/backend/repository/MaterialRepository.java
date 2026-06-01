@@ -54,6 +54,18 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByName(String name);
 
   /**
+   * Case-insensitive name lookup. Used to bridge a SC-Wiki blueprint ITEM ingredient (which the
+   * wiki counts in pieces and resolves to a {@code game_item}) to the shared {@code material}
+   * catalogue by name, so a non-craftable component that also exists as a material is treated as a
+   * procurement requirement rather than a (recipe-less) sub-assembly. {@code material.name} is
+   * unique, so at most one row matches.
+   *
+   * @param name the material name to match ignoring case
+   * @return the material if one exists with that name (any case)
+   */
+  Optional<Material> findByNameIgnoreCase(String name);
+
+  /**
    * Resolution-chain step 1 for the R3 Wiki commodity sync (§8.1.1): match a Wiki commodity to a
    * local material via the SC Wiki UUID written on a previous sync.
    *
