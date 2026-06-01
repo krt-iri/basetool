@@ -67,7 +67,6 @@ public class MaterialClaimService {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
-  private final SpecialCommandSecurityService specialCommandSecurityService;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
 
@@ -390,19 +389,20 @@ public class MaterialClaimService {
   }
 
   /**
-   * Enforces the claim permission matrix (decision #8): an admin, or an authority of the
+   * Enforces the claim permission matrix (decision #8): an admin, or a logistician of the
    * <em>responsible</em> SK, may manage <b>any</b> claim on that order; a squadron's
    * logistician/officer may manage only claims for their <b>own</b> squadron ({@link
-   * AuthHelperService#canEditOrgUnit}). "Authority of the responsible SK" is a member of that SK
-   * who is either its <b>logistician</b> ({@code is_logistician} → contextual {@code
-   * LOGISTICIAN@skId}) <b>or</b> its <b>lead/officer</b> ({@code is_lead}, via {@link
-   * SpecialCommandSecurityService#canManageMembers}). The bare {@code hasRole('LOGISTICIAN')}
-   * controller gate has already filtered out anyone below logistician.
+   * AuthHelperService#canEditOrgUnit}). The SK-logistician check is the single contextual {@code
+   * LOGISTICIAN@skId} authority — and because an SK <b>lead</b> ({@code is_lead}) is automatically
+   * a logistician of its SK (granted that contextual authority by {@code
+   * CustomJwtGrantedAuthoritiesConverter}, mirroring how admin/officer outrank the role below
+   * them), this one check covers both the SK's logisticians and its leads/officers. The bare {@code
+   * hasRole('LOGISTICIAN')} controller gate has already filtered out anyone below logistician.
    *
    * @param order the order whose responsible SK defines the elevated authority.
    * @param claimingOrgUnitId the squadron the claim is for.
-   * @throws AccessDeniedException when the caller may neither manage any claim as an SK
-   *     logistician/lead nor act for this squadron.
+   * @throws AccessDeniedException when the caller is neither a logistician/lead of the responsible
+   *     SK nor allowed to act for this squadron.
    */
   private void assertCanManage(JobOrder order, UUID claimingOrgUnitId) {
     if (authHelperService.isAdmin()) {
@@ -410,9 +410,7 @@ public class MaterialClaimService {
     }
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
-        ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN")
-            || specialCommandSecurityService.canManageMembers(
-                responsibleSkId, authHelperService.currentAuthentication().orElse(null));
+        ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
     boolean managesOwnSquadron = authHelperService.canEditOrgUnit(claimingOrgUnitId);
     if (!managesResponsibleSk && !managesOwnSquadron) {
       throw new AccessDeniedException(

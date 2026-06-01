@@ -3,7 +3,6 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,7 +56,6 @@ class MaterialClaimServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private SpecialCommandSecurityService specialCommandSecurityService;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
 
@@ -334,38 +332,15 @@ class MaterialClaimServiceTest {
     }
 
     @Test
-    void responsibleSkLogistician_mayManageForeignSquadronClaim() {
-      // SK logistician (is_logistician → contextual LOGISTICIAN@skId) of the responsible SK.
+    void responsibleSkLogisticianOrLead_mayManageForeignSquadronClaim() {
+      // An authority of the responsible SK manages any claim. Both an SK logistician
+      // (is_logistician) and an SK lead (is_lead, which is automatically a logistician of its SK
+      // via
+      // CustomJwtGrantedAuthoritiesConverter) surface here as the contextual LOGISTICIAN@skId.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
-              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
-
-      verify(materialClaimRepository).save(any(MaterialClaim.class));
-    }
-
-    @Test
-    void responsibleSkLead_mayManageForeignSquadronClaim() {
-      // SK lead/officer (is_lead → SpecialCommandSecurityService.canManageMembers) of the
-      // responsible SK, even without the SK-logistician flag.
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
-      when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(specialCommandSecurityService.canManageMembers(eq(SK_ID), any())).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
               ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
           .thenReturn(List.of());
