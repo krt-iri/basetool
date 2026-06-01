@@ -93,7 +93,7 @@ class SquadronServiceTest {
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(mission);
     participant.setGuestName("Test Guest");
-    participant.setSquadron(squadron);
+    participant.getOrgUnits().add(squadron);
     missionParticipantRepository.save(participant);
 
     // When

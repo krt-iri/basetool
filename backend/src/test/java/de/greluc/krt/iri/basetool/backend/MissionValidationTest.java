@@ -217,7 +217,11 @@ class MissionValidationTest {
   void testAddParticipantPublic_GuestNameUnique_ShouldReturn200() throws Exception {
     AddParticipantPublicRequest request =
         new AddParticipantPublicRequest(
-            null, "UniqueGuestName", taskJobType.getId(), "Comment", testSquadron.getId());
+            null,
+            "UniqueGuestName",
+            taskJobType.getId(),
+            "Comment",
+            java.util.List.of(testSquadron.getId()));
 
     mockMvc
         .perform(

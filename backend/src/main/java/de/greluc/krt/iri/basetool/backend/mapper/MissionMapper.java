@@ -8,6 +8,8 @@ import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionCrewDto;
@@ -18,6 +20,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionUnitDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.MissionSecurityService;
 import org.mapstruct.Mapper;
@@ -75,7 +78,18 @@ public abstract class MissionMapper {
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   public abstract MissionDto toDto(Mission mission);
 
-  /** Maps a {@link MissionParticipant} entity to its outbound DTO. */
+  /**
+   * Maps a {@link MissionParticipant} entity to its outbound DTO. The {@code orgUnits} target is
+   * filled by {@link #orgUnitsToReferenceDtos(java.util.Set)} so the participant's Staffel and/or
+   * Spezialkommando affiliations surface as a sorted reference list rather than the former single
+   * squadron field.
+   *
+   * @param participant the participant entity to project; {@code null} returns {@code null}.
+   * @return the populated participant DTO.
+   */
+  @Mapping(
+      target = "orgUnits",
+      expression = "java(orgUnitsToReferenceDtos(participant.getOrgUnits()))")
   public abstract MissionParticipantDto toDto(MissionParticipant participant);
 
   /** Maps a {@link MissionUnit} to its DTO with a deterministic leader-first crew ordering. */
@@ -125,6 +139,33 @@ public abstract class MissionMapper {
   // through dedicated CreateMissionRequest / UpdateMissionRequest records that physically lack
   // those fields. The ArchUnit rule {@code missionDtoMustNotBeAcceptedAsRequestBody} keeps this
   // direction one-way.
+
+  /**
+   * Projects a participant's {@code Set<OrgUnit>} affiliations into a deterministically ordered
+   * list of {@link OrgUnitReferenceDto} — Staffel first, then Spezialkommandos alphabetically by
+   * name — mirroring the order {@code OrgUnitMembershipService} uses for membership pickers so the
+   * roster badges and the sign-up picker render consistently. Each org unit's {@code kind} is taken
+   * from the entity's {@code getKind()} discriminator (no lazy-proxy {@code instanceof} pitfall).
+   *
+   * @param orgUnits the participant's affiliations; {@code null} or empty yields an empty list.
+   * @return the sorted reference DTOs; never {@code null}.
+   */
+  public java.util.List<OrgUnitReferenceDto> orgUnitsToReferenceDtos(
+      java.util.Set<OrgUnit> orgUnits) {
+    if (orgUnits == null || orgUnits.isEmpty()) {
+      return java.util.List.of();
+    }
+    return orgUnits.stream()
+        .sorted(
+            java.util.Comparator.<OrgUnit, Integer>comparing(
+                    ou -> ou.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
+                .thenComparing(
+                    ou -> ou.getName() == null ? "" : ou.getName(), String.CASE_INSENSITIVE_ORDER))
+        .map(
+            ou ->
+                new OrgUnitReferenceDto(ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
+        .toList();
+  }
 
   /**
    * Returns the mission description only to authenticated callers; guests get {@code null} so the

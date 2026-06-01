@@ -574,7 +574,7 @@
             <thead>
                 <tr>
                     <th th:text="#{mission.participant.user}">Benutzer</th>
-                    <th th:text="#{admin.mission_data.squadrons}">Staffel</th>
+                    <th th:text="#{mission.participant.org_units}">Org-Einheiten</th>
                     <th th:text="#{mission.participant.desired_job}">Aufgabenwunsch</th>
                     <th th:text="#{mission.participant.comment}">Bemerkung</th>
                     <th th:text="#{mission.participant.planned_job}">Zugewiesener Job</th>
@@ -585,7 +585,17 @@
             <tbody>
                 <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
                     <td th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Username</td>
-                    <td th:text="${p?.squadron != null ? p.squadron.shorthand : '-'}">Staffel</td>
+                    <td>
+                        <span th:if="${p?.orgUnits == null or p.orgUnits.isEmpty()}"
+                              class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        <span th:if="${p?.orgUnits != null and !p.orgUnits.isEmpty()}" class="squadron-badge-group">
+                            <span th:each="ou : ${p.orgUnits}"
+                                  th:classappend="${ou.kind == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
+                                  class="squadron-badge"
+                                  th:text="${ou.shorthand != null ? ou.shorthand : ou.name}"
+                                  th:title="${ou.name}">IRI</span>
+                        </span>
+                    </td>
                     <td th:text="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.name : '-'}">Job</td>
                     <td th:text="${p?.comment}">Comment</td>
                     <td th:text="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.name : '-'}">Geplanter Job</td>
@@ -604,7 +614,7 @@
                                     th:data-action="@{/missions/{id}/participants/{pId}/update(id=${mission.id}, pId=${p?.id})}"
                                     th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
                                     th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
-                                    th:data-squadron="${p?.squadron != null ? p.squadron.id : ''}"
+                                    th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
                                     th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('MEMBER') or p.user.roles.contains('ROLE_MEMBER') or p.user.roles.contains('SQUADRON_MEMBER') or p.user.roles.contains('ROLE_SQUADRON_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                                     th:data-payout-preference="${p?.payoutPreference?.name()}"
                                     th:data-comment="${p?.comment}"
@@ -980,14 +990,14 @@
                     <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" class="field-error"></div>
                 </div>
 
-                <div class="form-group">
-                    <label th:text="#{admin.mission_data.squadrons}">Staffel</label>
-                    <select name="squadronId" id="participant-squadron">
-                        <option value="">-</option>
-                        <option th:if="${squadrons}" th:each="sq : ${squadrons}" th:value="${sq.id}" th:text="${sq.name}" th:selected="${participantForm.squadronId != null and participantForm.squadronId.toString() == sq.id.toString()}">IRIDIUM</option>
+                <div class="form-group" id="participant-org-units-group">
+                    <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
+                    <select name="orgUnitIds" id="participant-org-units" multiple>
+                        <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">IRIDIUM</option>
                     </select>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
                 </div>
-                
+
                 <div class="form-group">
                     <label th:text="#{mission.participant.desired_job}">Job</label>
                     <select name="desiredJobTypeId">
@@ -1030,12 +1040,12 @@
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label th:text="#{admin.mission_data.squadrons}">Staffel</label>
-                    <select name="squadronId" id="edit-squadron">
-                        <option value="">-</option>
-                        <option th:if="${squadrons}" th:each="sq : ${squadrons}" th:value="${sq.id}" th:text="${sq.name}">Alpha</option>
+                <div class="form-group" id="edit-org-units-group">
+                    <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
+                    <select name="orgUnitIds" id="edit-org-units" multiple>
+                        <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">Alpha</option>
                     </select>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
                 </div>
 
                 <div class="form-group">
@@ -1441,7 +1451,7 @@
         const eForm = document.getElementById('edit-participant-form');
         const eJob = document.getElementById('edit-job');
         const ePlannedJob = document.getElementById('edit-planned-job');
-        const eSquadron = document.getElementById('edit-squadron');
+        const eOrgUnits = document.getElementById('edit-org-units');
         const eComment = document.getElementById('edit-comment');
         const eClose = document.querySelector('.close-edit-participant-modal');
         
@@ -1452,15 +1462,12 @@
                     eForm.setAttribute('data-participant-id', this.getAttribute('data-participant-id') || '');
                     eJob.value = this.getAttribute('data-job');
                     if(ePlannedJob) ePlannedJob.value = this.getAttribute('data-planned-job');
-                    if(eSquadron) {
-                        eSquadron.value = this.getAttribute('data-squadron');
-                        if (!eSquadron.value && this.getAttribute('data-is-member') === 'true') {
-                            const iridiumOption = Array.from(eSquadron.options).find(opt => opt.text.trim().toUpperCase() === 'IRIDIUM');
-                            if (iridiumOption) {
-                                eSquadron.value = iridiumOption.value;
-                                eSquadron.dispatchEvent(new Event('change'));
-                            }
-                        }
+                    if(eOrgUnits) {
+                        // Preselect the participant's current org-unit ids in the multi-select.
+                        const selected = (this.getAttribute('data-org-units') || '').split(',').filter(Boolean);
+                        Array.from(eOrgUnits.options).forEach(opt => {
+                            opt.selected = selected.includes(opt.value);
+                        });
                     }
                     eComment.value = this.getAttribute('data-comment');
                     
@@ -1836,11 +1843,17 @@
                 addForm.addEventListener('submit', async function (ev) {
                     ev.preventDefault();
                     const fd = new FormData(addForm);
+                    // Org units only matter for guest entries; when a registered user is selected
+                    // the backend derives the affiliations and ignores the submitted list. Send the
+                    // multi-select values regardless — the backend ignores them for registered users.
+                    const addOrgUnitIds = addForm.querySelector('#participant-user-id') && addForm.querySelector('#participant-user-id').value
+                        ? []
+                        : fd.getAll('orgUnitIds').filter(Boolean);
                     const payload = {
                         userId: fd.get('userId') || null,
                         guestName: fd.get('guestName') || null,
                         desiredJobTypeId: fd.get('desiredJobTypeId') || null,
-                        squadronId: fd.get('squadronId') || null,
+                        orgUnitIds: addOrgUnitIds,
                         comment: fd.get('comment') || null
                     };
                     const res = await window.MissionSubresource.patchSubResource({
@@ -1869,7 +1882,7 @@
                     const payload = {
                         desiredMissionJobTypeId: fd.get('desiredJobTypeId') || null,
                         plannedMissionJobTypeId: fd.get('plannedMissionJobTypeId') || null,
-                        squadronId: fd.get('squadronId') || null,
+                        orgUnitIds: fd.getAll('orgUnitIds').filter(Boolean),
                         payoutPreference: fd.get('payoutPreference') || null,
                         comment: fd.get('comment') || null,
                         startTime: fd.get('startTime') || null,
@@ -2100,6 +2113,12 @@
                 // Reset ID on any input change
                 userIdInput.value = '';
 
+                // No registered user selected anymore -> reveal the guest org-unit picker again.
+                const orgUnitsGroup = document.getElementById('participant-org-units-group');
+                if (orgUnitsGroup) {
+                    orgUnitsGroup.style.display = '';
+                }
+
                 clearTimeout(debounceTimer);
 
                 if (!val) {
@@ -2135,13 +2154,11 @@
                                 div.addEventListener("click", function(e) {
                                     searchInput.value = displayName;
                                     userIdInput.value = user.id;
-                                    const pSquadron = document.getElementById('participant-squadron');
-                                    if (pSquadron && user.roles && (user.roles.includes('MEMBER') || user.roles.includes('ROLE_MEMBER') || user.roles.includes('SQUADRON_MEMBER') || user.roles.includes('ROLE_SQUADRON_MEMBER') || user.roles.includes('ADMIN') || user.roles.includes('ROLE_ADMIN') || user.roles.includes('OFFICER') || user.roles.includes('ROLE_OFFICER'))) {
-                                        const iridiumOption = Array.from(pSquadron.options).find(opt => opt.text.trim().toUpperCase() === 'IRIDIUM');
-                                        if (iridiumOption) {
-                                            pSquadron.value = iridiumOption.value;
-                                            pSquadron.dispatchEvent(new Event('change'));
-                                        }
+                                    // A registered user's org units are derived server-side, so hide
+                                    // the guest-only picker once a user is matched.
+                                    const orgUnitsGroup = document.getElementById('participant-org-units-group');
+                                    if (orgUnitsGroup) {
+                                        orgUnitsGroup.style.display = 'none';
                                     }
                                     closeAllLists();
                                 });

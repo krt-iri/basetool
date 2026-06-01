@@ -11,10 +11,10 @@ import de.greluc.krt.iri.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.iri.basetool.backend.model.MissionUnit;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
-import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.UpdateMissionRequest;
@@ -29,7 +29,6 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -82,7 +81,6 @@ public class MissionService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionUnitRepository missionUnitRepository;
   private final MissionCrewRepository missionCrewRepository;
-  private final SquadronRepository squadronRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
@@ -91,6 +89,7 @@ public class MissionService {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -626,7 +625,7 @@ public class MissionService {
   /**
    * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
    * authenticated), an optional desired job type, and an optional comment. Convenience overload
-   * that delegates to the full form with {@code squadronId=null}.
+   * that delegates to the full form with {@code orgUnitIds=null}.
    */
   @Transactional
   public Mission addParticipant(
@@ -641,9 +640,20 @@ public class MissionService {
   /**
    * Full-form participant add. Resolves the user reference from {@code userId} (or by
    * case-insensitive {@code guestName} match against existing users — promotes a guest entry to a
-   * linked-user entry when the guest name turns out to be a real member). Optional {@code
-   * squadronId} pins the participant's squadron for the mission's roster line; null inherits the
-   * user's current squadron.
+   * linked-user entry when the guest name turns out to be a real member).
+   *
+   * <p>Org-unit affiliations are stamped per kind of participant:
+   *
+   * <ul>
+   *   <li><b>Registered user</b> — affiliations are auto-derived from the user's memberships (every
+   *       Staffel and Spezialkommando they belong to); the submitted {@code orgUnitIds} are
+   *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
+   *       fallback).
+   *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
+   *       authorization filter in {@link #resolveGuestSubmittedOrgUnits(java.util.List)} (anonymous
+   *       callers cannot label a guest at all; authenticated callers may label only org units they
+   *       can edit).
+   * </ul>
    *
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
    *     is unknown
@@ -655,7 +665,7 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment,
-      UUID squadronId) {
+      java.util.List<UUID> orgUnitIds) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -723,33 +733,17 @@ public class MissionService {
               .findById(effectiveUserId)
               .orElseThrow(() -> new NotFoundException("User not found"));
       participant.setUser(user);
-      // Registered users carry the squadron they belong to at participate-time
-      // (MULTI_SQUADRON_PLAN.md section 3.2: `mission_participant.squadron_id` is the
-      // squadron the member participates *for* — usually their own home squadron, may
-      // differ from `mission.owning_squadron` when a non-internal mission attracts
-      // cross-staffel members). Falls back to IRIDIUM only when the user has no
-      // squadron assigned (admins / brand-new accounts), so finance/reporting still
-      // produces a valid bucket. Post-R9 D3 (V101): the user's home Staffel is sourced from
-      // org_unit_membership directly — the legacy User.squadron column was dropped.
-      Squadron homeStaffel =
-          orgUnitMembershipService
-              .findStaffelMembershipOrgUnitId(user.getId())
-              .flatMap(squadronRepository::findById)
-              .orElse(null);
-      if (homeStaffel != null) {
-        participant.setSquadron(homeStaffel);
-      } else {
-        squadronRepository
-            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
-            .ifPresent(participant::setSquadron);
-      }
+      // Registered users carry every org unit they belong to at participate-time (their Staffel
+      // and/or any Spezialkommandos). Auto-derived from org_unit_membership — empty when the user
+      // belongs to none (admins / brand-new accounts) so the roster shows no affiliation instead of
+      // the old, wrong IRIDIUM fallback. The caller-submitted orgUnitIds are intentionally ignored
+      // for registered participants; the picker is guest-only.
+      participant.getOrgUnits().clear();
+      participant.getOrgUnits().addAll(resolveMembershipOrgUnits(user.getId()));
     } else {
       participant.setGuestName(effectiveGuestName);
-      UUID safeSquadronId = resolveGuestSubmittedSquadron(squadronId);
-      if (safeSquadronId != null) {
-        Squadron squadron = squadronRepository.findById(safeSquadronId).orElse(null);
-        participant.setSquadron(squadron);
-      }
+      participant.getOrgUnits().clear();
+      participant.getOrgUnits().addAll(resolveGuestSubmittedOrgUnits(orgUnitIds));
     }
 
     if (desiredJobTypeId != null) {
@@ -871,7 +865,7 @@ public class MissionService {
       String comment,
       Instant startTime,
       Instant endTime,
-      UUID squadronId,
+      java.util.List<UUID> orgUnitIds,
       PayoutPreference payoutPreference,
       String guestName,
       Long version) {
@@ -912,23 +906,12 @@ public class MissionService {
     }
 
     if (participant.getUser() != null) {
-      // Registered users carry the squadron they belong to at participate-time. Mirror the
-      // logic from addParticipant — same semantics, same fallback (MULTI_SQUADRON_PLAN.md
-      // section 3.2). Post-R9 D3 (V101): re-reads the user's Staffel membership row on every
-      // update so a freshly-assigned squadron propagates into the participant row.
-      User registeredUser = participant.getUser();
-      Squadron homeStaffel =
-          orgUnitMembershipService
-              .findStaffelMembershipOrgUnitId(registeredUser.getId())
-              .flatMap(squadronRepository::findById)
-              .orElse(null);
-      if (homeStaffel != null) {
-        participant.setSquadron(homeStaffel);
-      } else {
-        squadronRepository
-            .findById(de.greluc.krt.iri.basetool.backend.model.Squadron.IRIDIUM_ID)
-            .ifPresent(participant::setSquadron);
-      }
+      // Registered users carry every org unit they belong to at participate-time. Re-derives from
+      // org_unit_membership on every update so a freshly-assigned Staffel / SK propagates into the
+      // participant row. The submitted orgUnitIds are ignored for registered participants — the
+      // picker is guest-only, and the affiliation is the user's actual membership set.
+      participant.getOrgUnits().clear();
+      participant.getOrgUnits().addAll(resolveMembershipOrgUnits(participant.getUser().getId()));
     } else {
       // Audit finding M-3 (2026-05-20): logging the raw {@code guestName} leaks PII —
       // free-text names often contain real-life names of third parties that PiiMasker does not
@@ -939,16 +922,8 @@ public class MissionService {
       if (guestName != null) {
         participant.setGuestName(guestName);
       }
-      UUID safeSquadronId = resolveGuestSubmittedSquadron(squadronId);
-      if (safeSquadronId != null) {
-        Squadron sq =
-            squadronRepository
-                .findById(safeSquadronId)
-                .orElseThrow(() -> new NotFoundException("Squadron not found"));
-        participant.setSquadron(sq);
-      } else {
-        participant.setSquadron(null);
-      }
+      participant.getOrgUnits().clear();
+      participant.getOrgUnits().addAll(resolveGuestSubmittedOrgUnits(orgUnitIds));
     }
 
     if (plannedMissionJobTypeId != null) {
@@ -1669,40 +1644,66 @@ public class MissionService {
   }
 
   /**
-   * Resolves a caller-submitted {@code squadronId} for a GUEST participant entry to the value the
-   * service is allowed to persist. Implements audit finding H-3:
+   * Resolves every org unit a registered user belongs to (Staffel and/or Spezialkommandos) into the
+   * managed {@link OrgUnit} entities to stamp on the participant. Reads the membership rows via
+   * {@link OrgUnitMembershipService#findAllMembershipsForUser(UUID)} (already Staffel-first, then
+   * SK alphabetical) and materialises each org-unit id through the polymorphic {@code
+   * OrgUnitRepository}. A user with no memberships yields an empty list — there is deliberately no
+   * IRIDIUM fallback, so an admin who belongs to nothing shows no affiliation on the roster.
+   *
+   * @param userId the registered user whose memberships to resolve; never {@code null}.
+   * @return the managed org-unit entities, membership order preserved; never {@code null}, possibly
+   *     empty.
+   */
+  private java.util.List<OrgUnit> resolveMembershipOrgUnits(@NotNull UUID userId) {
+    return orgUnitMembershipService.findAllMembershipsForUser(userId).stream()
+        .map(m -> m.getId().getOrgUnitId())
+        .map(id -> orgUnitRepository.findById(id).orElse(null))
+        .filter(java.util.Objects::nonNull)
+        .toList();
+  }
+
+  /**
+   * Resolves a caller-submitted {@code orgUnitIds} list for a GUEST participant entry to the org
+   * units the service is allowed to persist. Generalises audit finding H-3 from a single squadron
+   * to a list of org units (Staffel + Spezialkommandos):
    *
    * <ul>
-   *   <li>anonymous caller + non-null {@code squadronId} → silently coerced to {@code null}.
-   *       Throwing 403 here would expose the existence of the auth gate to a probe; the
-   *       audit-recommended behaviour is to drop the claim and let the request succeed without the
-   *       forged affiliation.
-   *   <li>authenticated caller + non-null {@code squadronId} + {@code canEditSquadron} returns
-   *       {@code true} → the submitted value is honoured (an officer of squadron A may legitimately
-   *       label a guest as "guest of squadron A").
-   *   <li>authenticated caller + non-null {@code squadronId} + {@code canEditSquadron} returns
-   *       {@code false} → 403 {@link AccessDeniedException}, since the caller is attempting
-   *       cross-squadron forgery.
-   *   <li>{@code null} input → returns {@code null} (no change).
+   *   <li>{@code null} / empty input → empty list (no affiliation).
+   *   <li>anonymous caller → empty list, the claim is silently dropped (the H-3 debug log fires).
+   *       Throwing 403 here would expose the auth gate to a probe.
+   *   <li>authenticated caller → each id is kept only when {@link OwnerScopeService#canEditOrgUnit}
+   *       (via {@link AuthHelperService}) permits the caller to label that org unit; an id the
+   *       caller may not edit raises 403 {@link AccessDeniedException}, since that is cross-org
+   *       forgery rather than an accidental extra option.
    * </ul>
    *
-   * @param submittedSquadronId the caller-supplied squadron id from the request DTO
-   * @return the squadron id the service may persist on the guest participant, or {@code null}
+   * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
+   * @return the managed org-unit entities the service may persist on the guest participant; never
+   *     {@code null}, possibly empty.
    */
-  private UUID resolveGuestSubmittedSquadron(UUID submittedSquadronId) {
-    if (submittedSquadronId == null) {
-      return null;
+  private java.util.List<OrgUnit> resolveGuestSubmittedOrgUnits(
+      java.util.List<UUID> submittedOrgUnitIds) {
+    if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
+      return java.util.List.of();
     }
     if (!authHelperService.isAuthenticated()) {
       log.debug(
-          "Anonymous guest tried to claim squadronId {}; silently dropping the claim (H-3)",
-          submittedSquadronId);
-      return null;
+          "Anonymous guest tried to claim {} org unit(s); silently dropping the claim (H-3)",
+          submittedOrgUnitIds.size());
+      return java.util.List.of();
     }
-    if (!authHelperService.canEditSquadron(submittedSquadronId)) {
-      throw new AccessDeniedException(
-          "Cross-squadron guest labeling requires admin or squadron-officer rights.");
+    java.util.List<OrgUnit> resolved = new java.util.ArrayList<>();
+    for (UUID orgUnitId : submittedOrgUnitIds) {
+      if (orgUnitId == null) {
+        continue;
+      }
+      if (!authHelperService.canEditOrgUnit(orgUnitId)) {
+        throw new AccessDeniedException(
+            "Cross-org-unit guest labeling requires admin or org-unit-officer rights.");
+      }
+      orgUnitRepository.findById(orgUnitId).ifPresent(resolved::add);
     }
-    return submittedSquadronId;
+    return resolved;
   }
 }
