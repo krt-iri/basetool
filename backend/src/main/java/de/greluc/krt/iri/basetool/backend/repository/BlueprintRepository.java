@@ -1,8 +1,10 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -140,4 +142,28 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
               + " LOWER(CONCAT('%', :q, '%'))")
   Page<de.greluc.krt.iri.basetool.backend.model.GameItem> findOrderableItems(
       @Param("q") String q, Pageable pageable);
+
+  /**
+   * Projection of active (non-soft-deleted) blueprint recipes for the user-facing product search
+   * (#327), reduced to the scalars the service needs to group recipes into products: output name,
+   * Wiki key, the resolved manufacturer name, and the resolved output-item id (the last two via a
+   * {@code LEFT JOIN}, so they are {@code null} when the output item / manufacturer is unresolved).
+   *
+   * <p>The grouping into products happens in the service (the {@code product_key} is a normalized
+   * form of {@code output_name} that PostgreSQL cannot compute), so this query loads the matching
+   * rows and leaves the de-duplication to {@code BlueprintNameNormalizer}. The caller passes an
+   * empty string for "no filter": a {@code null} bind into {@code LOWER(CONCAT(...))} would be
+   * typed as {@code bytea} by PostgreSQL and fail, whereas {@code ''} matches every row via {@code
+   * %%}.
+   *
+   * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
+   * @return projection rows for every matching active recipe
+   */
+  @Query(
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductRow("
+          + "b.outputName, b.scwikiKey, m.name, oi.id) "
+          + "FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m "
+          + "WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL "
+          + "AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))")
+  List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 }

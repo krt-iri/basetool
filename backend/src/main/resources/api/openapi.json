@@ -43,6 +43,9 @@
     "name" : "Missions",
     "description" : "Mission management endpoints"
   }, {
+    "name" : "Blueprint Products",
+    "description" : "User-facing blueprint product search (#327)."
+  }, {
     "name" : "UEX Locations",
     "description" : "Lookup UEX cities and space stations."
   }, {
@@ -29723,6 +29726,125 @@
         }
       }
     },
+    "/api/v1/blueprints/products/search" : {
+      "get" : {
+        "tags" : [ "Blueprint Products" ],
+        "summary" : "Search blueprint products (type-ahead) with an owned-by-caller flag.",
+        "description" : "Returns de-duplicated SC Wiki blueprint products matching the name filter, each marked with whether the calling user already owns it. Capped at a small result count for type-ahead use.",
+        "operationId" : "search_1",
+        "parameters" : [ {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Matching products returned.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BlueprintProductDto"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/announcement/admin" : {
       "get" : {
         "tags" : [ "announcement-controller" ],
@@ -36717,6 +36839,30 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "BlueprintProductDto" : {
+        "type" : "object",
+        "properties" : {
+          "productKey" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "variantCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "manufacturerName" : {
+            "type" : "string"
+          },
+          "exampleKey" : {
+            "type" : "string"
+          },
+          "ownedByCurrentUser" : {
+            "type" : "boolean"
           }
         }
       },
