@@ -104,6 +104,20 @@ public class BlueprintProductService {
   }
 
   /**
+   * Returns every active product as a {@link ResolvedProduct} (normalized key + display name +
+   * optional resolved output-item id), de-duplicated by product key. Backs the Phase 4 import
+   * matching engine, which needs the full candidate set in memory to score fuzzy suggestions.
+   *
+   * @return all active products, de-duplicated by normalized product key, in master-scan order
+   */
+  @NotNull
+  public List<ResolvedProduct> allProducts() {
+    return buildProductMap("").values().stream()
+        .map(p -> new ResolvedProduct(p.productKey, p.displayName, p.outputItemId))
+        .toList();
+  }
+
+  /**
    * Loads the active blueprint rows matching {@code q} and groups them by normalized product key,
    * preserving first-seen order. Each group records the first display name, the recipe count, and
    * the first non-null example key / manufacturer / output-item id.

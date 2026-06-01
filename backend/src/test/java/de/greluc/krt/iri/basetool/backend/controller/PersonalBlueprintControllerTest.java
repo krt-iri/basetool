@@ -7,12 +7,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportApplyRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportPreviewDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResolutionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.iri.basetool.backend.service.PersonalBlueprintService;
 import java.time.Instant;
 import java.util.List;
@@ -26,9 +31,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Unit tests for {@link PersonalBlueprintController}. */
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +44,7 @@ class PersonalBlueprintControllerTest {
   private static final String SUB = "user-sub-1";
 
   @Mock private PersonalBlueprintService service;
+  @Mock private BlueprintImportService importService;
   @InjectMocks private PersonalBlueprintController controller;
 
   private JwtAuthenticationToken auth;
@@ -112,5 +120,32 @@ class PersonalBlueprintControllerTest {
   void add_rejectsMissingJwtWithAccessDenied() {
     PersonalBlueprintCreateRequest req = new PersonalBlueprintCreateRequest("k", null, null);
     assertThrows(AccessDeniedException.class, () -> controller.add(req, null));
+  }
+
+  @Test
+  void previewImport_relaysFileAndSub() {
+    MultipartFile file =
+        new MockMultipartFile("file", "scmdb.json", "application/json", "{}".getBytes());
+    BlueprintImportPreviewDto preview = new BlueprintImportPreviewDto(0, 0, 0, 0, 0, 0, List.of());
+    when(importService.previewImport(SUB, file)).thenReturn(preview);
+
+    BlueprintImportPreviewDto result = controller.previewImport(file, auth);
+
+    assertEquals(0, result.total());
+    verify(importService).previewImport(SUB, file);
+  }
+
+  @Test
+  void applyImport_relaysResolutionsWithSub() {
+    BlueprintImportResolutionDto res =
+        new BlueprintImportResolutionDto("Arclight Pistol", "arclight pistol", null, null);
+    BlueprintImportApplyRequest req = new BlueprintImportApplyRequest(List.of(res));
+    when(importService.applyImport(SUB, List.of(res)))
+        .thenReturn(new BlueprintImportResultDto(1, 0, 0, 0));
+
+    BlueprintImportResultDto result = controller.applyImport(req, auth);
+
+    assertEquals(1, result.added());
+    verify(importService).applyImport(SUB, List.of(res));
   }
 }

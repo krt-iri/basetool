@@ -13024,6 +13024,196 @@
         } ]
       }
     },
+    "/api/v1/personal-blueprints/import/preview" : {
+      "post" : {
+        "tags" : [ "Personal Blueprints" ],
+        "summary" : "Preview an SCMDB blueprint import (parse + match, no writes).",
+        "operationId" : "previewImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Preview computed.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BlueprintImportPreviewDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/personal-blueprints/import/apply" : {
+      "post" : {
+        "tags" : [ "Personal Blueprints" ],
+        "summary" : "Apply reviewed SCMDB import resolutions; learns aliases for manual picks.",
+        "operationId" : "applyImport",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BlueprintImportApplyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Import applied; see the summary.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BlueprintImportResultDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/personal-blueprints/batch" : {
       "post" : {
         "tags" : [ "Personal Blueprints" ],
@@ -34341,6 +34531,143 @@
           }
         },
         "required" : [ "productKey" ]
+      },
+      "BlueprintImportEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "externalName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "MATCHED", "MATCHED_BY_ALIAS", "SUGGESTED", "UNMATCHED", "ALREADY_OWNED" ]
+          },
+          "productKey" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "outputItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "suggestedAcquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "suggestions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintImportSuggestionDto"
+            }
+          }
+        }
+      },
+      "BlueprintImportPreviewDto" : {
+        "type" : "object",
+        "properties" : {
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "matched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "matchedByAlias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "suggested" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unmatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "alreadyOwned" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintImportEntryDto"
+            }
+          }
+        }
+      },
+      "BlueprintImportSuggestionDto" : {
+        "type" : "object",
+        "properties" : {
+          "productKey" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "BlueprintImportApplyRequest" : {
+        "type" : "object",
+        "properties" : {
+          "resolutions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintImportResolutionDto"
+            }
+          }
+        },
+        "required" : [ "resolutions" ]
+      },
+      "BlueprintImportResolutionDto" : {
+        "type" : "object",
+        "properties" : {
+          "externalName" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "productKey" : {
+            "type" : "string"
+          },
+          "acquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "externalName" ]
+      },
+      "BlueprintImportResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aliasesLearned" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "skipped" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "alreadyOwned" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
       },
       "PersonalBlueprintBatchCreateRequest" : {
         "type" : "object",

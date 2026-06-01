@@ -1,11 +1,15 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportApplyRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportPreviewDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.iri.basetool.backend.service.PersonalBlueprintService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -34,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * REST endpoints for the user-facing personal-blueprint set (#327). Every method derives the owner
@@ -49,6 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PersonalBlueprintController {
 
   private final PersonalBlueprintService service;
+  private final BlueprintImportService importService;
 
   /**
    * Lists the caller's owned blueprints (paginated, sortable, optional product-name filter).
@@ -169,6 +176,47 @@ public class PersonalBlueprintController {
   })
   public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
     service.delete(requireSub(auth), id);
+  }
+
+  /**
+   * Previews an SCMDB log-watcher JSON import: parses the uploaded file, matches each blueprint
+   * name against the master product list, and returns per-name resolution rows for the caller to
+   * review. Nothing is persisted.
+   *
+   * @param file the uploaded SCMDB JSON export
+   * @param auth the caller's JWT authentication
+   * @return the per-name preview with status counts
+   */
+  @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @Operation(summary = "Preview an SCMDB blueprint import (parse + match, no writes).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Preview computed."),
+    @ApiResponse(responseCode = "400", description = "File empty, malformed, or wrong format."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public BlueprintImportPreviewDto previewImport(
+      @RequestParam("file") @NotNull MultipartFile file, JwtAuthenticationToken auth) {
+    return importService.previewImport(requireSub(auth), file);
+  }
+
+  /**
+   * Applies the caller's reviewed import resolutions: creates the missing owned-blueprint rows and
+   * learns an alias for every manual pick. Blank or unresolvable choices are skipped.
+   *
+   * @param request the per-name resolutions
+   * @param auth the caller's JWT authentication
+   * @return a summary of added / learned / skipped / already-owned counts
+   */
+  @PostMapping("/import/apply")
+  @Operation(summary = "Apply reviewed SCMDB import resolutions; learns aliases for manual picks.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Import applied; see the summary."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public BlueprintImportResultDto applyImport(
+      @Valid @RequestBody BlueprintImportApplyRequest request, JwtAuthenticationToken auth) {
+    return importService.applyImport(requireSub(auth), request.resolutions());
   }
 
   /**
