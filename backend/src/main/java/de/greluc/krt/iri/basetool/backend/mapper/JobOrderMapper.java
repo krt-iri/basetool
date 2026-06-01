@@ -28,19 +28,19 @@ public interface JobOrderMapper {
    * structured {@code requestingSquadron} reference (and its {@code shorthand} sub-field) for a
    * human-readable label.
    *
-   * <p>After R9 Step 2 the entity exposes {@code creatingOrgUnit} / {@code requestingOrgUnit}
-   * (typed {@code OrgUnit}); the DTO still publishes {@code creatingSquadron} / {@code
-   * requestingSquadron} as {@code SquadronReferenceDto} for API stability. The two explicit
-   * mappings below route both fields through {@code SquadronMapper.orgUnitToReferenceDto}, which
-   * projects either kind — a Staffel or a Spezialkommando — into the slim reference
-   * (id/name/shorthand), so an SK creating or requesting on behalf now surfaces its SK badge
-   * instead of a blank cell.
+   * <p>The Phase 2 rework (#342) exposes {@code responsibleOrgUnit} (the processing unit) and
+   * {@code requestingOrgUnit} (the customer) on the entity, both typed {@code OrgUnit}; the DTO
+   * publishes them as {@code SquadronReferenceDto}. The two explicit mappings below route both
+   * fields through {@code SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a
+   * Staffel or a Spezialkommando — into the slim reference (id/name/shorthand), so an SK
+   * responsible or requester surfaces its SK badge instead of a blank cell. {@code
+   * responsibleOrgUnit} is {@code null} only on pre-rework rows not yet backfilled (Phase 3).
    *
    * @param jobOrder the entity to project; {@code null} returns {@code null}.
    * @return the populated outbound DTO.
    */
-  @Mapping(target = "creatingSquadron", source = "creatingOrgUnit")
-  @Mapping(target = "requestingSquadron", source = "requestingOrgUnit")
+  @Mapping(target = "responsibleOrgUnit", source = "responsibleOrgUnit")
+  @Mapping(target = "requestingOrgUnit", source = "requestingOrgUnit")
   @Mapping(target = "items", ignore = true)
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)

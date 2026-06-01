@@ -13,26 +13,20 @@ import org.jetbrains.annotations.Nullable;
  * <p>Two org-unit references:
  *
  * <ul>
- *   <li>{@code creatingSquadronId} (optional, immutable after first persist) — the squadron that
- *       authored the order in the system. {@code null} on create means "use the caller's active
- *       squadron context"; admins in "all squadrons" mode must set it explicitly (the service layer
- *       returns 400 otherwise). Ignored on update. Plan §7.3 reserves a {@code creatingOrgUnitId}
- *       admin-override field that R5.d.c left intentionally out of scope — the rename + widening to
- *       SKs ship in a follow-up release once the destructive cleanup release lowers NOT NULL on the
- *       legacy column.
- *   <li>{@code requestingOrgUnitId} — the org unit the order is being executed for. Renamed from
- *       the historical {@code requestingSquadronId} in R5.d.c so the picker on the create form can
- *       offer Staffel + Spezialkommando alike. Today the picker is filtered to Staffel-only by the
- *       schema (the legacy {@code requesting_squadron_id} column is still NOT NULL); SK selections
- *       are refused by the service with a clean 400 until the cleanup release lifts the constraint.
- *       When the field is {@code null} the service falls back to {@code creatingSquadronId} (i.e.
- *       the order executes for its own author squadron), preserving the same minimal-payload
- *       contract the legacy field had.
+ *   <li>{@code responsibleOrgUnitId} — the org unit that <em>processes</em> the order. Must be a
+ *       profit-eligible squadron or Spezialkommando (the service returns 400 otherwise). Required
+ *       for authenticated callers; <b>ignored</b> for anonymous/guest creations, which are routed
+ *       onto the configured intake Spezialkommando ({@code job_order.intake_special_command_id}).
+ *       Ignored on update — the responsible org unit is only changed through the dedicated
+ *       reassignment endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}).
+ *   <li>{@code requestingOrgUnitId} — the org unit the order is placed on behalf of (the customer).
+ *       Any squadron or Spezialkommando, no profit-eligibility restriction. Mandatory; the service
+ *       returns 400 when it does not resolve.
  *   <li>{@code comment} — optional free-text note (≤1000 chars), HTML-escaped on display.
  * </ul>
  */
 public record CreateJobOrderDto(
-    @Nullable UUID creatingSquadronId,
+    @Nullable UUID responsibleOrgUnitId,
     @Nullable UUID requestingOrgUnitId,
     @Size(max = 200) String handle,
     @Size(max = 1000) String comment,

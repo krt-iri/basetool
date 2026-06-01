@@ -107,8 +107,8 @@ class JobOrderMapperTest {
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals(42, dto.displayId());
-    assertNotNull(dto.requestingSquadron());
-    assertEquals("Iridium", dto.requestingSquadron().shorthand());
+    assertNotNull(dto.requestingOrgUnit());
+    assertEquals("Iridium", dto.requestingOrgUnit().shorthand());
     assertEquals("recipient", dto.handle());
     assertEquals("Bring to ArcCorp", dto.comment());
     assertEquals(3, dto.priority());

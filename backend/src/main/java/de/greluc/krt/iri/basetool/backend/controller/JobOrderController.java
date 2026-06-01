@@ -43,6 +43,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -398,8 +399,8 @@ public class JobOrderController {
     return new JobOrderDto(
         dto.id(),
         dto.displayId(),
-        dto.creatingSquadron(),
-        dto.requestingSquadron(),
+        dto.responsibleOrgUnit(),
+        dto.requestingOrgUnit(),
         dto.handle(),
         dto.comment(),
         dto.priority(),
@@ -574,6 +575,35 @@ public class JobOrderController {
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
   }
+
+  /**
+   * Reassigns the responsible (processing) org unit of an order. Admins may reassign freely to any
+   * profit-eligible org unit; a squadron logistician/officer may only escalate their own squadron's
+   * order to a Spezialkommando. The detailed permission rule is enforced in the service.
+   *
+   * @param id job-order id
+   * @param body the target responsible org unit id
+   * @return the updated DTO
+   */
+  @PatchMapping("/{id}/responsible-org-unit")
+  @Operation(
+      summary = "Reassign responsible org unit",
+      description =
+          "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
+              + " squadron logistician/officer: escalate own squadron's order to an SK only.")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  public JobOrderDto reassignResponsibleOrgUnit(
+      @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
+    return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
+  }
+
+  /**
+   * Request body for the responsible-org-unit reassignment endpoint.
+   *
+   * @param responsibleOrgUnitId the target profit-eligible org unit id (required)
+   */
+  public record ReassignResponsibleOrgUnitRequest(
+      @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId) {}
 
   /**
    * ADMIN-only delete. Surviving orders' priorities shift up to keep the queue contiguous.

@@ -11,7 +11,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
-import de.greluc.krt.iri.basetool.backend.model.Squadron;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
@@ -24,7 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,12 +64,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderService {
 
+  /** System-setting key holding the UUID of the intake SK that guest order creations route to. */
+  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
+
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
-  private final SquadronRepository squadronRepository;
-  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitRepository orgUnitRepository;
+  private final SystemSettingService systemSettingService;
   private final AuthHelperService authHelperService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
@@ -92,19 +95,16 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    Squadron creatingSquadron =
-        resolveCreatingSquadronForCreate(
-            createDto.creatingSquadronId(), createDto.requestingOrgUnitId());
-    Squadron requestingSquadron =
-        resolveRequestingSquadron(createDto.requestingOrgUnitId(), creatingSquadron);
+    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
             .comment(normalizeComment(createDto.comment()))
             .priority(newPriority)
-            .creatingOrgUnit(creatingSquadron)
-            .requestingOrgUnit(requestingSquadron)
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requesting)
             .build();
 
     for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
@@ -149,11 +149,8 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    Squadron creatingSquadron =
-        resolveCreatingSquadronForCreate(
-            createDto.creatingSquadronId(), createDto.requestingOrgUnitId());
-    Squadron requestingSquadron =
-        resolveRequestingSquadron(createDto.requestingOrgUnitId(), creatingSquadron);
+    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -161,8 +158,8 @@ public class JobOrderService {
             .comment(normalizeComment(createDto.comment()))
             .priority(newPriority)
             .type(JobOrderType.ITEM)
-            .creatingOrgUnit(creatingSquadron)
-            .requestingOrgUnit(requestingSquadron)
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requesting)
             .build();
 
     Map<Integer, JobOrderItem> byClientId = new HashMap<>();
@@ -473,26 +470,15 @@ public class JobOrderService {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
     }
 
-    // creatingSquadron is immutable post-create (MULTI_SQUADRON_PLAN.md section 8 + section 11
-    // expectation that a creatingSquadronId change rejects with 400/409). Reject explicitly so
-    // misbehaving clients learn about the contract instead of silently dropping the field. The
-    // legacy fallback resolution remains for pre-V83 rows that have no creator stamp yet — in
-    // that case the column is filled in for the first time, which counts as initial stamping
-    // rather than a mutation of an existing value.
-    OrgUnit existingCreator = jobOrder.getCreatingOrgUnit();
-    if (existingCreator != null
-        && updateDto.creatingSquadronId() != null
-        && !existingCreator.getId().equals(updateDto.creatingSquadronId())) {
-      throw new BadRequestException(
-          "creatingSquadronId is immutable post-create; pass null or the unchanged id.");
+    // The responsible org unit is NOT changed on the regular update path — it is only mutated
+    // through
+    // the dedicated reassignment endpoint (reassignResponsibleOrgUnit) so its permission rules and
+    // (Phase 3) visibility consequences stay in one place. updateDto.responsibleOrgUnitId() is
+    // therefore ignored here. The requesting (customer) org unit is freely editable by any
+    // Logistician+; a null id on update means "leave it unchanged" (minimal-payload contract).
+    if (updateDto.requestingOrgUnitId() != null) {
+      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
-    Squadron creatingFallback =
-        existingCreator instanceof Squadron existingSquadron
-            ? existingSquadron
-            : resolveCreatingSquadronForCreate(null, updateDto.requestingOrgUnitId());
-    Squadron newRequesting =
-        resolveRequestingSquadron(updateDto.requestingOrgUnitId(), creatingFallback);
-    jobOrder.setRequestingOrgUnit(newRequesting);
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
 
@@ -747,8 +733,8 @@ public class JobOrderService {
     return new JobOrderDto(
         baseDto.id(),
         baseDto.displayId(),
-        baseDto.creatingSquadron(),
-        baseDto.requestingSquadron(),
+        baseDto.responsibleOrgUnit(),
+        baseDto.requestingOrgUnit(),
         baseDto.handle(),
         baseDto.comment(),
         baseDto.priority(),
@@ -765,118 +751,163 @@ public class JobOrderService {
   }
 
   /**
-   * Resolves the {@code creating_squadron_id} stamp for a freshly-created job order.
+   * Resolves the responsible (processing) org unit for a freshly-created job order.
    *
-   * <p>Resolution order (MULTI_SQUADRON_PLAN.md section 4.4):
+   * <ul>
+   *   <li>Anonymous / guest callers (the public request form is {@code permitAll}) are routed onto
+   *       the configured intake Spezialkommando ({@link #INTAKE_SK_SETTING_KEY}); any
+   *       client-supplied {@code responsibleOrgUnitId} is ignored so a guest cannot assign work to
+   *       an arbitrary unit.
+   *   <li>Authenticated callers must supply a {@code responsibleOrgUnitId} that resolves to a
+   *       profit-eligible squadron or Spezialkommando — only Profit-side units process orders.
+   * </ul>
    *
-   * <ol>
-   *   <li>Explicit {@code creatingSquadronIdOverride} from the create DTO — only honored when the
-   *       caller is an admin (admin override path).
-   *   <li>Caller's active squadron context ({@link OwnerScopeService#currentSquadron()}).
-   *   <li>Anonymous caller without context — falls back to the squadron the public form picked as
-   *       requesting squadron ({@code anonymousRequestingFallback}). The audit trail then credits
-   *       the squadron the request was filed on behalf of rather than always crediting the
-   *       canonical IRIDIUM squadron. When the form also leaves {@code requestingSquadronId} blank,
-   *       the IRIDIUM seed row is used as a last resort so the V86 NOT NULL constraint is still
-   *       respected.
-   *   <li>Admin in "all squadrons" mode without override → {@link BadRequestException} (400). The
-   *       Plan is explicit on this: a focused stamp is required so the column is populated
-   *       correctly for the V86 NOT NULL tightening, and an admin with no selection has more than
-   *       one valid choice that the system cannot guess.
-   * </ol>
-   *
-   * @param creatingSquadronIdOverride optional explicit value from the create DTO; rejected for
-   *     non-admins.
-   * @param anonymousRequestingFallback {@code requestingSquadronId} from the same DTO; only
-   *     consulted for unauthenticated callers so the creating squadron equals the squadron the
-   *     anonymous form selected as the requesting one.
-   * @return the resolved squadron; never {@code null}.
-   * @throws BadRequestException when the caller is an admin in all-squadrons mode and did not
-   *     supply an explicit {@code creatingSquadronId}, or when a non-admin tried to override.
+   * @param responsibleOrgUnitId picker output from the create DTO; required for authenticated
+   *     callers, ignored for guests.
+   * @return the resolved, profit-eligible responsible org unit; never {@code null}.
+   * @throws BadRequestException when the id is missing/unresolvable, the unit is not
+   *     profit-eligible, or no intake SK is configured for a guest creation.
    */
   @org.jetbrains.annotations.NotNull
-  private Squadron resolveCreatingSquadronForCreate(
-      @org.jetbrains.annotations.Nullable UUID creatingSquadronIdOverride,
-      @org.jetbrains.annotations.Nullable UUID anonymousRequestingFallback) {
-    if (creatingSquadronIdOverride != null) {
-      if (!authHelperService.isAdmin()) {
-        throw new BadRequestException(
-            "Only admins may set creatingSquadronId explicitly; non-admins are stamped from"
-                + " their active squadron context.");
-      }
-      return squadronRepository
-          .findById(creatingSquadronIdOverride)
-          .orElseThrow(
-              () ->
-                  new BadRequestException(
-                      "creatingSquadronId does not resolve to a known squadron: "
-                          + creatingSquadronIdOverride));
-    }
-    java.util.Optional<Squadron> active = ownerScopeService.currentSquadron();
-    if (active.isPresent()) {
-      return active.orElseThrow();
-    }
-    // Anonymous caller (public request form). The SecurityConfig permits POST /api/v1/orders
-    // for unauthenticated callers because the squadron uses the form for external sympathisers /
-    // visitors who want to request a job. Stamp the creating squadron with the squadron the form
-    // picked as requesting — the request belongs to that squadron and the audit trail should
-    // reflect it. Fall back to the canonical IRIDIUM seed row when the form did not pick a
-    // requesting squadron either, so the V86 NOT NULL constraint still holds.
+  private OrgUnit resolveResponsibleOrgUnit(
+      @org.jetbrains.annotations.Nullable UUID responsibleOrgUnitId) {
     if (!authHelperService.isAuthenticated()) {
-      UUID anonymousStampId =
-          anonymousRequestingFallback != null ? anonymousRequestingFallback : Squadron.IRIDIUM_ID;
-      return squadronRepository
-          .findById(anonymousStampId)
-          .orElseThrow(
-              () ->
-                  new BadRequestException(
-                      "Squadron does not resolve for anonymous job-order creation: "
-                          + anonymousStampId));
+      return resolveIntakeSpecialCommand();
     }
-    // Authenticated caller without a resolvable squadron context — only happens for an admin in
-    // "all squadrons" mode. Plan-compliant 400: a focused stamp is required so the audit trail
-    // stays meaningful.
-    throw new BadRequestException(
-        "No active squadron context — admins in 'all squadrons' mode must supply"
-            + " creatingSquadronId explicitly when creating a job order.");
+    if (responsibleOrgUnitId == null) {
+      throw new BadRequestException("responsibleOrgUnitId is required.");
+    }
+    OrgUnit orgUnit =
+        orgUnitRepository
+            .findById(responsibleOrgUnitId)
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "responsibleOrgUnitId does not resolve to a known org unit: "
+                            + responsibleOrgUnitId));
+    if (!orgUnit.isProfitEligible()) {
+      throw new BadRequestException(
+          "The selected responsible org unit is not profit-eligible and cannot process orders: "
+              + responsibleOrgUnitId);
+    }
+    return orgUnit;
   }
 
   /**
-   * Resolves the {@code requesting_squadron_id} stamp for create / update from the picker output.
+   * Resolves the configured intake Spezialkommando that anonymous/guest order creations are routed
+   * to (system setting {@link #INTAKE_SK_SETTING_KEY}). The setting is seeded empty by V128; until
+   * an admin selects an SK, guest creation is refused with a 400.
    *
-   * <p>Preference order:
-   *
-   * <ol>
-   *   <li>Typed {@code requestingOrgUnitId} UUID from the DTO. Required value path for any client
-   *       that has migrated to the structured contract.
-   *   <li>Fallback to {@code creatingFallback} (the creating squadron) so the requesting field
-   *       stays populated even on minimal payloads — mirrors the legacy backfill rule.
-   * </ol>
-   *
-   * <p>When the picker output references a Spezialkommando, {@link SquadronRepository#findById}
-   * returns empty (the JPA single-table discriminator filter limits the repository to {@code
-   * kind='SQUADRON'} rows). The resulting 400 surfaces as a clean error in the picker UX until the
-   * destructive cleanup release lowers NOT NULL on the legacy column and unlocks SK stamping.
-   *
-   * @param requestingOrgUnitId typed UUID from the DTO (R5.d.c picker output); preferred when
-   *     present.
-   * @param creatingFallback the creating squadron used as the fallback when the UUID is absent.
-   * @return the resolved squadron; never {@code null}.
+   * @return the configured intake org unit; never {@code null}.
+   * @throws BadRequestException when the setting is unset/blank/malformed or no longer resolves.
    */
   @org.jetbrains.annotations.NotNull
-  private Squadron resolveRequestingSquadron(
-      @org.jetbrains.annotations.Nullable UUID requestingOrgUnitId,
-      @org.jetbrains.annotations.NotNull Squadron creatingFallback) {
-    if (requestingOrgUnitId != null) {
-      return squadronRepository
-          .findById(requestingOrgUnitId)
-          .orElseThrow(
-              () ->
-                  new BadRequestException(
-                      "requestingOrgUnitId does not resolve to a known active Staffel: "
-                          + requestingOrgUnitId));
+  private OrgUnit resolveIntakeSpecialCommand() {
+    String raw =
+        systemSettingService
+            .getSettingValue(INTAKE_SK_SETTING_KEY)
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "No intake Spezialkommando is configured; an admin must set it in system"
+                            + " settings before guests can create orders."));
+    UUID intakeId;
+    try {
+      intakeId = UUID.fromString(raw);
+    } catch (IllegalArgumentException ex) {
+      throw new BadRequestException("Configured intake Spezialkommando id is malformed.");
     }
-    return creatingFallback;
+    return orgUnitRepository
+        .findById(intakeId)
+        .orElseThrow(
+            () -> new BadRequestException("Configured intake Spezialkommando no longer exists."));
+  }
+
+  /**
+   * Reassigns the responsible (processing) org unit of an existing order. Permission model:
+   *
+   * <ul>
+   *   <li>Admins may reassign freely to any profit-eligible org unit (squadron or SK), in any
+   *       direction (escalation, SK→SK, or SK→squadron de-escalation).
+   *   <li>A non-admin Logistician/Officer may only <em>escalate</em> a squadron-responsible order
+   *       to an SK, and only when they may edit the order's current responsible squadron ({@link
+   *       AuthHelperService#canEditOrgUnit}). They cannot hand an order to another squadron, nor
+   *       touch an order already responsible to an SK.
+   * </ul>
+   *
+   * <p>The target must be profit-eligible in every case. Visibility consequences of the move are
+   * enforced from Phase 3 (#343) on; this method only changes the field and its permission gate.
+   *
+   * @param id job order id.
+   * @param newResponsibleOrgUnitId the target responsible org unit id.
+   * @return the updated order DTO.
+   * @throws NotFoundException when the order does not exist.
+   * @throws BadRequestException when the target is unknown or not profit-eligible.
+   * @throws org.springframework.security.access.AccessDeniedException when the caller may not
+   *     perform the requested reassignment.
+   */
+  @Transactional
+  public JobOrderDto reassignResponsibleOrgUnit(UUID id, UUID newResponsibleOrgUnitId) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+
+    OrgUnit target =
+        orgUnitRepository
+            .findById(newResponsibleOrgUnitId)
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "responsibleOrgUnitId does not resolve to a known org unit: "
+                            + newResponsibleOrgUnitId));
+    if (!target.isProfitEligible()) {
+      throw new BadRequestException(
+          "The selected responsible org unit is not profit-eligible and cannot process orders: "
+              + newResponsibleOrgUnitId);
+    }
+
+    if (!authHelperService.isAdmin()) {
+      OrgUnit current = jobOrder.getResponsibleOrgUnit();
+      boolean currentIsSquadron = current != null && current.getKind() == OrgUnitKind.SQUADRON;
+      boolean targetIsSpecialCommand = target.getKind() == OrgUnitKind.SPECIAL_COMMAND;
+      boolean mayEditCurrent = current != null && authHelperService.canEditOrgUnit(current.getId());
+      if (!(currentIsSquadron && targetIsSpecialCommand && mayEditCurrent)) {
+        throw new org.springframework.security.access.AccessDeniedException(
+            "Only an admin may reassign freely; a squadron logistician/officer may only escalate"
+                + " their own squadron's order to a Spezialkommando.");
+      }
+    }
+
+    jobOrder.setResponsibleOrgUnit(target);
+    jobOrder = jobOrderRepository.save(jobOrder);
+    return mapToDtoWithStock(jobOrder);
+  }
+
+  /**
+   * Resolves the requesting (customer) org unit from the picker output. Any squadron or
+   * Spezialkommando is accepted — there is no profit-eligibility restriction on who may place an
+   * order. Mandatory: the create/update DTOs always carry it.
+   *
+   * @param requestingOrgUnitId picker output from the DTO.
+   * @return the resolved requesting org unit; never {@code null}.
+   * @throws BadRequestException when the id is missing or does not resolve to a known org unit.
+   */
+  @org.jetbrains.annotations.NotNull
+  private OrgUnit resolveRequestingOrgUnit(
+      @org.jetbrains.annotations.Nullable UUID requestingOrgUnitId) {
+    if (requestingOrgUnitId == null) {
+      throw new BadRequestException("requestingOrgUnitId is required.");
+    }
+    return orgUnitRepository
+        .findById(requestingOrgUnitId)
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "requestingOrgUnitId does not resolve to a known org unit: "
+                        + requestingOrgUnitId));
   }
 
   /**

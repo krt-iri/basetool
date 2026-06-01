@@ -21440,6 +21440,105 @@
         }
       }
     },
+    "/api/v1/orders/{id}/responsible-org-unit" : {
+      "patch" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Reassign responsible org unit",
+        "description" : "Changes which org unit processes the order. Admin: free to any profit-eligible org unit; squadron logistician/officer: escalate own squadron's order to an SK only.",
+        "operationId" : "reassignResponsibleOrgUnit",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReassignResponsibleOrgUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/missions/{id}/schedule" : {
       "patch" : {
         "tags" : [ "Missions" ],
@@ -33742,7 +33841,7 @@
       "CreateJobOrderDto" : {
         "type" : "object",
         "properties" : {
-          "creatingSquadronId" : {
+          "responsibleOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
           },
@@ -33856,10 +33955,10 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "creatingSquadron" : {
+          "responsibleOrgUnit" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
-          "requestingSquadron" : {
+          "requestingOrgUnit" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
           },
           "handle" : {
@@ -35804,7 +35903,7 @@
       "CreateJobOrderItemRequestDto" : {
         "type" : "object",
         "properties" : {
-          "creatingSquadronId" : {
+          "responsibleOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
           },
@@ -36419,6 +36518,16 @@
             "type" : "boolean"
           }
         }
+      },
+      "ReassignResponsibleOrgUnitRequest" : {
+        "type" : "object",
+        "properties" : {
+          "responsibleOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "responsibleOrgUnitId" ]
       },
       "PatchMissionScheduleRequest" : {
         "type" : "object",

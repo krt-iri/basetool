@@ -12,6 +12,7 @@ import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.CreateJobOrderMaterialDto;
@@ -25,7 +26,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,9 +50,9 @@ class JobOrderServiceTest {
 
   @Mock private de.greluc.krt.iri.basetool.backend.repository.UserRepository userRepository;
 
-  @Mock private SquadronRepository squadronRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private SystemSettingService systemSettingService;
 
   @Mock private AuthHelperService authHelperService;
 
@@ -67,20 +68,33 @@ class JobOrderServiceTest {
   private JobOrderDto baseJobOrderDto;
   private UUID orderId;
   private UUID materialId;
+  private UUID responsibleOrgUnitId;
+  private UUID requestingOrgUnitId;
 
   @BeforeEach
   void setUp() {
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
-    // Multi-tenant: every create/update path resolves the caller's current squadron via the
-    // scope service. Stub a lenient default — read-path tests do not touch it and the
-    // lenient() call suppresses UnnecessaryStubbingException there.
-    Squadron currentSquadron = new Squadron();
-    currentSquadron.setShorthand("Alpha");
+    // Phase 2 org-unit stamping: createJobOrder resolves a profit-eligible responsible org unit and
+    // a requesting org unit via OrgUnitRepository. Lenient defaults cover the authenticated happy
+    // path — guest-path and error-path tests override isAuthenticated / the repo stubs as needed.
+    responsibleOrgUnitId = UUID.randomUUID();
+    requestingOrgUnitId = UUID.randomUUID();
+    Squadron responsible = new Squadron();
+    responsible.setId(responsibleOrgUnitId);
+    responsible.setShorthand("RESP");
+    responsible.setProfitEligible(true);
+    Squadron requesting = new Squadron();
+    requesting.setId(requestingOrgUnitId);
+    requesting.setShorthand("Alpha");
+    org.mockito.Mockito.lenient().when(authHelperService.isAuthenticated()).thenReturn(true);
     org.mockito.Mockito.lenient()
-        .when(ownerScopeService.currentSquadron())
-        .thenReturn(java.util.Optional.of(currentSquadron));
+        .when(orgUnitRepository.findById(responsibleOrgUnitId))
+        .thenReturn(java.util.Optional.of(responsible));
+    org.mockito.Mockito.lenient()
+        .when(orgUnitRepository.findById(requestingOrgUnitId))
+        .thenReturn(java.util.Optional.of(requesting));
 
     material = new Material();
     material.setId(materialId);
@@ -106,13 +120,12 @@ class JobOrderServiceTest {
 
     jobOrder = new JobOrder();
     jobOrder.setId(orderId);
-    // V88 removed JobOrder.squadron (legacy VARCHAR). Pre-V88 fixtures used
-    // setSquadron("Alpha") as the only squadron stamp; post-V88 tests must set
-    // requestingSquadron / creatingSquadron explicitly.
+    // Fixtures stamp both org-unit refs explicitly (the responsible governs visibility from Phase 3
+    // on; the requesting is the customer).
     Squadron alpha = new Squadron();
     alpha.setShorthand("Alpha");
     jobOrder.setRequestingOrgUnit(alpha);
-    jobOrder.setCreatingOrgUnit(alpha);
+    jobOrder.setResponsibleOrgUnit(alpha);
     jobOrder.setHandle("Tester");
     jobOrder.setPriority(1);
 
@@ -151,7 +164,8 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -188,7 +202,8 @@ class JobOrderServiceTest {
     // not force a default.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -223,7 +238,8 @@ class JobOrderServiceTest {
     // not coerce it to 700 or 0.
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -269,14 +285,21 @@ class JobOrderServiceTest {
 
     // When — comment with surrounding whitespace must be trimmed before persisting.
     jobOrderService.createJobOrder(
-        new CreateJobOrderDto(null, null, "Tester", "  Deliver fast  ", List.of(createMat), null));
+        new CreateJobOrderDto(
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            "  Deliver fast  ",
+            List.of(createMat),
+            null));
 
     // Then — trimmed value persisted.
     verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
 
     // When — a blank comment must normalise to null.
     jobOrderService.createJobOrder(
-        new CreateJobOrderDto(null, null, "Tester", "   ", List.of(createMat), null));
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", "   ", List.of(createMat), null));
 
     // Then — null comment persisted.
     verify(jobOrderRepository).save(argThat(jo -> jo.getComment() == null));
@@ -287,7 +310,8 @@ class JobOrderServiceTest {
     // Given
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -298,25 +322,23 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void createJobOrder_AnonymousCaller_StampsCreatingSquadronFromRequestingSquadron() {
-    // Given — anonymous public form picks a non-IRIDIUM squadron as the requesting one.
-    // Both creating and requesting must end up pointing at that same squadron so the audit
-    // trail credits the squadron the request was filed on behalf of, instead of always
-    // stamping IRIDIUM.
-    UUID requestingSquadronId = UUID.randomUUID();
-    Squadron requestingSquadron = new Squadron();
-    requestingSquadron.setId(requestingSquadronId);
-    requestingSquadron.setShorthand("BRAVO");
+  void createJobOrder_Guest_RoutesResponsibleToIntakeSpecialCommand() {
+    // Given — a guest (anonymous) creation. The responsible org unit is forced to the configured
+    // intake SK regardless of what the client supplies; the requesting (customer) is honoured.
+    UUID intakeId = UUID.randomUUID();
+    SpecialCommand intake = new SpecialCommand();
+    intake.setId(intakeId);
+    intake.setShorthand("INTK");
 
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.empty());
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(squadronRepository.findById(requestingSquadronId))
-        .thenReturn(Optional.of(requestingSquadron));
+    when(systemSettingService.getSettingValue("job_order.intake_special_command_id"))
+        .thenReturn(Optional.of(intakeId.toString()));
+    when(orgUnitRepository.findById(intakeId)).thenReturn(Optional.of(intake));
 
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            null, requestingSquadronId, "anon-handle", null, List.of(createMat), null);
+            UUID.randomUUID(), requestingOrgUnitId, "anon-handle", null, List.of(createMat), null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -335,54 +357,29 @@ class JobOrderServiceTest {
     // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — both stamps point at the requesting squadron, IRIDIUM is never looked up.
+    // Then — responsible is the intake SK (client id ignored), requesting is honoured.
     verify(jobOrderRepository)
         .save(
             argThat(
                 jo ->
-                    jo.getCreatingOrgUnit() == requestingSquadron
-                        && jo.getRequestingOrgUnit() == requestingSquadron));
-    verify(squadronRepository, never()).findById(Squadron.IRIDIUM_ID);
+                    jo.getResponsibleOrgUnit() == intake
+                        && jo.getRequestingOrgUnit().getId().equals(requestingOrgUnitId)));
   }
 
   @Test
-  void createJobOrder_AnonymousCaller_NoRequestingSquadron_FallsBackToIridium() {
-    // Given — anonymous caller without a requesting squadron in the DTO. The fallback to the
-    // IRIDIUM seed row must still kick in so the V86 NOT NULL constraint holds.
-    Squadron iridium = new Squadron();
-    iridium.setId(Squadron.IRIDIUM_ID);
-    iridium.setShorthand("IRI");
-
-    when(ownerScopeService.currentSquadron()).thenReturn(Optional.empty());
+  void createJobOrder_Guest_NoIntakeConfigured_Throws() {
+    // Given — a guest creation but no intake SK configured: must reject with 400, never persist.
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(squadronRepository.findById(Squadron.IRIDIUM_ID)).thenReturn(Optional.of(iridium));
+    when(systemSettingService.getSettingValue("job_order.intake_special_command_id"))
+        .thenReturn(Optional.empty());
 
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, null, "anon-handle", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            null, requestingOrgUnitId, "anon-handle", null, List.of(createMat), null);
 
-    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
-    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-    when(jobOrderRepository.save(any(JobOrder.class)))
-        .thenAnswer(
-            i -> {
-              JobOrder saved = i.getArgument(0);
-              saved.setId(orderId);
-              return saved;
-            });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
-    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
-        .thenReturn(0.0);
-
-    // When
-    jobOrderService.createJobOrder(createDto);
-
-    // Then
-    verify(jobOrderRepository)
-        .save(
-            argThat(
-                jo -> jo.getCreatingOrgUnit() == iridium && jo.getRequestingOrgUnit() == iridium));
+    assertThrows(BadRequestException.class, () -> jobOrderService.createJobOrder(createDto));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test
@@ -583,107 +580,83 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void updateJobOrder_ShouldNotModifyCreatingSquadron_WhenRequestingSquadronChanges() {
-    // Plan §8 + §11: creatingSquadron is immutable after the order is persisted; only
-    // requestingSquadron may be retargeted by a Logistician+ during the order's lifetime.
-    // This pins the contract that updateJobOrder NEVER touches creatingSquadron even when
-    // the inbound DTO carries a different requestingSquadronId (which only retargets
-    // requesting). Post Phase 7 part 3 / V90, the resolver path is UUID-only — the legacy
-    // String shorthand fallback has been removed together with the DTO field.
-    Squadron creatingOriginal = new Squadron();
-    creatingOriginal.setId(UUID.randomUUID());
-    creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingOrgUnit(creatingOriginal);
+  void updateJobOrder_RetargetsRequesting_AndIgnoresResponsible() {
+    // The regular update path retargets the requesting (customer) org unit but NEVER touches the
+    // responsible (processing) org unit — that is changed only via the dedicated reassignment
+    // endpoint. Any responsibleOrgUnitId in the update DTO is ignored.
+    Squadron responsibleOriginal = new Squadron();
+    responsibleOriginal.setId(UUID.randomUUID());
+    responsibleOriginal.setShorthand("RESP");
+    jobOrder.setResponsibleOrgUnit(responsibleOriginal);
 
     Squadron requestingOriginal = new Squadron();
     requestingOriginal.setId(UUID.randomUUID());
-    requestingOriginal.setShorthand("ALF");
+    requestingOriginal.setShorthand("REQ");
     jobOrder.setRequestingOrgUnit(requestingOriginal);
 
-    // The new requesting target ("Bravo") is intentionally different from creatingOriginal /
-    // requestingOriginal so the assertions below distinguish creating-untouched from
-    // requesting-flipped.
     UUID bravoId = UUID.randomUUID();
     Squadron bravo = new Squadron();
     bravo.setId(bravoId);
     bravo.setShorthand("Bravo");
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    // A non-null responsibleOrgUnitId is supplied but must be ignored by the update path.
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, bravoId, "Tester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(UUID.randomUUID(), bravoId, "Tester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(squadronRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
+    when(orgUnitRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrder(orderId, updateDto);
 
-    // The creating squadron must be the SAME reference (and same id) as before the update.
-    assertSame(
-        creatingOriginal,
-        jobOrder.getCreatingOrgUnit(),
-        "creatingSquadron is immutable per Plan §8 — update must not retag the authoring"
-            + " squadron.");
-    // The requesting squadron must reflect the new "Bravo" target.
+    // Responsible unchanged (same reference); requesting flipped to "Bravo".
+    assertSame(responsibleOriginal, jobOrder.getResponsibleOrgUnit());
     assertNotNull(jobOrder.getRequestingOrgUnit());
     assertEquals("Bravo", jobOrder.getRequestingOrgUnit().getShorthand());
   }
 
   @Test
-  void updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges() {
-    // Plan §8 + §11: passing a different creatingSquadronId on update must reject with 400
-    // rather than silently dropping the field. Pins the strict-reject contract that the prior
-    // "silently ignore" implementation violated.
-    Squadron creatingOriginal = new Squadron();
-    creatingOriginal.setId(UUID.randomUUID());
-    creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingOrgUnit(creatingOriginal);
+  void reassignResponsibleOrgUnit_Admin_MovesToProfitEligibleTarget() {
+    // Admin may reassign freely to any profit-eligible org unit.
+    Squadron current = new Squadron();
+    current.setId(UUID.randomUUID());
+    current.setShorthand("CUR");
+    jobOrder.setResponsibleOrgUnit(current);
 
-    UUID attemptedOverride = UUID.randomUUID();
-    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
-    CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(attemptedOverride, null, "Tester", null, List.of(updateMat), null);
-
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class, () -> jobOrderService.updateJobOrder(orderId, updateDto));
-    assertTrue(
-        ex.getMessage().contains("creatingSquadronId"),
-        "Error message should reference creatingSquadronId: " + ex.getMessage());
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
-  }
-
-  @Test
-  void updateJobOrder_ShouldAccept_WhenCreatingSquadronIdMatchesExisting() {
-    // Companion to updateJobOrder_ShouldReject_WhenCreatingSquadronIdChanges: passing the SAME
-    // creatingSquadronId (i.e. echoing the unchanged value back from a read DTO) is a no-op
-    // and must NOT trip the immutability guard.
-    Squadron creatingOriginal = new Squadron();
-    UUID creatingId = UUID.randomUUID();
-    creatingOriginal.setId(creatingId);
-    creatingOriginal.setShorthand("ALF");
-    jobOrder.setCreatingOrgUnit(creatingOriginal);
-
-    Squadron requestingOriginal = new Squadron();
-    requestingOriginal.setId(UUID.randomUUID());
-    requestingOriginal.setShorthand("ALF");
-    jobOrder.setRequestingOrgUnit(requestingOriginal);
-
-    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
-    CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(creatingId, null, "Tester", null, List.of(updateMat), null);
+    UUID targetId = UUID.randomUUID();
+    SpecialCommand target = new SpecialCommand();
+    target.setId(targetId);
+    target.setShorthand("SK");
+    target.setProfitEligible(true);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+    when(authHelperService.isAdmin()).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
-    assertDoesNotThrow(() -> jobOrderService.updateJobOrder(orderId, updateDto));
-    assertSame(creatingOriginal, jobOrder.getCreatingOrgUnit());
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+
+    assertSame(target, jobOrder.getResponsibleOrgUnit());
+  }
+
+  @Test
+  void reassignResponsibleOrgUnit_RejectsNonProfitEligibleTarget() {
+    UUID targetId = UUID.randomUUID();
+    Squadron target = new Squadron();
+    target.setId(targetId);
+    target.setProfitEligible(false);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test
@@ -706,7 +679,7 @@ class JobOrderServiceTest {
         new CreateJobOrderDto(null, betaId, "NewTester", null, List.of(updateMat), null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(squadronRepository.findById(betaId)).thenReturn(Optional.of(beta));
+    when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
