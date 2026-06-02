@@ -76,18 +76,14 @@
                 <col class="w-1">
                 <col class="w-1">
                 <col class="w-1">
-                <col class="w-1">
-                <col class="w-1">
                 <col class="w-full">
                 <col class="w-1">
             </colgroup>
             <thead>
             <tr>
                 <th th:text="#{orders.index.id}" class="nowrap">ID</th>
-                <th th:text="#{orders.index.prio}" class="nowrap">Prio</th>
-                <th th:text="#{orders.index.status}" class="nowrap">Status</th>
-                <th th:text="#{orders.index.responsible}" class="nowrap">Bearbeitend</th>
-                <th th:text="#{orders.index.handle}" class="nowrap">Handle</th>
+                <th class="nowrap"><span th:text="#{orders.index.prio}">Prio</span> / <span th:text="#{orders.index.status}">Status</span></th>
+                <th th:text="#{orders.index.requesting}" class="nowrap">Auftraggeber</th>
                 <th th:text="#{orders.index.materials}">Materialien</th>
                 <th th:text="#{orders.index.actions}" class="nowrap">Aktionen</th>
             </tr>
@@ -108,17 +104,17 @@
                 <td class="nowrap">
                     <span sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
                     <span th:text="${order.priority != null ? order.priority : '-'}"></span>
-                </td>
-                <td class="nowrap">
+                    <br>
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
                 </td>
                 <td class="nowrap">
-                    <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
-                          th:title="${order.responsibleOrgUnit.name()}"
-                          th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
-                    <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                    <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
+                          th:title="${order.requestingOrgUnit.name()}"
+                          th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                    <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                    <br>
+                    <span th:text="${order.handle}"></span>
                 </td>
-                <td th:text="${order.handle}" class="nowrap"></td>
                 <td class="p-0">
                     <!-- MATERIAL orders: the material-requirement summary with per-material stock
                          progress. ITEM orders show their ordered items with delivery progress
@@ -129,12 +125,10 @@
                             <col class="w-full">
                             <col class="w-1">
                             <col class="w-1">
-                            <col class="w-1">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th th:text="#{orders.material.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Material</th>
-                                <th th:text="#{orders.material.minQuality}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Min. Q.</th>
                                 <th th:text="#{orders.material.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Gefordert</th>
                                 <th th:text="#{orders.material.progress}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Fortschritt</th>
                             </tr>
@@ -142,10 +136,6 @@
                         <tbody>
                             <tr th:each="mat : ${order.materials}">
                                 <td th:text="${mat.material.name}" th:title="${mat.material.name}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td style="border-bottom: none; white-space: nowrap;">
-                                    <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
-                                    <span th:if="${mat.minQuality == null}" th:text="#{orders.material.minQuality.none}">Keine</span>
-                                </td>
                                 <td style="border-bottom: none; white-space: nowrap;" th:switch="${mat.material.quantityType}">
                                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
@@ -189,7 +179,7 @@
                 </td>
             </tr>
             <tr th:if="${orders.empty}">
-                <td colspan="7" class="text-center" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
+                <td colspan="5" class="text-center" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
             </tr>
             </tbody>
         </table>
