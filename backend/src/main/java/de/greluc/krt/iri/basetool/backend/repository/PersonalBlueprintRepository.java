@@ -79,4 +79,26 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    */
   List<PersonalBlueprint> findAllByOwnerSubAndProductKeyIn(
       String ownerSub, Collection<String> productKeys);
+
+  /**
+   * Bulk owner lookup across several owners — backs the org-unit blueprint availability aggregation
+   * (#364): given the Keycloak {@code sub}s of every in-scope org-unit member, returns all their
+   * owned-blueprint rows for grouping by product in the service layer.
+   *
+   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @return every owned-blueprint row whose owner is in the given set; never {@code null}
+   */
+  List<PersonalBlueprint> findAllByOwnerSubIn(Collection<String> ownerSubs);
+
+  /**
+   * Owner-restricted product lookup — backs the availability drill-down (#364): given one product
+   * key and the Keycloak {@code sub}s of every in-scope member, returns the rows that pin which of
+   * those members own the product.
+   *
+   * @param productKey the normalized product key to match
+   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @return the matching rows (one per owning in-scope member); never {@code null}
+   */
+  List<PersonalBlueprint> findAllByProductKeyAndOwnerSubIn(
+      String productKey, Collection<String> ownerSubs);
 }

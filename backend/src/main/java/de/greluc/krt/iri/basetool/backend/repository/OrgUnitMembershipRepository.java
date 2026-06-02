@@ -3,10 +3,14 @@ package de.greluc.krt.iri.basetool.backend.repository;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -85,4 +89,26 @@ public interface OrgUnitMembershipRepository
    *     pair.
    */
   boolean existsByIdUserIdAndIdOrgUnitId(UUID userId, UUID orgUnitId);
+
+  /**
+   * Returns the distinct ids of every user who holds at least one org-unit membership. Backs the
+   * admin all-scope branch of the blueprint availability overview (#364), where "available in any
+   * org unit" resolves to "owned by any member of any org unit".
+   *
+   * @return the distinct member user ids across all org units; never {@code null}, possibly empty.
+   */
+  @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m")
+  Set<UUID> findDistinctMemberUserIds();
+
+  /**
+   * Returns the distinct ids of every user who is a member of any of the given org units. Backs the
+   * scoped branches of the blueprint availability overview (#364) — the pinned single org unit and
+   * the non-admin oversight union — by resolving the in-scope org units to their member users.
+   *
+   * @param orgUnitIds the org units whose members to collect; never {@code null}. An empty
+   *     collection yields an empty result.
+   * @return the distinct member user ids across the given org units; never {@code null}.
+   */
+  @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId IN :orgUnitIds")
+  Set<UUID> findDistinctUserIdsByOrgUnitIdIn(@Param("orgUnitIds") Collection<UUID> orgUnitIds);
 }
