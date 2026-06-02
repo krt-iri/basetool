@@ -40,7 +40,7 @@
             <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
             <div class="krt-bp-import-trigger">
                 <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
-                <button type="button" id="krt-bp-import-open" class="btn btn-secondary"
+                <button type="button" id="krt-bp-import-open" class="btn btn-outline"
                         data-trigger="bp-import-pick"
                         th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
             </div>
@@ -60,7 +60,7 @@
                 <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgewaehlt.</span>
             </div>
             <div class="krt-pi-modal-actions">
-                <button type="button" id="krt-bp-add-selected" class="btn" disabled
+                <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled
                         th:text="#{personalInventory.blueprints.add.submit}">Auswahl hinzufuegen</button>
             </div>
         </div>
@@ -74,7 +74,7 @@
                 <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
                        th:placeholder="#{personalInventory.filter.search}"
                        class="krt-pi-search-input">
-                <button type="submit" class="btn btn-secondary" th:text="#{personalInventory.filter.apply}">Filtern</button>
+                <button type="submit" class="btn btn-ghost" th:text="#{personalInventory.filter.apply}">Filtern</button>
             </form>
         </div>
 
@@ -101,7 +101,7 @@
                     <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
                     <td>
                         <div class="krt-pi-actions">
-                            <button type="button" class="btn"
+                            <button type="button" class="btn btn-ghost"
                                     data-trigger="bp-open-edit"
                                     th:attr="data-id=${bp.id},
                                              data-version=${bp.version},
@@ -109,7 +109,7 @@
                                              data-note=${bp.note},
                                              data-acquired-at=${bp.acquiredAt}"
                                     th:text="#{personalInventory.blueprints.action.editNote}">Notiz bearbeiten</button>
-                            <button type="button" class="btn btn-secondary"
+                            <button type="button" class="btn btn-quiet-danger"
                                     data-trigger="bp-open-delete"
                                     th:attr="data-id=${bp.id},
                                              data-name=${bp.productName}"
@@ -138,8 +138,8 @@
                 <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
             </div>
             <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn" th:text="#{personalInventory.action.save}">Speichern</button>
-                <button type="button" class="btn btn-secondary" data-trigger="bp-close-edit" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta" th:text="#{personalInventory.action.save}">Speichern</button>
+                <button type="button" class="btn btn-ghost" data-trigger="bp-close-edit" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
@@ -155,7 +155,7 @@
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div class="krt-pi-modal-actions">
                 <button type="submit" class="btn krt-danger" th:text="#{personalInventory.blueprints.action.remove}">Entfernen</button>
-                <button type="button" class="btn btn-secondary" data-trigger="bp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="bp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
@@ -168,16 +168,16 @@
         <h2 th:text="#{personalInventory.blueprints.import.title}">Import-Vorschau</h2>
         <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>
         <div class="krt-bp-import-toolbar">
-            <button type="button" class="btn btn-secondary" data-trigger="bp-import-selectall"
+            <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectall"
                     th:text="#{personalInventory.blueprints.import.selectAll}">Alle auswählen</button>
-            <button type="button" class="btn btn-secondary" data-trigger="bp-import-selectnone"
+            <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectnone"
                     th:text="#{personalInventory.blueprints.import.selectNone}">Auswahl aufheben</button>
         </div>
         <div id="krt-bp-import-body" class="krt-bp-import-body"></div>
         <div class="krt-pi-modal-actions">
-            <button type="button" id="krt-bp-import-apply" class="btn" data-trigger="bp-import-apply"
+            <button type="button" id="krt-bp-import-apply" class="btn btn--cta" data-trigger="bp-import-apply"
                     th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
-            <button type="button" class="btn btn-secondary" data-trigger="bp-import-close"
+            <button type="button" class="btn btn-ghost" data-trigger="bp-import-close"
                     th:text="#{personalInventory.action.cancel}">Abbrechen</button>
         </div>
     </div>

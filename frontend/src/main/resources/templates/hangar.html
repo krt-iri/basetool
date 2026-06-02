@@ -145,7 +145,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{hangar.title}">Hangar</h1>
-        <a th:href="@{/hangar/squadron}" class="btn" th:text="#{hangar.squadron.title}">Staffelübersicht</a>
+        <a th:href="@{/hangar/squadron}" class="btn btn-ghost" th:text="#{hangar.squadron.title}">Staffelübersicht</a>
     </div>
 
     <div class="hud-box mt-2">
@@ -153,7 +153,7 @@
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
-                <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
+                <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
             </div>
 
             <div class="table-responsive">
@@ -195,7 +195,7 @@
                             <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                         </td>
                         <td class="flex-gap-xs">
-                            <button class="btn edit-ship-btn"
+                            <button class="btn btn-ghost edit-ship-btn"
                                     th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
                                     th:data-id="${ship.id}" 
                                     th:data-name="${ship.name}" 
@@ -268,8 +268,8 @@
                 <!-- R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 <div style="display: flex; justify-content: space-between;">
-                    <button type="submit" class="btn" data-testid="hangar-ship-submit" th:text="#{hangar.ship.save}">Speichern</button>
-                    <button type="button" id="modal-delete-btn" class="btn btn-danger" style="display: none;" th:text="#{hangar.ship.delete}">Löschen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit" th:text="#{hangar.ship.save}">Speichern</button>
+                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" style="display: none;" th:text="#{hangar.ship.delete}">Löschen</button>
                 </div>
             </form>
         </div>
@@ -284,7 +284,7 @@
                 <label for="fleetview-file" th:text="#{hangar.import.label}">Fleetview-JSON-Datei</label>
                 <input type="file" id="fleetview-file" accept=".json,application/json" style="min-height:44px;">
             </div>
-            <button id="fleetview-import-btn" class="btn" type="button"
+            <button id="fleetview-import-btn" class="btn btn-outline" type="button"
                     th:text="#{hangar.import.btn}"
                     th:data-uploading="#{hangar.import.uploading}"
                     th:data-error-nofile="#{hangar.import.error.nofile}"
@@ -297,7 +297,7 @@
             <h3 th:text="#{hangar.delete_all.section_title}">Hangar leeren</h3>
             <div class="delete-all-row">
                 <p th:text="#{hangar.delete_all.description}">Alle eigenen Schiffe aus dem Hangar entfernen.</p>
-                <button id="delete-all-ships-btn" class="btn btn-danger" type="button"
+                <button id="delete-all-ships-btn" class="btn btn-quiet-danger" type="button"
                         th:text="#{hangar.delete_all.btn}"
                         th:data-error-failed="#{hangar.delete_all.error.failed}"
                         th:data-success="#{hangar.delete_all.success}">Alle Schiffe löschen</button>
@@ -330,7 +330,7 @@
                 <div id="import-dup-list" class="skip-list"></div>
             </div>
             <div style="margin-top:1.5rem; text-align:right;">
-                <button id="import-result-close" class="btn" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
+                <button id="import-result-close" class="btn btn-ghost" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
             </div>
         </div>
     </div>
@@ -341,7 +341,7 @@
             <h2 th:text="#{hangar.delete_all.modal.title}" class="mt-0">Hangar leeren</h2>
             <p th:text="#{hangar.delete_all.modal.body}" class="mb-2">Alle eigenen Schiffe wirklich löschen?</p>
             <div class="flex-center-gap">
-                <button type="button" id="delete-all-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" id="delete-all-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
             </div>
         </div>
@@ -353,7 +353,7 @@
             <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
             <p th:text="#{hangar.ship.delete_confirm}" class="mb-2">Schiff wirklich löschen?</p>
             <div class="flex-center-gap">
-                <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/hangar}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{hangar.ship.delete}">Löschen</button>
                 </form>

@@ -120,9 +120,9 @@
         </div>
 
         <div class="actions-bar">
-            <a th:href="@{/inventory}" class="btn btn-secondary">&laquo; Zurück zur Staffelübersicht</a>
-            <a sec:authorize="hasRole('LOGISTICIAN')" th:href="@{/inventory/input(source='admin')}" class="btn" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
-            <button sec:authorize="hasRole('ADMIN')" type="button" id="delete-all-global-inventory-btn" class="btn btn-danger"
+            <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Staffelübersicht</a>
+            <a sec:authorize="hasRole('LOGISTICIAN')" th:href="@{/inventory/input(source='admin')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
+            <button sec:authorize="hasRole('ADMIN')" type="button" id="delete-all-global-inventory-btn" class="btn btn-quiet-danger"
                     th:text="#{inventory.deleteAll.btn}"
                     th:data-error-failed="#{inventory.deleteAll.error.failed}"
                     th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
@@ -190,7 +190,7 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-secondary" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
             </div>
         </div>
@@ -211,7 +211,7 @@
                 <tbody th:each="group : ${groupedItems}">
                     <tr class="group-header" style="cursor: pointer; background-color: rgba(255,255,255,0.05);" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
                         <td class="text-center"><span class="toggle-icon" style="color: var(--color-primary); font-size: 1.2rem;">▶</span></td>
-                        <td th:text="${group.material.name}" style="font-weight: bold; color: var(--color-primary);">Material</td>
+                        <td th:text="${group.material.name}" style="font-weight: bold; color: var(--color-gray-1);">Material</td>
                         <td th:text="${group.averageQuality != null ? #numbers.formatDecimal(group.averageQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">95.50</td>
                         <td th:text="${group.maxQuality}">100</td>
                         <td th:switch="${group.material.quantityType}">
@@ -313,7 +313,7 @@
                                         </td>
                                         <td>
                                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" sec:authorize="hasRole('LOGISTICIAN')">
-                                                <button type="button" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
+                                                <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
                                                         th:data-id="${item.id}"
                                                         th:data-amount="${item.amount}"
                                                         th:data-version="${item.version}"
@@ -322,7 +322,7 @@
                                                         th:data-user-id="${item.user.id}"
                                                         th:data-location-id="${item.location.id}"
                                                         data-trigger="inv-admin-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                                                <button type="button" class="btn btn-secondary inventory-note-btn"
+                                                <button type="button" class="btn btn-ghost inventory-note-btn"
                                                         style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
                                                         th:data-id="${item.id}"
                                                         th:data-version="${item.version}"
@@ -444,12 +444,12 @@
             </div>
             
             <div class="mt-2-flex-gap">
-                <button type="submit" id="bookOutSubmitBtn" class="btn" 
+                <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta" 
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-transfer="#{inventory.bookout.btn.transfer}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
                         th:text="#{inventory.bookout.submit}">Ausbuchen</button>
-                <button type="button" class="btn btn-secondary" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
@@ -468,9 +468,9 @@
             <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
         </div>
         <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn" data-trigger="inv-admin-save-note" th:text="#{inventory.note.save}">Speichern</button>
-            <button type="button" class="btn btn-secondary" data-trigger="inv-admin-remove-note" th:text="#{inventory.note.remove}">Entfernen</button>
-            <button type="button" class="btn btn-secondary" style="min-height: 44px; margin-left: auto;" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note" th:text="#{inventory.note.save}">Speichern</button>
+            <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note" th:text="#{inventory.note.remove}">Entfernen</button>
+            <button type="button" class="btn btn-ghost" style="min-height: 44px; margin-left: auto;" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
 </div>
@@ -480,7 +480,7 @@
         <h2 th:text="#{inventory.deleteAll.modal.title}" class="mt-0">Globales Lager leeren</h2>
         <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
         <div class="flex-center-gap">
-            <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-secondary" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
         </div>
     </div>
