@@ -91,16 +91,6 @@ public interface OrgUnitMembershipRepository
   boolean existsByIdUserIdAndIdOrgUnitId(UUID userId, UUID orgUnitId);
 
   /**
-   * Returns the distinct ids of every user who holds at least one org-unit membership. Backs the
-   * admin all-scope branch of the blueprint availability overview (#364), where "available in any
-   * org unit" resolves to "owned by any member of any org unit".
-   *
-   * @return the distinct member user ids across all org units; never {@code null}, possibly empty.
-   */
-  @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m")
-  Set<UUID> findDistinctMemberUserIds();
-
-  /**
    * Returns the distinct ids of every user who is a member of any of the given org units. Backs the
    * scoped branches of the blueprint availability overview (#364) — the pinned single org unit and
    * the non-admin oversight union — by resolving the in-scope org units to their member users.

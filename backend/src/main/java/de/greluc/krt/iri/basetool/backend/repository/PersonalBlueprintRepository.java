@@ -4,10 +4,12 @@ import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -101,4 +103,17 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    */
   List<PersonalBlueprint> findAllByProductKeyAndOwnerSubIn(
       String productKey, Collection<String> ownerSubs);
+
+  /**
+   * Returns the distinct Keycloak {@code sub} of every blueprint owner in the table. Backs the
+   * admin "all org units" branch of the availability overview (#364, #371 fix): that scope spans
+   * every owner — including a user with no org-unit membership (e.g. an admin without a Staffel) —
+   * which a membership-derived member list silently dropped. The owned rows are still fetched
+   * through {@link #findAllByOwnerSubIn(Collection)}, so the owner-isolation contract is unchanged.
+   *
+   * @return every distinct {@code owner_sub} present in the table; never {@code null}, possibly
+   *     empty.
+   */
+  @Query("SELECT DISTINCT pb.ownerSub FROM PersonalBlueprint pb")
+  Set<String> findAllDistinctOwnerSubs();
 }

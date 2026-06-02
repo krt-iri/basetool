@@ -67,11 +67,14 @@ class PersonalBlueprintOverviewServiceTest {
   }
 
   @Test
-  void list_adminAllScope_aggregatesAndCountsDistinctOwners() {
+  void list_adminAllScope_aggregatesEveryOwner_includingOrgUnitLess() {
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(orgUnitMembershipRepository.findDistinctMemberUserIds())
-        .thenReturn(Set.of(USER_1, USER_2));
+    // Admin "all org units" must span EVERY blueprint owner — including USER_2, who holds no
+    // org-unit membership. Resolving via the org-unit member list (the #371 bug) silently dropped
+    // such owners, so a squadron-less admin's own blueprints went missing.
+    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
+        .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
     when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
         .thenReturn(
             List.of(
@@ -86,6 +89,7 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals(2L, page.getContent().get(0).ownerCount());
     assertEquals("Cutlass Black", page.getContent().get(1).productName());
     assertEquals(1L, page.getContent().get(1).ownerCount());
+    verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
   }
 
   @Test
@@ -119,7 +123,8 @@ class PersonalBlueprintOverviewServiceTest {
   void list_descendingSort_reversesByName() {
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(orgUnitMembershipRepository.findDistinctMemberUserIds()).thenReturn(Set.of(USER_1));
+    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
+        .thenReturn(Set.of(USER_1.toString()));
     when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
         .thenReturn(
             List.of(bp("aurora", "Aurora MR", USER_1), bp("cutlass", "Cutlass Black", USER_1)));
@@ -170,5 +175,26 @@ class PersonalBlueprintOverviewServiceTest {
 
     assertTrue(service.listOwnersForProduct("aurora").isEmpty());
     verify(userRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit() {
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    // The drill-down for the admin "all org units" scope resolves owners the same way as the list:
+    // across every blueprint owner, not just org-unit members (#371 fix).
+    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
+        .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
+    when(personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(eq("aurora"), any()))
+        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
+    when(userRepository.findAllById(any()))
+        .thenReturn(List.of(user(USER_1, "Bravo"), user(USER_2, "Alpha")));
+
+    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("aurora");
+
+    assertEquals(
+        List.of("Alpha", "Bravo"),
+        owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
+    verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
   }
 }
