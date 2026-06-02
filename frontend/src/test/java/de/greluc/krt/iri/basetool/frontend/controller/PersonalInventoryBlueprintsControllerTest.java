@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.List;
@@ -130,6 +131,35 @@ class PersonalInventoryBlueprintsControllerTest {
     assertEquals(
         "personalInventory.blueprints.error.conflict",
         flash.getFlashAttributes().get("errorToast"));
+  }
+
+  @Test
+  void recipe_delegatesToBackendRecipeEndpoint() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprintRecipeDto dto =
+        new PersonalBlueprintRecipeDto("Arclight Pistol", 2, List.of(), List.of());
+    when(backendApiClient.get(
+            contains("/api/v1/personal-blueprints/" + id + "/recipe"),
+            eq(PersonalBlueprintRecipeDto.class)))
+        .thenReturn(dto);
+
+    PersonalBlueprintRecipeDto result = controller.recipe(id);
+
+    assertEquals("Arclight Pistol", result.productName());
+    assertEquals(2, result.variantCount());
+  }
+
+  @Test
+  void recipe_returnsEmptyRecipe_whenBackendThrows() {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.get(any(String.class), eq(PersonalBlueprintRecipeDto.class)))
+        .thenThrow(new RuntimeException("boom"));
+
+    PersonalBlueprintRecipeDto result = controller.recipe(id);
+
+    assertNotNull(result);
+    assertEquals(0, result.variantCount());
+    assertTrue(result.requirementGroups().isEmpty());
   }
 
   @Test

@@ -7,6 +7,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.service.BlueprintImportService;
@@ -176,6 +177,29 @@ public class PersonalBlueprintController {
   })
   public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
     service.delete(requireSub(auth), id);
+  }
+
+  /**
+   * Returns the SC Wiki recipe graph (ingredients + per-quality stat contributions) of one of the
+   * caller's owned blueprints, backing the Personal Inventory blueprint view's expandable "Zutaten
+   * &amp; Stats" detail (#327). Owner-scoped: a foreign or unknown id yields 404.
+   *
+   * @param id owned-blueprint entry id
+   * @param auth the caller's JWT authentication
+   * @return the recipe view for the owned product
+   */
+  @GetMapping("/{id}/recipe")
+  @Operation(
+      summary =
+          "Get the recipe (ingredients + per-quality stat contributions) of an owned blueprint.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Recipe view for the owned blueprint."),
+    @ApiResponse(responseCode = "401", description = "Authentication required."),
+    @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
+  })
+  public PersonalBlueprintRecipeResponse recipe(
+      @PathVariable UUID id, JwtAuthenticationToken auth) {
+    return service.recipeForOwn(requireSub(auth), id);
   }
 
   /**

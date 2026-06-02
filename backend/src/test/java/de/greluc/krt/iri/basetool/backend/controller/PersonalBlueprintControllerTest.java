@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -15,6 +16,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.service.BlueprintImportService;
@@ -114,6 +116,17 @@ class PersonalBlueprintControllerTest {
     controller.delete(id, auth);
 
     verify(service).delete(SUB, id);
+  }
+
+  @Test
+  void recipe_derivesSubAndRelaysToService() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprintRecipeResponse recipe =
+        new PersonalBlueprintRecipeResponse("Name", 1, List.of(), List.of());
+    when(service.recipeForOwn(SUB, id)).thenReturn(recipe);
+
+    assertSame(recipe, controller.recipe(id, auth));
+    verify(service).recipeForOwn(SUB, id);
   }
 
   @Test

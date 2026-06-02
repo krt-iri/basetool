@@ -1,8 +1,12 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductRow;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
 import java.util.ArrayList;
@@ -46,6 +50,7 @@ public class BlueprintProductService {
   private final BlueprintRepository blueprintRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final BlueprintNameNormalizer normalizer;
+  private final BlueprintMapper blueprintMapper;
 
   /**
    * Searches the blueprint products by a case-insensitive substring of the product name, returning
@@ -101,6 +106,54 @@ public class BlueprintProductService {
     return p == null
         ? Optional.empty()
         : Optional.of(new ResolvedProduct(p.productKey, p.displayName, p.outputItemId));
+  }
+
+  /**
+   * Resolves a normalized product key to the recipe graph of a representative SC Wiki recipe for
+   * the Personal Inventory blueprint view (#327): the build slots with their ingredients and
+   * per-quality stat modifiers, plus the count of recipe variants collapsing into the product.
+   * Returns empty for a blank key or one that no active recipe produces.
+   *
+   * <p>Resolution mirrors the product grouping used by {@link #searchProducts}: active recipes are
+   * grouped by the {@link BlueprintNameNormalizer}-normalized output name; the first recipe (in the
+   * deterministic scan order of {@code findActiveIdNameRows}) of the matching group is the
+   * representative whose graph is mapped. The mapping touches the lazy recipe collections, so the
+   * call must run inside the read transaction this service declares.
+   *
+   * @param productKey normalized product key (see {@link BlueprintNameNormalizer})
+   * @return the representative recipe view, or empty if the key is blank or unknown
+   */
+  @NotNull
+  public Optional<PersonalBlueprintRecipeResponse> resolveRecipe(@Nullable String productKey) {
+    if (productKey == null || productKey.isBlank()) {
+      return Optional.empty();
+    }
+    UUID representativeId = null;
+    String displayName = null;
+    int variantCount = 0;
+    for (BlueprintIdNameRow row : blueprintRepository.findActiveIdNameRows()) {
+      if (row.outputName() == null || !normalizer.normalize(row.outputName()).equals(productKey)) {
+        continue;
+      }
+      if (representativeId == null) {
+        representativeId = row.id();
+        displayName = row.outputName();
+      }
+      variantCount++;
+    }
+    if (representativeId == null) {
+      return Optional.empty();
+    }
+    Blueprint recipe = blueprintRepository.findById(representativeId).orElse(null);
+    if (recipe == null) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new PersonalBlueprintRecipeResponse(
+            displayName,
+            variantCount,
+            blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
+            blueprintMapper.toIngredientDtos(recipe.getIngredients())));
   }
 
   /**
