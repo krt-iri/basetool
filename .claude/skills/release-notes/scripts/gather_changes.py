@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Collect the raw material for release notes from one starting point onward.
+
+This script does the mechanical part of the release-notes workflow so the model
+can focus on the editorial part (filtering + translating into friendly German).
+It prints two things:
+
+  1. The ``## [Unreleased]`` block of CHANGELOG.md verbatim -- the richest,
+     already-curated description of recent changes. Per-entry dates are NOT in
+     the changelog, so this block may contain items from before the window; the
+     git log below defines the real time boundary.
+  2. The git history in range, bucketed by Conventional-Commit type, so it is
+     obvious at a glance which commits are user-facing (feat / fix / perf) and
+     which are almost certainly internal (chore / refactor / test / docs / ...).
+
+The starting point may be a DATE (``2026-05-15``), a DATE WITH A TIME
+(``"2026-05-15 14:30"`` or ``2026-05-15T14:30``, optionally with seconds), a git
+TAG (``v0.3.40``), or a commit SHA. Dates/times are matched with ``git log
+--since``; a ref becomes the range ``<ref>..<until>``. A bare date covers the whole
+day; add a time to scope from a precise hour and minute. ``--until`` works the same
+way (a bare end date stays inclusive through 23:59:59).
+
+Usage:
+    python gather_changes.py --since v0.3.40
+    python gather_changes.py --since 2026-05-15 --until 2026-05-31
+    python gather_changes.py --since "2026-05-15 14:30"
+    python gather_changes.py --since 2026-05-15T14:30 --until 2026-05-16T09:00
+    python gather_changes.py --since v0.3.40 --repo /path/to/basetool
+
+Note: a date+time contains a space, so quote it in the shell ("2026-05-15 14:30"),
+or use the unquoted 'T' form (2026-05-15T14:30).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+# The changelog is full of umlauts and arrows; Windows consoles default to
+# cp1252 and would crash on them. Force UTF-8 so the digest prints anywhere.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # already wrapped / not reconfigurable
+        pass
+
+# Conventional-commit type -> (bucket label, is this normally user-facing?).
+# The buckets mirror the three release-notes sections plus a "probably internal"
+# catch-all the model should skim and usually drop.
+TYPE_BUCKETS: dict[str, str] = {
+    "feat": "NEU (feat) -- new features, usually user-facing",
+    "fix": "BEHOBEN (fix) -- bug fixes, keep the ones a user could notice",
+    "perf": "PERFORMANCE (perf) -- keep ONLY if the speed-up is perceptible",
+    "revert": "REVERT -- check what was rolled back and whether users saw it",
+}
+INTERNAL_TYPES = {
+    "chore", "refactor", "test", "docs", "build", "ci", "style", "deps", "release",
+}
+
+# A bare calendar date (2026-05-15) vs. a date carrying an optional hour:minute
+# (:second), separated by a space or 'T' (2026-05-15 14:30, 2026-05-15T14:30:00).
+# The second form is what lets a caller scope from a precise time of day, not just
+# midnight. Both are anchored so a ref like "2026-05-release" is NOT misread.
+DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DATE_TIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$")
+# Leading conventional-commit token, e.g. "feat(orders)!:" -> type "feat".
+CC_RE = re.compile(r"^(?P<type>[a-z]+)(?:\([^)]*\))?!?:", re.IGNORECASE)
+
+
+def run_git(repo: str, args: list[str]) -> str:
+    """Run a git command in ``repo`` and return stdout, or exit with its stderr."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+    except FileNotFoundError:
+        sys.exit("error: git is not on PATH")
+    except subprocess.CalledProcessError as exc:
+        sys.exit(f"error: git {' '.join(args)} failed:\n{exc.stderr.strip()}")
+    return result.stdout
+
+
+def extract_unreleased(changelog_path: str) -> str:
+    """Return the ``## [Unreleased]`` section verbatim, or a not-found notice."""
+    if not os.path.isfile(changelog_path):
+        return f"(no CHANGELOG.md found at {changelog_path})"
+    with open(changelog_path, encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+
+    out: list[str] = []
+    capturing = False
+    for line in lines:
+        if line.startswith("## "):
+            if capturing:  # reached the next version section -> stop
+                break
+            if "unreleased" in line.lower():
+                capturing = True
+                out.append(line)
+                continue
+        elif capturing:
+            out.append(line)
+    return "\n".join(out).strip() or "(no [Unreleased] section found)"
+
+
+def as_git_date(value: str, *, end: bool = False) -> str | None:
+    """Normalise a start/end bound into a git timestamp, or return None for a ref.
+
+    ``None`` means ``value`` is not a date — it is a git tag or commit SHA, which the
+    caller turns into a ``<ref>..<ref>`` range instead. A bare date snaps to the
+    start of its day (or the last second when ``end`` is set, so a ``--until`` date
+    stays inclusive). A value that already carries a time is honoured verbatim — the
+    ``T`` separator is rewritten to the space git prefers — which is what makes
+    scoping from a specific hour and minute work.
+    """
+    if DATE_TIME_RE.match(value):
+        return value.replace("T", " ", 1)
+    if DATE_ONLY_RE.match(value):
+        return f"{value} 23:59:59" if end else f"{value} 00:00:00"
+    return None
+
+
+def collect_commits(repo: str, since: str, until: str) -> str:
+    """Return the git log in range as tab-separated ``sha<TAB>date<TAB>subject``."""
+    fmt = "%h%x09%ad%x09%s"
+    base = ["log", "--no-merges", "--date=short", f"--pretty=format:{fmt}"]
+    since_bound = as_git_date(since)
+    if since_bound is not None:  # date or date+time -> time window
+        args = base + [f"--since={since_bound}"]
+        if until and until != "HEAD":
+            until_bound = as_git_date(until, end=True)
+            if until_bound is not None:
+                args.append(f"--until={until_bound}")
+            else:
+                print(f"# warning: --until={until!r} ignored "
+                      "(a date/time --since needs a date/time --until)", file=sys.stderr)
+    else:  # tag or commit SHA -> revision range
+        args = base + [f"{since}..{until or 'HEAD'}"]
+    return run_git(repo, args).strip()
+
+
+def bucket_commits(log: str) -> dict[str, list[str]]:
+    """Group raw log lines into release-notes buckets by conventional-commit type."""
+    buckets: dict[str, list[str]] = {label: [] for label in TYPE_BUCKETS.values()}
+    buckets["PROBABLY INTERNAL -- skim, usually drop"] = []
+    buckets["UNTYPED -- no conventional prefix, check each"] = []
+    for line in log.splitlines():
+        parts = line.split("\t", 2)
+        subject = parts[2] if len(parts) == 3 else line
+        match = CC_RE.match(subject)
+        if not match:
+            buckets["UNTYPED -- no conventional prefix, check each"].append(line)
+            continue
+        ctype = match.group("type").lower()
+        if ctype in TYPE_BUCKETS:
+            buckets[TYPE_BUCKETS[ctype]].append(line)
+        elif ctype in INTERNAL_TYPES:
+            buckets["PROBABLY INTERNAL -- skim, usually drop"].append(line)
+        else:
+            buckets["UNTYPED -- no conventional prefix, check each"].append(line)
+    return buckets
+
+
+def ddmm(value: str) -> str:
+    """Convert ``YYYY-MM-DD`` (with any trailing time) to the German short ``DD.MM.``.
+
+    Only the leading 10-character date is used, so a ``2026-05-15 14:30`` start still
+    yields ``15.05.`` — the optional time refines scoping, not the title.
+    """
+    parts = value[:10].split("-")
+    return f"{parts[2]}.{parts[1]}." if len(parts) == 3 else value
+
+
+def suggested_title(log: str, since: str) -> str:
+    """Build the release-notes H1 ``Release Notes (DD.MM. -> DD.MM.)`` from the window.
+
+    The left date is the start the user asked for (the ``--since`` date itself when
+    it is a date or date+time, otherwise the oldest change actually in range). The
+    right date is the newest change in range -- i.e. the last thing the notes cover.
+    The title stays date-only even when ``--since`` carries a time.
+    """
+    dates = sorted(line.split("\t")[1] for line in log.splitlines() if line.count("\t") >= 2)
+    if not dates:
+        return "Release Notes"
+    left = ddmm(since) if as_git_date(since) is not None else ddmm(dates[0])
+    return f"Release Notes ({left} → {ddmm(dates[-1])})"
+
+
+def main() -> None:
+    """Parse arguments, gather both sources, and print the digest to stdout."""
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--since", required=True,
+                        help="Starting point: a date (YYYY-MM-DD), a date+time "
+                             "(\"YYYY-MM-DD HH:MM\" or YYYY-MM-DDTHH:MM, seconds "
+                             "optional), a git tag, or a commit SHA.")
+    parser.add_argument("--until", default="HEAD",
+                        help="End point: same forms as --since (date / date+time / "
+                             "ref). Default: HEAD / now.")
+    parser.add_argument("--repo", default=os.getcwd(),
+                        help="Repository root. Default: current directory.")
+    args = parser.parse_args()
+
+    repo = os.path.abspath(args.repo)
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        # Worktrees keep .git as a file, not a dir -- accept either.
+        if not os.path.exists(os.path.join(repo, ".git")):
+            sys.exit(f"error: {repo} is not a git repository")
+
+    log = collect_commits(repo, args.since, args.until)
+
+    print("=" * 78)
+    print(f"RELEASE-NOTES SOURCE DIGEST   since={args.since}  until={args.until}")
+    print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, args.since)}")
+    print("=" * 78)
+
+    print("\n### SOURCE 1 -- CHANGELOG.md [Unreleased] (verbatim, richest descriptions)")
+    print("# Note: entries are NOT dated; some may predate the window. Use the git")
+    print("#       log below to decide what actually falls in range.\n")
+    print(extract_unreleased(os.path.join(repo, "CHANGELOG.md")))
+
+    print("\n\n### SOURCE 2 -- git log in range, bucketed by Conventional-Commit type")
+    print("# feat/fix/perf are the user-facing candidates; the internal bucket is")
+    print("# almost always dropped from user release notes.\n")
+    if not log:
+        print("(no commits in range -- check the --since value)")
+        return
+    for label, entries in bucket_commits(log).items():
+        print(f"\n-- {label} [{len(entries)}]")
+        for entry in entries:
+            print(f"   {entry}")
+
+
+if __name__ == "__main__":
+    main()
