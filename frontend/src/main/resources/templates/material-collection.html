@@ -85,41 +85,13 @@
     </div>
 </main>
 
-<!-- KRT Toast Container -->
-<div id="krt-toast-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem; pointer-events: none;"></div>
-
 <style th:attr="nonce=${cspNonce}">
     .krt-select:focus {
         outline: 2px solid var(--color-primary);
         outline-offset: 1px;
     }
-    .krt-toast {
-        background: var(--color-surface-input, #1C1C1C);
-        border-left: 4px solid var(--color-primary, #E77E23);
-        color: var(--color-gray-1, #D2D2D2);
-        font-family: 'Lato', sans-serif;
-        font-size: 0.95rem;
-        padding: 0.85rem 1.25rem;
-        border-radius: var(--radius-none);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-        pointer-events: auto;
-        min-width: 240px;
-        max-width: 380px;
-        opacity: 0;
-        transform: translateY(12px);
-        transition: opacity 0.25s ease, transform 0.25s ease;
-    }
-    .krt-toast.krt-toast--error {
-        border-left-color: var(--color-danger);
-    }
-    .krt-toast.krt-toast--visible {
-        opacity: 1;
-        transform: translateY(0);
-    }
     @media (max-width: 768px) {
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        #krt-toast-container { bottom: 1rem; right: 1rem; left: 1rem; }
-        .krt-toast { min-width: unset; max-width: 100%; }
     }
 </style>
 
@@ -132,18 +104,13 @@
     const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
 
     function showToast(message, isError) {
-        const container = document.getElementById('krt-toast-container');
-        const toast = document.createElement('div');
-        toast.className = 'krt-toast' + (isError ? ' krt-toast--error' : '');
-        toast.textContent = message;
-        container.appendChild(toast);
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => toast.classList.add('krt-toast--visible'));
-        });
-        setTimeout(() => {
-            toast.classList.remove('krt-toast--visible');
-            setTimeout(() => toast.remove(), 300);
-        }, 3500);
+        // Delegates to the shared toast component (fragments/toast.html, included
+        // below) instead of a page-local .krt-toast implementation.
+        if (isError) {
+            window.showFrontendErrorToast(message);
+        } else {
+            window.showFrontendSuccessToast(message);
+        }
     }
 
     function getVersion(inventoryId) {

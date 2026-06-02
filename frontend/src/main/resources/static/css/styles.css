@@ -371,8 +371,11 @@ main {
     margin-top: var(--space-2);
 }
 
-/* Table Styles */
-table, .krt-table {
+/* Table Styles — one canonical treatment for every data table. The bare
+   `table` element selector, `.krt-table` and `.data-table` are interchangeable
+   aliases (templates use all three historically); keeping them on a single rule
+   guarantees identical rendering regardless of which class a page picked. */
+table, .krt-table, .data-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: var(--space-4);
