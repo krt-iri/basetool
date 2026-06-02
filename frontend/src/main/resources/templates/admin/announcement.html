@@ -47,8 +47,8 @@
              </div>
              
              <div class="flex-between">
-                 <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
-                 <button type="button" id="trigger-delete-confirm" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
+                 <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+                 <button type="button" id="trigger-delete-confirm" class="btn btn-outline-danger" th:text="#{info.delete}">Löschen</button>
              </div>
         </form>
     </div>
@@ -59,7 +59,7 @@
             <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
             <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
             <div class="flex-center-gap">
-                <button type="button" class="btn btn-secondary close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form th:action="@{/admin/announcement/delete}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>

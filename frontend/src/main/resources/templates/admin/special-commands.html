@@ -63,7 +63,7 @@
                     <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}" data-trigger="submit-form-by-id" data-form-id="sc-filter-form">
                     <label for="includeInactive" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
                 </form>
-                <button id="add-sc-btn" class="btn" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
+                <button id="add-sc-btn" class="btn btn--cta" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
             </div>
         </div>
 
@@ -90,9 +90,9 @@
                             <td th:text="${sc.shorthand}">Kürzel</td>
                             <td th:text="${sc.description}">Desc</td>
                             <td class="flex-gap-xs">
-                                <a th:href="@{/admin/special-commands/{id}(id=${sc.id})}" class="btn btn-secondary"
+                                <a th:href="@{/admin/special-commands/{id}(id=${sc.id})}" class="btn btn-ghost"
                                    th:text="#{admin.specialcommands.members.manage}">Mitglieder verwalten</a>
-                                <button class="btn edit-sc-btn"
+                                <button class="btn btn-ghost edit-sc-btn"
                                         th:data-action="@{/admin/special-commands/{id}/update(id=${sc.id})}"
                                         th:data-id="${sc.id}"
                                         th:data-name="${sc.name}"
@@ -100,11 +100,11 @@
                                         th:data-desc="${sc.description}"
                                         th:data-version="${sc.version}"
                                         th:text="#{members.edit}">Bearbeiten</button>
-                                <button th:if="${sc.active}" type="button" class="btn btn-secondary delete-btn"
+                                <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger delete-btn"
                                         th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
                                         th:text="#{info.delete}">Löschen</button>
                                 <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="m-0">
-                                    <button type="submit" class="btn btn-secondary" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
+                                    <button type="submit" class="btn btn-ghost" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
                                 </form>
                             </td>
                         </tr>
@@ -137,7 +137,7 @@
                 <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
                 <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
             </div>
-            <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
+            <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
         </form>
     </div>
 </div>
