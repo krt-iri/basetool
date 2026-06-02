@@ -60,7 +60,7 @@
     <div class="greeting hud-box flex-between">
         <h1 th:if="${material != null}" th:text="${material.name}">Material Name</h1>
         <h1 th:if="${material == null}">Material nicht gefunden</h1>
-        <a th:href="@{/materials}" class="btn btn-secondary">Zurück zur Übersicht</a>
+        <a th:href="@{/materials}" class="btn btn-ghost">Zurück zur Übersicht</a>
     </div>
 
     <div class="hud-box mt-2">
