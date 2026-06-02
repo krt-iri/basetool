@@ -103,13 +103,6 @@
 .krt-pi-table-wrapper { overflow-x: auto; }
 .krt-pi-table { width: 100%; }
 
-.krt-pi-table th {
-    font-family: Ethnocentric, Lato, sans-serif;
-    text-transform: uppercase;
-    color: var(--color-primary, #E77E23);
-    letter-spacing: 0.06em;
-}
-
 .krt-pi-table td.krt-pi-empty {
     text-align: center;
     color: var(--color-gray-2, #646464);
