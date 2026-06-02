@@ -109,27 +109,27 @@
                 <span th:text="#{promotion.admin.topics.save.all.label}">ungespeicherte Änderungen</span>
             </span>
             <button type="button"
-                    class="btn pa-btn-tiny"
+                    class="btn btn--cta pa-btn-tiny"
                     data-trigger="pa-save-all"
                     th:text="#{promotion.admin.topics.save.all}">Alle speichern</button>
             <button type="button"
-                    class="btn btn-secondary pa-btn-tiny"
+                    class="btn btn-ghost pa-btn-tiny"
                     data-trigger="pa-discard-all"
                     th:text="#{promotion.admin.topics.discard.all}">Verwerfen</button>
         </div>
 
         <div class="pa-toolbar">
             <button type="button"
-                    class="btn"
+                    class="btn btn--cta"
                     data-trigger="pa-open-create-topic"
                     th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
             <div class="pa-spacer"></div>
             <button type="button"
-                    class="btn btn-secondary pa-btn-tiny"
+                    class="btn btn-ghost pa-btn-tiny"
                     data-trigger="pa-expand-all-topics"
                     th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
             <button type="button"
-                    class="btn btn-secondary pa-btn-tiny"
+                    class="btn btn-ghost pa-btn-tiny"
                     data-trigger="pa-collapse-all-topics"
                     th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
         </div>
@@ -162,7 +162,7 @@
                     </span>
                 </span>
                 <div class="admin-actions">
-                    <button class="btn pa-btn-tiny"
+                    <button class="btn btn-ghost pa-btn-tiny"
                             data-trigger="pa-edit-topic"
                             th:attr="data-pa-id=${topic.id},
                                      data-pa-name=${topic.name},
@@ -170,11 +170,11 @@
                                      data-pa-sort=${topic.sortOrder},
                                      data-pa-version=${topic.version}"
                             th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                    <button class="btn btn-danger pa-btn-tiny"
+                    <button class="btn btn-quiet-danger pa-btn-tiny"
                             data-trigger="pa-delete-topic"
                             th:attr="data-pa-id=${topic.id},data-pa-name=${topic.name}"
                             th:text="#{promotion.admin.topics.delete}">Löschen</button>
-                    <button class="btn pa-btn-tiny"
+                    <button class="btn btn-ghost pa-btn-tiny"
                             data-trigger="pa-open-create-category"
                             th:attr="data-pa-topic-id=${topic.id}"
                             th:text="#{promotion.admin.topics.category.new}">Neue Kategorie</button>
@@ -207,7 +207,7 @@
                             </span>
                             <span class="category-summary-name" th:text="${cat.name}">Kategorie</span>
                             <div class="admin-actions">
-                                <button class="btn pa-btn-tiny"
+                                <button class="btn btn-ghost pa-btn-tiny"
                                         data-trigger="pa-edit-category"
                                         th:attr="data-pa-id=${cat.id},
                                                  data-pa-name=${cat.name},
@@ -216,7 +216,7 @@
                                                  data-pa-version=${cat.version},
                                                  data-pa-topic-id=${topic.id}"
                                         th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                                <button class="btn btn-danger pa-btn-tiny"
+                                <button class="btn btn-quiet-danger pa-btn-tiny"
                                         data-trigger="pa-delete-category"
                                         th:attr="data-pa-id=${cat.id},data-pa-name=${cat.name}"
                                         th:text="#{promotion.admin.topics.delete}">Löschen</button>
@@ -238,7 +238,7 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save"
                                             data-trigger="pa-save-level-content"
                                             th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
                                 </div>
@@ -256,7 +256,7 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save"
                                             data-trigger="pa-save-level-content"
                                             th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
                                 </div>
@@ -274,7 +274,7 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save"
                                             data-trigger="pa-save-level-content"
                                             th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
                                 </div>
@@ -305,8 +305,8 @@
             <span class="form-hint" th:text="#{promotion.admin.topics.sort.hint}">Niedrigere Werte erscheinen weiter oben. Die Position kann später per Pfeiltasten in der Liste angepasst werden.</span>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
+            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -330,8 +330,8 @@
             <input id="et-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pa-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="pa-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>
@@ -354,8 +354,8 @@
             <input id="cc-sort" class="form-input" type="number" value="0">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
+            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -380,8 +380,8 @@
             <input id="ec-sort" class="form-input" type="number">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="pa-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="pa-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
         </div>
     </div>
 </div>

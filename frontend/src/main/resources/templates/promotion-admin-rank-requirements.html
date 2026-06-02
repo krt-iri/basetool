@@ -102,7 +102,7 @@
                    autocomplete="off" />
             <div class="pa-spacer"></div>
             <button type="button"
-                    class="btn"
+                    class="btn btn--cta"
                     data-trigger="ar-open-create"
                     th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
         </div>
@@ -160,7 +160,7 @@
                                 <td th:text="${req.description} ?: '-'">-</td>
                                 <td class="pa-actions-cell" style="white-space:nowrap;">
                                     <div class="flex-gap-xs">
-                                        <button class="btn pa-btn-tiny"
+                                        <button class="btn btn-ghost pa-btn-tiny"
                                                 data-trigger="ar-open-edit"
                                                 th:attr="data-ar-id=${req.id},
                                                          data-ar-from=${req.fromRank},
@@ -172,7 +172,7 @@
                                                          data-ar-description=${req.description} ?: '',
                                                          data-ar-version=${req.version}"
                                                 th:text="#{promotion.admin.ranks.edit}">Bearbeiten</button>
-                                        <button class="btn btn-danger pa-btn-tiny"
+                                        <button class="btn btn-quiet-danger pa-btn-tiny"
                                                 data-trigger="ar-open-delete"
                                                 th:attr="data-ar-id=${req.id}"
                                                 th:text="#{promotion.admin.ranks.delete}">Löschen</button>
@@ -243,8 +243,8 @@
             <textarea id="cr-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="ar-close-create" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="ar-submit-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
+            <button class="btn btn-ghost" data-trigger="ar-close-create" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="ar-submit-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
         </div>
     </div>
 </div>
@@ -304,8 +304,8 @@
             <textarea id="er-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-trigger="ar-close-edit" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn" data-trigger="ar-submit-edit" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
+            <button class="btn btn-ghost" data-trigger="ar-close-edit" th:text="#{general.cancel}">Abbrechen</button>
+            <button class="btn btn--cta" data-trigger="ar-submit-edit" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
         </div>
     </div>
 </div>
