@@ -271,11 +271,17 @@ public final class BackendSeeder {
    * id, so the handover flow has an order to record a handover against. The material line's {@code
    * minQuality} must be at least 700 ({@code CreateJobOrderMaterialDto} constraint).
    *
-   * @param username the Keycloak username of the test user
+   * <p>The given org unit is named as BOTH the responsible (processing) and the requesting
+   * (customer) unit — these flows model a squadron that owns and fulfils its own order. The backend
+   * requires a {@code responsibleOrgUnitId} that resolves to a <em>profit-eligible</em> unit; the
+   * canonical IRIDIUM Squadron is opted in once during stack bootstrap ({@link E2eStackExtension}),
+   * so passing it here succeeds. A squadron-responsible order is private to that squadron + admins,
+   * which is exactly the ownership these flows assert.
+   *
+   * @param username the Keycloak username of the (admin) test user
    * @param password the Keycloak password of the test user
-   * @param requestingOrgUnitId the org unit the order is requested for (the IRIDIUM Squadron here);
-   *     also sent as {@code creatingSquadronId} because an admin in "all squadrons" mode (no active
-   *     pin, as the seeder's bearer token has) must name the creating squadron explicitly
+   * @param orgUnitId the org unit named as both the responsible (processing) and requesting
+   *     (customer) unit of the order; must be a profit-eligible squadron (see bootstrap seeding)
    * @param handle the free-text contact handle of the order
    * @param materialId the id of the (job-order) material to request
    * @param minQuality the minimum acceptable quality of the requested material ({@code >= 700})
@@ -285,16 +291,16 @@ public final class BackendSeeder {
   public String createJobOrder(
       String username,
       String password,
-      String requestingOrgUnitId,
+      String orgUnitId,
       String handle,
       String materialId,
       int minQuality,
       double amount) {
     String body =
-        "{\"creatingSquadronId\":\""
-            + requestingOrgUnitId
+        "{\"responsibleOrgUnitId\":\""
+            + orgUnitId
             + "\",\"requestingOrgUnitId\":\""
-            + requestingOrgUnitId
+            + orgUnitId
             + "\",\"handle\":\""
             + handle
             + "\",\"materials\":[{\"materialId\":\""
@@ -374,16 +380,17 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code POST /api/v1/orders} with explicit creating + requesting OrgUnit ids and
-   * returns the HTTP status WITHOUT throwing, so a test can assert the documented 400 when a
-   * Spezialkommando is named as a job order's OrgUnit (the legacy {@code owning_squadron_id} column
-   * is still {@code NOT NULL}, so the picker resolver rejects SK ownership until the destructive
-   * cleanup release).
+   * Attempts {@code POST /api/v1/orders} naming the given org unit as the responsible (processing)
+   * unit and returns the HTTP status WITHOUT throwing, so a test can assert the documented 400 when
+   * the named unit is not profit-eligible. Only profit-eligible squadrons / Spezialkommandos may
+   * process orders (V128); a freshly created SK is not profit-eligible by default, so naming it as
+   * the responsible unit is rejected with 400 ("not profit-eligible").
    *
-   * @param username the Keycloak username (an admin, to name an explicit creating squadron)
+   * @param username the Keycloak username (an admin, to create in all-squadrons scope)
    * @param password the Keycloak password
-   * @param creatingOrgUnitId the creating OrgUnit id under test (an SK to trigger the 400)
-   * @param requestingOrgUnitId the requesting OrgUnit id
+   * @param responsibleOrgUnitId the responsible (processing) OrgUnit id under test (a
+   *     non-profit-eligible SK, to trigger the 400)
+   * @param requestingOrgUnitId the requesting (customer) OrgUnit id
    * @param handle the order contact handle
    * @param materialId the requested material id
    * @param minQuality the minimum quality ({@code >= 700})
@@ -393,7 +400,7 @@ public final class BackendSeeder {
   public int attemptCreateJobOrderStatus(
       String username,
       String password,
-      String creatingOrgUnitId,
+      String responsibleOrgUnitId,
       String requestingOrgUnitId,
       String handle,
       String materialId,
@@ -402,8 +409,8 @@ public final class BackendSeeder {
     try {
       String token = passwordGrant(username, password);
       String body =
-          "{\"creatingSquadronId\":\""
-              + creatingOrgUnitId
+          "{\"responsibleOrgUnitId\":\""
+              + responsibleOrgUnitId
               + "\",\"requestingOrgUnitId\":\""
               + requestingOrgUnitId
               + "\",\"handle\":\""
@@ -497,6 +504,37 @@ public final class BackendSeeder {
             + "\",\"shorthand\":\""
             + shorthand
             + "\",\"isPromotionEnabled\":true}");
+  }
+
+  /**
+   * Opts a squadron into (or out of) Job-Order processing by setting its {@code is_profit_eligible}
+   * flag via {@code PATCH /api/v1/squadrons/{id}/profit-eligible} (admin-only, body {@code
+   * {"eligible": …}}). Only profit-eligible org units may be a job order's responsible (processing)
+   * unit and appear in the create form's responsible picker (V128), so this is a precondition for
+   * seeding any order owned by the squadron. Throws on a non-2xx status.
+   *
+   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
+   * @param adminPassword the admin password
+   * @param squadronId the squadron OrgUnit id to toggle
+   * @param eligible the new {@code is_profit_eligible} value
+   */
+  public void setSquadronProfitEligible(
+      String adminUser, String adminPassword, String squadronId, boolean eligible) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      int status =
+          patch(
+              token,
+              "/api/v1/squadrons/" + squadronId + "/profit-eligible",
+              "{\"eligible\":" + eligible + "}");
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("Profit-eligibility PATCH failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.setSquadronProfitEligible failed", e);
+    }
   }
 
   /**

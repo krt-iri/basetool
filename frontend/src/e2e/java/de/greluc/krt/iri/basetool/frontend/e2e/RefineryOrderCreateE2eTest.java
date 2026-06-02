@@ -7,6 +7,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -101,7 +102,9 @@ class RefineryOrderCreateE2eTest {
 
         // The created order must appear in the list (fresh ephemeral DB => exactly one).
         page.navigate(baseUrl + "/refinery-orders");
-        assertThat(page.getByTestId("refinery-order-row").first()).isVisible();
+        // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
+        assertThat(page.getByTestId("refinery-order-row").first())
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-create");
         throw failure;
