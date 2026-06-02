@@ -59,8 +59,8 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:if="${material != null}" th:text="${material.name}">Material Name</h1>
-        <h1 th:if="${material == null}">Material nicht gefunden</h1>
-        <a th:href="@{/materials}" class="btn btn-ghost">Zurück zur Übersicht</a>
+        <h1 th:if="${material == null}" th:text="#{materials.detail.notFound}">Material nicht gefunden</h1>
+        <a th:href="@{/materials}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
     </div>
 
     <div class="hud-box mt-2">
@@ -75,9 +75,10 @@
 
             <div class="data-section">
                 <div class="flex-between-mb">
-                    <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;">Preise und Terminals</h2>
+                    <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
                     <div class="form-group" style="margin: 0; position: relative;">
-                        <input type="text" id="terminalFilter" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
+                        <label for="terminalFilter" class="visually-hidden" th:text="#{materials.detail.filterPlaceholder}">Terminal suchen</label>
+                        <input type="text" id="terminalFilter" th:placeholder="#{materials.detail.filterPlaceholder}" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
                         <!--/*
                           Terminal names are exposed to JavaScript via this server-
                           rendered <datalist> instead of a Thymeleaf JS-inline
