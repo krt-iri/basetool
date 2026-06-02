@@ -161,8 +161,6 @@ class UserControllerTest {
     assertEquals("bob.callsign", result.username());
     assertEquals("Bob Display", result.displayName());
     assertNull(result.email(), "peer view must not expose email");
-    assertNull(result.firstName(), "peer view must not expose firstName");
-    assertNull(result.lastName(), "peer view must not expose lastName");
     assertNull(result.roles(), "peer view must not expose roles");
     assertNull(result.permissions(), "peer view must not expose permissions");
   }
@@ -181,8 +179,6 @@ class UserControllerTest {
 
     UserDto redacted = resp.content().getFirst();
     assertNull(redacted.email());
-    assertNull(redacted.firstName());
-    assertNull(redacted.lastName());
   }
 
   // ── Audit finding H-3 (2026-05-20): cross-squadron isolation on getUserById ────────────
@@ -212,8 +208,6 @@ class UserControllerTest {
     // existing peer-redaction path.
     assertEquals("bob.callsign", result.username());
     assertNull(result.email(), "cross-squadron non-admin must not see email");
-    assertNull(result.firstName(), "cross-squadron non-admin must not see first name");
-    assertNull(result.lastName(), "cross-squadron non-admin must not see last name");
     assertNull(result.joinDate(), "cross-squadron non-admin must not see joinDate");
   }
 
@@ -235,8 +229,6 @@ class UserControllerTest {
     UserDto result = controller.getUserById(userId);
 
     assertNull(result.email());
-    assertNull(result.firstName());
-    assertNull(result.lastName());
   }
 
   @Test
@@ -268,8 +260,6 @@ class UserControllerTest {
         "bob.callsign",
         "Bob Display",
         "Bob",
-        "Bob",
-        "Builder",
         "bob@example.invalid",
         5,
         "some desc",
@@ -469,8 +459,6 @@ class UserControllerTest {
         "u",
         "U",
         "U",
-        "First",
-        "Last",
         "u@example.com",
         5,
         "desc",

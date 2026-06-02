@@ -41,8 +41,6 @@ public final class EntityMappers {
         u.getUsername(),
         u.getDisplayName(),
         u.getEffectiveName(),
-        u.getFirstName(),
-        u.getLastName(),
         u.getEmail(),
         u.getRank(),
         u.getDescription(),

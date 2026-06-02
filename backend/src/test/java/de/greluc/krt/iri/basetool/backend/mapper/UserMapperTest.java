@@ -50,8 +50,6 @@ class UserMapperTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("jdoe");
-    user.setFirstName("John");
-    user.setLastName("Doe");
     user.setEmail("jdoe@example.com");
     user.setRank(5);
     user.setDescription("desc");
@@ -66,8 +64,6 @@ class UserMapperTest {
     assertNotNull(dto);
     assertEquals(user.getId(), dto.id());
     assertEquals("jdoe", dto.username());
-    assertEquals("John", dto.firstName());
-    assertEquals("Doe", dto.lastName());
     assertEquals("jdoe@example.com", dto.email());
     assertEquals(5, dto.rank());
     assertEquals("desc", dto.description());
@@ -80,8 +76,6 @@ class UserMapperTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("empty");
-    user.setFirstName(null);
-    user.setLastName(null);
     user.setEmail(null);
     user.setRank(null);
     user.setDescription(null);

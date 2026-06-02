@@ -44,8 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional
 public class UserController {
 
-  private static final Set<String> ALLOWED_SORT =
-      Set.of("username", "firstName", "lastName", "email", "rank", "id");
+  private static final Set<String> ALLOWED_SORT = Set.of("username", "email", "rank", "id");
 
   private final UserService userService;
   private final UserMapper userMapper;
@@ -376,16 +375,14 @@ public class UserController {
   /**
    * Strips the PII that a peer (non-Officer, non-Admin) does not need to see. Returns the input
    * unchanged for officers/admins and the caller's own row (admins/officers may legitimately need
-   * the email + real-name fields for moderation / payouts). Audit finding H-4: previously any
-   * SQUADRON_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email +
-   * first/last name.
+   * the email field for moderation / payouts). Audit finding H-4: previously any SQUADRON_MEMBER
+   * could paginate {@code /api/v1/users/search} and harvest every member's email.
    *
    * <p>The peer view keeps {@code id}, {@code username}, {@code displayName}, {@code
    * effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code version} — enough
    * for the participant pickers in the mission editor to identify peers visually; drops {@code
-   * email}, {@code firstName}, {@code lastName}, {@code description}, {@code roles}, {@code
-   * permissions}, {@code lastReadAnnouncementId}, {@code isLogistician}, {@code isMissionManager},
-   * {@code joinDate}.
+   * email}, {@code description}, {@code roles}, {@code permissions}, {@code
+   * lastReadAnnouncementId}, {@code isLogistician}, {@code isMissionManager}, {@code joinDate}.
    *
    * @param dto the persisted user DTO
    * @return the redacted DTO for non-elevated callers, or the original for officer/admin
@@ -399,10 +396,10 @@ public class UserController {
 
   /**
    * Returns the slim peer view of {@code dto} unconditionally — drops PII fields ({@code email},
-   * first/last name, description, roles, permissions, flags, joinDate, lastReadAnnouncementId) and
-   * keeps the public callsign tuple. Used by {@link #getUserById} for the cross-squadron non-admin
-   * path (audit finding H-3), where role-based escalation does NOT widen the view — an officer of
-   * squadron A must not see PII of squadron B's members.
+   * description, roles, permissions, flags, joinDate, lastReadAnnouncementId) and keeps the public
+   * callsign tuple. Used by {@link #getUserById} for the cross-squadron non-admin path (audit
+   * finding H-3), where role-based escalation does NOT widen the view — an officer of squadron A
+   * must not see PII of squadron B's members.
    *
    * @param dto persisted user DTO; never {@code null}
    * @return the slim peer-view DTO
@@ -413,8 +410,6 @@ public class UserController {
         dto.username(),
         dto.displayName(),
         dto.effectiveName(),
-        null, // firstName
-        null, // lastName
         null, // email
         dto.rank(),
         null, // description

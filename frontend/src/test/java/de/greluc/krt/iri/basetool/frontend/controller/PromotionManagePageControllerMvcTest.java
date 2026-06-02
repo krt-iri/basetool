@@ -84,8 +84,8 @@ class PromotionManagePageControllerMvcTest {
             catId2, 0L, topicId, "Profit", "Mining", "Mining description", 1, null, null);
     UserDto member =
         new UserDto(
-            memberId, "alice", null, "alice", null, null, null, 20, null, Set.of(), Set.of(), null,
-            null, null, null, null, 0L, null);
+            memberId, "alice", null, "alice", null, 20, null, Set.of(), Set.of(), null, null, null,
+            null, null, 0L, null);
     MemberEvaluationDto eval =
         new MemberEvaluationDto(
             UUID.randomUUID(),

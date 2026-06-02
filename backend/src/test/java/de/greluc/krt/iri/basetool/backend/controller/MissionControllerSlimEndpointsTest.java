@@ -148,8 +148,6 @@ class MissionControllerSlimEndpointsTest {
     User manager = new User();
     manager.setId(userId);
     manager.setUsername("user.one");
-    manager.setFirstName("User");
-    manager.setLastName("One");
     Set<User> managers = new HashSet<>();
     managers.add(manager);
     mission.setManagers(managers);
@@ -236,8 +234,6 @@ class MissionControllerSlimEndpointsTest {
     User u = new User();
     u.setId(userId);
     u.setUsername("self.user");
-    u.setFirstName("Self");
-    u.setLastName("User");
     p.setUser(u);
     Set<MissionParticipant> set = new LinkedHashSet<>();
     set.add(p);
@@ -622,10 +618,10 @@ class MissionControllerSlimEndpointsTest {
   // ===================================================================
 
   /**
-   * Builds a mission whose participant set already contains an OTHER registered user (Bob,
-   * email/firstName/lastName populated) plus the newly-added guest entry. Reflects the response
-   * shape both endpoints assemble: the entire participant list is returned, so the response carries
-   * everyone's PII unless redaction kicks in.
+   * Builds a mission whose participant set already contains an OTHER registered user (Bob, email
+   * populated) plus the newly-added guest entry. Reflects the response shape both endpoints
+   * assemble: the entire participant list is returned, so the response carries everyone's PII
+   * unless redaction kicks in.
    */
   private Mission missionWithOtherUserAndGuest(UUID otherUserId, UUID guestParticipantId) {
     Mission mission = new Mission();
@@ -636,8 +632,6 @@ class MissionControllerSlimEndpointsTest {
     User bob = new User();
     bob.setId(otherUserId);
     bob.setUsername("bob.callsign");
-    bob.setFirstName("Bob");
-    bob.setLastName("Builder");
     bob.setEmail("bob@example.invalid");
     bobEntry.setUser(bob);
     set.add(bobEntry);
@@ -676,16 +670,10 @@ class MissionControllerSlimEndpointsTest {
     // way to identify the other participants on the public mission page.
     org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob.callsign"), "username must remain visible to guests");
-    // PII redaction: email, real first / last name must NOT appear in the response.
+    // PII redaction: email must NOT appear in the response.
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "anonymous response must not leak participant email — audit finding C-1");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"firstName\":\"Bob\""),
-        "anonymous response must not leak participant first name — audit finding C-1");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"lastName\":\"Builder\""),
-        "anonymous response must not leak participant last name — audit finding C-1");
   }
 
   @Test
@@ -715,12 +703,6 @@ class MissionControllerSlimEndpointsTest {
     // Authenticated officer DOES see the full PII — required for the existing mission-roster UI.
     org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob@example.invalid"), "authenticated officer must see participant email");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"firstName\":\"Bob\""),
-        "authenticated officer must see participant first name");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"lastName\":\"Builder\""),
-        "authenticated officer must see participant last name");
   }
 
   @Test
@@ -748,12 +730,6 @@ class MissionControllerSlimEndpointsTest {
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "anonymous response must not leak participant email — audit finding C-1");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"firstName\":\"Bob\""),
-        "anonymous response must not leak participant first name — audit finding C-1");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"lastName\":\"Builder\""),
-        "anonymous response must not leak participant last name — audit finding C-1");
   }
 
   @Test
@@ -782,11 +758,5 @@ class MissionControllerSlimEndpointsTest {
 
     org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob@example.invalid"), "authenticated officer must see participant email");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"firstName\":\"Bob\""),
-        "authenticated officer must see participant first name");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"lastName\":\"Builder\""),
-        "authenticated officer must see participant last name");
   }
 }

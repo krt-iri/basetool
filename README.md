@@ -440,7 +440,6 @@ worktree; the commands are identical).
        'username': 'test-admin',
        'enabled': True, 'emailVerified': True,
        'email': 'test-admin@example.test',
-       'firstName': 'Test', 'lastName': 'Admin',
        'credentials': [{'type': 'password', 'value': 'test-admin-pw', 'temporary': False}],
        'realmRoles': ['Admin', 'Officer', 'Squadron Member', 'default-roles-iri',
                       'offline_access', 'uma_authorization'],

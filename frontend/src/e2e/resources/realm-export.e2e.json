@@ -65,8 +65,6 @@
       "enabled": true,
       "emailVerified": true,
       "email": "test-admin@example.test",
-      "firstName": "Test",
-      "lastName": "Admin",
       "credentials": [
         { "type": "password", "value": "test-admin-pw", "temporary": false }
       ],
@@ -77,8 +75,6 @@
       "enabled": true,
       "emailVerified": true,
       "email": "test-officer@example.test",
-      "firstName": "Test",
-      "lastName": "Officer",
       "credentials": [
         { "type": "password", "value": "test-officer-pw", "temporary": false }
       ],
@@ -89,8 +85,6 @@
       "enabled": true,
       "emailVerified": true,
       "email": "test-member@example.test",
-      "firstName": "Test",
-      "lastName": "Member",
       "credentials": [
         { "type": "password", "value": "test-member-pw", "temporary": false }
       ],

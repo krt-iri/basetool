@@ -121,8 +121,9 @@ public class UserService {
       // indicates a misconfigured authorization server. Refuse rather than
       // falling back to a different claim and silently identifying users by
       // a value an admin might rename in Keycloak.
-      // Audit finding H-10: only log the claim keys, never the values. Full claims map contains
-      // preferred_username / given_name / family_name / email which PiiMasker only partially
+      // Audit finding H-10: only log the claim keys, never the values. The claims map still
+      // carries PII (preferred_username / email — and, on a Keycloak that has not yet had its
+      // name mappers removed, possibly given_name / family_name) which PiiMasker only partially
       // scrubs — the keys still help diagnose a Keycloak mapper misconfiguration.
       log.error(
           "JWT has no subject (sub). Refusing the request. Claim keys: {}",
@@ -192,18 +193,9 @@ public class UserService {
       changed = true;
     }
 
-    String firstName = jwt.getClaimAsString("given_name");
-    if (!Objects.equals(user.getFirstName(), firstName)) {
-      user.setFirstName(firstName);
-      changed = true;
-    }
-
-    String lastName = jwt.getClaimAsString("family_name");
-    if (!Objects.equals(user.getLastName(), lastName)) {
-      user.setLastName(lastName);
-      changed = true;
-    }
-
+    // Privacy / data minimisation: given_name / family_name are intentionally NOT read or stored
+    // anymore (the columns were dropped from the entity). Only username, email and roles are
+    // mirrored locally.
     String email = jwt.getClaimAsString("email");
     if (!Objects.equals(user.getEmail(), email)) {
       user.setEmail(email);
@@ -261,16 +253,8 @@ public class UserService {
       changed = true;
     }
 
-    if (!Objects.equals(user.getFirstName(), dto.firstName())) {
-      user.setFirstName(dto.firstName());
-      changed = true;
-    }
-
-    if (!Objects.equals(user.getLastName(), dto.lastName())) {
-      user.setLastName(dto.lastName());
-      changed = true;
-    }
-
+    // Privacy / data minimisation: first / last name are intentionally not mirrored (see
+    // syncUser(Jwt)).
     if (!Objects.equals(user.getEmail(), dto.email())) {
       user.setEmail(dto.email());
       changed = true;

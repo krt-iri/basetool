@@ -112,8 +112,6 @@ class MissionControllerLifecycleTest {
             "alice",
             "Alice Display",
             "Alice Effective",
-            "Alice",
-            "Anderson",
             "alice@example.com",
             12,
             "internal description",
@@ -487,13 +485,11 @@ class MissionControllerLifecycleTest {
     assertThat(result.inventoryEntries()).isEmpty();
     assertThat(result.refineryOrders()).isEmpty();
 
-    // Nested-participant redaction: the user must lose firstName/lastName/email/description/
+    // Nested-participant redaction: the user must lose email/description/
     // roles/permissions/announcementWatermark/joinDate. Username + displayName + rank stay
     // (public callsign tuple).
     MissionParticipantDto participant = result.participants().iterator().next();
     UserDto cleanedUser = participant.user();
-    assertThat(cleanedUser.firstName()).isNull();
-    assertThat(cleanedUser.lastName()).isNull();
     assertThat(cleanedUser.email()).isNull();
     assertThat(cleanedUser.description()).isNull();
     assertThat(cleanedUser.roles()).isNull();

@@ -42,8 +42,6 @@ public class User extends AbstractEntity<UUID> {
 
   private String username;
   private String displayName;
-  private String firstName;
-  private String lastName;
   private String email;
 
   @Min(1)
