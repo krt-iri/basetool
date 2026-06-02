@@ -66,6 +66,27 @@ public class BackendApiClient {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
+  /**
+   * GET against the authenticated backend, expanding {@code uriVariables} into {@code uriTemplate}
+   * so the WebClient encodes them per RFC 3986. Prefer this over hand-encoding a value into the URI
+   * string: a value carrying spaces or reserved characters (e.g. a normalized blueprint product key
+   * such as {@code killshot "dominion camo" rifle}) round-trips intact, whereas {@code
+   * URLEncoder.encode} form-encoding (space &rarr; {@code +}) gets mangled when re-encoded across
+   * the frontend&rarr;backend hop. Targets the authenticated WebClient only.
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param responseType the decoded response type
+   * @param uriVariables the values expanded into the template, encoded by the WebClient
+   * @param <T> the response body type
+   * @return the decoded response body
+   */
+  @Retry(name = "backend")
+  @CircuitBreaker(name = "backend")
+  public <T> T get(
+      String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
+    return executeGet(webClient, uriTemplate, responseType, uriVariables);
+  }
+
   /** GET overload for simple (non-generic) return types. */
   @Retry(name = "backend")
   @CircuitBreaker(name = "backend")
@@ -138,6 +159,25 @@ public class BackendApiClient {
       return handleWebClientException(e, "GET", uri);
     } catch (Exception e) {
       return handleException(e, "GET", uri);
+    }
+  }
+
+  private <T> T executeGet(
+      WebClient client,
+      String uriTemplate,
+      ParameterizedTypeReference<T> responseType,
+      Object... uriVariables) {
+    try {
+      return client
+          .get()
+          .uri(uriTemplate, uriVariables)
+          .retrieve()
+          .bodyToMono(responseType)
+          .block();
+    } catch (WebClientResponseException e) {
+      return handleWebClientException(e, "GET", uriTemplate);
+    } catch (Exception e) {
+      return handleException(e, "GET", uriTemplate);
     }
   }
 

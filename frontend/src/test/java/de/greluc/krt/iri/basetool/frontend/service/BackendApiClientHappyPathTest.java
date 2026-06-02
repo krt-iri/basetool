@@ -116,6 +116,31 @@ class BackendApiClientHappyPathTest {
     assertEquals("public", req.getHeader("X-Auth"));
   }
 
+  @Test
+  void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
+    // #371 regression guard: the blueprint owner drill-down passes a normalized product key
+    // (spaces plus a literal quote) as a query value. The WebClient must percent-encode it
+    // (space -> %20, '"' -> %22), never form-encode it (space -> '+'), so the backend
+    // @RequestParam decodes the exact stored key. The previous URLEncoder.encode path produced
+    // '+' for spaces and was mangled across the frontend->backend hop, yielding zero owners.
+    server.enqueue(jsonOk("[]"));
+
+    client.get(
+        "/api/v1/personal-blueprints/overview/owners?productKey={productKey}",
+        new ParameterizedTypeReference<List<String>>() {},
+        "killshot \"dominion camo\" rifle");
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals(
+        "/api/v1/personal-blueprints/overview/owners?productKey=killshot%20%22dominion%20camo%22%20rifle",
+        req.getPath());
+    assertEquals(
+        "authenticated",
+        req.getHeader("X-Auth"),
+        "URI-variable GET must use the authenticated WebClient");
+  }
+
   // ── getCached ───────────────────────────────────────────────────────────
   // The @Cacheable annotation is a no-op outside a Spring application
   // context, so the body executes normally — that's all we need to cover.

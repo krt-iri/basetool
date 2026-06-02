@@ -4,8 +4,6 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintOverviewOwnerDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -80,9 +78,9 @@ public class BlueprintOverviewPageController {
     try {
       List<BlueprintOverviewOwnerDto> owners =
           backendApiClient.get(
-              "/api/v1/personal-blueprints/overview/owners?productKey="
-                  + URLEncoder.encode(productKey, StandardCharsets.UTF_8),
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/personal-blueprints/overview/owners?productKey={productKey}",
+              new ParameterizedTypeReference<>() {},
+              productKey);
       return owners != null ? owners : List.of();
     } catch (Exception e) {
       log.warn(

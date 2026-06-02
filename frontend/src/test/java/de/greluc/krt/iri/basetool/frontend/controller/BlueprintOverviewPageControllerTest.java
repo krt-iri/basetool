@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
@@ -64,10 +65,14 @@ class BlueprintOverviewPageControllerTest {
   }
 
   @Test
-  void owners_relaysProductKey_andReturnsList() {
+  void owners_relaysProductKey_asUriVariable_andReturnsList() {
+    // The product key is passed as a URI template variable (so the WebClient percent-encodes it),
+    // not concatenated into the path — see BackendApiClient#get(String, ParameterizedTypeReference,
+    // Object...). The raw key therefore arrives as a separate argument, not inside the template.
     when(backendApiClient.get(
-            contains("/api/v1/personal-blueprints/overview/owners?productKey=aurora"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/personal-blueprints/overview/owners?productKey={productKey}"),
+            any(ParameterizedTypeReference.class),
+            eq("aurora")))
         .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha")));
 
     List<BlueprintOverviewOwnerDto> result = controller.owners("aurora");
@@ -78,7 +83,8 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void owners_onBackendError_returnsEmptyList() {
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(
+            any(String.class), any(ParameterizedTypeReference.class), eq("aurora")))
         .thenThrow(new RuntimeException("boom"));
 
     assertTrue(controller.owners("aurora").isEmpty());

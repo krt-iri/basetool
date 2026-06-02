@@ -125,19 +125,24 @@ public class PersonalBlueprintOverviewService {
   }
 
   /**
-   * Resolves the Keycloak {@code sub}s of every user in the caller's oversight scope, translating
-   * the {@link ScopePredicate} into a set of member user ids and then into their {@code sub} string
-   * form (the {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}).
+   * Resolves the Keycloak {@code sub}s of every user in the caller's oversight scope. For the admin
+   * "all org units" scope this is every blueprint owner in the system (via {@link
+   * PersonalBlueprintRepository#findAllDistinctOwnerSubs()}) — including owners with no org-unit
+   * membership (e.g. a squadron-less admin), which the previous member-list resolution dropped so
+   * the admin's own blueprints went missing (#371 fix). For a pinned or member-union scope it is
+   * the {@code sub} form of the in-scope org units' member ids (the {@code owner_sub} stored on
+   * {@link PersonalBlueprint} equals {@code User.id}).
    *
-   * @return the in-scope owner {@code sub}s; empty when the caller oversees no org unit
+   * @return the in-scope owner {@code sub}s; empty when a non-admin caller oversees no org unit
    */
   @NotNull
   private Set<String> inScopeOwnerSubs() {
     ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
-    Set<UUID> userIds;
     if (scope.adminAllScope()) {
-      userIds = orgUnitMembershipRepository.findDistinctMemberUserIds();
-    } else if (scope.activeOrgUnitId() != null) {
+      return personalBlueprintRepository.findAllDistinctOwnerSubs();
+    }
+    Set<UUID> userIds;
+    if (scope.activeOrgUnitId() != null) {
       userIds =
           orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(
               Set.of(scope.activeOrgUnitId()));
