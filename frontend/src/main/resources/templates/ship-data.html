@@ -46,7 +46,7 @@
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.hangar_data}">Schiffsdaten</h1>
         <form sec:authorize="hasRole('ADMIN')" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
-            <button type="button" class="btn btn-secondary" data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
+            <button type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
         </form>
     </div>
 
@@ -155,7 +155,7 @@
             <h2 th:text="#{hangar.ship.reset_fitted.confirm.title}">Zurücksetzen bestätigen</h2>
             <p style="margin:1.5rem 0; font-family:var(--font-body); color:var(--color-gray-1);" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
             <div style="display:flex; gap:1rem; justify-content:center;">
-                <button type="button" class="btn btn-secondary" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" data-trigger="submit-form-by-id" data-form-id="reset-fitted-form" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>
         </div>

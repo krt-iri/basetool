@@ -101,7 +101,7 @@
                 border-bottom: 1px solid var(--color-gray-3);
             }
             .material-entry-title {
-                color: var(--color-primary);
+                color: var(--color-gray-1);
                 font-family: var(--font-body);
                 font-weight: bold;
                 font-size: 0.85rem;
@@ -169,7 +169,7 @@
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{refineryorder.create.title}">Neuer Raffinerieauftrag</h1>
         <div class="flex-gap-sm" sec:authorize="isAuthenticated()">
-            <a th:href="@{/refinery-orders}" class="btn btn-secondary" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
+            <a th:href="@{/refinery-orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
         </div>
     </div>
 
@@ -228,7 +228,7 @@
                                 <input type="date" class="date-part">
                                 <input type="time" class="time-part">
                             </div>
-                            <button type="button" class="btn btn-secondary" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button type="button" class="btn btn-ghost" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>
                     </div>
                     
@@ -305,14 +305,14 @@
                 </div>
 
                 <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
+                    <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
                 </div>
 
                 <div id="materials-container">
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                            <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
                         </div>
 
                         <div class="material-row">
@@ -361,8 +361,8 @@
                 <button type="button" class="btn-add-row" data-testid="refinery-add-material" data-trigger="rfc-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
 
                 <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn" data-testid="refinery-submit" th:text="#{orders.create.save}">Speichern</button>
-                    <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <button type="submit" class="btn btn--cta" data-testid="refinery-submit" th:text="#{orders.create.save}">Speichern</button>
+                    <a th:href="@{/refinery-orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
         </div>
@@ -470,7 +470,7 @@
             if (header) {
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
-                removeBtn.className = 'btn btn-secondary remove-btn';
+                removeBtn.className = 'btn btn-quiet-danger remove-btn';
                 removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
                 removeBtn.setAttribute('data-trigger', 'rfc-remove-material');
                 removeBtn.innerText = MATERIAL_REMOVE_LABEL;

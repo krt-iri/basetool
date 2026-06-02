@@ -30,13 +30,6 @@
             display: flex;
             gap: 1rem;
         }
-        .btn-secondary {
-            background-color: var(--color-gray-3);
-            color: var(--color-gray-1);
-        }
-        .btn-secondary:hover {
-            background-color: var(--color-gray-2);
-        }
     </style>
     </th:block>
 </head>
@@ -136,8 +129,8 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn" th:text="#{members.save}">Speichern</button>
-                <a th:href="@{/members}" class="btn btn-secondary" th:text="#{profile.back}">Zurück</a>
+                <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+                <a th:href="@{/members}" class="btn btn-ghost" th:text="#{profile.back}">Zurück</a>
             </div>
         </form>
     </div>
