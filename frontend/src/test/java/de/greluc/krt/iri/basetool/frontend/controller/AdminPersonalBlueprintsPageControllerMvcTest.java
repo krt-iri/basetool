@@ -1,10 +1,12 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -60,6 +62,24 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(model().attributeExists("users"))
         .andExpect(model().attributeExists("blueprints"))
         .andExpect(model().attribute("adminMode", Boolean.TRUE));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_rendersIdPlaceholderToken_inPerRowEndpoints() throws Exception {
+    PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(empty);
+
+    // With a user selected, the inline-JS endpoint map renders. The per-row updateNote/remove
+    // URLs must keep the literal ID_PLACEHOLDER token verbatim; a double-underscore __ID__ would
+    // be eaten by Thymeleaf preprocessing and render "ID", 400ing on UUID parse.
+    mockMvc
+        .perform(
+            get("/admin/personal-blueprints")
+                .param("userSub", "00000000-0000-0000-0000-000000000009"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("ID_PLACEHOLDER")));
   }
 
   @Test

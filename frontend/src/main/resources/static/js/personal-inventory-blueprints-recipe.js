@@ -11,7 +11,7 @@
  *
  * Wiring: uses the global `krtEvents.on` delegation helper (CSP-nonce-safe, no inline
  * onclick). Strings come from window.krtBlueprintsRecipeI18n; the per-row URL (with an
- * `__ID__` placeholder) from window.krtBlueprintsEndpoints. The DOM is built with
+ * `ID_PLACEHOLDER` placeholder) from window.krtBlueprintsEndpoints. The DOM is built with
  * createElement + textContent only (no innerHTML), so no value is ever an HTML sink.
  */
 (function () {
@@ -35,7 +35,7 @@
     }
 
     function resolveUrl(template, id) {
-        const raw = (template || '').replace('__ID__', encodeURIComponent(id));
+        const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
     }
 
