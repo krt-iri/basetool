@@ -2,15 +2,23 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductRow;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintRequirementGroupDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintRequirementIngredientDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
+import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.service.BlueprintProductService.ResolvedProduct;
@@ -31,6 +39,7 @@ class BlueprintProductServiceTest {
 
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
+  @Mock private BlueprintMapper blueprintMapper;
 
   private BlueprintProductService service;
 
@@ -38,7 +47,10 @@ class BlueprintProductServiceTest {
   void setUp() {
     service =
         new BlueprintProductService(
-            blueprintRepository, personalBlueprintRepository, new BlueprintNameNormalizer());
+            blueprintRepository,
+            personalBlueprintRepository,
+            new BlueprintNameNormalizer(),
+            blueprintMapper);
   }
 
   private static BlueprintProductRow row(
@@ -154,5 +166,46 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveProductRows("")).thenReturn(List.of());
 
     assertTrue(service.resolveByProductKey("does-not-exist").isEmpty());
+  }
+
+  @Test
+  void resolveRecipe_mapsRepresentativeRecipeAndCountsVariants() {
+    UUID id1 = UUID.randomUUID();
+    UUID id2 = UUID.randomUUID();
+    when(blueprintRepository.findActiveIdNameRows())
+        .thenReturn(
+            List.of(
+                new BlueprintIdNameRow(id1, "Arclight Pistol"),
+                new BlueprintIdNameRow(id2, "Arclight Pistol")));
+    Blueprint recipe = new Blueprint();
+    when(blueprintRepository.findById(id1)).thenReturn(Optional.of(recipe));
+    List<BlueprintRequirementGroupDto> groups =
+        List.of(new BlueprintRequirementGroupDto("Emitter", "EMITTER", 1, List.of(), List.of()));
+    List<BlueprintRequirementIngredientDto> ingredients =
+        List.of(new BlueprintRequirementIngredientDto("RESOURCE", "Tin", 0.36, null, null));
+    when(blueprintMapper.toGroupDtos(any())).thenReturn(groups);
+    when(blueprintMapper.toIngredientDtos(any())).thenReturn(ingredients);
+
+    Optional<PersonalBlueprintRecipeResponse> result = service.resolveRecipe("arclight pistol");
+
+    assertTrue(result.isPresent());
+    assertEquals("Arclight Pistol", result.get().productName());
+    assertEquals(2, result.get().variantCount());
+    assertSame(groups, result.get().requirementGroups());
+    assertSame(ingredients, result.get().ingredients());
+  }
+
+  @Test
+  void resolveRecipe_returnsEmptyForBlankKey() {
+    assertTrue(service.resolveRecipe("  ").isEmpty());
+    verify(blueprintRepository, org.mockito.Mockito.never()).findActiveIdNameRows();
+  }
+
+  @Test
+  void resolveRecipe_returnsEmptyForUnknownKey() {
+    when(blueprintRepository.findActiveIdNameRows())
+        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item")));
+
+    assertTrue(service.resolveRecipe("ghost").isEmpty());
   }
 }

@@ -47,6 +47,26 @@ public interface BlueprintMapper {
   BlueprintRequirementGroupDto toGroupDto(BlueprintRequirementGroup group);
 
   /**
+   * Maps a list of requirement groups element-wise via {@link
+   * #toGroupDto(BlueprintRequirementGroup)}, so a recipe's build slots can be exposed without
+   * mapping the rest of the blueprint aggregate (used by the Personal Inventory recipe view, #327).
+   *
+   * @param groups the requirement-group entities (may be {@code null})
+   * @return the requirement-group DTOs, or {@code null} when {@code groups} is {@code null}
+   */
+  List<BlueprintRequirementGroupDto> toGroupDtos(List<BlueprintRequirementGroup> groups);
+
+  /**
+   * Maps a list of ingredient lines element-wise via {@link #toIngredientDto(BlueprintIngredient)},
+   * used to expose a recipe's flat ingredient list as the legacy fallback for the Personal
+   * Inventory recipe view (#327).
+   *
+   * @param ingredients the ingredient entities (may be {@code null})
+   * @return the ingredient DTOs, or {@code null} when {@code ingredients} is {@code null}
+   */
+  List<BlueprintRequirementIngredientDto> toIngredientDtos(List<BlueprintIngredient> ingredients);
+
+  /**
    * Maps a requirement modifier (stat contribution) to its DTO, deriving the effective quality band
    * from the segments so the slider spans the full covered range (see {@link
    * #effectiveQualityMin(BlueprintRequirementModifier)}).

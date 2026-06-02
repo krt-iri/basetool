@@ -82,6 +82,9 @@
             <table class="krt-table krt-pi-table">
                 <thead>
                 <tr>
+                    <th class="krt-bp-recipe-toggle-col" scope="col">
+                        <span class="visually-hidden" th:text="#{personalInventory.blueprints.recipe.toggle}">Zutaten &amp; Stats</span>
+                    </th>
                     <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
                     <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
                     <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
@@ -90,33 +93,48 @@
                 </thead>
                 <tbody>
                 <tr th:if="${#lists.isEmpty(blueprints)}">
-                    <td colspan="4" class="krt-pi-empty" th:text="#{personalInventory.blueprints.empty}">Keine Blueprints.</td>
+                    <td colspan="5" class="krt-pi-empty" th:text="#{personalInventory.blueprints.empty}">Keine Blueprints.</td>
                 </tr>
-                <tr th:each="bp : ${blueprints}" th:attr="data-bp-id=${bp.id}">
-                    <td th:text="${bp.productName}">Produkt</td>
-                    <td>
-                        <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
-                        <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
-                    </td>
-                    <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
-                    <td>
-                        <div class="krt-pi-actions">
-                            <button type="button" class="btn btn-ghost"
-                                    data-trigger="bp-open-edit"
-                                    th:attr="data-id=${bp.id},
-                                             data-version=${bp.version},
-                                             data-name=${bp.productName},
-                                             data-note=${bp.note},
-                                             data-acquired-at=${bp.acquiredAt}"
-                                    th:text="#{personalInventory.blueprints.action.editNote}">Notiz bearbeiten</button>
-                            <button type="button" class="btn btn-quiet-danger"
-                                    data-trigger="bp-open-delete"
-                                    th:attr="data-id=${bp.id},
-                                             data-name=${bp.productName}"
-                                    th:text="#{personalInventory.blueprints.action.remove}">Entfernen</button>
-                        </div>
-                    </td>
-                </tr>
+                <th:block th:each="bp : ${blueprints}">
+                    <tr th:attr="data-bp-id=${bp.id}">
+                        <td class="krt-bp-recipe-toggle-cell">
+                            <button type="button" class="krt-bp-recipe-toggle"
+                                    data-trigger="bp-toggle-recipe" aria-expanded="false"
+                                    th:attr="data-id=${bp.id},aria-controls=|bp-recipe-${bp.id}|,aria-label=#{personalInventory.blueprints.recipe.toggle}">
+                                <span class="krt-bp-recipe-caret" aria-hidden="true">&#9656;</span>
+                            </button>
+                        </td>
+                        <td th:text="${bp.productName}">Produkt</td>
+                        <td>
+                            <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
+                            <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
+                        </td>
+                        <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
+                        <td>
+                            <div class="krt-pi-actions">
+                                <button type="button" class="btn btn-ghost"
+                                        data-trigger="bp-open-edit"
+                                        th:attr="data-id=${bp.id},
+                                                 data-version=${bp.version},
+                                                 data-name=${bp.productName},
+                                                 data-note=${bp.note},
+                                                 data-acquired-at=${bp.acquiredAt}"
+                                        th:text="#{personalInventory.blueprints.action.editNote}">Notiz bearbeiten</button>
+                                <button type="button" class="btn btn-quiet-danger"
+                                        data-trigger="bp-open-delete"
+                                        th:attr="data-id=${bp.id},
+                                                 data-name=${bp.productName}"
+                                        th:text="#{personalInventory.blueprints.action.remove}">Entfernen</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="krt-bp-recipe-row" hidden
+                        th:attr="id=|bp-recipe-${bp.id}|,data-recipe-for=${bp.id}">
+                        <td colspan="5" class="krt-bp-recipe-cell">
+                            <div class="krt-bp-recipe-panel" data-loaded="false"></div>
+                        </td>
+                    </tr>
+                </th:block>
                 </tbody>
             </table>
         </div>
@@ -219,11 +237,25 @@
         addedLabel:      /*[[#{personalInventory.blueprints.toast.addedLabel}]]*/ 'hinzugefuegt',
         skippedLabel:    /*[[#{personalInventory.blueprints.toast.skipped}]]*/ 'uebersprungen'
     };
+    window.krtBlueprintsRecipeI18n = {
+        ingredients:      /*[[#{personalInventory.blueprints.recipe.ingredients}]]*/      'Zutaten',
+        statContribution: /*[[#{personalInventory.blueprints.recipe.statContribution}]]*/ 'Stat-Beitrag nach Zutat-Qualitaet',
+        minQuality:       /*[[#{personalInventory.blueprints.recipe.minQuality}]]*/        'min. Qualitaet',
+        betterHigher:     /*[[#{personalInventory.blueprints.recipe.betterWhen.higher}]]*/  'hoeher ist besser',
+        betterLower:      /*[[#{personalInventory.blueprints.recipe.betterWhen.lower}]]*/   'niedriger ist besser',
+        betterNeutral:    /*[[#{personalInventory.blueprints.recipe.betterWhen.neutral}]]*/ 'neutral',
+        loading:          /*[[#{personalInventory.blueprints.recipe.loading}]]*/  'Rezept wird geladen...',
+        empty:            /*[[#{personalInventory.blueprints.recipe.empty}]]*/    'Keine Rezeptdaten verfuegbar.',
+        error:            /*[[#{personalInventory.blueprints.recipe.error}]]*/    'Rezept konnte nicht geladen werden.',
+        exampleRecipe:    /*[[#{personalInventory.blueprints.recipe.exampleRecipe}]]*/ 'Beispielrezept',
+        variants:         /*[[#{personalInventory.blueprints.add.variants}]]*/    'Varianten'
+    };
     window.krtBlueprintsEndpoints = {
         search:      /*[[@{/personal-inventory/blueprints/search}]]*/      '/personal-inventory/blueprints/search',
         addSelected: /*[[@{/personal-inventory/blueprints/add-selected}]]*/ '/personal-inventory/blueprints/add-selected',
         updateNote:  /*[[@{/personal-inventory/blueprints/__ID__/update-note}]]*/ '/personal-inventory/blueprints/__ID__/update-note',
         remove:      /*[[@{/personal-inventory/blueprints/__ID__/delete}]]*/ '/personal-inventory/blueprints/__ID__/delete',
+        recipe:      /*[[@{/personal-inventory/blueprints/__ID__/recipe}]]*/ '/personal-inventory/blueprints/__ID__/recipe',
         importPreview: /*[[@{/personal-inventory/blueprints/import/preview}]]*/ '/personal-inventory/blueprints/import/preview',
         importApply:   /*[[@{/personal-inventory/blueprints/import/apply}]]*/   '/personal-inventory/blueprints/import/apply'
     };
@@ -231,5 +263,6 @@
 </script>
 <script th:src="@{/js/personal-inventory-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/personal-inventory-blueprints-import.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/personal-inventory-blueprints-recipe.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

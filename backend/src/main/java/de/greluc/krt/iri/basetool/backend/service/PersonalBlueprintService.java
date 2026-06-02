@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
@@ -182,6 +183,29 @@ public class PersonalBlueprintService {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
     repository.delete(entity);
     log.info("Deleted personal blueprint id={} ownerSub={}", id, ownerSub);
+  }
+
+  /**
+   * Owner-scoped recipe view for one of the caller's owned blueprints (#327): loads the entry (404
+   * if missing or foreign), then resolves its product key to a representative SC Wiki recipe graph
+   * (ingredients + per-quality stat modifiers) via {@link BlueprintProductService#resolveRecipe}.
+   * If the master no longer lists the product the view degrades to an empty graph carrying the
+   * owned-row product name, so the UI still has a label to show.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param id owned-blueprint entry id
+   * @return the recipe view (never {@code null}; empty graph when the product is unresolved)
+   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   */
+  @NotNull
+  public PersonalBlueprintRecipeResponse recipeForOwn(@NotNull String ownerSub, @NotNull UUID id) {
+    PersonalBlueprint entity = loadOwn(ownerSub, id);
+    return blueprintProductService
+        .resolveRecipe(entity.getProductKey())
+        .orElseGet(
+            () ->
+                new PersonalBlueprintRecipeResponse(
+                    entity.getProductName(), 0, List.of(), List.of()));
   }
 
   // ---------------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.net.URLEncoder;
@@ -97,6 +98,40 @@ public class PersonalInventoryBlueprintsPageController {
       log.warn("Blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
       return Collections.emptyList();
     }
+  }
+
+  /**
+   * Recipe proxy backing the expandable "Zutaten &amp; Stats" detail of an owned blueprint. Relays
+   * to the backend owned-blueprint recipe endpoint and returns the ingredients + per-quality stat
+   * modifiers as JSON; failures collapse to an empty recipe so the detail panel renders a graceful
+   * "no data" state rather than a stack trace.
+   *
+   * @param id owned-blueprint entry id
+   * @return the recipe view, or an empty recipe on any backend failure
+   */
+  @GetMapping("/{id}/recipe")
+  @ResponseBody
+  public PersonalBlueprintRecipeDto recipe(@PathVariable @NotNull UUID id) {
+    try {
+      PersonalBlueprintRecipeDto result =
+          backendApiClient.get(
+              "/api/v1/personal-blueprints/" + id + "/recipe", PersonalBlueprintRecipeDto.class);
+      return result == null ? emptyRecipe() : result;
+    } catch (Exception e) {
+      log.warn("Failed to fetch blueprint recipe {}: {}", id, e.getMessage());
+      return emptyRecipe();
+    }
+  }
+
+  /**
+   * Builds an empty recipe view (no product name, no variants, no groups/ingredients) returned when
+   * the backend recipe call fails or yields nothing, so the client always receives a well-formed
+   * payload to render the "no data" state.
+   *
+   * @return an empty recipe DTO
+   */
+  private static PersonalBlueprintRecipeDto emptyRecipe() {
+    return new PersonalBlueprintRecipeDto(null, 0, List.of(), List.of());
   }
 
   /**

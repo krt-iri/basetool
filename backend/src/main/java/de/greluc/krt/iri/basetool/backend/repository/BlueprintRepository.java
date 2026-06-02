@@ -1,5 +1,6 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.iri.basetool.backend.model.scwiki.Blueprint;
 import java.time.Instant;
@@ -166,4 +167,21 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           + "WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL "
           + "AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))")
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
+
+  /**
+   * Projection of every active (non-soft-deleted) blueprint recipe reduced to {@code (id,
+   * outputName)}, feeding {@code BlueprintProductService}'s resolution of a normalized {@code
+   * product_key} to a representative recipe id for the Personal Inventory recipe view (#327). The
+   * {@code product_key} is a Java-computed normalization of {@code output_name} (see {@code
+   * BlueprintNameNormalizer}) that PostgreSQL cannot reproduce, so the grouping happens in the
+   * service; the {@code ORDER BY} makes the chosen representative deterministic across calls.
+   *
+   * @return id + output name for every active recipe with a non-null output name, ordered by name
+   *     then Wiki key then id
+   */
+  @Query(
+      "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.BlueprintIdNameRow(b.id,"
+          + " b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS"
+          + " NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC")
+  List<BlueprintIdNameRow> findActiveIdNameRows();
 }

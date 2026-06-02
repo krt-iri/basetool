@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -15,6 +16,7 @@ import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
@@ -225,6 +227,53 @@ class PersonalBlueprintServiceTest {
     when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.delete(SUB, id));
+  }
+
+  @Test
+  void recipeForOwn_loadsOwnedThenDelegatesToProductService() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerSub(SUB)
+            .productKey("k")
+            .productName("Name")
+            .build();
+    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    PersonalBlueprintRecipeResponse recipe =
+        new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of());
+    when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.of(recipe));
+
+    assertSame(recipe, service.recipeForOwn(SUB, id));
+  }
+
+  @Test
+  void recipeForOwn_fallsBackToEmptyGraphWithOwnedName_whenProductUnresolved() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerSub(SUB)
+            .productKey("k")
+            .productName("Name")
+            .build();
+    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.empty());
+
+    PersonalBlueprintRecipeResponse result = service.recipeForOwn(SUB, id);
+
+    assertEquals("Name", result.productName());
+    assertEquals(0, result.variantCount());
+    assertTrue(result.requirementGroups().isEmpty());
+    assertTrue(result.ingredients().isEmpty());
+  }
+
+  @Test
+  void recipeForOwn_throwsNotFound_whenMissingOrForeign() {
+    UUID id = UUID.randomUUID();
+    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
+
+    assertThrows(EntityNotFoundException.class, () -> service.recipeForOwn(SUB, id));
   }
 
   // --------------------------------------------------------------- admin variants --
