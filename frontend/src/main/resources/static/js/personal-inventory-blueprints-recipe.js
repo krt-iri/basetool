@@ -85,17 +85,19 @@
 
     /* -------------------------------------------------------------- rendering */
 
+    // renderRecipe is only ever called from loadRecipe after `recipe` is confirmed truthy, so the
+    // object itself needs no further guarding here — only its optional fields default to empty.
     function renderRecipe(panel, recipe) {
         clear(panel);
-        const groups = (recipe && recipe.requirementGroups) || [];
-        const flat = (recipe && recipe.ingredients) || [];
+        const groups = recipe.requirementGroups || [];
+        const flat = recipe.ingredients || [];
         if (groups.length === 0 && flat.length === 0) {
             panel.appendChild(el('div', 'krt-bp-recipe-empty', i18n().empty || 'No recipe data.'));
             return;
         }
 
         const wrap = el('div', 'krt-bp-recipe');
-        if (recipe && recipe.variantCount > 1) {
+        if (recipe.variantCount > 1) {
             const hint = recipe.variantCount + ' ' + (i18n().variants || 'variants')
                     + ' · ' + (i18n().exampleRecipe || 'example recipe');
             wrap.appendChild(el('p', 'krt-bp-recipe-variants', hint));
