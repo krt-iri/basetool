@@ -12,7 +12,7 @@
  * Wiring: uses the global `krtEvents.on` delegation helper and `data-trigger="bp-…"`
  * attributes (CSP-nonce-safe, no inline onclick). Translatable strings come from
  * window.krtBlueprintsI18n; endpoints from window.krtBlueprintsEndpoints (the
- * per-row URLs carry an `__ID__` placeholder the module substitutes).
+ * per-row URLs carry an `ID_PLACEHOLDER` placeholder the module substitutes).
  */
 (function () {
     'use strict';
@@ -212,7 +212,7 @@
     /* ----------------------------------------------------------------- modals */
 
     function resolveUrl(template, id) {
-        const raw = (template || '').replace('__ID__', encodeURIComponent(id));
+        const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
     }
 
