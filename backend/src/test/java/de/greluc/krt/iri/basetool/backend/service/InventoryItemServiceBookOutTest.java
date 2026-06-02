@@ -460,6 +460,103 @@ class InventoryItemServiceBookOutTest {
       // Only the new item save call (the source is deleted, not saved).
       verify(inventoryItemRepository, org.mockito.Mockito.times(1)).save(any(InventoryItem.class));
     }
+
+    @Test
+    void transferIntoExistingIdenticalStack_mergesInsteadOfDuplicating() {
+      // REGRESSION: a transfer onto a (user, location) slot that already holds an identical stack
+      // must add to that stack, not insert a second row. Previously the TRANSFER branch always did
+      // `new InventoryItem()`, which produced the visible duplicates reported in the inventory
+      // view.
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+
+      // Source: alice @ ARC-L1, Quantanium, quality 500, 10 units.
+      InventoryItem source = newItem(10.0, 1L);
+
+      // An identical stack already exists at the target (same location/material/quality, 6 units).
+      InventoryItem existingTarget = new InventoryItem();
+      existingTarget.setId(UUID.randomUUID());
+      existingTarget.setUser(targetUser);
+      existingTarget.setLocation(location);
+      existingTarget.setMaterial(material);
+      existingTarget.setQuality(500);
+      existingTarget.setPersonal(false);
+      existingTarget.setAmount(6.0);
+      existingTarget.setVersion(3L);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
+              any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(java.util.List.of(existingTarget));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      // The moved 4 units land on the existing stack (6 -> 10); the source keeps 10 - 4 = 6.
+      assertEquals(10.0, existingTarget.getAmount(), "moved amount merges into the existing stack");
+      assertEquals(6.0, source.getAmount(), "source keeps the remainder");
+      verify(inventoryItemRepository).save(existingTarget);
+      verify(inventoryItemRepository).save(source);
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    @Test
+    void transferDoesNotMergeAcrossOwningOrgUnit() {
+      // The eighth merge-key dimension on the transfer path: an identical-looking target stack that
+      // belongs to a DIFFERENT owning org unit must NOT be merged into — a new row is inserted.
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+
+      InventoryItem source = newItem(10.0, 1L);
+
+      de.greluc.krt.iri.basetool.backend.model.Squadron orgA =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      orgA.setId(UUID.randomUUID());
+      InventoryItem foreignOrgTarget = new InventoryItem();
+      foreignOrgTarget.setId(UUID.randomUUID());
+      foreignOrgTarget.setUser(targetUser);
+      foreignOrgTarget.setLocation(location);
+      foreignOrgTarget.setMaterial(material);
+      foreignOrgTarget.setQuality(500);
+      foreignOrgTarget.setPersonal(false);
+      foreignOrgTarget.setAmount(6.0);
+      foreignOrgTarget.setOwningOrgUnit(orgA);
+
+      de.greluc.krt.iri.basetool.backend.model.Squadron orgB =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      orgB.setId(UUID.randomUUID());
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(orgB);
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
+              any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(java.util.List.of(foreignOrgTarget));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      // foreign-org target untouched; a brand-new row stamped org B is created instead.
+      assertEquals(6.0, foreignOrgTarget.getAmount(), "foreign-org stack must be left untouched");
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+      InventoryItem newRow = captor.getAllValues().get(0);
+      assertSame(orgB, newRow.getOwningOrgUnit());
+      assertSame(targetUser, newRow.getUser());
+    }
   }
 
   // ---------------------------------------------------------------

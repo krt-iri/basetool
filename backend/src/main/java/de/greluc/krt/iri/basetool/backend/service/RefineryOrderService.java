@@ -552,15 +552,27 @@ public class RefineryOrderService {
                             "JobOrder not found: " + itemDto.jobOrderId()));
       }
 
+      // Resolve the assignee's owning org unit up front — the eighth natural-key dimension — so the
+      // refinery output only merges into a stack of the SAME org-unit pool, and a freshly created
+      // row is stamped with that pool. The store form has no owner picker, so the picker output is
+      // null: the resolver auto-stamps for a single-membership assignee (today's 100% case), yields
+      // an ownerless personal row (owningOrgUnit == null, V132) for none, and 400s for a
+      // multi-membership assignee (a per-output picker on the store form is a follow-up to the SK
+      // §5.5 stamping wave). See sameOwningOrgUnit and InventoryItemService.
+      final de.greluc.krt.iri.basetool.backend.model.OrgUnit owningOrgUnit =
+          ownerScopeService.resolveOrgUnitForPickerOutputNullable(assignee, null);
+
       // Pessimistic write lock on the merge target so a parallel store of the same refinery
       // order (or a parallel inventory create with the same natural key) cannot read the same
       // pre-merge amount and both write their delta on top of it — see
       // InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
-      java.util.List<InventoryItem> existingItems =
-          inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              assignee, mat, loc, itemDto.quality(), order.getMission(), jobOrder, false);
-
-      java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
+      java.util.Optional<InventoryItem> existingItemOpt =
+          inventoryItemRepository
+              .findMatchingInventoryItemForUpdate(
+                  assignee, mat, loc, itemDto.quality(), order.getMission(), jobOrder, false)
+              .stream()
+              .filter(c -> sameOwningOrgUnit(c.getOwningOrgUnit(), owningOrgUnit))
+              .findFirst();
 
       // Why: The amount the user enters in the store dialog is the authoritative
       // amount (it overrides the originally calculated output amount of the refinery
@@ -589,17 +601,7 @@ public class RefineryOrderService {
       } else {
         InventoryItem item = new InventoryItem();
         item.setUser(assignee);
-        // R6.b: route the stamp through OwnerScopeService, which reads the assignee's membership
-        // from org_unit_membership. The store form has no owner picker (refinery STORE is
-        // admin-driven and predates the R5.d picker wave), so {@code owningOrgUnitId} is passed as
-        // {@code null} — the resolver auto-stamps when the assignee has exactly one org-unit
-        // membership (today's 100% case), yields an ownerless personal item ({@code owningOrgUnit
-        // == null}, V132) when the assignee has none, and surfaces a clean 400 ("owningOrgUnitId is
-        // required") for multi-membership assignees. The multi-membership case currently can't be
-        // resolved from the UI; widening the store form with a per-output picker is tracked as a
-        // follow-up to the SK §5.5 stamping wave.
-        item.setOwningOrgUnit(
-            ownerScopeService.resolveOrgUnitForPickerOutputNullable(assignee, null));
+        item.setOwningOrgUnit(owningOrgUnit);
         item.setJobOrder(jobOrder);
         item.setMaterial(mat);
         item.setLocation(loc);
@@ -628,6 +630,26 @@ public class RefineryOrderService {
     }
     String trimmed = note.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  /**
+   * Null-safe identity check of two owning-org-unit references by id — the eighth merge-key
+   * dimension applied on top of the seven-dimension {@code findMatchingInventoryItemForUpdate}
+   * candidate set. Two {@code null} references (ownerless-personal rows) count as the same pool; a
+   * {@code null} and a present reference never match, so refinery output owned by different org
+   * units never merges into one inventory row. Mirrors the helper of the same name in {@code
+   * InventoryItemService}.
+   *
+   * @param a first owning-org-unit reference, may be {@code null}
+   * @param b second owning-org-unit reference, may be {@code null}
+   * @return {@code true} iff both are {@code null} or both reference the same org-unit id
+   */
+  private static boolean sameOwningOrgUnit(
+      de.greluc.krt.iri.basetool.backend.model.OrgUnit a,
+      de.greluc.krt.iri.basetool.backend.model.OrgUnit b) {
+    java.util.UUID idA = a == null ? null : a.getId();
+    java.util.UUID idB = b == null ? null : b.getId();
+    return java.util.Objects.equals(idA, idB);
   }
 
   /**

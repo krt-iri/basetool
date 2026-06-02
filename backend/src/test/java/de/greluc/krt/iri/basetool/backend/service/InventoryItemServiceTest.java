@@ -1216,4 +1216,62 @@ class InventoryItemServiceTest {
         () -> inventoryItemService.createInventoryItem(dto, userId, true));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
+
+  @Test
+  void createInventoryItem_doesNotMergeAcrossOwningOrgUnit() {
+    // The eighth merge-key dimension: a candidate that matches on the other seven dimensions but
+    // belongs to a DIFFERENT owning org unit must NOT be merged into — a new row is inserted.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID pickedOrgUnitId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId, materialId, locationId, 100, 10.0, false, null, null, pickedOrgUnitId);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+
+    // The picker resolves to org B, but the only candidate stack belongs to org A.
+    Squadron orgB = new Squadron();
+    orgB.setId(pickedOrgUnitId);
+    Squadron orgA = new Squadron();
+    orgA.setId(UUID.randomUUID());
+    InventoryItem foreignOrgItem = new InventoryItem();
+    foreignOrgItem.setId(UUID.randomUUID());
+    foreignOrgItem.setOwningOrgUnit(orgA);
+    foreignOrgItem.setAmount(5.0);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
+        .thenReturn(orgB);
+    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
+            any(User.class),
+            any(Material.class),
+            any(Location.class),
+            anyInt(),
+            isNull(),
+            isNull(),
+            anyBoolean()))
+        .thenReturn(List.of(foreignOrgItem));
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    inventoryItemService.createInventoryItem(dto, userId, true);
+
+    // A brand-new row is saved (not the foreign-org candidate), stamped with org B; the foreign
+    // stack's amount is left untouched.
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(orgB, captor.getValue().getOwningOrgUnit());
+    assertEquals(5.0, foreignOrgItem.getAmount(), "foreign-org stack must be left untouched");
+  }
 }
